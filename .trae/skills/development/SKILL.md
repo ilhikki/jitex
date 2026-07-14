@@ -1,71 +1,93 @@
 ---
 name: "development"
-description: "Guides development of pascal-ts interpreter: AST nodes, lexer, and parser in FP style. Invoke when implementing new productions, writing parser functions, or adding AST node types."
+description: "Guides development of pascal-ts interpreter: AST, lexer, parser (frozen) and PDI interpreter. Invoke when implementing frames, state, scope, or writing interpreter tests."
 ---
 
 # Development
 
-This skill guides the development of the pascal-ts interpreter.
+This skill guides development of the pascal-ts project.
 
 ## When to Use
 
-- Implementing new AST node types
-- Writing lexer or parser functions
-- Adding new grammar productions
-- Writing unit tests for productions
+- Implementing interpreter frames (Frame types, step logic)
+- Working on State, Scope, or DeclarationTable
+- Writing interpreter unit tests
+- Adding new statement types to the interpreter
 
 ## Architecture
 
-### Two-Layer Design
+### Layer 1: Lexer (Frozen)
+Pure function: `{ string, offset, offsetToPosition } => Token[]`
 
-**Layer 1: Lexer** — pure function
+### Layer 2: Parser (Frozen)
+Pure functions: `{ tokens, position } => ParseResult`
+
+### Layer 3: Interpreter (PDI — current focus)
+
+#### Execution Model
 ```
-input: { string, offset, offsetToPosition }
-output: Token[]
+run(state: State, mode: RunMode): void
 ```
-Token contains: `{ type, content, start, end }`
+- `state` is the single runtime state, `run` mutates it in place
+- Each `run` call advances one control step
+- Loop `run` until `state.status === 'terminated'`
 
-**Layer 2: Parser** — pure functions
-```
-input: { tokens, position }
-output: Error | { newPosition, astNode }
-```
-
-### AST Node Style (FP / Duck Typing)
-
-AST nodes are plain records (objects), NOT classes. Each node has a `kind` field for duck typing.
-
+#### State
 ```typescript
-type AstNode = {
-  kind: string
-  // ... fields specific to each node type
+interface State {
+  stack: Frame[]           // execution stack
+  globalScope: Scope       // program-level scope
+  currentScope: Scope      // active scope
+  program: ProgramNode     // parsed AST
+  declarations: DeclarationTable
+  status: 'running' | 'terminated'
+  returnValue: Value | null
 }
 ```
 
-### Parser Function Pattern
-
-Each parser function:
-1. Takes `{ tokens, position }` as input
-2. Uses lookahead (peek current token) to decide which branch to take
-3. Does NOT iterate through all possible branches like parser combinators
-4. Returns `ParseError | { newPosition: number, astNode: AstNode }`
-
+#### Scope
 ```typescript
-type ParseResult<T> =
-  | { success: false; error: string; position: number }
-  | { success: true; newPosition: number; astNode: T }
+interface Scope {
+  variables: Map<string, Value>
+  parent: Scope | null          // static link (lexical parent)
+  functionDecl: ProcDecl | FuncDecl | null  // null = global
+}
 ```
 
-## Grammar Productions
+#### Frame
+Each statement type has its own Frame. A Frame is a record with:
+```typescript
+interface Frame {
+  kind: string
+  done: boolean
+  step(state: State): void  // can mutate self, push new frames, set done
+}
+```
 
-See `docs/productions.md` for the full grammar. Each production should:
-1. Have a corresponding parser function
-2. Have unit tests in `tests/parser/`
-3. Be documented with examples
+`run` logic:
+1. Get top frame from `state.stack`
+2. Call `frame.step(state)`
+3. Pop all `done` frames from top
+
+#### Value (placeholder for M0)
+```typescript
+type Value = number | string | boolean | null | undefined
+```
+M0 does not implement expression evaluation. Tests mock values.
 
 ## Testing Strategy
 
-- Test each production independently
-- Use small Pascal snippets as test inputs
-- Verify both success and failure cases
-- Check AST structure matches expectations
+- Baby M0 uses minimal Pascal programs (handwritten)
+- Verify stack state (depth, frame kinds) — not output
+- Verify scope creation/destruction
+- Verify stackTrace() output
+- Mock expression evaluation where needed
+
+## Key Principles
+
+- FP style: records with duck typing, not classes
+- Frozen layers: never modify `src/ast/`, `src/lexer/`, `src/parser/`
+- State is single source of truth: `run(state, mode)` mutates state
+- Each statement has its own Frame with `step(state)`
+- Issues logged to `/issue` before fixing
+- Git commits on major changes
