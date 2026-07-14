@@ -3,7 +3,7 @@ import * as path from 'path'
 import { parse } from '../src/index'
 
 describe('Tangle Official', () => {
-  const pasFile = path.join(__dirname, '..', 'pascal-file', 'tangle-official.pas')
+  const pasFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle-official.pas')
 
   test('should parse tangle-official.pas without error', () => {
     const source = fs.readFileSync(pasFile, 'utf-8')

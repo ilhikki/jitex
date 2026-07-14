@@ -83,8 +83,10 @@ pascal-ts/
 │   ├── project-management/
 │   ├── development/
 │   └── issue-fixing/
-├── pascal-file/
-│   └── tangle-official.pas     # 目标 Pascal 文件
+├── knuth/
+    └── web/
+        ├── tangle-official.pas     # 目标 Pascal 文件
+        └── tangle.web              # WEB 源文件
 ├── plan.md
 ├── package.json
 ├── tsconfig.json
