@@ -1,94 +1,297 @@
-# Pascal 解释器项目计划
+# Pascal Debug Interpreter (PDI) 实现计划
 
-## 目标
-使用 TypeScript 实现一个浏览器环境的 Pascal 解释器，能解析 `tangle-official.pas` 文件。
+## 原则
 
-## 阶段一：AST 实现 ✅
+- **冻结 parser**：不修改 `src/ast/`、`src/lexer/`、`src/parser/` 下任何文件
+- **不设计 bytecode**：第一阶段只实现 AST interpreter
+- **State 是唯一运行状态**：`run(state, mode)` 原地修改 state
+- **FP 风格**：延续 AST 层的 record + 鸭子类型风格
 
-### 1.1 项目初始化 ✅
-- 创建 git 仓库
-- 配置 TypeScript 项目
-- 安装 jest 测试框架
+## 执行模型
 
-### 1.2 AST 节点定义 ✅
-FP 风格，使用 record 和鸭子类型（`kind` 字段）：
-- 所有节点定义在 `src/ast/types.ts`
-- 纯 interface，不使用 class
-- Token 携带位置信息，AST 节点不携带位置信息
+```
+run(state: State, mode: RunMode): void
+```
 
-### 1.3 Lexer 实现 ✅
-纯函数风格：
-- `src/lexer/lexer.ts`
-- `lex(source) => Token[]`
-- Token: `{ type, content, start: Position, end: Position }`
-- 位置函数: `createOffsetToPosition(source) => (offset) => Position`
+- `state` 是唯一的运行时状态，`run` 原地修改它
+- 每次 `run` 调用推进一个控制步骤
+- 要运行到结束，循环调用 `run` 直到 `state.status === 'terminated'`
 
-### 1.4 Parser 实现 ✅
-纯函数风格：
-- 每个函数对应一个产生式
-- 输入: `{ tokens, position }`
-- 输出: `ParseResult = { success, newPosition, astNode } | { success, error, position }`
-- 使用 lookahead 决定分支，不使用 parser comb 遍历
-- 文件:
-  - `src/parser/helpers.ts` — 工具函数
-  - `src/parser/expressions.ts` — 表达式解析
-  - `src/parser/types.ts` — 类型解析
-  - `src/parser/statements.ts` — 语句解析
-  - `src/parser/declarations.ts` — 声明和程序解析
+### RunMode
 
-### 1.5 产生式文档 ✅
-- `docs/productions.md` — 每个产生式有对应的函数名和节点类型
+| Mode | 行为 |
+|------|------|
+| `STEP_INTO` | 推进一个控制步骤，进入函数调用 |
+| `STEP_OVER` | (后续) 推进一个步骤，但不进入函数 |
+| `RUN` | (后续) 运行到断点或结束 |
 
-### 1.6 问题管理 ✅
-- `issue/` 目录，每个 issue 单独文件
-- ISSUE-001: 预定义标识符被当作关键字 (已修复)
-- ISSUE-002: WRITE/WRITELN 格式说明符未解析 (已修复)
+第一阶段只实现 `STEP_INTO`。
 
-### 1.7 单元测试 ✅
-- 88 个测试全部通过
-- `tests/lexer/lexer.test.ts` — 16 个 lexer 测试
-- `tests/parser/productions.test.ts` — 71 个产生式测试
-- `tests/tangle.test.ts` — 1 个 tangle-official.pas 集成测试
+## State
 
-## 阶段二：解释器实现（后续）
-- 实现表达式求值
-- 实现语句执行
-- 实现程序运行
+```typescript
+interface State {
+  // 执行栈
+  stack: Frame[]
+
+  // 作用域链
+  globalScope: Scope
+  currentScope: Scope
+
+  // 程序信息
+  program: ProgramNode
+  declarations: DeclarationTable  // 查表：名字 -> 声明
+
+  // 运行状态
+  status: 'running' | 'terminated'
+  returnValue: Value | null
+
+  // Debugger observer (后续)
+  breakpoints: Set<string>
+  watches: Map<string, WatchCallback>
+  stepCallback: (() => void) | null
+}
+```
+
+### Scope
+
+```typescript
+interface Scope {
+  variables: Map<string, Value>
+  parent: Scope | null  // 静态父作用域
+  functionDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null
+  // functionDecl === null 表示全局作用域
+}
+```
+
+作用域链遵循 Pascal 的词法嵌套规则：
+- 全局作用域 → parent = null
+- 过程局部作用域 → parent = 该过程定义所在的作用域（静态链接）
+
+## Frame 设计
+
+每种 statement 定义自己的控制规则。Frame 是执行栈上的一个帧。
+
+```typescript
+interface Frame {
+  kind: string          // 鸭子类型标识
+  done: boolean         // 是否完成
+  step(state: State): void  // 推进一个步骤
+}
+```
+
+`step(state)` 可以做三件事：
+1. **修改自身状态**（如推进语句索引）
+2. **push 新 Frame**（如进入函数体）
+3. **标记自身 done**（让 `run` 自动 pop）
+
+### Frame 类型与 step 行为
+
+| Frame kind | 对应 AST 节点 | step 行为 |
+|------------|-------------|----------|
+| `Program` | `ProgramNode` | push 主 block 的 CompoundFrame，然后 done |
+| `Function` | `ProcedureCallNode` / `FunctionCallNode` | 建局部 scope，push block 的 CompoundFrame；block done 时 pop scope 并 return |
+| `Compound` | `CompoundStatementNode` | 逐条 push 子语句的 Frame；全部执行完则 done |
+| `If` | `IfStatementNode` | (M0) 评估条件，push then/else 分支 Frame |
+| `While` | `WhileStatementNode` | (M0) 评估条件，若 true 则 push body Frame，下一轮再检查 |
+| `Repeat` | `RepeatStatementNode` | push statements 的 CompoundFrame，完后评估 until 条件 |
+| `For` | `ForStatementNode` | 初始化变量，push body Frame，每轮后递增/递减并检查 |
+| `Case` | `CaseStatementNode` | 评估表达式，匹配分支，push 对应 statement Frame |
+| `Goto` | `GotoStatementNode` | 搜索 label，跳转到对应语句（ unwind/rebuild stack） |
+| `Assignment` | `AssignmentNode` | (M1) 评估右值，赋给左值 |
+| `ProcedureCall` | `ProcedureCallNode` | push FunctionFrame |
+| `Empty` | `EmptyStatementNode` | 立即 done |
+
+### run 函数逻辑
+
+```
+function run(state, mode):
+  if state.status === 'terminated': return
+  if state.stack.length === 0:
+    state.status = 'terminated'
+    return
+
+  frame = state.stack[top]
+  frame.step(state)
+
+  // 清理 done 的帧
+  while state.stack.length > 0 && state.stack[top].done:
+    state.stack.pop()
+```
+
+## 里程碑
+
+### M0 — 控制流和函数跳转
+
+实现 execution stack、FunctionFrame、StatementFrame、procedure call/return、statement traversal。
+
+#### Baby M0 — 最小验证
+
+只验证机制正确性：
+- ✅ 函数调用（push FunctionFrame）
+- ✅ 函数返回（pop FunctionFrame + scope 清理）
+- ✅ scope 生命周期（创建/销毁）
+- ✅ stack trace（打印调用栈）
+
+不实现：
+- ❌ expression 求值（条件用 mock）
+- ❌ type system
+- ❌ heap / 复杂对象
+- ❌ IO (WRITE/READ 等)
+
+**Baby M0 测试用例**：
+
+```pascal
+(* test 1: simple call/return + stack trace *)
+PROGRAM TEST1;
+PROCEDURE FOO;
+BEGIN END;
+BEGIN FOO END.
+
+(* test 2: nested call + scope *)
+PROGRAM TEST2;
+PROCEDURE OUTER;
+  PROCEDURE INNER;
+  BEGIN END;
+BEGIN INNER END;
+BEGIN OUTER END.
+
+(* test 3: multiple calls + return *)
+PROGRAM TEST3;
+PROCEDURE A; BEGIN END;
+PROCEDURE B; BEGIN A; END;
+PROCEDURE C; BEGIN B; END;
+BEGIN C END.
+```
+
+预期验证：
+- 每步 step 后 stack 的深度和 kind 正确
+- 进入函数时 scope 创建，退出时 scope 不再可访问
+- stackTrace() 输出函数调用链
+
+#### M0 Full — 所有 statement 的控制流
+
+在 Baby M0 基础上，为每种 statement 实现 Frame：
+- CompoundFrame：语句遍历
+- IfFrame：条件分支（条件求值用 mock，始终走 then）
+- WhileFrame / RepeatFrame / ForFrame：循环控制（条件用 mock）
+- CaseFrame：分支选择
+- GotoFrame：标签跳转
+- AssignmentFrame：占位（M1 实现）
+- EmptyFrame：立即完成
+
+### M1 — 简单表达式和赋值
+
+- 实现 expression evaluator：`evalExpr(expr, scope): Value`
+- 支持：整数、字符串、char、boolean 字面量
+- 支持：标识符查找
+- 支持：二元运算 (+ - * / DIV MOD AND OR)
+- 支持：比较运算 (= <> < <= > >=)
+- 支持：一元运算 (NOT - +)
+- 实现 assignment
+- 支持：函数调用作为表达式
+
+### M2 — Pascal 类型系统
+
+- 实现 range 检查
+- 实现 array / record / file 类型
+- 实现 VAR 参数（引用传递）
+- 实现类型转换
+
+### M3 — 标准库
+
+- 实现 I/O：WRITE / WRITELN / READ / READLN
+- 实现：RESET / REWRITE / GET / PUT / EOF / EOLN
+- 实现：CHR / ORD / ROUND / TRUNC / ABS
+- 实现：BREAK / CONTINUE / EXIT
+- 实现 Pascal 文件操作
+
+### M4 — 非 debugger 模式和优化
+
+- 实现 RUN 模式（跳过断点检查，减少帧操作开销）
+- 实现 STEP_OVER 模式
+- 直接执行模式（不走 step-by-step）
+- 性能优化
 
 ## 项目结构
+
 ```
-pascal-ts/
-├── src/
-│   ├── ast/
-│   │   └── types.ts           # AST 节点定义 (FP records)
-│   ├── lexer/
-│   │   └── lexer.ts            # Lexer (纯函数)
-│   ├── parser/
-│   │   ├── helpers.ts          # 解析工具函数
-│   │   ├── expressions.ts      # 表达式产生式
-│   │   ├── types.ts            # 类型产生式
-│   │   ├── statements.ts       # 语句产生式
-│   │   └── declarations.ts     # 声明和程序产生式
-│   └── index.ts                # 入口文件
+src/
+├── ast/                        # ❄️ 冻结
+├── lexer/                      # ❄️ 冻结
+├── parser/                     # ❄️ 冻结
+├── interpreter/                # 🆕 PDI
+│   ├── types.ts                # State, Frame, Scope, Value 类型
+│   ├── state.ts                # State 工厂函数和工具
+│   ├── scope.ts                # Scope 链实现
+│   ├── declarations.ts         # DeclarationTable：名字 -> 声明查找
+│   ├── frames/
+│   │   ├── types.ts            # Frame interface
+│   │   ├── program.ts          # ProgramFrame
+│   │   ├── function.ts         # FunctionFrame
+│   │   ├── compound.ts         # CompoundFrame
+│   │   ├── if.ts               # IfFrame
+│   │   ├── while.ts            # WhileFrame
+│   │   ├── repeat.ts           # RepeatFrame
+│   │   ├── for.ts              # ForFrame
+│   │   ├── case.ts             # CaseFrame
+│   │   ├── goto.ts             # GotoFrame
+│   │   ├── call.ts             # ProcedureCallFrame
+│   │   ├── assignment.ts       # AssignmentFrame (M1)
+│   │   └── empty.ts            # EmptyFrame
+│   ├── run.ts                  # run(state, mode)
+│   ├── debugger.ts             # DebuggerObserver (后续)
+│   └── index.ts                # 公开 API
 ├── tests/
-│   ├── lexer/lexer.test.ts     # Lexer 测试
-│   ├── parser/productions.test.ts  # 产生式测试
-│   └── tangle.test.ts          # 集成测试
-├── docs/
-│   └── productions.md          # 产生式文档
-├── issue/                      # 问题记录
-│   ├── ISSUE-001-*.md
-│   └── ISSUE-002-*.md
-├── .trae/skills/               # Skill 配置
-│   ├── project-management/
-│   ├── development/
-│   └── issue-fixing/
-├── knuth/
-    └── web/
-        ├── tangle-official.pas     # 目标 Pascal 文件
-        └── tangle.web              # WEB 源文件
-├── plan.md
-├── package.json
-├── tsconfig.json
-└── jest.config.js
+│   └── interpreter/
+│       ├── baby-m0-call-return.test.ts
+│       ├── baby-m0-scope.test.ts
+│       └── baby-m0-stack-trace.test.ts
+└── index.ts                    # 更新入口
 ```
+
+## DeclarationTable
+
+从 ProgramNode 提取所有声明，支持按名查找：
+
+```typescript
+interface DeclarationTable {
+  // 全局声明
+  procedures: Map<string, ProcedureDeclarationNode>
+  functions: Map<string, FunctionDeclarationNode>
+  variables: Map<string, VariableDeclarationNode>
+  constants: Map<string, ConstDeclarationNode>
+  types: Map<string, TypeDeclarationNode>
+  labels: Map<number, StatementNode>  // label -> target statement
+
+  // 嵌套查找：根据 scope 链查找
+  findProcedure(name: string, scope: Scope): ProcedureDeclarationNode | null
+  findFunction(name: string, scope: Scope): FunctionDeclarationNode | null
+}
+```
+
+Pascal 的嵌套声明需要考虑：
+- 过程/函数内部可以声明自己的过程/函数
+- 查找时从当前 scope 开始，沿静态链向上查找
+
+## Value (M0 占位)
+
+```typescript
+type Value = number | string | boolean | null | undefined
+// M0 中 Value 不重要，只验证控制流
+// M1/M2 会扩展为完整的类型系统
+```
+
+## Git 策略
+
+- 每个 milestone 完成后提交
+- 每个 issue 修复后提交
+- Baby M0 完成后提交
+- M0 Full 完成后提交
+
+## 测试策略
+
+- Baby M0 使用最小 Pascal 程序（手写）
+- 验证 stack 状态而非输出结果
+- 验证 scope 创建/销毁
+- 验证 stackTrace 输出

@@ -14,37 +14,63 @@ This skill manages the pascal-ts interpreter project lifecycle.
 - User wants to plan the next development phase
 - User asks about project structure or architecture decisions
 
+## Current Phase
+
+**Pascal Debug Interpreter (PDI)** — see `plan.md`
+
+### Milestones
+- **M0** — Control flow and function jumping (current)
+  - Baby M0: call/return, scope lifetime, stack trace
+  - M0 Full: all statement types
+- **M1** — Simple expressions and assignment
+- **M2** — Pascal type system
+- **M3** — Standard library
+- **M4** — Non-debugger mode and optimization
+
+### Frozen Layers
+- `src/ast/` — AST node definitions (FP records)
+- `src/lexer/` — Lexer (pure function)
+- `src/parser/` — Parser (pure functions)
+- **Do not modify these layers**
+
+### Previous Phase
+- AST/Lexer/Parser implementation — archived in `docs/plan-ast-phase.md`
+
 ## Workflow
 
-1. Read `plan.md` to understand current plan and progress
+1. Read `plan.md` to understand current milestone and progress
 2. Review completed work vs pending tasks
-3. Update `plan.md` with new milestones or status changes
+3. Update `plan.md` with status changes
 4. Suggest next steps based on dependencies
-5. Commit at a good time
+5. Commit at milestone boundaries
 
 ## Project Structure
 
 ```
 pascal-ts/
 ├── src/
-│   ├── ast/           # AST node definitions (FP style records)
-│   ├── lexer/         # Lexer (pure function: input => token[])
-│   ├── parser/        # Parser (pure functions: {tokens, pos} => result)
+│   ├── ast/              # ❄️ Frozen - AST node definitions
+│   ├── lexer/             # ❄️ Frozen - Lexer
+│   ├── parser/            # ❄️ Frozen - Parser
+│   ├── interpreter/       # 🆕 PDI implementation
 │   └── index.ts
 ├── tests/
+│   ├── lexer/             # Lexer tests
+│   ├── parser/            # Parser tests
+│   └── interpreter/       # Interpreter tests
 ├── docs/
-│   └── productions.md # Grammar productions documentation
-├── issue/             # Issue tracking (one file per issue)
-├── plan.md            # Project plan
-└── pascal-file/
-    └── tangle-official.pas
+│   ├── productions.md     # Grammar productions
+│   └── plan-ast-phase.md  # Archived AST phase plan
+├── issue/                 # Issue tracking
+├── knuth/web/             # Target Pascal files
+├── scripts/               # Utility scripts
+└── plan.md                # Current plan (PDI)
 ```
 
 ## Key Principles
 
-- FP style: AST nodes are records with duck typing, not classes
-- Parser functions are pure: `{tokens, position} => Error | {newPosition, astNode}`
-- Lexer is a pure function: `{string, offset, offsetToPosition} => token[]`
-- Each production has unit tests
+- FP style: records with duck typing, not classes
+- State is the single runtime state: `run(state, mode)` mutates state in place
+- Each statement type has its own Frame with `step(state)` method
 - Issues are logged to `/issue` before fixing
-- Git commits on major changes
+- Git commits on major changes and milestone boundaries
