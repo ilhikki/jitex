@@ -7,7 +7,8 @@
  * - PascalIO：包含 file 和 console 字段的运行时 IO
  *
  * createDefaultIO() 全部方法抛异常，必须自定义才能使用。
- * createRecordFileOps() 使用 Map<url, Uint8Array> 存储文件数据。
+ * createRecordFileOps(files) 接受用户自定义的 Map<string, Uint8Array>。
+ *   用户可以提前定义文件内容，程序执行后 Map 会被更新以反映写入结果。
  * createCallbackConsole() 控制台底层依赖两个回调函数。
  */
 
@@ -115,64 +116,55 @@ export function createDefaultFileHandle(url: string): PascalFile {
 }
 
 // ============================================================================
-// Record 模式文件实现：底层是 Map<string, Uint8Array>
+// Record 模式文件实现：用户提供 Map<string, Uint8Array>
 // key = file.url, value = 文件原始字节内容
+// 写入时自动回写到 Map
 // ============================================================================
 
 interface RecordFileState {
-  /** 文件原始字节 */
-  content: Uint8Array
-  /** 当前读取位置（按行抽象，实际按字节推进） */
   offset: number
-  /** 是否已到达文件末尾 */
   eof: boolean
-  /** 是否可写 */
   writable: boolean
-  /** 写入缓冲区（按行追加） */
   lines: string[]
-  /** 当前正在累积的行 */
   currentLine: string
 }
 
-const recordFileStore = new Map<string, RecordFileState>()
+export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileOps {
+  const handleState = new WeakMap<PascalFile, RecordFileState>()
 
-function getRecordState(file: PascalFile): RecordFileState {
-  let state = recordFileStore.get(file.url)
-  if (!state) {
-    state = { content: new Uint8Array(0), offset: 0, eof: true, writable: false, lines: [], currentLine: '' }
-    recordFileStore.set(file.url, state)
+  function getState(file: PascalFile): RecordFileState {
+    let s = handleState.get(file)
+    if (!s) {
+      const content = files.get(file.url) || new Uint8Array(0)
+      s = { offset: 0, eof: content.length === 0, writable: false, lines: [], currentLine: '' }
+      handleState.set(file, s)
+    }
+    return s
   }
-  return state
-}
 
-export function setRecordFileContent(url: string, content: Uint8Array): void {
-  const state = getRecordState({ url, offset: 0 })
-  state.content = content
-  state.eof = content.length === 0
-}
+  function currentContent(file: PascalFile): Uint8Array {
+    return files.get(file.url) || new Uint8Array(0)
+  }
 
-export function getRecordFileLines(url: string): string[] {
-  const state = recordFileStore.get(url)
-  return state ? state.lines : []
-}
+  function writeBack(file: PascalFile): void {
+    const s = getState(file)
+    const text = s.lines.join('\n') + (s.lines.length > 0 ? '\n' : '')
+    files.set(file.url, new TextEncoder().encode(text))
+  }
 
-export function createRecordFileHandle(url: string): PascalFile {
-  return { url, offset: 0 }
-}
-
-export function createRecordFileOps(): PascalFileOps {
   return {
     reset(file: PascalFile): void {
-      const s = getRecordState(file)
+      const s = getState(file)
+      const content = files.get(file.url) || new Uint8Array(0)
       s.offset = 0
-      s.eof = s.content.length === 0
+      s.eof = content.length === 0
       s.writable = false
       s.currentLine = ''
     },
 
     rewrite(file: PascalFile): void {
-      const s = getRecordState(file)
-      s.content = new Uint8Array(0)
+      const s = getState(file)
+      files.set(file.url, new Uint8Array(0))
       s.offset = 0
       s.eof = true
       s.writable = true
@@ -181,10 +173,11 @@ export function createRecordFileOps(): PascalFileOps {
     },
 
     get(file: PascalFile): void {
-      const s = getRecordState(file)
+      const s = getState(file)
       if (s.eof) return
+      const content = currentContent(file)
       s.offset++
-      if (s.offset >= s.content.length) {
+      if (s.offset >= content.length) {
         s.eof = true
       }
     },
@@ -193,44 +186,48 @@ export function createRecordFileOps(): PascalFileOps {
     },
 
     close(file: PascalFile): void {
-      const s = getRecordState(file)
+      const s = getState(file)
       if (s.currentLine.length > 0) {
         s.lines.push(s.currentLine)
         s.currentLine = ''
       }
+      writeBack(file)
     },
 
     bufferChar(file: PascalFile): number {
-      const s = getRecordState(file)
-      if (s.eof || s.offset >= s.content.length) return 0
-      return s.content[s.offset] & 0xFF
+      const s = getState(file)
+      const content = currentContent(file)
+      if (s.eof || s.offset >= content.length) return 0
+      return content[s.offset] & 0xFF
     },
 
     eof(file: PascalFile): boolean {
-      return getRecordState(file).eof
+      return getState(file).eof
     },
 
     eoln(file: PascalFile): boolean {
-      const s = getRecordState(file)
-      if (s.eof || s.offset >= s.content.length) return true
-      return s.content[s.offset] === 10 // '\n'
+      const s = getState(file)
+      const content = currentContent(file)
+      if (s.eof || s.offset >= content.length) return true
+      return content[s.offset] === 10
     },
 
     readln(file: PascalFile): void {
-      const s = getRecordState(file)
+      const s = getState(file)
       if (s.eof) return
-      while (s.offset < s.content.length) {
-        const ch = s.content[s.offset]
+      const content = currentContent(file)
+      while (s.offset < content.length) {
+        const ch = content[s.offset]
         s.offset++
-        if (ch === 10) break // '\n'
+        if (ch === 10) break
       }
-      if (s.offset >= s.content.length) {
+      if (s.offset >= content.length) {
         s.eof = true
       }
     },
 
     write(file: PascalFile, text: string): void {
-      const s = getRecordState(file)
+      const s = getState(file)
       if (!s.writable) {
         throw new Error('Cannot write to file that is not opened for writing (use REWRITE first)')
       }
@@ -238,12 +235,13 @@ export function createRecordFileOps(): PascalFileOps {
     },
 
     writeln(file: PascalFile): void {
-      const s = getRecordState(file)
+      const s = getState(file)
       if (!s.writable) {
         throw new Error('Cannot write to file that is not opened for writing (use REWRITE first)')
       }
       s.lines.push(s.currentLine)
       s.currentLine = ''
+      writeBack(file)
     },
   }
 }
