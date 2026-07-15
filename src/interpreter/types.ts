@@ -103,6 +103,8 @@ export type RunMode = 'STEP_INTO' | 'STEP_OVER' | 'RUN'
 // State
 // ============================================================================
 
+export type StepCallback = (state: State) => void
+
 export interface State {
   stack: Frame[]
   globalScope: Scope
@@ -122,6 +124,9 @@ export interface State {
 
   /** 运行时 IO 层：文件操作 + 控制台 IO */
   io: PascalIO
+
+  /** 每次 step 后的回调，用于调试/追踪执行路径 */
+  stepCallback: StepCallback | null
 }
 
 // ============================================================================
@@ -417,6 +422,7 @@ export function createState(program: ProgramNode, io?: PascalIO): State {
     systemProcedures: new Map(),
     systemFunctions: new Map(),
     io: io ?? createDefaultIO(),
+    stepCallback: null,
   }
 
   // 先求值常量，供类型解析使用

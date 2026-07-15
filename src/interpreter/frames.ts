@@ -133,7 +133,7 @@ export function createEmptyFrame(_node: EmptyStatementNode): Frame {
 
 export function createFunctionFrame(
   decl: ProcedureDeclarationNode | FunctionDeclarationNode,
-  _args: PascalValue[]
+  args: ExpressionNode[]
 ): Frame & { decl: ProcedureDeclarationNode | FunctionDeclarationNode; savedScope: Scope | null } {
   let phase: 'init' | 'running' = 'init'
   let savedScope: Scope | null = null
@@ -146,6 +146,7 @@ export function createFunctionFrame(
     savedScope,
     step(state: State) {
       if (phase === 'init') {
+        const callerScope = state.currentScope
         const fnScope = createScope(state.currentScope, decl)
         this.savedScope = state.currentScope
         state.currentScope = fnScope
@@ -155,6 +156,10 @@ export function createFunctionFrame(
           decl.block.variableDeclarations.forEach(v => {
             initVariables(v, fnScope, state)
           })
+          // 绑定参数
+          if (args.length > 0 && decl.parameters.length > 0) {
+            bindArguments(decl.parameters, args, fnScope, callerScope, state)
+          }
           state.stack.push(createCompoundFrame(decl.block.compound))
         }
         phase = 'running'
@@ -251,7 +256,7 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
       // 优先查找用户定义的过程
       const procDecl = state.declarations.findProcedure(name, state.currentScope)
       if (procDecl) {
-        const frame = createFunctionFrame(procDecl, [])
+        const frame = createFunctionFrame(procDecl, node.arguments)
         state.stack.push(frame)
         this.done = true
         return
@@ -260,7 +265,7 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
       // 用户定义的函数以过程形式调用
       const funcDecl = state.declarations.findFunction(name, state.currentScope)
       if (funcDecl) {
-        const frame = createFunctionFrame(funcDecl, [])
+        const frame = createFunctionFrame(funcDecl, node.arguments)
         state.stack.push(frame)
         this.done = true
         return
@@ -270,9 +275,11 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
       const handler = state.systemProcedures.get(name)
       if (handler) {
         handler(node.arguments, state)
+        this.done = true
+        return
       }
 
-      this.done = true
+      throw new Error(`Unknown procedure: ${name}`)
     },
   }
 }
@@ -698,8 +705,7 @@ export function createGotoFrame(node: GotoStatementNode): Frame {
       }
 
       if (foundIdx < 0) {
-        this.done = true
-        return
+        throw new Error(`GOTO label ${labelValue} not found`)
       }
 
       while (state.stack.length > foundIdx + 1) {
@@ -971,8 +977,8 @@ function pushAndGotoTag(stmt: StatementNode, label: number, state: State): void 
 export function createFunctionCallFrame(
   decl: ProcedureDeclarationNode | FunctionDeclarationNode,
   args: ExpressionNode[],
-  state: State
+  _state: State
 ): Frame {
-  // 参数绑定在调用点已经处理，这里只需要创建函数帧
-  return createFunctionFrame(decl, [])
+  // 参数绑定在 createFunctionFrame 的 init 阶段处理
+  return createFunctionFrame(decl, args)
 }

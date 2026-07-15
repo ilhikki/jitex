@@ -1,4 +1,4 @@
-export type { State, Scope, Frame, PascalValue, PascalType, DeclarationTable, RunMode } from './types'
+export type { State, Scope, Frame, PascalValue, PascalType, DeclarationTable, RunMode, StepCallback } from './types'
 export { createState, createScope, createDeclarations, stackTrace } from './types'
 export { run, runToCompletion } from './run'
 export { createStatementFrame, populateSystemProcedures } from './frames'

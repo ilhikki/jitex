@@ -7,6 +7,7 @@ export function run(state: State, _mode: RunMode = 'STEP_INTO'): void {
   // Lazy initialization: push ProgramFrame on first call
   if (state.stack.length === 0) {
     state.stack.push(createProgramFrame(state.program))
+    if (state.stepCallback) state.stepCallback(state)
     return
   }
 
@@ -21,6 +22,11 @@ export function run(state: State, _mode: RunMode = 'STEP_INTO'): void {
   // If stack is empty after cleanup, program is done
   if (state.stack.length === 0) {
     state.status = 'terminated'
+  }
+
+  // Call step callback if set
+  if (state.stepCallback) {
+    state.stepCallback(state)
   }
 }
 

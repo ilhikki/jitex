@@ -212,14 +212,11 @@ describe('GOTO scope (intra-procedural)', () => {
     expect(getVar(state, 'X')).toBe(102)
   })
 
-  test('GOTO cannot cross function boundary (label not found = ignored)', () => {
+  test('GOTO cannot cross function boundary (label not found != ignored)', () => {
+      // 快速失败！
     const source = `PROGRAM T; LABEL 99; VAR X: INTEGER; PROCEDURE P; BEGIN GOTO 99; X := 1 END; BEGIN X := 0; P; 99: X := 42 END.`
     const state = makeState(source)
-    runToCompletion(state)
-    // GOTO 99 inside P refers to P's block, not the main block.
-    // Label 99 is not in P's block, so GOTO is ignored.
-    // P continues: X := 1. Then main: 99: X := 42.
-    expect(getVar(state, 'X')).toBe(42)
+    expect(()=>runToCompletion(state)).toThrow()
   })
 })
 

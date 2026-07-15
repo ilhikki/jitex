@@ -53,7 +53,7 @@ import type {
   VariableDeclarationNode,
 } from '../ast/types'
 import { createScope, resolveType } from './types'
-import { createFunctionCallFrame } from './frames'
+import { createFunctionFrame } from './frames'
 
 // ============================================================================
 // 主要求值函数
@@ -384,7 +384,7 @@ function evalFunctionCall(fn: FunctionCallNode, scope: Scope, state: State): Pas
     return handler(fn.arguments, scope, state)
   }
 
-  return makeInteger(0)
+  throw new Error(`Unknown function: ${name}`)
 }
 
 function evalUserFunctionCall(
@@ -393,30 +393,12 @@ function evalUserFunctionCall(
   scope: Scope,
   state: State
 ): PascalValue {
-  const fnScope = createScope(scope, funcDecl)
   const savedScope = state.currentScope
-  state.currentScope = fnScope
-
   const savedReturnValue = state.returnValue
   state.returnValue = null
 
-  // 初始化函数局部变量
-  if (funcDecl.block) {
-    funcDecl.block.variableDeclarations.forEach((v: VariableDeclarationNode) => {
-      const varType = resolveType(v.type, state)
-      v.names.forEach(n => {
-        const name = n.name.toUpperCase()
-        fnScope.variables.set(name, makeDefaultValue(varType))
-        fnScope.variableTypes.set(name, varType)
-      })
-    })
-  }
-
-  // 传递参数
-  bindArguments(funcDecl.parameters, args, fnScope, scope, state)
-
-  // 执行函数体
-  const frame = createFunctionCallFrame(funcDecl, args, state)
+  // 创建函数帧（参数绑定在 createFunctionFrame 的 init 阶段处理）
+  const frame = createFunctionFrame(funcDecl, args)
   state.stack.push(frame)
 
   while (state.stack.length > 0 && !frame.done) {
