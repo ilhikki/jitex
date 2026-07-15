@@ -218,6 +218,12 @@ describe('GOTO scope (intra-procedural)', () => {
     const state = makeState(source)
     expect(()=>runToCompletion(state)).toThrow()
   })
+
+  test('GOTO to non-existent label in same procedure throws (fast fail)', () => {
+    const source = `PROGRAM T; LABEL 10; VAR X: INTEGER; BEGIN X := 0; GOTO 99; X := 1; 10: X := 42 END.`
+    const state = makeState(source)
+    expect(()=>runToCompletion(state)).toThrow()
+  })
 })
 
 // ============================================================================
