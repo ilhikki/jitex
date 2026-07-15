@@ -200,6 +200,57 @@ function initVariables(v: VariableDeclarationNode, scope: Scope, state: State): 
   })
 }
 
+function handleBreak(state: State): void {
+  while (state.stack.length > 0) {
+    const frame = state.stack[state.stack.length - 1]
+    if (frame.kind === 'While' || frame.kind === 'Repeat' || frame.kind === 'For') {
+      frame.done = true
+      state.stack.pop()
+      break
+    }
+    state.stack.pop()
+  }
+}
+
+function handleExit(state: State): void {
+  while (state.stack.length > 0) {
+    const frame = state.stack[state.stack.length - 1]
+    if (frame.kind === 'Function') {
+      const fnFrame = frame as any
+      if (fnFrame.savedScope) {
+        state.currentScope = fnFrame.savedScope
+      }
+      frame.done = true
+      state.stack.pop()
+      break
+    }
+    if (frame.kind === 'Program') {
+      frame.done = true
+      state.stack.pop()
+      break
+    }
+    state.stack.pop()
+  }
+}
+
+/**
+ * 将所有内置过程注册到 state.systemProcedures 中，
+ * 供 createProcedureCallFrame 在用户定义过程未命中时回退查找。
+ */
+export function populateSystemProcedures(state: State): void {
+  state.systemProcedures.set('WRITE', (args, s) => handleWrite(args, s, false))
+  state.systemProcedures.set('WRITELN', (args, s) => handleWrite(args, s, true))
+  state.systemProcedures.set('READ', (args, s) => handleRead(args, s, false))
+  state.systemProcedures.set('READLN', (args, s) => handleRead(args, s, true))
+  state.systemProcedures.set('BREAK', (_args, s) => handleBreak(s))
+  state.systemProcedures.set('EXIT', (_args, s) => handleExit(s))
+  state.systemProcedures.set('RESET', (args, s) => handleFileReset(args, s))
+  state.systemProcedures.set('REWRITE', (args, s) => handleFileRewrite(args, s))
+  state.systemProcedures.set('GET', (args, s) => handleFileGet(args, s))
+  state.systemProcedures.set('PUT', (args, s) => handleFilePut(args, s))
+  state.systemProcedures.set('CLOSE', (args, s) => handleFileClose(args, s))
+}
+
 export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
   return {
     kind: 'ProcedureCall',
@@ -207,102 +258,7 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
     step(state: State) {
       const name = node.name.name.toUpperCase()
 
-      if (name === 'WRITE' || name === 'WRITELN') {
-        handleWrite(node.arguments, state, name === 'WRITELN')
-        this.done = true
-        return
-      }
-
-      if (name === 'CONSOLE_LOG') {
-        const vals = node.arguments.map(a => formatOutputArg(a, state))
-        const msg = vals.join(' ')
-        // 同时写入 TERMOUT 文件和 outputBuffer
-        const termoutFile = state.globalScope.variables.get('TERMOUT')
-        if (termoutFile && termoutFile.type.kind === 'file') {
-          fileWrite(termoutFile.rawValue as PascalFile, msg + '\n')
-        }
-        state.outputBuffer.push(`[LOG] ${msg}\n`)
-        this.done = true
-        return
-      }
-
-      if (name === 'READ' || name === 'READLN') {
-        handleRead(node.arguments, state, name === 'READLN')
-        this.done = true
-        return
-      }
-
-      if (name === 'BREAK') {
-        // 跳出最近的循环
-        while (state.stack.length > 0) {
-          const frame = state.stack[state.stack.length - 1]
-          if (frame.kind === 'While' || frame.kind === 'Repeat' || frame.kind === 'For') {
-            frame.done = true
-            state.stack.pop()
-            break
-          }
-          state.stack.pop()
-        }
-        this.done = true
-        return
-      }
-
-      if (name === 'EXIT') {
-        while (state.stack.length > 0) {
-          const frame = state.stack[state.stack.length - 1]
-          if (frame.kind === 'Function') {
-            const fnFrame = frame as any
-            if (fnFrame.savedScope) {
-              state.currentScope = fnFrame.savedScope
-            }
-            frame.done = true
-            state.stack.pop()
-            break
-          }
-          if (frame.kind === 'Program') {
-            frame.done = true
-            state.stack.pop()
-            break
-          }
-          state.stack.pop()
-        }
-        this.done = true
-        return
-      }
-
-      // 文件操作
-      if (name === 'RESET') {
-        handleFileReset(node.arguments, state)
-        this.done = true
-        return
-      }
-      if (name === 'REWRITE') {
-        handleFileRewrite(node.arguments, state)
-        this.done = true
-        return
-      }
-      if (name === 'GET') {
-        handleFileGet(node.arguments, state)
-        this.done = true
-        return
-      }
-      if (name === 'PUT') {
-        handleFilePut(node.arguments, state)
-        this.done = true
-        return
-      }
-      if (name === 'CLOSE') {
-        handleFileClose(node.arguments, state)
-        this.done = true
-        return
-      }
-      if (name === 'BREAK') {
-        // BREAK(F) 用于刷新文件输出，暂不实现
-        this.done = true
-        return
-      }
-
-      // 用户定义的过程/函数
+      // 优先查找用户定义的过程
       const procDecl = state.declarations.findProcedure(name, state.currentScope)
       if (procDecl) {
         const frame = createFunctionFrame(procDecl, [])
@@ -311,12 +267,19 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
         return
       }
 
+      // 用户定义的函数以过程形式调用
       const funcDecl = state.declarations.findFunction(name, state.currentScope)
       if (funcDecl) {
         const frame = createFunctionFrame(funcDecl, [])
         state.stack.push(frame)
         this.done = true
         return
+      }
+
+      // 回退到系统过程
+      const handler = state.systemProcedures.get(name)
+      if (handler) {
+        handler(node.arguments, state)
       }
 
       this.done = true

@@ -1,10 +1,10 @@
 import { parse } from '../../src'
-import { createState, runToCompletion, run, State, PascalValue } from '../../src/interpreter'
+import { createInterpreterState, runToCompletion, run, State, PascalValue } from '../../src/interpreter'
 
 function makeState(source: string): State {
   const result = parse(source)
   if (!result.success) throw new Error(`Parse failed: ${result.error}`)
-  return createState(result.astNode)
+  return createInterpreterState(result.astNode)
 }
 
 function getVar(state: State, name: string): any {

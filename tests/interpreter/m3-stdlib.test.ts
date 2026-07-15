@@ -1,10 +1,10 @@
 import { parse } from '../../src/index'
-import { createState, runToCompletion, State, PascalValue } from '../../src/interpreter'
+import { createInterpreterState, runToCompletion, State, PascalValue } from '../../src/interpreter'
 
 function makeState(source: string, input?: string[]): State {
   const result = parse(source)
   if (!result.success) throw new Error(`Parse failed: ${result.error}`)
-  const state = createState(result.astNode)
+  const state = createInterpreterState(result.astNode)
   if (input) {
     state.inputQueue = [...input]
   }

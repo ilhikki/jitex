@@ -112,6 +112,11 @@ export interface State {
 
   outputBuffer: string[]
   inputQueue: string[]
+
+  /** 系统过程：优先查找用户定义，未命中则回退到系统过程 */
+  systemProcedures: Map<string, (args: ExpressionNode[], state: State) => void>
+  /** 系统函数：优先查找用户定义，未命中则回退到系统函数 */
+  systemFunctions: Map<string, (args: ExpressionNode[], scope: Scope, state: State) => PascalValue>
 }
 
 // ============================================================================
@@ -404,6 +409,8 @@ export function createState(program: ProgramNode): State {
     returnValue: null,
     outputBuffer: [],
     inputQueue: [],
+    systemProcedures: new Map(),
+    systemFunctions: new Map(),
   }
 
   // 先求值常量，供类型解析使用

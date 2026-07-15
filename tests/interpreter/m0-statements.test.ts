@@ -1,10 +1,10 @@
 import { parse } from '../../src/index'
-import { createState, runToCompletion, run, stackTrace, State } from '../../src/interpreter'
+import { createInterpreterState, runToCompletion, run, stackTrace, State } from '../../src/interpreter'
 
 function makeState(source: string): State {
   const result = parse(source)
   if (!result.success) throw new Error(`Parse failed: ${result.error}`)
-  return createState(result.astNode)
+  return createInterpreterState(result.astNode)
 }
 
 function stackKinds(state: State): string[] {

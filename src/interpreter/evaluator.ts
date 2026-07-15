@@ -136,14 +136,16 @@ function evalIdentifier(expr: IdentifierNode, scope: Scope, state: State): Pasca
   const value = lookupVariable(name, scope)
   if (value) return value
 
-  // 尝试作为无参内置函数调用
-  const builtinResult = evalBuiltin(name, [], scope, state)
-  if (builtinResult) return builtinResult
-
   // 尝试调用用户定义的函数（无参）
   const funcDecl = state.declarations.findFunction(expr.name, scope)
   if (funcDecl) {
     return evalUserFunctionCall(funcDecl, [], scope, state)
+  }
+
+  // 回退到系统函数（无参调用）
+  const handler = state.systemFunctions.get(name)
+  if (handler) {
+    return handler([], scope, state)
   }
 
   // 未找到，返回默认整数
@@ -260,115 +262,111 @@ function hasVariable(name: string, scope: Scope): boolean {
 }
 
 // ============================================================================
-// 内置函数
+// 内置函数注册
 // ============================================================================
 
-function evalBuiltin(name: string, args: ExpressionNode[], scope: Scope, state: State): PascalValue | null {
-  switch (name) {
-    case 'CHR': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeChar(getNum(arg))
+export function populateSystemFunctions(state: State): void {
+  state.systemFunctions.set('CHR', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeChar(getNum(arg))
+  })
+  state.systemFunctions.set('ORD', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    if (arg.type.kind === 'char') {
+      return makeInteger(getCharCode(arg))
     }
-    case 'ORD': {
-      const arg = evalExpr(args[0], scope, state)
-      if (arg.type.kind === 'char') {
-        return makeInteger(getCharCode(arg))
-      }
-      return makeInteger(getNum(arg))
+    return makeInteger(getNum(arg))
+  })
+  state.systemFunctions.set('ABS', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    if (arg.type === LONGINT_TYPE || arg.type === LONGWORD_TYPE) {
+      const b = getBigInt(arg)
+      return b < 0 ? makeLongInt(-b) : makeLongInt(b)
     }
-    case 'ABS': {
+    const val = getNum(arg)
+    return arg.type.kind === 'integer' ? makeInteger(Math.abs(val)) : makeReal(Math.abs(val))
+  })
+  state.systemFunctions.set('ROUND', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeInteger(Math.round(getNum(arg)))
+  })
+  state.systemFunctions.set('TRUNC', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeInteger(Math.trunc(getNum(arg)))
+  })
+  state.systemFunctions.set('EOF', (args, scope, state) => {
+    if (args.length > 0) {
       const arg = evalExpr(args[0], scope, state)
-      if (arg.type === LONGINT_TYPE || arg.type === LONGWORD_TYPE) {
-        const b = getBigInt(arg)
-        return b < 0 ? makeLongInt(-b) : makeLongInt(b)
+      if (arg.type.kind === 'file') {
+        return makeBoolean(fileEof(arg.rawValue as PascalFile))
       }
+    }
+    return makeBoolean(state.inputQueue.length === 0)
+  })
+  state.systemFunctions.set('EOLN', (args, scope, state) => {
+    if (args.length > 0) {
+      const arg = evalExpr(args[0], scope, state)
+      if (arg.type.kind === 'file') {
+        return makeBoolean(fileEoln(arg.rawValue as PascalFile))
+      }
+    }
+    return makeBoolean(state.inputQueue.length === 0 || state.inputQueue[0] === '\n')
+  })
+  state.systemFunctions.set('SQR', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    const val = getNum(arg)
+    return arg.type.kind === 'integer' ? makeInteger(val * val) : makeReal(val * val)
+  })
+  state.systemFunctions.set('SQRT', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeReal(Math.sqrt(getNum(arg)))
+  })
+  state.systemFunctions.set('SIN', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeReal(Math.sin(getNum(arg)))
+  })
+  state.systemFunctions.set('COS', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeReal(Math.cos(getNum(arg)))
+  })
+  state.systemFunctions.set('LN', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeReal(Math.log(getNum(arg)))
+  })
+  state.systemFunctions.set('EXP', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeReal(Math.exp(getNum(arg)))
+  })
+  state.systemFunctions.set('PRED', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    if (arg.type.kind === 'integer') {
       const val = getNum(arg)
-      return arg.type.kind === 'integer' ? makeInteger(Math.abs(val)) : makeReal(Math.abs(val))
+      return arg.type === LONGINT_TYPE || arg.type === LONGWORD_TYPE
+        ? makeLongInt(BigInt(val) - BigInt(1))
+        : makeInteger(val - 1)
     }
-    case 'ROUND': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeInteger(Math.round(getNum(arg)))
+    if (arg.type.kind === 'char') {
+      return makeChar(getCharCode(arg) - 1)
     }
-    case 'TRUNC': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeInteger(Math.trunc(getNum(arg)))
-    }
-    case 'EOF': {
-      if (args.length > 0) {
-        const arg = evalExpr(args[0], scope, state)
-        if (arg.type.kind === 'file') {
-          return makeBoolean(fileEof(arg.rawValue as PascalFile))
-        }
-      }
-      return makeBoolean(state.inputQueue.length === 0)
-    }
-    case 'EOLN': {
-      if (args.length > 0) {
-        const arg = evalExpr(args[0], scope, state)
-        if (arg.type.kind === 'file') {
-          return makeBoolean(fileEoln(arg.rawValue as PascalFile))
-        }
-      }
-      return makeBoolean(state.inputQueue.length === 0 || state.inputQueue[0] === '\n')
-    }
-    case 'SQR': {
-      const arg = evalExpr(args[0], scope, state)
+    throw new Error('PRED requires ordinal type')
+  })
+  state.systemFunctions.set('SUCC', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    if (arg.type.kind === 'integer') {
       const val = getNum(arg)
-      return arg.type.kind === 'integer' ? makeInteger(val * val) : makeReal(val * val)
+      return arg.type === LONGINT_TYPE || arg.type === LONGWORD_TYPE
+        ? makeLongInt(BigInt(val) + BigInt(1))
+        : makeInteger(val + 1)
     }
-    case 'SQRT': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeReal(Math.sqrt(getNum(arg)))
+    if (arg.type.kind === 'char') {
+      return makeChar(getCharCode(arg) + 1)
     }
-    case 'SIN': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeReal(Math.sin(getNum(arg)))
-    }
-    case 'COS': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeReal(Math.cos(getNum(arg)))
-    }
-    case 'LN': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeReal(Math.log(getNum(arg)))
-    }
-    case 'EXP': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeReal(Math.exp(getNum(arg)))
-    }
-    case 'PRED': {
-      const arg = evalExpr(args[0], scope, state)
-      if (arg.type.kind === 'integer') {
-        const val = getNum(arg)
-        return arg.type === LONGINT_TYPE || arg.type === LONGWORD_TYPE
-          ? makeLongInt(BigInt(val) - BigInt(1))
-          : makeInteger(val - 1)
-      }
-      if (arg.type.kind === 'char') {
-        return makeChar(getCharCode(arg) - 1)
-      }
-      throw new Error('PRED requires ordinal type')
-    }
-    case 'SUCC': {
-      const arg = evalExpr(args[0], scope, state)
-      if (arg.type.kind === 'integer') {
-        const val = getNum(arg)
-        return arg.type === LONGINT_TYPE || arg.type === LONGWORD_TYPE
-          ? makeLongInt(BigInt(val) + BigInt(1))
-          : makeInteger(val + 1)
-      }
-      if (arg.type.kind === 'char') {
-        return makeChar(getCharCode(arg) + 1)
-      }
-      throw new Error('SUCC requires ordinal type')
-    }
-    case 'ODD': {
-      const arg = evalExpr(args[0], scope, state)
-      return makeBoolean((getNum(arg) & 1) === 1)
-    }
-    default:
-      return null
-  }
+    throw new Error('SUCC requires ordinal type')
+  })
+  state.systemFunctions.set('ODD', (args, scope, state) => {
+    const arg = evalExpr(args[0], scope, state)
+    return makeBoolean((getNum(arg) & 1) === 1)
+  })
 }
 
 // ============================================================================
@@ -378,14 +376,16 @@ function evalBuiltin(name: string, args: ExpressionNode[], scope: Scope, state: 
 function evalFunctionCall(fn: FunctionCallNode, scope: Scope, state: State): PascalValue {
   const name = fn.name.name.toUpperCase()
 
-  // 尝试内置函数
-  const builtinResult = evalBuiltin(name, fn.arguments, scope, state)
-  if (builtinResult) return builtinResult
-
-  // 用户定义的函数
+  // 优先查找用户定义的函数
   const funcDecl = state.declarations.findFunction(name, scope)
   if (funcDecl && funcDecl.block) {
     return evalUserFunctionCall(funcDecl, fn.arguments, scope, state)
+  }
+
+  // 回退到系统函数
+  const handler = state.systemFunctions.get(name)
+  if (handler) {
+    return handler(fn.arguments, scope, state)
   }
 
   return makeInteger(0)
