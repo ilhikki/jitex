@@ -6,17 +6,48 @@ import type {
   ProcedureCallNode,
   EmptyStatementNode,
   StatementNode,
+  IfStatementNode,
+  WhileStatementNode,
+  RepeatStatementNode,
+  ForStatementNode,
+  CaseStatementNode,
+  GotoStatementNode,
+  WithStatementNode,
+  ExpressionNode,
+  IntegerLiteralNode,
+  BooleanLiteralNode,
+  IdentifierNode,
+  CaseBranchNode,
 } from '../ast/types'
 import type { Frame, State, Scope, Value } from './types'
 import { createScope } from './types'
 
 // ============================================================================
-// Frame constructors — each returns a Frame record
+// Mock Expression Evaluator (M0)
 // ============================================================================
 
-// --- ProgramFrame: entry point, push main block's compound ---
-// Phase 1: push main compound
-// Phase 2: (compound done, we're top again) set done
+function evalExpr(expr: ExpressionNode, _scope: Scope): Value {
+  switch (expr.kind) {
+    case 'IntegerLiteral':
+      return (expr as IntegerLiteralNode).value
+    case 'BooleanLiteral':
+      return (expr as BooleanLiteralNode).value
+    case 'Identifier':
+      return 0
+    default:
+      return 0
+  }
+}
+
+function evalCondition(expr: ExpressionNode, scope: Scope): boolean {
+  const value = evalExpr(expr, scope)
+  return Boolean(value)
+}
+
+// ============================================================================
+// Frame constructors
+// ============================================================================
+
 export function createProgramFrame(program: ProgramNode): Frame {
   let pushed = false
   return {
@@ -28,13 +59,11 @@ export function createProgramFrame(program: ProgramNode): Frame {
         pushed = true
         return
       }
-      // Compound is done, we're back on top
       this.done = true
     },
   }
 }
 
-// --- CompoundFrame: iterate over statements ---
 export function createCompoundFrame(node: CompoundStatementNode): Frame {
   let index = 0
   const statements = node.statements
@@ -53,18 +82,10 @@ export function createCompoundFrame(node: CompoundStatementNode): Frame {
   }
 }
 
-// --- EmptyFrame: immediately done ---
 export function createEmptyFrame(_node: EmptyStatementNode): Frame {
-  return {
-    kind: 'Empty',
-    done: true,
-    step(_state: State) {},
-  }
+  return { kind: 'Empty', done: true, step() {} }
 }
 
-// --- FunctionFrame: manages procedure/function call lifecycle ---
-// Phase 'init':    create scope, push block compound, -> 'running'
-// Phase 'running': block done (we're top again), restore scope, set done
 export function createFunctionFrame(
   decl: ProcedureDeclarationNode | FunctionDeclarationNode,
   _args: Value[]
@@ -89,7 +110,6 @@ export function createFunctionFrame(
         return
       }
 
-      // phase === 'running': block finished
       if (savedScope) {
         state.currentScope = savedScope
         savedScope = null
@@ -99,8 +119,6 @@ export function createFunctionFrame(
   }
 }
 
-// --- ProcedureCallFrame: looks up procedure and pushes FunctionFrame ---
-// Sets done immediately — will be cleaned up when it reaches top again
 export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
   return {
     kind: 'ProcedureCall',
@@ -121,13 +139,201 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
         return
       }
 
-      // Unknown — builtin or not implemented, skip
       this.done = true
     },
   }
 }
 
-// --- Dispatch: create the right frame for a statement ---
+// --- IfFrame ---
+// Phase 'eval':  evaluate condition, push then/else branch
+// Phase 'done':  branch executed, we're top again
+export function createIfFrame(node: IfStatementNode): Frame {
+  let phase: 'eval' | 'done' = 'eval'
+
+  return {
+    kind: 'If',
+    done: false,
+    step(state: State) {
+      if (phase === 'eval') {
+        const condition = evalCondition(node.condition, state.currentScope)
+        if (condition && node.thenBranch) {
+          state.stack.push(createStatementFrame(node.thenBranch))
+        } else if (!condition && node.elseBranch) {
+          state.stack.push(createStatementFrame(node.elseBranch))
+        }
+        phase = 'done'
+        return
+      }
+      this.done = true
+    },
+  }
+}
+
+// --- WhileFrame ---
+// Phase 'eval':  evaluate condition
+//   - if true: push body, -> 'running'
+//   - if false: -> 'done'
+// Phase 'running': body done (we're top again), -> 'done' (M0: single iteration)
+export function createWhileFrame(node: WhileStatementNode): Frame {
+  let phase: 'eval' | 'running' = 'eval'
+
+  return {
+    kind: 'While',
+    done: false,
+    step(state: State) {
+      if (phase === 'eval') {
+        const condition = evalCondition(node.condition, state.currentScope)
+        if (condition) {
+          state.stack.push(createStatementFrame(node.body))
+          phase = 'running'
+        } else {
+          this.done = true
+        }
+        return
+      }
+
+      this.done = true
+    },
+  }
+}
+
+// --- RepeatFrame ---
+// Phase 'body':  push statements compound
+// Phase 'eval':  body done, -> 'done' (M0: single iteration)
+export function createRepeatFrame(node: RepeatStatementNode): Frame {
+  let phase: 'body' | 'eval' = 'body'
+
+  return {
+    kind: 'Repeat',
+    done: false,
+    step(state: State) {
+      if (phase === 'body') {
+        const compound: CompoundStatementNode = {
+          kind: 'CompoundStatement',
+          statements: node.statements,
+        }
+        state.stack.push(createCompoundFrame(compound))
+        phase = 'eval'
+        return
+      }
+
+      this.done = true
+    },
+  }
+}
+
+// --- ForFrame ---
+// Phase 'init':  initialize variable (skip in M0), push body, -> 'running'
+// Phase 'running': body done (we're top again), increment, check boundary
+//   - if within range: push body again, -> 'running'
+//   - if out of range: -> 'done'
+// Note: M0 uses mock values - direction is ignored
+export function createForFrame(node: ForStatementNode): Frame {
+  let phase: 'init' | 'running' = 'init'
+
+  return {
+    kind: 'For',
+    done: false,
+    step(state: State) {
+      if (phase === 'init') {
+        state.stack.push(createStatementFrame(node.body))
+        phase = 'running'
+        return
+      }
+
+      // M0: execute body once then done
+      // M1 will handle proper iteration
+      this.done = true
+    },
+  }
+}
+
+// --- CaseFrame ---
+// Phase 'eval':  evaluate expression, match branch, push statement
+// Phase 'done':  branch executed, we're top again
+export function createCaseFrame(node: CaseStatementNode): Frame {
+  let phase: 'eval' | 'done' = 'eval'
+
+  return {
+    kind: 'Case',
+    done: false,
+    step(state: State) {
+      if (phase === 'eval') {
+        const exprValue = evalExpr(node.expression, state.currentScope)
+        let matchedBranch: CaseBranchNode | null = null
+
+        for (const branch of node.branches) {
+          for (const label of branch.labels) {
+            const labelValue = evalExpr(label, state.currentScope)
+            if (exprValue === labelValue) {
+              matchedBranch = branch
+              break
+            }
+          }
+          if (matchedBranch) break
+        }
+
+        if (matchedBranch) {
+          state.stack.push(createStatementFrame(matchedBranch.statement))
+        } else if (node.otherwise) {
+          state.stack.push(createStatementFrame(node.otherwise))
+        }
+
+        phase = 'done'
+        return
+      }
+      this.done = true
+    },
+  }
+}
+
+// --- GotoFrame ---
+// Phase 'find':  find label target in declarations, rebuild stack to target
+// Phase 'done':  jump completed
+// Note: M0 uses simple approach - just skip to next statement
+export function createGotoFrame(node: GotoStatementNode): Frame {
+  const labelValue = (node.label as IntegerLiteralNode).value
+
+  return {
+    kind: 'Goto',
+    done: false,
+    step(state: State) {
+      const targetStmt = state.declarations.labels.get(labelValue)
+      if (targetStmt) {
+        state.stack.push(createStatementFrame(targetStmt))
+      }
+      this.done = true
+    },
+  }
+}
+
+// --- WithFrame ---
+// Phase 'init':  create scope for record fields (skip in M0), push body
+// Phase 'done':  body done, cleanup scope
+export function createWithFrame(node: WithStatementNode): Frame {
+  let phase: 'init' | 'done' = 'init'
+
+  return {
+    kind: 'With',
+    done: false,
+    step(state: State) {
+      if (phase === 'init') {
+        state.stack.push(createStatementFrame(node.body))
+        phase = 'done'
+        return
+      }
+      this.done = true
+    },
+  }
+}
+
+// --- AssignmentFrame ---
+// M0: skip evaluation, just done
+export function createAssignmentFrame(_node: any): Frame {
+  return { kind: 'Assignment', done: true, step() {} }
+}
+
+// --- Dispatch ---
 export function createStatementFrame(stmt: StatementNode): Frame {
   switch (stmt.kind) {
     case 'CompoundStatement':
@@ -140,29 +346,28 @@ export function createStatementFrame(stmt: StatementNode): Frame {
       return createEmptyFrame(stmt as EmptyStatementNode)
 
     case 'Assignment':
-      return { kind: 'Assignment', done: true, step() {} }
+      return createAssignmentFrame(stmt)
 
     case 'IfStatement':
-      return {
-        kind: 'If',
-        done: false,
-        step(state: State) {
-          state.stack.push(createStatementFrame((stmt as any).thenBranch))
-          this.done = true
-        },
-      }
+      return createIfFrame(stmt as IfStatementNode)
 
     case 'WhileStatement':
-      return { kind: 'While', done: true, step() {} }
+      return createWhileFrame(stmt as WhileStatementNode)
 
     case 'RepeatStatement':
-      return { kind: 'Repeat', done: true, step() {} }
+      return createRepeatFrame(stmt as RepeatStatementNode)
 
     case 'ForStatement':
-      return { kind: 'For', done: true, step() {} }
+      return createForFrame(stmt as ForStatementNode)
+
+    case 'CaseStatement':
+      return createCaseFrame(stmt as CaseStatementNode)
 
     case 'GotoStatement':
-      return { kind: 'Goto', done: true, step() {} }
+      return createGotoFrame(stmt as GotoStatementNode)
+
+    case 'WithStatement':
+      return createWithFrame(stmt as WithStatementNode)
 
     default:
       return { kind: 'Unknown', done: true, step() {} }
