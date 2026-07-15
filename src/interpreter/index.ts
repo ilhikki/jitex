@@ -1,5 +1,6 @@
-export type { State, Scope, Frame, Value, DeclarationTable, RunMode } from './types'
+export type { State, Scope, Frame, PascalValue, PascalType, DeclarationTable, RunMode } from './types'
 export { createState, createScope, createDeclarations, stackTrace } from './types'
 export { run, runToCompletion } from './run'
 export { createStatementFrame } from './frames'
-export { evalExpr, evalCondition } from './evaluator'
+export { evalExpr, inferExprType, lookupVariableType } from './evaluator'
+export * from './types/pascal-value'

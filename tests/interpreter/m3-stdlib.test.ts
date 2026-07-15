@@ -16,7 +16,8 @@ function getVar(state: State, name: string): any {
   let s: any = state.currentScope
   while (s) {
     if (s.variables.has(upper)) {
-      return s.variables.get(upper)
+      const value = s.variables.get(upper)
+      return value.rawValue
     }
     s = s.parent
   }

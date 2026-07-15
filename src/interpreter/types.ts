@@ -10,18 +10,18 @@ import type {
   LabelDeclarationNode,
 } from '../ast/types'
 
-// ============================================================================
-// Value (M0 placeholder — M1/M2 will extend)
-// ============================================================================
-
-export type Value = number | string | boolean | null | undefined
+import type { PascalValue, PascalType } from './types/pascal-value'
+export { PascalValue, PascalType } from './types/pascal-value'
+export * from './types/pascal-value'
+import { makeInteger, makeReal, makeBoolean, makeChar, makeString, findType, INTEGER_TYPE } from './types/pascal-value'
 
 // ============================================================================
 // Scope
 // ============================================================================
 
 export interface Scope {
-  variables: Map<string, Value>
+  variables: Map<string, PascalValue>
+  variableTypes: Map<string, PascalType>
   parent: Scope | null
   functionDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null
 }
@@ -32,6 +32,7 @@ export function createScope(
 ): Scope {
   return {
     variables: new Map(),
+    variableTypes: new Map(),
     parent,
     functionDecl,
   }
@@ -82,7 +83,7 @@ export interface State {
   program: ProgramNode
   declarations: DeclarationTable
   status: 'running' | 'terminated'
-  returnValue: Value | null
+  returnValue: PascalValue | null
 
   outputBuffer: string[]
   inputQueue: string[]
@@ -195,8 +196,17 @@ export function createState(program: ProgramNode): State {
   const declarations = createDeclarations(program.block, globalScope)
 
   program.block.variableDeclarations.forEach(v => {
+    const typeName = v.type && v.type.kind === 'SimpleType' ? (v.type as any).name.name : 'INTEGER'
+    const varType = findType(typeName) || INTEGER_TYPE
     v.names.forEach(n => {
-      globalScope.variables.set(n.name.toUpperCase(), 0)
+      const defaultValue = varType.kind === 'integer' ? makeInteger(0) :
+                           varType.kind === 'real' ? makeReal(0) :
+                           varType.kind === 'boolean' ? makeBoolean(false) :
+                           varType.kind === 'char' ? makeChar('\0') :
+                           varType.kind === 'string' ? makeString('') :
+                           makeInteger(0)
+      globalScope.variables.set(n.name.toUpperCase(), defaultValue)
+      globalScope.variableTypes.set(n.name.toUpperCase(), varType)
     })
   })
 

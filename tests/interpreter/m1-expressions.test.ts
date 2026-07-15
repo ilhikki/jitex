@@ -12,7 +12,8 @@ function getVar(state: State, name: string): any {
   let s: any = state.currentScope
   while (s) {
     if (s.variables.has(upper)) {
-      return s.variables.get(upper)
+      const value = s.variables.get(upper)
+      return value.rawValue
     }
     s = s.parent
   }
@@ -59,7 +60,7 @@ describe('M1: expression evaluation', () => {
   })
 
   test('unary operators', () => {
-    const source = `PROGRAM T; VAR A,B,C,D: INTEGER; BEGIN A := -5; B := +3; C := NOT 0; D := NOT 1 END.`
+    const source = `PROGRAM T; VAR A,B: INTEGER; C,D: BOOLEAN; BEGIN A := -5; B := +3; C := NOT FALSE; D := NOT TRUE END.`
     const state = makeState(source)
     runToCompletion(state)
     expect(getVar(state, 'A')).toBe(-5)
@@ -69,7 +70,7 @@ describe('M1: expression evaluation', () => {
   })
 
   test('logical AND/OR', () => {
-    const source = `PROGRAM T; VAR A,B,C,D: BOOLEAN; BEGIN A := 1 AND 1; B := 1 AND 0; C := 0 OR 1; D := 0 OR 0 END.`
+    const source = `PROGRAM T; VAR A,B,C,D: BOOLEAN; BEGIN A := TRUE AND TRUE; B := TRUE AND FALSE; C := FALSE OR TRUE; D := FALSE OR FALSE END.`
     const state = makeState(source)
     runToCompletion(state)
     expect(getVar(state, 'A')).toBe(true)

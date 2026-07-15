@@ -19,9 +19,19 @@ import type {
   AssignmentNode,
   IdentifierNode,
 } from '../ast/types'
-import type { Frame, State, Scope, Value } from './types'
+import type { Frame, State, Scope, PascalValue } from './types'
 import { createScope } from './types'
-import { evalExpr, evalCondition } from './evaluator'
+import { evalExpr, inferExprType, lookupVariableType } from './evaluator'
+import {
+  makeInteger,
+  makeReal,
+  makeBoolean,
+  makeString,
+  findType,
+  coerceToType,
+  binaryOp,
+  INTEGER_TYPE,
+} from './types/pascal-value'
 
 export function createProgramFrame(program: ProgramNode): Frame {
   let pushed = false
@@ -63,7 +73,7 @@ export function createEmptyFrame(_node: EmptyStatementNode): Frame {
 
 export function createFunctionFrame(
   decl: ProcedureDeclarationNode | FunctionDeclarationNode,
-  _args: Value[]
+  _args: PascalValue[]
 ): Frame & { decl: ProcedureDeclarationNode | FunctionDeclarationNode; savedScope: Scope | null } {
   let phase: 'init' | 'running' = 'init'
   let savedScope: Scope | null = null
@@ -81,8 +91,15 @@ export function createFunctionFrame(
 
         if (decl.block) {
           decl.block.variableDeclarations.forEach(v => {
+            const typeName = v.type && v.type.kind === 'SimpleType' ? (v.type as any).name.name : 'INTEGER'
+            const varType = findType(typeName) || INTEGER_TYPE
             v.names.forEach(n => {
-              fnScope.variables.set(n.name.toUpperCase(), 0)
+              const defaultValue = varType.kind === 'integer' ? makeInteger(0) :
+                                   varType.kind === 'real' ? makeReal(0) :
+                                   varType.kind === 'boolean' ? makeBoolean(false) :
+                                   makeInteger(0)
+              fnScope.variables.set(n.name.toUpperCase(), defaultValue)
+              fnScope.variableTypes.set(n.name.toUpperCase(), varType)
             })
           })
           state.stack.push(createCompoundFrame(decl.block.compound))
@@ -110,7 +127,7 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
       if (name === 'WRITE' || name === 'WRITELN') {
         for (const arg of node.arguments) {
           const value = evalExpr(arg, state.currentScope, state)
-          state.outputBuffer.push(String(value))
+          state.outputBuffer.push(String(value.rawValue))
         }
         if (name === 'WRITELN') {
           state.outputBuffer.push('\n')
@@ -124,12 +141,33 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
           if (arg.kind === 'Identifier') {
             const varName = (arg as IdentifierNode).name.toUpperCase()
             const inputValue = state.inputQueue.shift() || ''
-            const numValue = parseFloat(inputValue)
-            state.currentScope.variables.set(varName, isNaN(numValue) ? inputValue : numValue)
+            const varType = lookupVariableType(varName, state.currentScope) || INTEGER_TYPE
+
+            let value: PascalValue
+            if (varType.kind === 'integer') {
+              value = makeInteger(parseInt(inputValue, 10) || 0)
+            } else if (varType.kind === 'real') {
+              value = makeReal(parseFloat(inputValue) || 0)
+            } else {
+              value = makeString(inputValue)
+            }
+
+            let targetScope = findVariableScope(varName, state.currentScope)
+            if (targetScope) {
+              targetScope.variables.set(varName, value)
+            } else {
+              state.currentScope.variables.set(varName, value)
+            }
           }
         }
         if (name === 'READLN') {
-          state.inputQueue.shift()
+          // 跳过剩余行
+          while (state.inputQueue.length > 0 && state.inputQueue[0] !== '\n') {
+            state.inputQueue.shift()
+          }
+          if (state.inputQueue[0] === '\n') {
+            state.inputQueue.shift()
+          }
         }
         this.done = true
         return
@@ -186,10 +224,11 @@ export function createIfFrame(node: IfStatementNode): Frame {
     done: false,
     step(state: State) {
       if (phase === 'eval') {
-        const condition = evalCondition(node.condition, state.currentScope, state)
-        if (condition && node.thenBranch) {
+        const condition = evalExpr(node.condition, state.currentScope, state)
+        const conditionBool = Boolean(condition.rawValue)
+        if (conditionBool && node.thenBranch) {
           state.stack.push(createStatementFrame(node.thenBranch))
-        } else if (!condition && node.elseBranch) {
+        } else if (!conditionBool && node.elseBranch) {
           state.stack.push(createStatementFrame(node.elseBranch))
         }
         phase = 'done'
@@ -209,8 +248,9 @@ export function createWhileFrame(node: WhileStatementNode): Frame {
     done: false,
     step(state: State) {
       if (phase === 'eval') {
-        const condition = evalCondition(node.condition, state.currentScope, state)
-        if (condition) {
+        const condition = evalExpr(node.condition, state.currentScope, state)
+        const conditionBool = Boolean(condition.rawValue)
+        if (conditionBool) {
           state.stack.push(createStatementFrame(node.body))
           phase = 'running'
         } else {
@@ -242,8 +282,9 @@ export function createRepeatFrame(node: RepeatStatementNode): Frame {
         return
       }
 
-      const condition = evalCondition(node.untilCondition, state.currentScope, state)
-      if (condition) {
+      const condition = evalExpr(node.untilCondition, state.currentScope, state)
+      const conditionBool = Boolean(condition.rawValue)
+      if (conditionBool) {
         this.done = true
       } else {
         phase = 'body'
@@ -255,7 +296,7 @@ export function createRepeatFrame(node: RepeatStatementNode): Frame {
 // --- ForFrame ---
 export function createForFrame(node: ForStatementNode): Frame {
   let phase: 'init' | 'eval' | 'body' = 'init'
-  let finalValue: Value | null = null
+  let finalValue: PascalValue | null = null
   let isDownTo = false
 
   return {
@@ -282,18 +323,26 @@ export function createForFrame(node: ForStatementNode): Frame {
 
       if (phase === 'eval') {
         const varName = node.variable.name.toUpperCase()
-        const current = state.currentScope.variables.get(varName) ?? 0
+        const current = state.currentScope.variables.get(varName)
+        if (!current || !finalValue) {
+          this.done = true
+          return
+        }
+
+        const currentNum = current.rawValue as number
+        const finalNum = finalValue.rawValue as number
 
         let shouldContinue = false
         if (isDownTo) {
-          shouldContinue = (current as number) > (finalValue as number)
+          shouldContinue = currentNum > finalNum
         } else {
-          shouldContinue = (current as number) < (finalValue as number)
+          shouldContinue = currentNum < finalNum
         }
 
         if (shouldContinue) {
           const increment = isDownTo ? -1 : 1
-          state.currentScope.variables.set(varName, (current as number) + increment)
+          const newValue = makeInteger(currentNum + increment)
+          state.currentScope.variables.set(varName, newValue)
           phase = 'body'
           state.stack.push(createStatementFrame(node.body))
           return
@@ -320,7 +369,9 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
         for (const branch of node.branches) {
           for (const label of branch.labels) {
             const labelValue = evalExpr(label, state.currentScope, state)
-            if (exprValue === labelValue) {
+            // 比较 PascalValue
+            const cmp = binaryOp('=', exprValue, labelValue)
+            if (cmp.rawValue === true) {
               matchedBranch = branch
               break
             }
@@ -390,18 +441,28 @@ export function createAssignmentFrame(node: AssignmentNode): Frame {
   }
 }
 
-function assignToLeft(left: ExpressionNode, value: Value, scope: Scope, state: State): void {
+function assignToLeft(left: ExpressionNode, value: PascalValue, scope: Scope, state: State): void {
   if (left.kind === 'Identifier') {
     const name = (left as IdentifierNode).name.toUpperCase()
 
     if (scope.functionDecl && scope.functionDecl.name.name.toUpperCase() === name) {
+      // 赋值给函数名 = 设置返回值
       state.returnValue = value
     } else {
+      // 查找变量类型，进行类型检查和转换
+      const targetType = lookupVariableType(name, scope)
+      let finalValue = value
+
+      if (targetType) {
+        // 类型转换（如整数到实数）
+        finalValue = coerceToType(value, targetType)
+      }
+
       let targetScope = findVariableScope(name, scope)
       if (targetScope) {
-        targetScope.variables.set(name, value)
+        targetScope.variables.set(name, finalValue)
       } else {
-        scope.variables.set(name, value)
+        scope.variables.set(name, finalValue)
       }
     }
   }
@@ -457,4 +518,13 @@ export function createStatementFrame(stmt: StatementNode): Frame {
     default:
       return { kind: 'Unknown', done: true, step() {} }
   }
+}
+
+// --- Helper for creating function call frames ---
+export function createFunctionCallFrame(
+  decl: ProcedureDeclarationNode | FunctionDeclarationNode,
+  _args: ExpressionNode[],
+  _state: State
+): Frame {
+  return createFunctionFrame(decl, [])
 }
