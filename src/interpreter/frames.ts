@@ -286,19 +286,21 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
   const varArgs: { name: string; scope: Scope | null; type: PascalType }[] = []
 
   for (const arg of args) {
-    if (arg.kind === 'Identifier') {
-      const varName = (arg as IdentifierNode).name.toUpperCase()
-      const varType = lookupVariableType(varName, state.currentScope) || INTEGER_TYPE
-      const targetScope = findVariableScope(varName, state.currentScope)
+    if (arg.kind !== 'Identifier') {
+      throw new Error('READ/READLN requires variable identifiers as arguments')
+    }
+    const varName = (arg as IdentifierNode).name.toUpperCase()
+    const varType = lookupVariableType(varName, state.currentScope) || INTEGER_TYPE
+    const targetScope = findVariableScope(varName, state.currentScope)
+    if (!targetScope) {
+      throw new Error(`Unknown variable '${varName}' in READ/READLN`)
+    }
 
-      if (varType.kind === 'file') {
-        const value = targetScope
-          ? targetScope.variables.get(varName)
-          : state.currentScope.variables.get(varName)
-        if (value) fileArg = value.rawValue as PascalFile
-      } else {
-        varArgs.push({ name: varName, scope: targetScope, type: varType })
-      }
+    if (varType.kind === 'file') {
+      const value = targetScope.variables.get(varName)
+      fileArg = value!.rawValue as PascalFile
+    } else {
+      varArgs.push({ name: varName, scope: targetScope, type: varType })
     }
   }
 

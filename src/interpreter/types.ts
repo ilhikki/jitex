@@ -400,7 +400,7 @@ function findLabelInBlock(block: BlockNode | null, value: number): StatementNode
 // State factory
 // ============================================================================
 
-export function createState(program: ProgramNode): State {
+export function createState(program: ProgramNode, io?: PascalIO): State {
   const globalScope = createScope(null, null)
   const declarations = createDeclarations(program.block, globalScope)
 
@@ -416,7 +416,7 @@ export function createState(program: ProgramNode): State {
     inputQueue: [],
     systemProcedures: new Map(),
     systemFunctions: new Map(),
-    io: createDefaultIO(),
+    io: io ?? createDefaultIO(),
   }
 
   // 先求值常量，供类型解析使用

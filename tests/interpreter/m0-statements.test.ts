@@ -4,7 +4,16 @@ import { createInterpreterState, runToCompletion, run, stackTrace, State } from 
 function makeState(source: string): State {
   const result = parse(source)
   if (!result.success) throw new Error(`Parse failed: ${result.error}`)
-  return createInterpreterState(result.astNode)
+  const state = createInterpreterState(result.astNode)
+  state.io.console = {
+    write() {},
+    writeln() {},
+    read() { return '' },
+    readln() { return '' },
+    eof() { return true },
+    eoln() { return true },
+  }
+  return state
 }
 
 function stackKinds(state: State): string[] {
