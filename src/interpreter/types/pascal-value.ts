@@ -2,7 +2,17 @@
  * Pascal 类型系统核心
  *
  * 每个 PascalValue 都是带类型的 boxed 对象
- * 运算由类型决定，支持溢出/截断检查
+ * 内部表示尽量贴近 Pascal 内存模型，减少依赖 JS 原生类型
+ *
+ * 约定：
+ * - 整数：小整数用 number，LONGINT/LONGWORD 用 bigint
+ * - 实数：用 number（IEEE 754），但意识到精度限制
+ * - 字符：用 number (ASCII code 0..255)，不是 JS string
+ * - 布尔：用 number (0/1)，不是 JS boolean
+ * - 字符串/PACKED ARRAY OF CHAR：用 number[] (ASCII 数组)
+ * - 数组：用 PascalArray
+ * - 记录：用 PascalRecord
+ * - 文件：用 PascalFile
  */
 
 // ============================================================================
@@ -18,17 +28,28 @@ export interface PascalValue {
 // PascalType - 类型接口
 // ============================================================================
 
+export type PascalTypeKind =
+  | 'integer'
+  | 'real'
+  | 'char'
+  | 'boolean'
+  | 'string'
+  | 'subrange'
+  | 'array'
+  | 'record'
+  | 'file'
+
 export interface PascalType {
   readonly name: string
-  readonly kind: 'integer' | 'real' | 'char' | 'boolean' | 'string' | 'subrange'
+  readonly kind: PascalTypeKind
 
-  // 检查值是否在此类型范围内
-  checkRange(value: number): boolean
+  // 检查数值是否在此类型范围内 (仅对数值类型有意义)
+  checkRange(value: number | bigint): boolean
 
   // 类型兼容性检查
   isAssignableFrom(other: PascalType): boolean
 
-  // 算术运算 (返回 null 表示不支持的运算)
+  // 算术运算
   add?(other: PascalType, left: PascalValue, right: PascalValue): PascalValue
   sub?(other: PascalType, left: PascalValue, right: PascalValue): PascalValue
   mul?(other: PascalType, left: PascalValue, right: PascalValue): PascalValue
@@ -43,76 +64,126 @@ export interface PascalType {
   le?(other: PascalType, left: PascalValue, right: PascalValue): PascalValue
   gt?(other: PascalType, left: PascalValue, right: PascalValue): PascalValue
   ge?(other: PascalType, left: PascalValue, right: PascalValue): PascalValue
+}
 
-  // 一元运算
-  neg?(): PascalValue
-  pos?(): PascalValue
-  not?(): PascalValue
+// ============================================================================
+// 底层取值辅助函数
+// ============================================================================
+
+export function getNum(v: PascalValue): number {
+  if (typeof v.rawValue === 'bigint') {
+    return Number(v.rawValue)
+  }
+  return v.rawValue as number
+}
+
+export function getBigInt(v: PascalValue): bigint {
+  if (typeof v.rawValue === 'bigint') {
+    return v.rawValue
+  }
+  return BigInt(v.rawValue as number)
+}
+
+export function getCharCode(v: PascalValue): number {
+  return v.rawValue as number
+}
+
+export function getBoolValue(v: PascalValue): boolean {
+  return (v.rawValue as number) !== 0
+}
+
+export function getStringChars(v: PascalValue): number[] {
+  return v.rawValue as number[]
 }
 
 // ============================================================================
 // 整数类型
 // ============================================================================
 
-abstract class IntegerType implements PascalType {
+export abstract class IntegerType implements PascalType {
   readonly kind = 'integer' as const
-
   abstract readonly name: string
-  abstract readonly min: number
-  abstract readonly max: number
+  abstract readonly min: number | bigint
+  abstract readonly max: number | bigint
+  abstract readonly useBigInt: boolean
 
-  checkRange(value: number): boolean {
-    return value >= this.min && value <= this.max && Number.isInteger(value)
+  checkRange(value: number | bigint): boolean {
+    const num = typeof value === 'bigint' ? Number(value) : value
+    const min = typeof this.min === 'bigint' ? Number(this.min) : this.min
+    const max = typeof this.max === 'bigint' ? Number(this.max) : this.max
+    return num >= min && num <= max && Number.isInteger(num)
   }
 
   isAssignableFrom(other: PascalType): boolean {
     return other.kind === 'integer' || other.kind === 'subrange'
   }
 
-  // 辅助方法：获取数值
-  protected getNum(v: PascalValue): number {
-    return v.rawValue as number
+  make(value: number | bigint): PascalValue {
+    if (this.useBigInt) {
+      const b = typeof value === 'bigint' ? value : BigInt(value)
+      return { type: this, rawValue: this.truncateBigInt(b) }
+    }
+    return { type: this, rawValue: this.truncateNumber(Number(value)) }
   }
 
-  // 辅助方法：截断到范围
-  protected truncate(value: number): number {
-    // 模拟 Pascal 整数溢出行为
-    if (value > this.max) {
-      // 溢出: 在 Pascal 中通常未定义，这里我们模拟回绕
-      const range = this.max - this.min + 1
-      return this.min + ((value - this.min) % range)
+  protected truncateNumber(value: number): number {
+    const min = Number(this.min)
+    const max = Number(this.max)
+    const range = max - min + 1
+    if (value > max) {
+      return min + ((value - min) % range)
     }
-    if (value < this.min) {
-      const range = this.max - this.min + 1
-      return this.max - ((this.min - value - 1) % range)
+    if (value < min) {
+      return max - ((min - value - 1) % range)
+    }
+    return value
+  }
+
+  protected truncateBigInt(value: bigint): bigint {
+    const min = typeof this.min === 'bigint' ? this.min : BigInt(this.min)
+    const max = typeof this.max === 'bigint' ? this.max : BigInt(this.max)
+    const range = max - min + BigInt(1)
+    if (value > max) {
+      return min + ((value - min) % range)
+    }
+    if (value < min) {
+      return max - ((min - value - BigInt(1)) % range)
     }
     return value
   }
 
   add(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const result = this.getNum(left) + this.getNum(right)
-    return { type: INTEGER_TYPE, rawValue: this.truncate(result) }
+    if (this.useBigInt) {
+      return this.make(getBigInt(left) + getBigInt(right))
+    }
+    return this.make(getNum(left) + getNum(right))
   }
 
   sub(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const result = this.getNum(left) - this.getNum(right)
-    return { type: INTEGER_TYPE, rawValue: this.truncate(result) }
+    if (this.useBigInt) {
+      return this.make(getBigInt(left) - getBigInt(right))
+    }
+    return this.make(getNum(left) - getNum(right))
   }
 
   mul(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const result = this.getNum(left) * this.getNum(right)
-    return { type: INTEGER_TYPE, rawValue: this.truncate(result) }
+    if (this.useBigInt) {
+      return this.make(getBigInt(left) * getBigInt(right))
+    }
+    return this.make(getNum(left) * getNum(right))
   }
 
   div(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const l = this.getNum(left)
-    const r = this.getNum(right)
-    if (r === 0) {
-      throw new Error('Division by zero')
+    const r = getNum(right)
+    if (r === 0) throw new Error('Division by zero')
+    if (this.useBigInt) {
+      const l = getBigInt(left)
+      const rr = BigInt(r)
+      // 向零截断
+      const result = l / rr
+      return this.make(result)
     }
-    // Pascal DIV 是向零截断
-    const result = Math.trunc(l / r)
-    return { type: INTEGER_TYPE, rawValue: this.truncate(result) }
+    return this.make(Math.trunc(getNum(left) / r))
   }
 
   intDiv(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
@@ -120,78 +191,90 @@ abstract class IntegerType implements PascalType {
   }
 
   mod(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const l = this.getNum(left)
-    const r = this.getNum(right)
-    if (r === 0) {
-      throw new Error('Modulo by zero')
+    const r = getNum(right)
+    if (r === 0) throw new Error('Modulo by zero')
+    if (this.useBigInt) {
+      const l = getBigInt(left)
+      const rr = BigInt(r)
+      const result = l - (l / rr) * rr
+      return this.make(result)
     }
-    // Pascal MOD 的符号跟随除数
-    const result = l - Math.trunc(l / r) * r
-    return { type: INTEGER_TYPE, rawValue: this.truncate(result) }
+    const l = getNum(left)
+    return this.make(l - Math.trunc(l / r) * r)
   }
 
   eq(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) === this.getNum(right) }
+    return makeBoolean(getNum(left) === getNum(right))
   }
 
   ne(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) !== this.getNum(right) }
+    return makeBoolean(getNum(left) !== getNum(right))
   }
 
   lt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) < this.getNum(right) }
+    return makeBoolean(getNum(left) < getNum(right))
   }
 
   le(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) <= this.getNum(right) }
+    return makeBoolean(getNum(left) <= getNum(right))
   }
 
   gt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) > this.getNum(right) }
+    return makeBoolean(getNum(left) > getNum(right))
   }
 
   ge(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) >= this.getNum(right) }
-  }
-
-  neg(): PascalValue {
-    return { type: INTEGER_TYPE, rawValue: 0 }
-  }
-
-  pos(): PascalValue {
-    return { type: INTEGER_TYPE, rawValue: 0 }
-  }
-
-  not(): PascalValue {
-    throw new Error('NOT operator not applicable to integer type')
+    return makeBoolean(getNum(left) >= getNum(right))
   }
 }
 
-// INTEGER (16-bit signed)
 class Integer16Type extends IntegerType {
-  readonly name = 'INTEGER'
+  readonly name = 'INTEGER16'
   readonly min = -32768
   readonly max = 32767
+  readonly useBigInt = false
 }
 
-// SMALLINT (8-bit signed)
+class Integer32Type extends IntegerType {
+  readonly name = 'INTEGER'
+  readonly min = -2147483648
+  readonly max = 2147483647
+  readonly useBigInt = false
+}
+
 class SmallIntType extends IntegerType {
   readonly name = 'SMALLINT'
   readonly min = -128
   readonly max = 127
+  readonly useBigInt = false
 }
 
-// LONGINT (32-bit signed)
 class LongIntType extends IntegerType {
   readonly name = 'LONGINT'
-  readonly min = -2147483648
-  readonly max = 2147483647
+  readonly min = BigInt('-2147483648')
+  readonly max = BigInt('2147483647')
+  readonly useBigInt = true
+}
 
-  // LONGINT 运算需要特殊处理
-  protected truncate(value: number): number {
-    // 使用 32 位整数模拟
-    return value | 0
-  }
+class LongWordType extends IntegerType {
+  readonly name = 'LONGWORD'
+  readonly min = BigInt(0)
+  readonly max = BigInt('4294967295')
+  readonly useBigInt = true
+}
+
+class ByteType extends IntegerType {
+  readonly name = 'BYTE'
+  readonly min = 0
+  readonly max = 255
+  readonly useBigInt = false
+}
+
+class WordType extends IntegerType {
+  readonly name = 'WORD'
+  readonly min = 0
+  readonly max = 65535
+  readonly useBigInt = false
 }
 
 // ============================================================================
@@ -202,7 +285,7 @@ class RealType implements PascalType {
   readonly name = 'REAL'
   readonly kind = 'real' as const
 
-  checkRange(value: number): boolean {
+  checkRange(value: number | bigint): boolean {
     return true
   }
 
@@ -210,60 +293,46 @@ class RealType implements PascalType {
     return other.kind === 'integer' || other.kind === 'real' || other.kind === 'subrange'
   }
 
-  private getNum(v: PascalValue): number {
-    return v.rawValue as number
-  }
-
   add(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: REAL_TYPE, rawValue: this.getNum(left) + this.getNum(right) }
+    return makeReal(getNum(left) + getNum(right))
   }
 
   sub(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: REAL_TYPE, rawValue: this.getNum(left) - this.getNum(right) }
+    return makeReal(getNum(left) - getNum(right))
   }
 
   mul(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: REAL_TYPE, rawValue: this.getNum(left) * this.getNum(right) }
+    return makeReal(getNum(left) * getNum(right))
   }
 
   div(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const r = this.getNum(right)
-    if (r === 0) {
-      throw new Error('Division by zero')
-    }
-    return { type: REAL_TYPE, rawValue: this.getNum(left) / r }
+    const r = getNum(right)
+    if (r === 0) throw new Error('Division by zero')
+    return makeReal(getNum(left) / r)
   }
 
   eq(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) === this.getNum(right) }
+    return makeBoolean(getNum(left) === getNum(right))
   }
 
   ne(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) !== this.getNum(right) }
+    return makeBoolean(getNum(left) !== getNum(right))
   }
 
   lt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) < this.getNum(right) }
+    return makeBoolean(getNum(left) < getNum(right))
   }
 
   le(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) <= this.getNum(right) }
+    return makeBoolean(getNum(left) <= getNum(right))
   }
 
   gt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) > this.getNum(right) }
+    return makeBoolean(getNum(left) > getNum(right))
   }
 
   ge(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getNum(left) >= this.getNum(right) }
-  }
-
-  neg(): PascalValue {
-    return { type: REAL_TYPE, rawValue: 0 }
-  }
-
-  pos(): PascalValue {
-    return { type: REAL_TYPE, rawValue: 0 }
+    return makeBoolean(getNum(left) >= getNum(right))
   }
 }
 
@@ -275,40 +344,37 @@ class CharType implements PascalType {
   readonly name = 'CHAR'
   readonly kind = 'char' as const
 
-  checkRange(value: number): boolean {
-    return value >= 0 && value <= 255
+  checkRange(value: number | bigint): boolean {
+    const num = typeof value === 'bigint' ? Number(value) : value
+    return num >= 0 && num <= 255
   }
 
   isAssignableFrom(other: PascalType): boolean {
     return other.kind === 'char'
   }
 
-  private getChar(v: PascalValue): string {
-    return v.rawValue as string
-  }
-
   eq(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getChar(left) === this.getChar(right) }
+    return makeBoolean(getCharCode(left) === getCharCode(right))
   }
 
   ne(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getChar(left) !== this.getChar(right) }
+    return makeBoolean(getCharCode(left) !== getCharCode(right))
   }
 
   lt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getChar(left) < this.getChar(right) }
+    return makeBoolean(getCharCode(left) < getCharCode(right))
   }
 
   le(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getChar(left) <= this.getChar(right) }
+    return makeBoolean(getCharCode(left) <= getCharCode(right))
   }
 
   gt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getChar(left) > this.getChar(right) }
+    return makeBoolean(getCharCode(left) > getCharCode(right))
   }
 
   ge(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getChar(left) >= this.getChar(right) }
+    return makeBoolean(getCharCode(left) >= getCharCode(right))
   }
 }
 
@@ -320,40 +386,49 @@ class BooleanType implements PascalType {
   readonly name = 'BOOLEAN'
   readonly kind = 'boolean' as const
 
-  checkRange(value: number): boolean {
-    return value === 0 || value === 1
+  checkRange(value: number | bigint): boolean {
+    const num = typeof value === 'bigint' ? Number(value) : value
+    return num === 0 || num === 1
   }
 
   isAssignableFrom(other: PascalType): boolean {
     return other.kind === 'boolean'
   }
 
-  private getBool(v: PascalValue): boolean {
-    return v.rawValue as boolean
-  }
-
   eq(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getBool(left) === this.getBool(right) }
+    return makeBoolean(getBoolValue(left) === getBoolValue(right))
   }
 
   ne(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getBool(left) !== this.getBool(right) }
+    return makeBoolean(getBoolValue(left) !== getBoolValue(right))
   }
 
-  not(): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: true }
+  lt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return makeBoolean(getNum(left) < getNum(right))
+  }
+
+  le(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return makeBoolean(getNum(left) <= getNum(right))
+  }
+
+  gt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return makeBoolean(getNum(left) > getNum(right))
+  }
+
+  ge(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return makeBoolean(getNum(left) >= getNum(right))
   }
 }
 
 // ============================================================================
-// 字符串类型
+// 字符串类型 - 用 ASCII 数组表示
 // ============================================================================
 
 class StringType implements PascalType {
   readonly name = 'STRING'
   readonly kind = 'string' as const
 
-  checkRange(value: number): boolean {
+  checkRange(value: number | bigint): boolean {
     return true
   }
 
@@ -361,32 +436,218 @@ class StringType implements PascalType {
     return other.kind === 'string' || other.kind === 'char'
   }
 
-  private getStr(v: PascalValue): string {
-    return v.rawValue as string
-  }
-
   eq(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getStr(left) === this.getStr(right) }
+    const a = getStringChars(left)
+    const b = getStringChars(right)
+    if (a.length !== b.length) return makeBoolean(false)
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return makeBoolean(false)
+    }
+    return makeBoolean(true)
   }
 
   ne(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getStr(left) !== this.getStr(right) }
+    const eq = this.eq(other, left, right)
+    return makeBoolean(!getBoolValue(eq))
   }
 
   lt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getStr(left) < this.getStr(right) }
+    const a = getStringChars(left)
+    const b = getStringChars(right)
+    const len = Math.min(a.length, b.length)
+    for (let i = 0; i < len; i++) {
+      if (a[i] < b[i]) return makeBoolean(true)
+      if (a[i] > b[i]) return makeBoolean(false)
+    }
+    return makeBoolean(a.length < b.length)
   }
 
   le(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getStr(left) <= this.getStr(right) }
+    const lt = this.lt(other, left, right)
+    if (getBoolValue(lt)) return makeBoolean(true)
+    const eq = this.eq(other, left, right)
+    return eq
   }
 
   gt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getStr(left) > this.getStr(right) }
+    const le = this.le(other, left, right)
+    return makeBoolean(!getBoolValue(le))
   }
 
   ge(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    return { type: BOOLEAN_TYPE, rawValue: this.getStr(left) >= this.getStr(right) }
+    const lt = this.lt(other, left, right)
+    return makeBoolean(!getBoolValue(lt))
+  }
+}
+
+// ============================================================================
+// 子界类型
+// ============================================================================
+
+export class SubrangeType implements PascalType {
+  readonly kind = 'subrange' as const
+
+  constructor(
+    readonly name: string,
+    readonly baseType: PascalType,
+    readonly min: number,
+    readonly max: number
+  ) {}
+
+  checkRange(value: number | bigint): boolean {
+    const num = typeof value === 'bigint' ? Number(value) : value
+    return num >= this.min && num <= this.max && Number.isInteger(num)
+  }
+
+  isAssignableFrom(other: PascalType): boolean {
+    return other.kind === 'integer' || other.kind === 'subrange'
+  }
+
+  add(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.add!(other, left, right)
+  }
+
+  sub(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.sub!(other, left, right)
+  }
+
+  mul(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.mul!(other, left, right)
+  }
+
+  div(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.div!(other, left, right)
+  }
+
+  intDiv(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.intDiv!(other, left, right)
+  }
+
+  mod(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.mod!(other, left, right)
+  }
+
+  eq(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.eq!(other, left, right)
+  }
+
+  ne(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.ne!(other, left, right)
+  }
+
+  lt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.lt!(other, left, right)
+  }
+
+  le(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.le!(other, left, right)
+  }
+
+  gt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.gt!(other, left, right)
+  }
+
+  ge(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return this.baseType.ge!(other, left, right)
+  }
+}
+
+// ============================================================================
+// 数组类型
+// ============================================================================
+
+export interface PascalArray {
+  // 用一维数组存储，通过索引函数访问
+  elements: PascalValue[]
+  // 每个维度的下标范围
+  dimensions: { low: number; high: number }[]
+  elementType: PascalType
+}
+
+export class ArrayType implements PascalType {
+  readonly kind = 'array' as const
+
+  constructor(
+    readonly name: string,
+    readonly elementType: PascalType,
+    readonly dimensions: { low: number; high: number }[]
+  ) {}
+
+  checkRange(value: number | bigint): boolean {
+    return true
+  }
+
+  isAssignableFrom(other: PascalType): boolean {
+    // 数组之间一般不能整体赋值（除非完全相同）
+    return false
+  }
+}
+
+// ============================================================================
+// 记录类型
+// ============================================================================
+
+export interface PascalRecord {
+  fields: Map<string, PascalValue>
+}
+
+export class RecordType implements PascalType {
+  readonly kind = 'record' as const
+  readonly fieldTypes: Map<string, PascalType> = new Map()
+
+  constructor(
+    readonly name: string,
+    fields: { name: string; type: PascalType }[]
+  ) {
+    for (const f of fields) {
+      this.fieldTypes.set(f.name.toUpperCase(), f.type)
+    }
+  }
+
+  checkRange(value: number | bigint): boolean {
+    return true
+  }
+
+  isAssignableFrom(other: PascalType): boolean {
+    return false
+  }
+}
+
+// ============================================================================
+// 文件类型
+// ============================================================================
+
+export interface PascalFile {
+  // 文件内容，按行存储
+  lines: string[]
+  // 当前读取位置（行索引）
+  currentLine: number
+  // 当前行内的字符位置
+  currentChar: number
+  // 是否已到达文件末尾
+  eof: boolean
+  // 文件名（用于输出）
+  name?: string
+  // 是否可写
+  writable: boolean
+  // 写入缓冲区
+  writeBuffer: string
+}
+
+export class FileType implements PascalType {
+  readonly kind = 'file' as const
+
+  constructor(
+    readonly name: string,
+    readonly elementType: PascalType | null = null
+  ) {}
+
+  checkRange(value: number | bigint): boolean {
+    return true
+  }
+
+  isAssignableFrom(other: PascalType): boolean {
+    return other.kind === 'file'
   }
 }
 
@@ -394,9 +655,12 @@ class StringType implements PascalType {
 // 类型单例
 // ============================================================================
 
-export const INTEGER_TYPE: PascalType = new Integer16Type()
+export const INTEGER_TYPE: PascalType = new Integer32Type()
 export const SMALLINT_TYPE: PascalType = new SmallIntType()
 export const LONGINT_TYPE: PascalType = new LongIntType()
+export const LONGWORD_TYPE: PascalType = new LongWordType()
+export const BYTE_TYPE: PascalType = new ByteType()
+export const WORD_TYPE: PascalType = new WordType()
 export const REAL_TYPE: PascalType = new RealType()
 export const CHAR_TYPE: PascalType = new CharType()
 export const BOOLEAN_TYPE: PascalType = new BooleanType()
@@ -407,25 +671,165 @@ export const STRING_TYPE: PascalType = new StringType()
 // ============================================================================
 
 export function makeInteger(value: number): PascalValue {
-  // 检查范围并截断
-  const truncated = INTEGER_TYPE.checkRange(value) ? value : (value & 0xFFFF) - (value & 0x8000 ? 0x10000 : 0)
-  return { type: INTEGER_TYPE, rawValue: truncated }
+  const type = INTEGER_TYPE as IntegerType
+  return type.make(value)
+}
+
+export function makeLongInt(value: bigint | number): PascalValue {
+  const type = LONGINT_TYPE as IntegerType
+  const b = typeof value === 'bigint' ? value : BigInt(value)
+  return type.make(b)
 }
 
 export function makeReal(value: number): PascalValue {
   return { type: REAL_TYPE, rawValue: value }
 }
 
-export function makeChar(value: string): PascalValue {
-  return { type: CHAR_TYPE, rawValue: value }
+export function makeChar(value: number | string): PascalValue {
+  if (typeof value === 'string') {
+    return { type: CHAR_TYPE, rawValue: value.charCodeAt(0) }
+  }
+  return { type: CHAR_TYPE, rawValue: value & 0xFF }
 }
 
 export function makeBoolean(value: boolean): PascalValue {
-  return { type: BOOLEAN_TYPE, rawValue: value }
+  return { type: BOOLEAN_TYPE, rawValue: value ? 1 : 0 }
 }
 
-export function makeString(value: string): PascalValue {
+export function makeString(value: string | number[]): PascalValue {
+  if (typeof value === 'string') {
+    const chars: number[] = []
+    for (let i = 0; i < value.length; i++) {
+      chars.push(value.charCodeAt(i) & 0xFF)
+    }
+    return { type: STRING_TYPE, rawValue: chars }
+  }
   return { type: STRING_TYPE, rawValue: value }
+}
+
+export function makeDefaultValue(type: PascalType): PascalValue {
+  switch (type.kind) {
+    case 'integer':
+      return type === LONGINT_TYPE || type === LONGWORD_TYPE
+        ? { type, rawValue: BigInt(0) }
+        : { type, rawValue: 0 }
+    case 'real':
+      return { type, rawValue: 0 }
+    case 'char':
+      return { type, rawValue: 0 }
+    case 'boolean':
+      return { type, rawValue: 0 }
+    case 'string':
+      return { type, rawValue: [] }
+    case 'subrange':
+      return { type, rawValue: (type as SubrangeType).min }
+    case 'array':
+      return createEmptyArray(type as ArrayType)
+    case 'record':
+      return createEmptyRecord(type as RecordType)
+    case 'file':
+      return { type, rawValue: createEmptyFile() }
+    default:
+      return { type: INTEGER_TYPE, rawValue: 0 }
+  }
+}
+
+export function createEmptyArray(arrayType: ArrayType): PascalValue {
+  const totalSize = arrayType.dimensions.reduce((acc, d) => acc * (d.high - d.low + 1), 1)
+  const elements: PascalValue[] = []
+  for (let i = 0; i < totalSize; i++) {
+    elements.push(makeDefaultValue(arrayType.elementType))
+  }
+  const arr: PascalArray = { elements, dimensions: arrayType.dimensions, elementType: arrayType.elementType }
+  return { type: arrayType, rawValue: arr }
+}
+
+export function createEmptyRecord(recordType: RecordType): PascalValue {
+  const fields = new Map<string, PascalValue>()
+  recordType.fieldTypes.forEach((type, name) => {
+    fields.set(name, makeDefaultValue(type))
+  })
+  return { type: recordType, rawValue: { fields } }
+}
+
+export function createEmptyFile(): PascalFile {
+  return { lines: [], currentLine: 0, currentChar: 0, eof: true, writable: false, writeBuffer: '' }
+}
+
+export function fileBufferChar(file: PascalFile): number {
+  if (file.eof || file.currentLine >= file.lines.length) return 0
+  const line = file.lines[file.currentLine]
+  if (file.currentChar >= line.length) return 0
+  return line.charCodeAt(file.currentChar) & 0xFF
+}
+
+export function fileEof(file: PascalFile): boolean {
+  return file.eof
+}
+
+export function fileEoln(file: PascalFile): boolean {
+  if (file.eof || file.currentLine >= file.lines.length) return true
+  const line = file.lines[file.currentLine]
+  return file.currentChar >= line.length
+}
+
+export function fileGet(file: PascalFile): void {
+  if (file.eof) return
+  const line = file.lines[file.currentLine]
+  file.currentChar++
+  if (file.currentChar > line.length) {
+    // GET past end-of-line moves to next line
+    file.currentLine++
+    file.currentChar = 0
+    if (file.currentLine >= file.lines.length) {
+      file.eof = true
+    }
+  }
+}
+
+export function fileReadln(file: PascalFile): void {
+  if (file.eof) return
+  file.currentLine++
+  file.currentChar = 0
+  if (file.currentLine >= file.lines.length) {
+    file.eof = true
+  }
+}
+
+export function fileReset(file: PascalFile): void {
+  file.currentLine = 0
+  file.currentChar = 0
+  file.eof = file.lines.length === 0
+  file.writable = false
+}
+
+export function fileRewrite(file: PascalFile): void {
+  file.lines = []
+  file.currentLine = 0
+  file.currentChar = 0
+  file.eof = true
+  file.writable = true
+  file.writeBuffer = ''
+}
+
+export function fileWrite(file: PascalFile, text: string): void {
+  if (file.writable) {
+    file.writeBuffer += text
+  }
+}
+
+export function fileWriteln(file: PascalFile): void {
+  if (file.writable) {
+    file.lines.push(file.writeBuffer)
+    file.writeBuffer = ''
+  }
+}
+
+export function fileClose(file: PascalFile): void {
+  if (file.writable && file.writeBuffer.length > 0) {
+    file.lines.push(file.writeBuffer)
+    file.writeBuffer = ''
+  }
 }
 
 // ============================================================================
@@ -436,6 +840,9 @@ const TYPE_TABLE: Record<string, PascalType> = {
   'INTEGER': INTEGER_TYPE,
   'SMALLINT': SMALLINT_TYPE,
   'LONGINT': LONGINT_TYPE,
+  'LONGWORD': LONGWORD_TYPE,
+  'BYTE': BYTE_TYPE,
+  'WORD': WORD_TYPE,
   'REAL': REAL_TYPE,
   'CHAR': CHAR_TYPE,
   'BOOLEAN': BOOLEAN_TYPE,
@@ -446,88 +853,53 @@ export function findType(name: string): PascalType | undefined {
   return TYPE_TABLE[name.toUpperCase()]
 }
 
+export function registerType(name: string, type: PascalType): void {
+  TYPE_TABLE[name.toUpperCase()] = type
+}
+
 // ============================================================================
 // 运算分发
 // ============================================================================
 
 export function binaryOp(op: string, left: PascalValue, right: PascalValue): PascalValue {
+  if (!left || !left.type) {
+    throw new Error(`binaryOp: left operand is undefined for operator ${op}`)
+  }
+  if (!right || !right.type) {
+    throw new Error(`binaryOp: right operand is undefined for operator ${op}`)
+  }
+
   const upper = op.toUpperCase()
 
   switch (upper) {
-    case '+': {
-      const fn = left.type.add?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator + not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '-': {
-      const fn = left.type.sub?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator - not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '*': {
-      const fn = left.type.mul?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator * not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '/': {
-      const fn = left.type.div?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator / not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case 'DIV': {
-      const fn = left.type.intDiv?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator DIV not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case 'MOD': {
-      const fn = left.type.mod?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator MOD not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '=': {
-      const fn = left.type.eq?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator = not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '<>': {
-      const fn = left.type.ne?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator <> not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '<': {
-      const fn = left.type.lt?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator < not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '<=': {
-      const fn = left.type.le?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator <= not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '>': {
-      const fn = left.type.gt?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator > not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case '>=': {
-      const fn = left.type.ge?.bind(left.type)
-      if (fn) return fn(right.type, left, right)
-      throw new Error(`Operator >= not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case 'AND': {
-      // AND 只适用于布尔类型
-      if (left.type.kind === 'boolean' && right.type.kind === 'boolean') {
-        return makeBoolean((left.rawValue as boolean) && (right.rawValue as boolean))
-      }
-      throw new Error(`Operator AND not supported for ${left.type.name} and ${right.type.name}`)
-    }
-    case 'OR': {
-      // OR 只适用于布尔类型
-      if (left.type.kind === 'boolean' && right.type.kind === 'boolean') {
-        return makeBoolean((left.rawValue as boolean) || (right.rawValue as boolean))
-      }
-      throw new Error(`Operator OR not supported for ${left.type.name} and ${right.type.name}`)
-    }
+    case '+':
+      return left.type.add!(right.type, left, right)
+    case '-':
+      return left.type.sub!(right.type, left, right)
+    case '*':
+      return left.type.mul!(right.type, left, right)
+    case '/':
+      return left.type.div!(right.type, left, right)
+    case 'DIV':
+      return left.type.intDiv!(right.type, left, right)
+    case 'MOD':
+      return left.type.mod!(right.type, left, right)
+    case '=':
+      return left.type.eq!(right.type, left, right)
+    case '<>':
+      return left.type.ne!(right.type, left, right)
+    case '<':
+      return left.type.lt!(right.type, left, right)
+    case '<=':
+      return left.type.le!(right.type, left, right)
+    case '>':
+      return left.type.gt!(right.type, left, right)
+    case '>=':
+      return left.type.ge!(right.type, left, right)
+    case 'AND':
+      return makeBoolean(getBoolValue(left) && getBoolValue(right))
+    case 'OR':
+      return makeBoolean(getBoolValue(left) || getBoolValue(right))
     default:
       throw new Error(`Unknown operator: ${op}`)
   }
@@ -537,20 +909,16 @@ export function unaryOp(op: string, operand: PascalValue): PascalValue {
   const upper = op.toUpperCase()
 
   switch (upper) {
-    case '+': {
-      const value = operand.rawValue as number
-      return { type: operand.type, rawValue: value }
-    }
+    case '+':
+      return { type: operand.type, rawValue: operand.rawValue }
     case '-': {
-      const value = operand.rawValue as number
-      return { type: operand.type, rawValue: -value }
-    }
-    case 'NOT': {
-      if (operand.type.kind === 'boolean') {
-        return makeBoolean(!(operand.rawValue as boolean))
+      if (operand.type === LONGINT_TYPE || operand.type === LONGWORD_TYPE) {
+        return { type: operand.type, rawValue: -(operand.rawValue as bigint) }
       }
-      throw new Error(`Operator NOT not supported for ${operand.type.name}`)
+      return { type: operand.type, rawValue: -(operand.rawValue as number) }
     }
+    case 'NOT':
+      return makeBoolean(!getBoolValue(operand))
     default:
       throw new Error(`Unknown unary operator: ${op}`)
   }
@@ -565,14 +933,35 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
     return value
   }
 
+  // 整数到子界类型 或 子界到整数
+  if ((value.type.kind === 'integer' && targetType.kind === 'subrange') ||
+      (value.type.kind === 'subrange' && targetType.kind === 'integer')) {
+    return { type: targetType, rawValue: value.rawValue }
+  }
+
   // 整数到实数
   if (value.type.kind === 'integer' && targetType.kind === 'real') {
-    return makeReal(value.rawValue as number)
+    return makeReal(getNum(value))
   }
 
   // 字符到字符串
   if (value.type.kind === 'char' && targetType.kind === 'string') {
-    return makeString(value.rawValue as string)
+    return { type: STRING_TYPE, rawValue: [getCharCode(value)] }
+  }
+
+  // 字符到整数/子界（Pascal 中 ord(ch) 返回字符的 ASCII 码）
+  if (value.type.kind === 'char' && (targetType.kind === 'integer' || targetType.kind === 'subrange')) {
+    return { type: targetType, rawValue: getCharCode(value) }
+  }
+
+  // 布尔到整数（Pascal 中 ord(false)=0, ord(true)=1）
+  if (value.type.kind === 'boolean' && targetType.kind === 'integer') {
+    return { type: targetType, rawValue: getNum(value) }
+  }
+
+  // 整数到布尔
+  if (value.type.kind === 'integer' && targetType.kind === 'boolean') {
+    return makeBoolean(getNum(value) !== 0)
   }
 
   // 同类类型之间可以赋值
@@ -581,4 +970,25 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
   }
 
   throw new Error(`Cannot coerce ${value.type.name} to ${targetType.name}`)
+}
+
+// ============================================================================
+// 数组索引计算和访问
+// ============================================================================
+
+export function arrayIndex(array: PascalArray, indices: number[]): number {
+  if (indices.length !== array.dimensions.length) {
+    throw new Error(`Array index dimension mismatch: expected ${array.dimensions.length}, got ${indices.length}`)
+  }
+
+  let index = 0
+  for (let i = 0; i < indices.length; i++) {
+    const dim = array.dimensions[i]
+    const idx = indices[i]
+    if (idx < dim.low || idx > dim.high) {
+      throw new Error(`Array index out of bounds: ${idx} not in [${dim.low}, ${dim.high}]`)
+    }
+    index = index * (dim.high - dim.low + 1) + (idx - dim.low)
+  }
+  return index
 }

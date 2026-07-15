@@ -213,6 +213,7 @@ export type StatementNode =
   | WithStatementNode
   | ProcedureCallNode
   | EmptyStatementNode
+  | LabeledStatementNode
 
 export interface CompoundStatementNode extends AstNode {
   kind: 'CompoundStatement'
@@ -273,6 +274,12 @@ export interface CaseBranchNode extends AstNode {
 export interface GotoStatementNode extends AstNode {
   kind: 'GotoStatement'
   label: IntegerLiteralNode
+}
+
+export interface LabeledStatementNode extends AstNode {
+  kind: 'LabeledStatement'
+  label: IntegerLiteralNode
+  statement: StatementNode
 }
 
 export interface WithStatementNode extends AstNode {

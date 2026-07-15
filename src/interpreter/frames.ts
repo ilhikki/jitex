@@ -15,45 +15,96 @@ import type {
   WithStatementNode,
   ExpressionNode,
   IntegerLiteralNode,
+  BinaryExpressionNode,
   CaseBranchNode,
   AssignmentNode,
   IdentifierNode,
+  ArrayAccessNode,
+  FieldAccessNode,
+  VariableDeclarationNode,
+  ParenthesizedExpressionNode,
+  LabeledStatementNode,
 } from '../ast/types'
-import type { Frame, State, Scope, PascalValue } from './types'
+import type { Frame, State, Scope, PascalValue, PascalType } from './types'
 import { createScope } from './types'
-import { evalExpr, inferExprType, lookupVariableType } from './evaluator'
+import {
+  evalExpr,
+  inferExprType,
+  lookupVariableType,
+  bindArguments,
+  formatValue,
+} from './evaluator'
+import { resolveType } from './types'
 import {
   makeInteger,
   makeReal,
   makeBoolean,
   makeString,
+  makeChar,
+  makeDefaultValue,
   findType,
   coerceToType,
   binaryOp,
   INTEGER_TYPE,
+  REAL_TYPE,
+  CHAR_TYPE,
+  BOOLEAN_TYPE,
+  STRING_TYPE,
+  ArrayType,
+  RecordType,
+  FileType, PascalArray,
+  PascalRecord,
+  PascalFile,
+  createEmptyFile,
+  arrayIndex,
+  createEmptyArray,
+  getNum,
+  getCharCode,
+  getStringChars,
+  getBoolValue,
+  fileBufferChar,
+  fileReset,
+  fileRewrite,
+  fileGet,
+  fileReadln,
+  fileWrite,
+  fileWriteln,
+  fileClose,
+  fileEof,
+  fileEoln,
 } from './types/pascal-value'
 
 export function createProgramFrame(program: ProgramNode): Frame {
   let pushed = false
+  const compound = program.block.compound
   return {
     kind: 'Program',
     done: false,
     step(state: State) {
       if (!pushed) {
-        state.stack.push(createCompoundFrame(state.program.block.compound))
+        state.stack.push(createCompoundFrame(compound))
         pushed = true
         return
       }
       this.done = true
     },
+    hasTag(label: number): boolean {
+      return statementHasLabel(compound, label)
+    },
+    gotoTag(label: number, state: State): void {
+      const frame = createCompoundFrame(compound)
+      if (frame.gotoTag) frame.gotoTag(label, state)
+      state.stack.push(frame)
+      pushed = true
+    },
   }
 }
 
-export function createCompoundFrame(node: CompoundStatementNode): Frame {
-  let index = 0
+export function createCompoundFrame(node: CompoundStatementNode, startIndex: number = 0): Frame {
+  let index = startIndex
   const statements = node.statements
 
-  return {
+  const frame: Frame = {
     kind: 'Compound',
     done: false,
     step(state: State) {
@@ -64,7 +115,26 @@ export function createCompoundFrame(node: CompoundStatementNode): Frame {
       state.stack.push(createStatementFrame(statements[index]))
       index++
     },
+    hasTag(label: number): boolean {
+      return statements.some(s => statementHasLabel(s, label))
+    },
+    gotoTag(label: number, state: State): void {
+      for (let i = 0; i < statements.length; i++) {
+        const stmt = statements[i]
+        if (stmt.kind === 'LabeledStatement' && (stmt as any).label.value === label) {
+          index = i + 1
+          state.stack.push(createStatementFrame((stmt as any).statement))
+          return
+        }
+        if (statementHasLabel(stmt, label)) {
+          index = i + 1
+          pushAndGotoTag(stmt, label, state)
+          return
+        }
+      }
+    },
   }
+  return frame
 }
 
 export function createEmptyFrame(_node: EmptyStatementNode): Frame {
@@ -77,6 +147,7 @@ export function createFunctionFrame(
 ): Frame & { decl: ProcedureDeclarationNode | FunctionDeclarationNode; savedScope: Scope | null } {
   let phase: 'init' | 'running' = 'init'
   let savedScope: Scope | null = null
+  const compound = decl.block ? decl.block.compound : null
 
   return {
     kind: 'Function',
@@ -90,17 +161,9 @@ export function createFunctionFrame(
         state.currentScope = fnScope
 
         if (decl.block) {
+          // 初始化局部变量
           decl.block.variableDeclarations.forEach(v => {
-            const typeName = v.type && v.type.kind === 'SimpleType' ? (v.type as any).name.name : 'INTEGER'
-            const varType = findType(typeName) || INTEGER_TYPE
-            v.names.forEach(n => {
-              const defaultValue = varType.kind === 'integer' ? makeInteger(0) :
-                                   varType.kind === 'real' ? makeReal(0) :
-                                   varType.kind === 'boolean' ? makeBoolean(false) :
-                                   makeInteger(0)
-              fnScope.variables.set(n.name.toUpperCase(), defaultValue)
-              fnScope.variableTypes.set(n.name.toUpperCase(), varType)
-            })
+            initVariables(v, fnScope, state)
           })
           state.stack.push(createCompoundFrame(decl.block.compound))
         }
@@ -114,7 +177,27 @@ export function createFunctionFrame(
       }
       this.done = true
     },
+    hasTag(label: number): boolean {
+      return compound ? statementHasLabel(compound, label) : false
+    },
+    gotoTag(label: number, state: State): void {
+      if (!compound) return
+      const frame = createCompoundFrame(compound)
+      if (frame.gotoTag) frame.gotoTag(label, state)
+      state.stack.push(frame)
+      phase = 'running'
+    },
   }
+}
+
+// 初始化变量声明（支持数组、记录、文件）
+function initVariables(v: VariableDeclarationNode, scope: Scope, state: State): void {
+  const varType = resolveType(v.type, state)
+  v.names.forEach(n => {
+    const name = n.name.toUpperCase()
+    scope.variables.set(name, makeDefaultValue(varType))
+    scope.variableTypes.set(name, varType)
+  })
 }
 
 export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
@@ -125,49 +208,40 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
       const name = node.name.name.toUpperCase()
 
       if (name === 'WRITE' || name === 'WRITELN') {
-        for (const arg of node.arguments) {
-          const value = evalExpr(arg, state.currentScope, state)
-          state.outputBuffer.push(String(value.rawValue))
+        handleWrite(node.arguments, state, name === 'WRITELN')
+        this.done = true
+        return
+      }
+
+      if (name === 'CONSOLE_LOG') {
+        const vals = node.arguments.map(a => formatOutputArg(a, state))
+        const msg = vals.join(' ')
+        // 同时写入 TERMOUT 文件和 outputBuffer
+        const termoutFile = state.globalScope.variables.get('TERMOUT')
+        if (termoutFile && termoutFile.type.kind === 'file') {
+          fileWrite(termoutFile.rawValue as PascalFile, msg + '\n')
         }
-        if (name === 'WRITELN') {
-          state.outputBuffer.push('\n')
-        }
+        state.outputBuffer.push(`[LOG] ${msg}\n`)
         this.done = true
         return
       }
 
       if (name === 'READ' || name === 'READLN') {
-        for (const arg of node.arguments) {
-          if (arg.kind === 'Identifier') {
-            const varName = (arg as IdentifierNode).name.toUpperCase()
-            const inputValue = state.inputQueue.shift() || ''
-            const varType = lookupVariableType(varName, state.currentScope) || INTEGER_TYPE
+        handleRead(node.arguments, state, name === 'READLN')
+        this.done = true
+        return
+      }
 
-            let value: PascalValue
-            if (varType.kind === 'integer') {
-              value = makeInteger(parseInt(inputValue, 10) || 0)
-            } else if (varType.kind === 'real') {
-              value = makeReal(parseFloat(inputValue) || 0)
-            } else {
-              value = makeString(inputValue)
-            }
-
-            let targetScope = findVariableScope(varName, state.currentScope)
-            if (targetScope) {
-              targetScope.variables.set(varName, value)
-            } else {
-              state.currentScope.variables.set(varName, value)
-            }
+      if (name === 'BREAK') {
+        // 跳出最近的循环
+        while (state.stack.length > 0) {
+          const frame = state.stack[state.stack.length - 1]
+          if (frame.kind === 'While' || frame.kind === 'Repeat' || frame.kind === 'For') {
+            frame.done = true
+            state.stack.pop()
+            break
           }
-        }
-        if (name === 'READLN') {
-          // 跳过剩余行
-          while (state.inputQueue.length > 0 && state.inputQueue[0] !== '\n') {
-            state.inputQueue.shift()
-          }
-          if (state.inputQueue[0] === '\n') {
-            state.inputQueue.shift()
-          }
+          state.stack.pop()
         }
         this.done = true
         return
@@ -196,16 +270,51 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
         return
       }
 
+      // 文件操作
+      if (name === 'RESET') {
+        handleFileReset(node.arguments, state)
+        this.done = true
+        return
+      }
+      if (name === 'REWRITE') {
+        handleFileRewrite(node.arguments, state)
+        this.done = true
+        return
+      }
+      if (name === 'GET') {
+        handleFileGet(node.arguments, state)
+        this.done = true
+        return
+      }
+      if (name === 'PUT') {
+        handleFilePut(node.arguments, state)
+        this.done = true
+        return
+      }
+      if (name === 'CLOSE') {
+        handleFileClose(node.arguments, state)
+        this.done = true
+        return
+      }
+      if (name === 'BREAK') {
+        // BREAK(F) 用于刷新文件输出，暂不实现
+        this.done = true
+        return
+      }
+
+      // 用户定义的过程/函数
       const procDecl = state.declarations.findProcedure(name, state.currentScope)
       if (procDecl) {
-        state.stack.push(createFunctionFrame(procDecl, []))
+        const frame = createFunctionFrame(procDecl, [])
+        state.stack.push(frame)
         this.done = true
         return
       }
 
       const funcDecl = state.declarations.findFunction(name, state.currentScope)
       if (funcDecl) {
-        state.stack.push(createFunctionFrame(funcDecl, []))
+        const frame = createFunctionFrame(funcDecl, [])
+        state.stack.push(frame)
         this.done = true
         return
       }
@@ -213,6 +322,183 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
       this.done = true
     },
   }
+}
+
+// ============================================================================
+// READ / READLN
+// ============================================================================
+
+function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): void {
+  let fileArg: PascalFile | null = null
+  const varArgs: { name: string; scope: Scope | null; type: PascalType }[] = []
+
+  for (const arg of args) {
+    if (arg.kind === 'Identifier') {
+      const varName = (arg as IdentifierNode).name.toUpperCase()
+      const varType = lookupVariableType(varName, state.currentScope) || INTEGER_TYPE
+      const targetScope = findVariableScope(varName, state.currentScope)
+
+      if (varType.kind === 'file') {
+        const value = targetScope
+          ? targetScope.variables.get(varName)
+          : state.currentScope.variables.get(varName)
+        if (value) fileArg = value.rawValue as PascalFile
+      } else {
+        varArgs.push({ name: varName, scope: targetScope, type: varType })
+      }
+    }
+  }
+
+  for (const v of varArgs) {
+    let value: PascalValue
+    if (fileArg) {
+      // 从文件读取（文本文件逐字符/逐值）
+      const ch = fileBufferChar(fileArg)
+      if (v.type.kind === 'char') {
+        value = makeChar(ch)
+      } else if (v.type.kind === 'integer') {
+        value = makeInteger(ch)
+      } else {
+        value = makeChar(ch)
+      }
+      fileGet(fileArg)
+    } else {
+      // 从 inputQueue 读取
+      if (v.type.kind === 'char') {
+        const input = state.inputQueue.shift() || ''
+        value = makeChar(input.charCodeAt(0) || 0)
+      } else if (v.type.kind === 'integer') {
+        const input = state.inputQueue.shift() || '0'
+        const num = parseInt(input, 10) || 0
+        value = v.type === findType('LONGINT') || v.type === findType('LONGWORD')
+          ? { type: v.type, rawValue: BigInt(num) }
+          : makeInteger(num)
+      } else if (v.type.kind === 'real') {
+        const input = state.inputQueue.shift() || '0'
+        value = makeReal(parseFloat(input) || 0)
+      } else if (v.type.kind === 'string') {
+        const input = state.inputQueue.shift() || ''
+        value = makeString(input)
+      } else {
+        const input = state.inputQueue.shift() || ''
+        value = makeString(input)
+      }
+    }
+
+    if (v.scope) {
+      v.scope.variables.set(v.name, value)
+    } else {
+      state.currentScope.variables.set(v.name, value)
+    }
+  }
+
+  if (isReadln) {
+    if (fileArg) {
+      fileReadln(fileArg)
+    } else {
+      while (state.inputQueue.length > 0 && state.inputQueue[0] !== '\n') {
+        state.inputQueue.shift()
+      }
+      if (state.inputQueue[0] === '\n') {
+        state.inputQueue.shift()
+      }
+    }
+  }
+}
+
+// ============================================================================
+// WRITE / WRITELN
+// ============================================================================
+
+function formatOutputArg(arg: ExpressionNode, state: State): string {
+  if (arg.kind === 'BinaryExpression' && (arg as BinaryExpressionNode).operator === ':') {
+    const bin = arg as BinaryExpressionNode
+    const value = evalExpr(bin.left, state.currentScope, state)
+    const width = getNum(evalExpr(bin.right, state.currentScope, state))
+    const str = formatValue(value)
+    if (str.length >= width) return str
+    return ' '.repeat(width - str.length) + str
+  }
+  const value = evalExpr(arg, state.currentScope, state)
+  return formatValue(value)
+}
+
+function handleWrite(args: ExpressionNode[], state: State, writeln: boolean): void {
+  if (args.length === 0) {
+    if (writeln) state.outputBuffer.push('\n')
+    return
+  }
+
+  const firstValue = evalExpr(args[0], state.currentScope, state)
+  if (firstValue.type.kind === 'file') {
+    const file = firstValue.rawValue as PascalFile
+    let text = ''
+    for (let i = 1; i < args.length; i++) {
+      text += formatOutputArg(args[i], state)
+    }
+    fileWrite(file, text)
+    if (writeln) fileWriteln(file)
+  } else {
+    let text = ''
+    for (const arg of args) {
+      text += formatOutputArg(arg, state)
+    }
+    state.outputBuffer.push(text)
+    if (writeln) state.outputBuffer.push('\n')
+  }
+}
+
+// ============================================================================
+// 文件操作
+// ============================================================================
+
+function getFileValue(arg: ExpressionNode, state: State): PascalValue | null {
+  if (arg.kind === 'Identifier') {
+    const name = (arg as IdentifierNode).name.toUpperCase()
+    let s: Scope | null = state.currentScope
+    while (s) {
+      if (s.variables.has(name)) {
+        return s.variables.get(name)!
+      }
+      s = s.parent
+    }
+  }
+  return null
+}
+
+function handleFileReset(args: ExpressionNode[], state: State): void {
+  if (args.length === 0) return
+  const fileValue = getFileValue(args[0], state)
+  if (!fileValue || fileValue.type.kind !== 'file') return
+  fileReset(fileValue.rawValue as PascalFile)
+}
+
+function handleFileRewrite(args: ExpressionNode[], state: State): void {
+  if (args.length === 0) return
+  const fileValue = getFileValue(args[0], state)
+  if (!fileValue || fileValue.type.kind !== 'file') return
+  fileRewrite(fileValue.rawValue as PascalFile)
+}
+
+function handleFileGet(args: ExpressionNode[], state: State): void {
+  if (args.length === 0) return
+  const fileValue = getFileValue(args[0], state)
+  if (!fileValue || fileValue.type.kind !== 'file') return
+  fileGet(fileValue.rawValue as PascalFile)
+}
+
+function handleFilePut(args: ExpressionNode[], state: State): void {
+  if (args.length === 0) return
+  const fileValue = getFileValue(args[0], state)
+  if (!fileValue || fileValue.type.kind !== 'file') return
+  // PUT 在文本文件中不常用，这里忽略
+}
+
+function handleFileClose(args: ExpressionNode[], state: State): void {
+  if (args.length === 0) return
+  const fileValue = getFileValue(args[0], state)
+  if (!fileValue || fileValue.type.kind !== 'file') return
+  fileClose(fileValue.rawValue as PascalFile)
 }
 
 // --- IfFrame ---
@@ -225,7 +511,7 @@ export function createIfFrame(node: IfStatementNode): Frame {
     step(state: State) {
       if (phase === 'eval') {
         const condition = evalExpr(node.condition, state.currentScope, state)
-        const conditionBool = Boolean(condition.rawValue)
+        const conditionBool = getBoolValue(condition)
         if (conditionBool && node.thenBranch) {
           state.stack.push(createStatementFrame(node.thenBranch))
         } else if (!conditionBool && node.elseBranch) {
@@ -235,6 +521,18 @@ export function createIfFrame(node: IfStatementNode): Frame {
         return
       }
       this.done = true
+    },
+    hasTag(label: number): boolean {
+      return statementHasLabel(node.thenBranch, label) ||
+        (node.elseBranch ? statementHasLabel(node.elseBranch, label) : false)
+    },
+    gotoTag(label: number, state: State): void {
+      if (statementHasLabel(node.thenBranch, label)) {
+        pushAndGotoTag(node.thenBranch, label, state)
+      } else if (node.elseBranch && statementHasLabel(node.elseBranch, label)) {
+        pushAndGotoTag(node.elseBranch, label, state)
+      }
+      phase = 'done'
     },
   }
 }
@@ -249,7 +547,7 @@ export function createWhileFrame(node: WhileStatementNode): Frame {
     step(state: State) {
       if (phase === 'eval') {
         const condition = evalExpr(node.condition, state.currentScope, state)
-        const conditionBool = Boolean(condition.rawValue)
+        const conditionBool = getBoolValue(condition)
         if (conditionBool) {
           state.stack.push(createStatementFrame(node.body))
           phase = 'running'
@@ -260,6 +558,13 @@ export function createWhileFrame(node: WhileStatementNode): Frame {
       }
 
       phase = 'eval'
+    },
+    hasTag(label: number): boolean {
+      return statementHasLabel(node.body, label)
+    },
+    gotoTag(label: number, state: State): void {
+      pushAndGotoTag(node.body, label, state)
+      phase = 'running'
     },
   }
 }
@@ -283,12 +588,25 @@ export function createRepeatFrame(node: RepeatStatementNode): Frame {
       }
 
       const condition = evalExpr(node.untilCondition, state.currentScope, state)
-      const conditionBool = Boolean(condition.rawValue)
+      const conditionBool = getBoolValue(condition)
       if (conditionBool) {
         this.done = true
       } else {
         phase = 'body'
       }
+    },
+    hasTag(label: number): boolean {
+      return node.statements.some(s => statementHasLabel(s, label))
+    },
+    gotoTag(label: number, state: State): void {
+      const compound: CompoundStatementNode = {
+        kind: 'CompoundStatement',
+        statements: node.statements,
+      }
+      const frame = createCompoundFrame(compound)
+      if (frame.gotoTag) frame.gotoTag(label, state)
+      state.stack.push(frame)
+      phase = 'eval'
     },
   }
 }
@@ -329,8 +647,8 @@ export function createForFrame(node: ForStatementNode): Frame {
           return
         }
 
-        const currentNum = current.rawValue as number
-        const finalNum = finalValue.rawValue as number
+        const currentNum = getNum(current)
+        const finalNum = getNum(finalValue)
 
         let shouldContinue = false
         if (isDownTo) {
@@ -351,6 +669,13 @@ export function createForFrame(node: ForStatementNode): Frame {
 
       this.done = true
     },
+    hasTag(label: number): boolean {
+      return statementHasLabel(node.body, label)
+    },
+    gotoTag(label: number, state: State): void {
+      pushAndGotoTag(node.body, label, state)
+      phase = 'eval'
+    },
   }
 }
 
@@ -369,9 +694,8 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
         for (const branch of node.branches) {
           for (const label of branch.labels) {
             const labelValue = evalExpr(label, state.currentScope, state)
-            // 比较 PascalValue
             const cmp = binaryOp('=', exprValue, labelValue)
-            if (cmp.rawValue === true) {
+            if (getBoolValue(cmp)) {
               matchedBranch = branch
               break
             }
@@ -390,6 +714,23 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
       }
       this.done = true
     },
+    hasTag(label: number): boolean {
+      return node.branches.some(b => statementHasLabel(b.statement, label)) ||
+        (node.otherwise ? statementHasLabel(node.otherwise, label) : false)
+    },
+    gotoTag(label: number, state: State): void {
+      for (const b of node.branches) {
+        if (statementHasLabel(b.statement, label)) {
+          pushAndGotoTag(b.statement, label, state)
+          phase = 'done'
+          return
+        }
+      }
+      if (node.otherwise && statementHasLabel(node.otherwise, label)) {
+        pushAndGotoTag(node.otherwise, label, state)
+        phase = 'done'
+      }
+    },
   }
 }
 
@@ -401,9 +742,51 @@ export function createGotoFrame(node: GotoStatementNode): Frame {
     kind: 'Goto',
     done: false,
     step(state: State) {
-      const targetStmt = state.declarations.labels.get(labelValue)
-      if (targetStmt) {
-        state.stack.push(createStatementFrame(targetStmt))
+      let foundIdx = -1
+      for (let i = state.stack.length - 1; i >= 0; i--) {
+        const frame = state.stack[i]
+        if (frame.kind === 'Program' || frame.kind === 'Function') {
+          if (frame.hasTag && frame.hasTag(labelValue)) {
+            foundIdx = i
+          }
+          break
+        }
+        if (frame.hasTag && frame.hasTag(labelValue)) {
+          foundIdx = i
+          break
+        }
+      }
+
+      if (foundIdx < 0) {
+        this.done = true
+        return
+      }
+
+      while (state.stack.length > foundIdx + 1) {
+        state.stack.pop()
+      }
+
+      const target = state.stack[foundIdx]
+      if (target.gotoTag) {
+        target.gotoTag(labelValue, state)
+      }
+
+      this.done = true
+    },
+  }
+}
+
+// --- LabeledFrame ---
+export function createLabeledFrame(node: LabeledStatementNode): Frame {
+  let pushed = false
+  return {
+    kind: 'Labeled',
+    done: false,
+    step(state: State) {
+      if (!pushed) {
+        state.stack.push(createStatementFrame(node.statement))
+        pushed = true
+        return
       }
       this.done = true
     },
@@ -425,6 +808,13 @@ export function createWithFrame(node: WithStatementNode): Frame {
       }
       this.done = true
     },
+    hasTag(label: number): boolean {
+      return statementHasLabel(node.body, label)
+    },
+    gotoTag(label: number, state: State): void {
+      pushAndGotoTag(node.body, label, state)
+      phase = 'done'
+    },
   }
 }
 
@@ -435,37 +825,109 @@ export function createAssignmentFrame(node: AssignmentNode): Frame {
     done: false,
     step(state: State) {
       const rightValue = evalExpr(node.right, state.currentScope, state)
-      assignToLeft(node.left, rightValue, state.currentScope, state)
+      assignToLeft(node.left, rightValue, state)
       this.done = true
     },
   }
 }
 
-function assignToLeft(left: ExpressionNode, value: PascalValue, scope: Scope, state: State): void {
+function assignToLeft(left: ExpressionNode, value: PascalValue, state: State): void {
   if (left.kind === 'Identifier') {
     const name = (left as IdentifierNode).name.toUpperCase()
+    const scope = state.currentScope
 
     if (scope.functionDecl && scope.functionDecl.name.name.toUpperCase() === name) {
-      // 赋值给函数名 = 设置返回值
       state.returnValue = value
-    } else {
-      // 查找变量类型，进行类型检查和转换
-      const targetType = lookupVariableType(name, scope)
-      let finalValue = value
-
-      if (targetType) {
-        // 类型转换（如整数到实数）
-        finalValue = coerceToType(value, targetType)
-      }
-
-      let targetScope = findVariableScope(name, scope)
-      if (targetScope) {
-        targetScope.variables.set(name, finalValue)
-      } else {
-        scope.variables.set(name, finalValue)
-      }
+      return
     }
+
+    const targetType = lookupVariableType(name, scope)
+    const finalValue = targetType ? coerceToType(value, targetType) : value
+
+    const targetScope = findVariableScope(name, scope)
+    if (targetScope) {
+      targetScope.variables.set(name, finalValue)
+    } else {
+      scope.variables.set(name, finalValue)
+    }
+    return
   }
+
+  if (left.kind === 'ArrayAccess') {
+    const access = left as ArrayAccessNode
+    const arrValue = evalLValueBase(access.array, state.currentScope, state)
+    if (arrValue.type.kind !== 'array') {
+      throw new Error('Array assignment target is not an array')
+    }
+    const arr = arrValue.rawValue as PascalArray
+    const indices = access.indices.map(idx => getNum(evalExpr(idx, state.currentScope, state)))
+    const flatIndex = arrayIndex(arr, indices)
+    arr.elements[flatIndex] = coerceToType(value, arr.elementType)
+    return
+  }
+
+  if (left.kind === 'FieldAccess') {
+    const access = left as FieldAccessNode
+    const objValue = evalLValueBase(access.object, state.currentScope, state)
+    if (objValue.type.kind !== 'record') {
+      throw new Error('Field assignment target is not a record')
+    }
+    const rec = objValue.rawValue as PascalRecord
+    const fieldName = access.field.name.toUpperCase()
+    const fieldType = (objValue.type as RecordType).fieldTypes.get(fieldName)
+    rec.fields.set(fieldName, fieldType ? coerceToType(value, fieldType) : value)
+    return
+  }
+
+  throw new Error(`Unsupported assignment target: ${left.kind}`)
+}
+
+function evalLValueBase(expr: ExpressionNode, scope: Scope, state: State): PascalValue {
+  if (expr.kind === 'Identifier') {
+    const value = lookupVariable((expr as IdentifierNode).name.toUpperCase(), scope)
+    if (!value) {
+      throw new Error(`Unknown variable: ${(expr as IdentifierNode).name}`)
+    }
+    return value
+  }
+  if (expr.kind === 'FieldAccess') {
+    const access = expr as FieldAccessNode
+    const objValue = evalLValueBase(access.object, scope, state)
+    if (objValue.type.kind !== 'record') {
+      throw new Error(`Field access on non-record type ${objValue.type.name}`)
+    }
+    const rec = objValue.rawValue as PascalRecord
+    const fieldName = access.field.name.toUpperCase()
+    const value = rec.fields.get(fieldName)
+    if (!value) throw new Error(`Unknown field: ${access.field.name}`)
+    return value
+  }
+  if (expr.kind === 'ArrayAccess') {
+    const access = expr as ArrayAccessNode
+    const arrValue = evalLValueBase(access.array, scope, state)
+    if (arrValue.type.kind !== 'array') {
+      throw new Error(`Array access on non-array type ${arrValue.type.name}`)
+    }
+    const arr = arrValue.rawValue as PascalArray
+    const indices = access.indices.map(idx => getNum(evalExpr(idx, scope, state)))
+    const flatIndex = arrayIndex(arr, indices)
+    return arr.elements[flatIndex]
+  }
+  if (expr.kind === 'ParenthesizedExpression') {
+    return evalLValueBase((expr as ParenthesizedExpressionNode).expression, scope, state)
+  }
+  throw new Error(`Unsupported lvalue base: ${expr.kind}`)
+}
+
+function lookupVariable(name: string, scope: Scope): PascalValue | null {
+  let s: Scope | null = scope
+  while (s) {
+    if (s.variables.has(name)) {
+      return s.variables.get(name)!
+    }
+    s = s.parent
+  }
+  return null
 }
 
 function findVariableScope(name: string, scope: Scope): Scope | null {
@@ -515,16 +977,62 @@ export function createStatementFrame(stmt: StatementNode): Frame {
     case 'WithStatement':
       return createWithFrame(stmt as WithStatementNode)
 
+    case 'LabeledStatement':
+      return createLabeledFrame(stmt as LabeledStatementNode)
+
     default:
       return { kind: 'Unknown', done: true, step() {} }
+  }
+}
+
+// ============================================================================
+// 标签查找辅助函数
+// ============================================================================
+
+function statementHasLabel(stmt: StatementNode, label: number): boolean {
+  switch (stmt.kind) {
+    case 'LabeledStatement': {
+      const ls = stmt as any
+      return ls.label.value === label || statementHasLabel(ls.statement, label)
+    }
+    case 'CompoundStatement':
+      return (stmt as any).statements.some((s: StatementNode) => statementHasLabel(s, label))
+    case 'IfStatement': {
+      const s = stmt as any
+      return statementHasLabel(s.thenBranch, label) ||
+        (s.elseBranch ? statementHasLabel(s.elseBranch, label) : false)
+    }
+    case 'WhileStatement':
+    case 'ForStatement':
+      return statementHasLabel((stmt as any).body, label)
+    case 'RepeatStatement':
+      return (stmt as any).statements.some((s: StatementNode) => statementHasLabel(s, label))
+    case 'CaseStatement': {
+      const s = stmt as any
+      return s.branches.some((b: any) => statementHasLabel(b.statement, label)) ||
+        (s.otherwise ? statementHasLabel(s.otherwise, label) : false)
+    }
+    case 'WithStatement':
+      return statementHasLabel((stmt as any).body, label)
+    default:
+      return false
+  }
+}
+
+function pushAndGotoTag(stmt: StatementNode, label: number, state: State): void {
+  const frame = createStatementFrame(stmt)
+  state.stack.push(frame)
+  if (frame.gotoTag) {
+    frame.gotoTag(label, state)
   }
 }
 
 // --- Helper for creating function call frames ---
 export function createFunctionCallFrame(
   decl: ProcedureDeclarationNode | FunctionDeclarationNode,
-  _args: ExpressionNode[],
-  _state: State
+  args: ExpressionNode[],
+  state: State
 ): Frame {
+  // 参数绑定在调用点已经处理，这里只需要创建函数帧
   return createFunctionFrame(decl, [])
 }

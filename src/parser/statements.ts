@@ -4,6 +4,7 @@ import {
   IfStatementNode, WhileStatementNode, RepeatStatementNode,
   ForStatementNode, CaseStatementNode, CaseBranchNode,
   GotoStatementNode, WithStatementNode, ProcedureCallNode,
+  LabeledStatementNode,
   IdentifierNode, IntegerLiteralNode,
 } from '../ast/types'
 import { peek, ok, fail, matchType, matchKeyword, expectType, expectKeyword, parseList } from './helpers'
@@ -96,6 +97,7 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
 function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   // label: statement
   const labelToken = peek(input)
+  const labelValue = parseInt(labelToken.content, 10)
   let pos = input.position + 1
 
   const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
@@ -105,7 +107,11 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
   if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
 
-  return ok(stmtResult.newPosition, stmtResult.astNode)
+  return ok(stmtResult.newPosition, {
+    kind: 'LabeledStatement',
+    label: { kind: 'IntegerLiteral', value: labelValue, raw: labelToken.content } as IntegerLiteralNode,
+    statement: stmtResult.astNode,
+  } as LabeledStatementNode)
 }
 
 function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {

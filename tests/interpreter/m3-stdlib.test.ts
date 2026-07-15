@@ -1,5 +1,5 @@
 import { parse } from '../../src/index'
-import { createState, runToCompletion, State } from '../../src/interpreter'
+import { createState, runToCompletion, State, PascalValue } from '../../src/interpreter'
 
 function makeState(source: string, input?: string[]): State {
   const result = parse(source)
@@ -16,7 +16,10 @@ function getVar(state: State, name: string): any {
   let s: any = state.currentScope
   while (s) {
     if (s.variables.has(upper)) {
-      const value = s.variables.get(upper)
+      const value: PascalValue = s.variables.get(upper)
+      if (value.type.kind === 'boolean') return value.rawValue === 1
+      if (value.type.kind === 'char') return String.fromCharCode(value.rawValue as number)
+      if (value.type.kind === 'string') return (value.rawValue as number[]).map(c => String.fromCharCode(c)).join('')
       return value.rawValue
     }
     s = s.parent

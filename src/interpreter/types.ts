@@ -8,12 +8,34 @@ import type {
   StatementNode,
   BlockNode,
   LabelDeclarationNode,
+  TypeNode,
 } from '../ast/types'
 
 import type { PascalValue, PascalType } from './types/pascal-value'
 export { PascalValue, PascalType } from './types/pascal-value'
 export * from './types/pascal-value'
-import { makeInteger, makeReal, makeBoolean, makeChar, makeString, findType, INTEGER_TYPE } from './types/pascal-value'
+import {
+  makeDefaultValue,
+  findType,
+  registerType,
+  INTEGER_TYPE,
+  SubrangeType,
+  ArrayType,
+  RecordType,
+  FileType,
+} from './types/pascal-value'
+import type {
+  SimpleTypeNode,
+  RangeTypeNode,
+  ArrayTypeNode,
+  RecordTypeNode,
+  FileTypeNode,
+  IntegerLiteralNode,
+  IdentifierNode,
+  BinaryExpressionNode,
+  UnaryExpressionNode,
+  ExpressionNode,
+} from '../ast/types'
 
 // ============================================================================
 // Scope
@@ -54,6 +76,7 @@ export interface DeclarationTable {
   // Nested declaration lookup: search scope chain for procedures/functions
   findProcedure: (name: string, scope: Scope) => ProcedureDeclarationNode | null
   findFunction: (name: string, scope: Scope) => FunctionDeclarationNode | null
+  findLabel: (value: number, scope: Scope) => StatementNode | null
 }
 
 // ============================================================================
@@ -64,6 +87,8 @@ export interface Frame {
   kind: string
   done: boolean
   step: (state: State) => void
+  hasTag?(label: number): boolean
+  gotoTag?(label: number, state: State): void
 }
 
 // ============================================================================
@@ -92,6 +117,131 @@ export interface State {
 // ============================================================================
 // Helpers
 // ============================================================================
+
+export function resolveType(typeNode: TypeNode | null, state: State): PascalType {
+  if (!typeNode) return INTEGER_TYPE
+
+  switch (typeNode.kind) {
+    case 'SimpleType': {
+      const name = (typeNode as SimpleTypeNode).name.name.toUpperCase()
+      const builtin = findType(name)
+      if (builtin) return builtin
+
+      // 用户定义的类型（如 ASCIICODE）
+      const typeDecl = state.declarations.types.get(name)
+      if (typeDecl) {
+        const resolved = resolveType(typeDecl.typeDef, state)
+        registerType(name, resolved)
+        return resolved
+      }
+
+      return INTEGER_TYPE
+    }
+
+    case 'RangeType': {
+      const sub = typeNode as RangeTypeNode
+      const low = evaluateConstExpr(sub.start, state)
+      const high = evaluateConstExpr(sub.end, state)
+      return new SubrangeType(`${low}..${high}`, INTEGER_TYPE, low, high)
+    }
+
+    case 'ArrayType': {
+      const arr = typeNode as ArrayTypeNode
+      const elementType = resolveType(arr.elementType, state)
+      const dimensions = arr.indexTypes.map(idx => arrayDimension(idx, state))
+      return new ArrayType(`ARRAY`, elementType, dimensions)
+    }
+
+    case 'RecordType': {
+      const rec = typeNode as RecordTypeNode
+      const fields: { name: string; type: PascalType }[] = []
+      for (const fieldDecl of rec.fields) {
+        const fieldType = resolveType(fieldDecl.type, state)
+        for (const nameNode of fieldDecl.names) {
+          fields.push({ name: nameNode.name, type: fieldType })
+        }
+      }
+      return new RecordType(`RECORD`, fields)
+    }
+
+    case 'FileType': {
+      const file = typeNode as FileTypeNode
+      const elementType = file.elementType ? resolveType(file.elementType, state) : null
+      return new FileType(`FILE`, elementType)
+    }
+
+    default:
+      return INTEGER_TYPE
+  }
+}
+
+function arrayDimension(idx: TypeNode, state: State): { low: number; high: number } {
+  if (idx.kind === 'RangeType') {
+    const sub = idx as RangeTypeNode
+    return {
+      low: evaluateConstExpr(sub.start, state),
+      high: evaluateConstExpr(sub.end, state),
+    }
+  }
+
+  if (idx.kind === 'SimpleType') {
+    const resolved = resolveType(idx, state)
+    if (resolved.kind === 'subrange') {
+      const sub = resolved as SubrangeType
+      return { low: sub.min, high: sub.max }
+    }
+    if (resolved.kind === 'char') {
+      return { low: 0, high: 255 }
+    }
+  }
+
+  return { low: 0, high: 0 }
+}
+
+export function evaluateConstExpr(expr: ExpressionNode, state: State): number {
+  switch (expr.kind) {
+    case 'IntegerLiteral':
+      return (expr as IntegerLiteralNode).value
+
+    case 'Identifier': {
+      const name = (expr as IdentifierNode).name.toUpperCase()
+      const value = state.globalScope.variables.get(name)
+      if (value) {
+        const raw = value.rawValue
+        return typeof raw === 'bigint' ? Number(raw) : raw as number
+      }
+      throw new Error(`Unknown constant: ${name}`)
+    }
+
+    case 'BinaryExpression': {
+      const bin = expr as BinaryExpressionNode
+      const left = evaluateConstExpr(bin.left, state)
+      const right = evaluateConstExpr(bin.right, state)
+      switch (bin.operator.toUpperCase()) {
+        case '+': return left + right
+        case '-': return left - right
+        case '*': return left * right
+        case 'DIV': return Math.trunc(left / right)
+        case '/': return Math.trunc(left / right)
+        case 'MOD': return left - Math.trunc(left / right) * right
+        default: throw new Error(`Unsupported constant operator: ${bin.operator}`)
+      }
+    }
+
+    case 'UnaryExpression': {
+      const unary = expr as UnaryExpressionNode
+      const val = evaluateConstExpr(unary.operand, state)
+      switch (unary.operator.toUpperCase()) {
+        case '+': return val
+        case '-': return -val
+        default: throw new Error(`Unsupported constant unary operator: ${unary.operator}`)
+      }
+    }
+
+    default:
+      throw new Error(`Unsupported constant expression: ${expr.kind}`)
+  }
+}
 
 export function stackTrace(state: State): string[] {
   const trace: string[] = []
@@ -176,15 +326,64 @@ export function createDeclarations(block: BlockNode, parentScope: Scope): Declar
       }
       return functions.get(upper) || null
     },
+    findLabel: (value: number, scope: Scope) => {
+      // Pascal GOTO is intra-procedural: only search the current function/program block
+      if (scope.functionDecl) {
+        return findLabelInBlock(scope.functionDecl.block, value)
+      }
+      // At global scope, search program block
+      return findLabelInBlock(block, value)
+    },
   }
 }
 
 function collectLabels(stmt: StatementNode, labels: Map<number, StatementNode>): void {
-  // Search for labeled statements in the compound
-  // Labeled statements are stored as INTEGER followed by COLON in the parser
-  // The parser treats "label: statement" as a plain statement
-  // For M0 we do a simple walk — proper label collection needs position info
-  // For now, we skip label collection (M0 Full will handle GOTO)
+  switch (stmt.kind) {
+    case 'LabeledStatement': {
+      const ls = stmt as any
+      labels.set(ls.label.value, ls.statement)
+      collectLabels(ls.statement, labels)
+      break
+    }
+    case 'CompoundStatement': {
+      for (const s of (stmt as any).statements) collectLabels(s, labels)
+      break
+    }
+    case 'IfStatement': {
+      const s = stmt as any
+      collectLabels(s.thenBranch, labels)
+      if (s.elseBranch) collectLabels(s.elseBranch, labels)
+      break
+    }
+    case 'WhileStatement':
+      collectLabels((stmt as any).body, labels)
+      break
+    case 'RepeatStatement': {
+      for (const s of (stmt as any).statements) collectLabels(s, labels)
+      break
+    }
+    case 'ForStatement':
+      collectLabels((stmt as any).body, labels)
+      break
+    case 'CaseStatement': {
+      const s = stmt as any
+      for (const b of s.branches) collectLabels(b.statement, labels)
+      if (s.otherwise) collectLabels(s.otherwise, labels)
+      break
+    }
+    case 'WithStatement':
+      collectLabels((stmt as any).body, labels)
+      break
+    default:
+      break
+  }
+}
+
+function findLabelInBlock(block: BlockNode | null, value: number): StatementNode | null {
+  if (!block) return null
+  const labels = new Map<number, StatementNode>()
+  collectLabels(block.compound, labels)
+  return labels.get(value) || null
 }
 
 // ============================================================================
@@ -194,21 +393,6 @@ function collectLabels(stmt: StatementNode, labels: Map<number, StatementNode>):
 export function createState(program: ProgramNode): State {
   const globalScope = createScope(null, null)
   const declarations = createDeclarations(program.block, globalScope)
-
-  program.block.variableDeclarations.forEach(v => {
-    const typeName = v.type && v.type.kind === 'SimpleType' ? (v.type as any).name.name : 'INTEGER'
-    const varType = findType(typeName) || INTEGER_TYPE
-    v.names.forEach(n => {
-      const defaultValue = varType.kind === 'integer' ? makeInteger(0) :
-                           varType.kind === 'real' ? makeReal(0) :
-                           varType.kind === 'boolean' ? makeBoolean(false) :
-                           varType.kind === 'char' ? makeChar('\0') :
-                           varType.kind === 'string' ? makeString('') :
-                           makeInteger(0)
-      globalScope.variables.set(n.name.toUpperCase(), defaultValue)
-      globalScope.variableTypes.set(n.name.toUpperCase(), varType)
-    })
-  })
 
   const state: State = {
     stack: [],
@@ -221,6 +405,28 @@ export function createState(program: ProgramNode): State {
     outputBuffer: [],
     inputQueue: [],
   }
+
+  // 先求值常量，供类型解析使用
+  program.block.constDeclarations.forEach((c: ConstDeclarationNode) => {
+    const value = evaluateConstExpr(c.value, state)
+    globalScope.variables.set(c.name.name.toUpperCase(), { type: INTEGER_TYPE, rawValue: value })
+    globalScope.variableTypes.set(c.name.name.toUpperCase(), INTEGER_TYPE)
+  })
+
+  // 注册用户定义类型
+  program.block.typeDeclarations.forEach((t: TypeDeclarationNode) => {
+    const resolved = resolveType(t.typeDef, state)
+    registerType(t.name.name.toUpperCase(), resolved)
+  })
+
+  // 初始化变量
+  program.block.variableDeclarations.forEach(v => {
+    const varType = resolveType(v.type, state)
+    v.names.forEach(n => {
+      globalScope.variables.set(n.name.toUpperCase(), makeDefaultValue(varType))
+      globalScope.variableTypes.set(n.name.toUpperCase(), varType)
+    })
+  })
 
   return state
 }
