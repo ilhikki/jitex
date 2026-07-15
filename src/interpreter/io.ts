@@ -6,13 +6,10 @@
  * - PascalFileOps：文件操作，通过 state.io.file 调用
  * - PascalIO：包含 file 和 console 字段的运行时 IO
  *
- * createDefaultIO() 使用内存实现，console 默认 write/writeln 抛异常，read/readln 返回空。
- * createRecordFileOps() 文件底层依赖 PascalRecord。
+ * createDefaultIO() 全部方法抛异常，必须自定义才能使用。
+ * createRecordFileOps() 使用 Map<url, Uint8Array> 存储文件数据。
  * createCallbackConsole() 控制台底层依赖两个回调函数。
  */
-
-import { makeInteger, makeBoolean, makeString } from './types/pascal-value'
-import type { PascalValue } from './types/pascal-value'
 
 // ============================================================================
 // 抽象 PascalFile 句柄
@@ -64,150 +61,37 @@ export interface PascalIO {
 }
 
 // ============================================================================
-// 默认控制台实现：read 返回空，write 抛异常
+// 默认实现：全部抛异常（必须自定义才能使用）
 // ============================================================================
 
-function createDefaultConsole(): PascalConsole {
-  return {
-    write() { throw new Error('Console write is not implemented. Set state.io.console to use console output.') },
-    writeln() { throw new Error('Console writeln is not implemented. Set state.io.console to use console output.') },
-    read() { return '' },
-    readln() { return '' },
-    eof() { return true },
-    eoln() { return true },
-  }
-}
-
-// ============================================================================
-// 默认内存文件实现
-// ============================================================================
-
-interface MemoryFileState {
-  lines: string[]
-  currentLine: number
-  currentChar: number
-  eof: boolean
-  writable: boolean
-  writeBuffer: string
-}
-
-const fileStates = new WeakMap<PascalFile, MemoryFileState>()
-
-function getState(file: PascalFile): MemoryFileState {
-  let state = fileStates.get(file)
-  if (!state) {
-    state = { lines: [], currentLine: 0, currentChar: 0, eof: true, writable: false, writeBuffer: '' }
-    fileStates.set(file, state)
-  }
-  return state
-}
-
-export function createDefaultFileHandle(url: string): PascalFile {
-  return { url, offset: 0 }
-}
-
-export function createEmptyFile(): PascalFile {
-  return { url: '', offset: 0 }
-}
-
-export function setMemoryFileContent(file: PascalFile, lines: string[], writable = false): void {
-  const state = getState(file)
-  state.lines = lines
-  state.writable = writable
-}
-
-export function getMemoryFileLines(file: PascalFile): string[] {
-  return getState(file).lines
+function throwNotImplemented(method: string): never {
+  throw new Error(`IO.${method} is not implemented. Customize state.io to provide an implementation.`)
 }
 
 function createDefaultFileOps(): PascalFileOps {
   return {
-    reset(file: PascalFile): void {
-      const s = getState(file)
-      s.currentLine = 0
-      s.currentChar = 0
-      s.eof = s.lines.length === 0
-      s.writable = false
-    },
+    reset() { throwNotImplemented('file.reset') },
+    rewrite() { throwNotImplemented('file.rewrite') },
+    get() { throwNotImplemented('file.get') },
+    put() { throwNotImplemented('file.put') },
+    close() { throwNotImplemented('file.close') },
+    bufferChar() { throwNotImplemented('file.bufferChar') },
+    eof() { throwNotImplemented('file.eof') },
+    eoln() { throwNotImplemented('file.eoln') },
+    readln() { throwNotImplemented('file.readln') },
+    write() { throwNotImplemented('file.write') },
+    writeln() { throwNotImplemented('file.writeln') },
+  }
+}
 
-    rewrite(file: PascalFile): void {
-      const s = getState(file)
-      s.lines = []
-      s.currentLine = 0
-      s.currentChar = 0
-      s.eof = true
-      s.writable = true
-      s.writeBuffer = ''
-    },
-
-    get(file: PascalFile): void {
-      const s = getState(file)
-      if (s.eof) return
-      s.currentChar++
-      if (s.currentChar > s.lines[s.currentLine].length) {
-        s.currentLine++
-        s.currentChar = 0
-        if (s.currentLine >= s.lines.length) {
-          s.eof = true
-        }
-      }
-    },
-
-    put(_file: PascalFile): void {
-    },
-
-    close(file: PascalFile): void {
-      const s = getState(file)
-      if (s.writeBuffer.length > 0) {
-        s.lines.push(s.writeBuffer)
-        s.writeBuffer = ''
-      }
-    },
-
-    bufferChar(file: PascalFile): number {
-      const s = getState(file)
-      if (s.eof || s.currentLine >= s.lines.length) return 0
-      const line = s.lines[s.currentLine]
-      if (s.currentChar >= line.length) return 0
-      return line.charCodeAt(s.currentChar) & 0xFF
-    },
-
-    eof(file: PascalFile): boolean {
-      return getState(file).eof
-    },
-
-    eoln(file: PascalFile): boolean {
-      const s = getState(file)
-      if (s.eof || s.currentLine >= s.lines.length) return true
-      return s.currentChar >= s.lines[s.currentLine].length
-    },
-
-    readln(file: PascalFile): void {
-      const s = getState(file)
-      if (s.eof) return
-      s.currentLine++
-      s.currentChar = 0
-      if (s.currentLine >= s.lines.length) {
-        s.eof = true
-      }
-    },
-
-    write(file: PascalFile, text: string): void {
-      const s = getState(file)
-      if (!s.writable) {
-        throw new Error('Cannot write to file that is not opened for writing (use REWRITE first)')
-      }
-      s.writeBuffer += text
-    },
-
-    writeln(file: PascalFile): void {
-      const s = getState(file)
-      if (!s.writable) {
-        throw new Error('Cannot write to file that is not opened for writing (use REWRITE first)')
-      }
-      s.lines.push(s.writeBuffer)
-      s.writeBuffer = ''
-    },
+function createDefaultConsole(): PascalConsole {
+  return {
+    write() { throwNotImplemented('console.write') },
+    writeln() { throwNotImplemented('console.writeln') },
+    read() { throwNotImplemented('console.read') },
+    readln() { throwNotImplemented('console.readln') },
+    eof() { throwNotImplemented('console.eof') },
+    eoln() { throwNotImplemented('console.eoln') },
   }
 }
 
@@ -219,17 +103,57 @@ export function createDefaultIO(): PascalIO {
 }
 
 // ============================================================================
-// Record 模式文件实现：底层是一个 PascalRecord，字段存储文件状态
+// 工具：创建空文件句柄
 // ============================================================================
 
-const recordFileStates = new WeakMap<PascalFile, PascalValue>()
-
-function getRecordFileState(file: PascalFile): PascalValue | undefined {
-  return recordFileStates.get(file)
+export function createEmptyFile(): PascalFile {
+  return { url: '', offset: 0 }
 }
 
-function setRecordFileState(file: PascalFile, rec: PascalValue): void {
-  recordFileStates.set(file, rec)
+export function createDefaultFileHandle(url: string): PascalFile {
+  return { url, offset: 0 }
+}
+
+// ============================================================================
+// Record 模式文件实现：底层是 Map<string, Uint8Array>
+// key = file.url, value = 文件原始字节内容
+// ============================================================================
+
+interface RecordFileState {
+  /** 文件原始字节 */
+  content: Uint8Array
+  /** 当前读取位置（按行抽象，实际按字节推进） */
+  offset: number
+  /** 是否已到达文件末尾 */
+  eof: boolean
+  /** 是否可写 */
+  writable: boolean
+  /** 写入缓冲区（按行追加） */
+  lines: string[]
+  /** 当前正在累积的行 */
+  currentLine: string
+}
+
+const recordFileStore = new Map<string, RecordFileState>()
+
+function getRecordState(file: PascalFile): RecordFileState {
+  let state = recordFileStore.get(file.url)
+  if (!state) {
+    state = { content: new Uint8Array(0), offset: 0, eof: true, writable: false, lines: [], currentLine: '' }
+    recordFileStore.set(file.url, state)
+  }
+  return state
+}
+
+export function setRecordFileContent(url: string, content: Uint8Array): void {
+  const state = getRecordState({ url, offset: 0 })
+  state.content = content
+  state.eof = content.length === 0
+}
+
+export function getRecordFileLines(url: string): string[] {
+  const state = recordFileStore.get(url)
+  return state ? state.lines : []
 }
 
 export function createRecordFileHandle(url: string): PascalFile {
@@ -239,56 +163,29 @@ export function createRecordFileHandle(url: string): PascalFile {
 export function createRecordFileOps(): PascalFileOps {
   return {
     reset(file: PascalFile): void {
-      const rec = getRecordFileState(file)
-      if (!rec) return
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      fields.set('CURRENTLINE', makeInteger(0))
-      fields.set('CURRENTCHAR', makeInteger(0))
-      const lines = fields.get('LINES')
-      const lineCount = lines && lines.type.kind === 'array' ? (lines.rawValue as any).elements.length : 0
-      fields.set('EOF', makeBoolean(lineCount === 0))
-      fields.set('WRITABLE', makeBoolean(false))
-      fields.set('WRITEBUFFER', makeString(''))
+      const s = getRecordState(file)
+      s.offset = 0
+      s.eof = s.content.length === 0
+      s.writable = false
+      s.currentLine = ''
     },
 
     rewrite(file: PascalFile): void {
-      const rec = getRecordFileState(file)
-      if (!rec) return
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      fields.set('CURRENTLINE', makeInteger(0))
-      fields.set('CURRENTCHAR', makeInteger(0))
-      fields.set('EOF', makeBoolean(true))
-      fields.set('WRITABLE', makeBoolean(true))
-      fields.set('WRITEBUFFER', makeString(''))
-      const lines = fields.get('LINES')
-      if (lines && lines.type.kind === 'array') {
-        ;(lines.rawValue as any).elements = []
-      }
+      const s = getRecordState(file)
+      s.content = new Uint8Array(0)
+      s.offset = 0
+      s.eof = true
+      s.writable = true
+      s.lines = []
+      s.currentLine = ''
     },
 
     get(file: PascalFile): void {
-      const rec = getRecordFileState(file)
-      if (!rec) return
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const eofVal = fields.get('EOF')
-      if (eofVal && eofVal.rawValue === 1) return
-      const currentLine = (fields.get('CURRENTLINE')?.rawValue as number) || 0
-      const currentChar = (fields.get('CURRENTCHAR')?.rawValue as number) || 0
-      const lines = fields.get('LINES')
-      if (!lines || lines.type.kind !== 'array') return
-      const elements = (lines.rawValue as any).elements as PascalValue[]
-      if (currentLine >= elements.length) return
-      const lineVal = elements[currentLine]
-      const lineStr = String.fromCharCode(...((lineVal.rawValue as number[]) || []))
-      const newChar = currentChar + 1
-      if (newChar > lineStr.length) {
-        fields.set('CURRENTLINE', makeInteger(currentLine + 1))
-        fields.set('CURRENTCHAR', makeInteger(0))
-        if (currentLine + 1 >= elements.length) {
-          fields.set('EOF', makeBoolean(true))
-        }
-      } else {
-        fields.set('CURRENTCHAR', makeInteger(newChar))
+      const s = getRecordState(file)
+      if (s.eof) return
+      s.offset++
+      if (s.offset >= s.content.length) {
+        s.eof = true
       }
     },
 
@@ -296,112 +193,57 @@ export function createRecordFileOps(): PascalFileOps {
     },
 
     close(file: PascalFile): void {
-      const rec = getRecordFileState(file)
-      if (!rec) return
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const writeBuffer = (fields.get('WRITEBUFFER')?.rawValue as number[]) || []
-      const lines = fields.get('LINES')
-      if (writeBuffer.length > 0 && lines && lines.type.kind === 'array') {
-        ;(lines.rawValue as any).elements.push(makeString(String.fromCharCode(...writeBuffer)))
-        fields.set('WRITEBUFFER', makeString(''))
+      const s = getRecordState(file)
+      if (s.currentLine.length > 0) {
+        s.lines.push(s.currentLine)
+        s.currentLine = ''
       }
     },
 
     bufferChar(file: PascalFile): number {
-      const rec = getRecordFileState(file)
-      if (!rec) return 0
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const eofVal = fields.get('EOF')
-      if (eofVal && eofVal.rawValue === 1) return 0
-      const currentLine = (fields.get('CURRENTLINE')?.rawValue as number) || 0
-      const currentChar = (fields.get('CURRENTCHAR')?.rawValue as number) || 0
-      const lines = fields.get('LINES')
-      if (!lines || lines.type.kind !== 'array') return 0
-      const elements = (lines.rawValue as any).elements as PascalValue[]
-      if (currentLine >= elements.length) return 0
-      const lineVal = elements[currentLine]
-      const chars = (lineVal.rawValue as number[]) || []
-      if (currentChar >= chars.length) return 0
-      return chars[currentChar] & 0xFF
+      const s = getRecordState(file)
+      if (s.eof || s.offset >= s.content.length) return 0
+      return s.content[s.offset] & 0xFF
     },
 
     eof(file: PascalFile): boolean {
-      const rec = getRecordFileState(file)
-      if (!rec) return true
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const eofVal = fields.get('EOF')
-      return eofVal ? eofVal.rawValue === 1 : true
+      return getRecordState(file).eof
     },
 
     eoln(file: PascalFile): boolean {
-      const rec = getRecordFileState(file)
-      if (!rec) return true
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const eofVal = fields.get('EOF')
-      if (eofVal && eofVal.rawValue === 1) return true
-      const currentLine = (fields.get('CURRENTLINE')?.rawValue as number) || 0
-      const currentChar = (fields.get('CURRENTCHAR')?.rawValue as number) || 0
-      const lines = fields.get('LINES')
-      if (!lines || lines.type.kind !== 'array') return true
-      const elements = (lines.rawValue as any).elements as PascalValue[]
-      if (currentLine >= elements.length) return true
-      const lineVal = elements[currentLine]
-      const chars = (lineVal.rawValue as number[]) || []
-      return currentChar >= chars.length
+      const s = getRecordState(file)
+      if (s.eof || s.offset >= s.content.length) return true
+      return s.content[s.offset] === 10 // '\n'
     },
 
     readln(file: PascalFile): void {
-      const rec = getRecordFileState(file)
-      if (!rec) return
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const eofVal = fields.get('EOF')
-      if (eofVal && eofVal.rawValue === 1) return
-      const currentLine = (fields.get('CURRENTLINE')?.rawValue as number) || 0
-      const lines = fields.get('LINES')
-      if (!lines || lines.type.kind !== 'array') return
-      const elements = (lines.rawValue as any).elements as PascalValue[]
-      const newLine = currentLine + 1
-      fields.set('CURRENTLINE', makeInteger(newLine))
-      fields.set('CURRENTCHAR', makeInteger(0))
-      if (newLine >= elements.length) {
-        fields.set('EOF', makeBoolean(true))
+      const s = getRecordState(file)
+      if (s.eof) return
+      while (s.offset < s.content.length) {
+        const ch = s.content[s.offset]
+        s.offset++
+        if (ch === 10) break // '\n'
+      }
+      if (s.offset >= s.content.length) {
+        s.eof = true
       }
     },
 
     write(file: PascalFile, text: string): void {
-      const rec = getRecordFileState(file)
-      if (!rec) {
-        throw new Error('Cannot write to file: record file not initialized')
-      }
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const writable = fields.get('WRITABLE')
-      if (!writable || writable.rawValue !== 1) {
+      const s = getRecordState(file)
+      if (!s.writable) {
         throw new Error('Cannot write to file that is not opened for writing (use REWRITE first)')
       }
-      const existing = (fields.get('WRITEBUFFER')?.rawValue as number[]) || []
-      const newChars: number[] = []
-      for (let i = 0; i < text.length; i++) {
-        newChars.push(text.charCodeAt(i) & 0xFF)
-      }
-      fields.set('WRITEBUFFER', makeString(String.fromCharCode(...existing, ...newChars)))
+      s.currentLine += text
     },
 
     writeln(file: PascalFile): void {
-      const rec = getRecordFileState(file)
-      if (!rec) {
-        throw new Error('Cannot write to file: record file not initialized')
-      }
-      const fields = (rec.rawValue as any).fields as Map<string, PascalValue>
-      const writable = fields.get('WRITABLE')
-      if (!writable || writable.rawValue !== 1) {
+      const s = getRecordState(file)
+      if (!s.writable) {
         throw new Error('Cannot write to file that is not opened for writing (use REWRITE first)')
       }
-      const writeBuffer = (fields.get('WRITEBUFFER')?.rawValue as number[]) || []
-      const lines = fields.get('LINES')
-      if (lines && lines.type.kind === 'array') {
-        ;(lines.rawValue as any).elements.push(makeString(String.fromCharCode(...writeBuffer)))
-        fields.set('WRITEBUFFER', makeString(''))
-      }
+      s.lines.push(s.currentLine)
+      s.currentLine = ''
     },
   }
 }

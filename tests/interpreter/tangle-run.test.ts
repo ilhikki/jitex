@@ -9,14 +9,18 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { parse, ProgramNode } from '../../src/index'
 import {
+  createState,
   createInterpreterState,
   runToCompletion,
   run,
   State,
   PascalFile,
-  setMemoryFileContent,
-  getMemoryFileLines,
-  createDefaultFileHandle,
+  setRecordFileContent,
+  getRecordFileLines,
+  createRecordFileOps,
+  createRecordFileHandle,
+  populateSystemProcedures,
+  populateSystemFunctions,
 } from '../../src/interpreter'
 
 describe('Tangle bootstrapping: compile tangle.web -> tangle.pas', () => {
@@ -30,69 +34,76 @@ describe('Tangle bootstrapping: compile tangle.web -> tangle.pas', () => {
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    const state = createInterpreterState(result.astNode)
-
-    // 预填充 WEBFILE：将 tangle.web 的内容按行存入文件
     const webContent = fs.readFileSync(tangleWebPath, 'utf-8')
-    const webLines = webContent.split('\n')
+    const webBytes = new TextEncoder().encode(webContent)
 
+    const fileOps = createRecordFileOps()
+    setRecordFileContent('web', webBytes)
+    setRecordFileContent('change', new Uint8Array(0))
+    setRecordFileContent('termin', new Uint8Array(0))
+
+    const io = { file: fileOps, console: { write() {}, writeln() {}, read() { return '' }, readln() { return '' }, eof() { return true }, eoln() { return true } } }
+    const state = createState(result.astNode, io)
+    populateSystemProcedures(state)
+    populateSystemFunctions(state)
+
+    // WEBFILE
     const webFileValue = state.globalScope.variables.get('WEBFILE')
     expect(webFileValue).toBeDefined()
     if (!webFileValue) return
     const webFile = webFileValue.rawValue as PascalFile
-    setMemoryFileContent(webFile, webLines, false)
+    webFile.url = 'web'
     state.io.file.reset(webFile)
 
-    // CHANGEFILE：空文件（无变更文件）
+    // CHANGEFILE
     const changeFileValue = state.globalScope.variables.get('CHANGEFILE')
     expect(changeFileValue).toBeDefined()
     if (!changeFileValue) return
     const changeFile = changeFileValue.rawValue as PascalFile
-    setMemoryFileContent(changeFile, [])
+    changeFile.url = 'change'
     state.io.file.reset(changeFile)
 
-    // TERMIN：空终端输入
+    // TERMIN
     const terminValue = state.globalScope.variables.get('TERMIN')
     if (terminValue) {
       const termin = terminValue.rawValue as PascalFile
-      setMemoryFileContent(termin, [])
+      termin.url = 'termin'
       state.io.file.reset(termin)
     }
 
-    // TERMOUT：终端输出
+    // TERMOUT
     const termoutValue = state.globalScope.variables.get('TERMOUT')
     if (termoutValue) {
       const termout = termoutValue.rawValue as PascalFile
+      termout.url = 'termout'
       state.io.file.rewrite(termout)
     }
 
-    // PASCALFILE：输出文件，初始化为可写
+    // PASCALFILE
     const pasFileValue = state.globalScope.variables.get('PASCALFILE')
     expect(pasFileValue).toBeDefined()
     if (!pasFileValue) return
     const pasFile = pasFileValue.rawValue as PascalFile
+    pasFile.url = 'pas'
     state.io.file.rewrite(pasFile)
 
-    // POOL：字符串池文件，初始化为可写
+    // POOL
     const poolValue = state.globalScope.variables.get('POOL')
     expect(poolValue).toBeDefined()
     if (!poolValue) return
     const pool = poolValue.rawValue as PascalFile
+    pool.url = 'pool'
     state.io.file.rewrite(pool)
 
-    // 运行到终止
     runToCompletion(state)
     expect(state.status).toBe('terminated')
 
-    // 收集 PASCALFILE 的输出内容
-    const pasOutput = getMemoryFileLines(pasFile).join('\n')
+    const pasOutput = getRecordFileLines('pas').join('\n')
     expect(pasOutput.length).toBeGreaterThan(0)
 
-    // 如果输出不为空，写入临时文件并验证解析
     if (pasOutput.length > 0) {
       fs.writeFileSync(tempOutputPath, pasOutput, 'utf-8')
 
-      // 验证输出可以被解析为有效的 Pascal 程序
       const outputResult = parse(pasOutput)
       expect(outputResult.success).toBe(true)
 
@@ -101,7 +112,6 @@ describe('Tangle bootstrapping: compile tangle.web -> tangle.pas', () => {
         expect(outputProgram.kind).toBe('Program')
         expect(outputProgram.block.compound.statements.length).toBeGreaterThan(0)
 
-        // 尝试执行输出的 Pascal 程序
         const outputState = createInterpreterState(outputResult.astNode)
         runToCompletion(outputState)
         expect(outputState.status).toBe('terminated')
