@@ -410,6 +410,10 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
       if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
       otherwise = stmtResult.astNode
       pos = stmtResult.newPosition
+      // Skip trailing semicolons before END (same as ordinary branches)
+      while (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
+        pos++
+      }
       break
     }
 
