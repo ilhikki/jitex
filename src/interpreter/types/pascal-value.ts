@@ -12,8 +12,11 @@
  * - 字符串/PACKED ARRAY OF CHAR：用 number[] (ASCII 数组)
  * - 数组：用 PascalArray
  * - 记录：用 PascalRecord
- * - 文件：用 PascalFile
+ * - 文件：用 PascalFile（抽象句柄，来自 io.ts）
  */
+
+import type { PascalFile } from '../io'
+import { createEmptyFile } from '../io'
 
 // ============================================================================
 // PascalValue - 带类型的值
@@ -617,23 +620,6 @@ export class RecordType implements PascalType {
 // 文件类型
 // ============================================================================
 
-export interface PascalFile {
-  // 文件内容，按行存储
-  lines: string[]
-  // 当前读取位置（行索引）
-  currentLine: number
-  // 当前行内的字符位置
-  currentChar: number
-  // 是否已到达文件末尾
-  eof: boolean
-  // 文件名（用于输出）
-  name?: string
-  // 是否可写
-  writable: boolean
-  // 写入缓冲区
-  writeBuffer: string
-}
-
 export class FileType implements PascalType {
   readonly kind = 'file' as const
 
@@ -752,85 +738,7 @@ export function createEmptyRecord(recordType: RecordType): PascalValue {
   return { type: recordType, rawValue: { fields } }
 }
 
-export function createEmptyFile(): PascalFile {
-  return { lines: [], currentLine: 0, currentChar: 0, eof: true, writable: false, writeBuffer: '' }
-}
-
-export function fileBufferChar(file: PascalFile): number {
-  if (file.eof || file.currentLine >= file.lines.length) return 0
-  const line = file.lines[file.currentLine]
-  if (file.currentChar >= line.length) return 0
-  return line.charCodeAt(file.currentChar) & 0xFF
-}
-
-export function fileEof(file: PascalFile): boolean {
-  return file.eof
-}
-
-export function fileEoln(file: PascalFile): boolean {
-  if (file.eof || file.currentLine >= file.lines.length) return true
-  const line = file.lines[file.currentLine]
-  return file.currentChar >= line.length
-}
-
-export function fileGet(file: PascalFile): void {
-  if (file.eof) return
-  const line = file.lines[file.currentLine]
-  file.currentChar++
-  if (file.currentChar > line.length) {
-    // GET past end-of-line moves to next line
-    file.currentLine++
-    file.currentChar = 0
-    if (file.currentLine >= file.lines.length) {
-      file.eof = true
-    }
-  }
-}
-
-export function fileReadln(file: PascalFile): void {
-  if (file.eof) return
-  file.currentLine++
-  file.currentChar = 0
-  if (file.currentLine >= file.lines.length) {
-    file.eof = true
-  }
-}
-
-export function fileReset(file: PascalFile): void {
-  file.currentLine = 0
-  file.currentChar = 0
-  file.eof = file.lines.length === 0
-  file.writable = false
-}
-
-export function fileRewrite(file: PascalFile): void {
-  file.lines = []
-  file.currentLine = 0
-  file.currentChar = 0
-  file.eof = true
-  file.writable = true
-  file.writeBuffer = ''
-}
-
-export function fileWrite(file: PascalFile, text: string): void {
-  if (file.writable) {
-    file.writeBuffer += text
-  }
-}
-
-export function fileWriteln(file: PascalFile): void {
-  if (file.writable) {
-    file.lines.push(file.writeBuffer)
-    file.writeBuffer = ''
-  }
-}
-
-export function fileClose(file: PascalFile): void {
-  if (file.writable && file.writeBuffer.length > 0) {
-    file.lines.push(file.writeBuffer)
-    file.writeBuffer = ''
-  }
-}
+// 文件操作函数已移至 io.ts
 
 // ============================================================================
 // 类型查找表

@@ -46,6 +46,13 @@ interface State {
     status: 'running' | 'terminated'
     returnValue: Value | null
 
+    // IO 层 (抽象)
+    io: PascalIO             // file: PascalFileOps, console: PascalConsole
+
+    // 系统过程/函数 (注册表)
+    systemProcedures: Map<string, ...>
+    systemFunctions: Map<string, ...>
+
     // Debugger observer (后续)
     breakpoints: Set<string>
     watches: Map<string, WatchCallback>
@@ -211,7 +218,7 @@ BEGIN C END.
 - 实现：RESET / REWRITE / GET / PUT / EOF / EOLN
 - 实现：CHR / ORD / ROUND / TRUNC / ABS
 - 实现：BREAK / CONTINUE / EXIT
-- 实现 Pascal 文件操作
+- ✅ **IO 抽象层重构**：PascalFile 抽象为仅含 url+offset 的接口，通过 `state.io`（包含 file 和 console）实现。默认内存实现，控制台默认无操作，可替换为网络/本地文件
 
 ### M4 — 非 debugger 模式和优化
 
@@ -228,26 +235,13 @@ src/
 ├── lexer/                      # ❄️ 冻结
 ├── parser/                     # ❄️ 冻结
 ├── interpreter/                # 🆕 PDI
-│   ├── types.ts                # State, Frame, Scope, Value 类型
-│   ├── state.ts                # State 工厂函数和工具
-│   ├── scope.ts                # Scope 链实现
-│   ├── declarations.ts         # DeclarationTable：名字 -> 声明查找
-│   ├── frames/
-│   │   ├── types.ts            # Frame interface
-│   │   ├── program.ts          # ProgramFrame
-│   │   ├── function.ts         # FunctionFrame
-│   │   ├── compound.ts         # CompoundFrame
-│   │   ├── if.ts               # IfFrame
-│   │   ├── while.ts            # WhileFrame
-│   │   ├── repeat.ts           # RepeatFrame
-│   │   ├── for.ts              # ForFrame
-│   │   ├── case.ts             # CaseFrame
-│   │   ├── goto.ts             # GotoFrame
-│   │   ├── call.ts             # ProcedureCallFrame
-│   │   ├── assignment.ts       # AssignmentFrame (M1)
-│   │   └── empty.ts            # EmptyFrame
+│   ├── types.ts                # State, Frame, Scope, Value 类型 + 工厂函数
+│   ├── types/
+│   │   └── pascal-value.ts     # PascalValue, PascalType, 类型系统实现
+│   ├── io.ts                   # 抽象 IO 层 (PascalFile, PascalIO, PascalConsole, 默认内存实现)
+│   ├── frames.ts               # 所有 Frame 类型 (Program, Compound, Function, ProcedureCall, If, While, Repeat, For, Case, Goto, Assignment, Empty)
+│   ├── evaluator.ts            # 表达式求值器 + 系统函数注册
 │   ├── run.ts                  # run(state, mode)
-│   ├── debugger.ts             # DebuggerObserver (后续)
 │   └── index.ts                # 公开 API
 ├── tests/
 │   └── interpreter/

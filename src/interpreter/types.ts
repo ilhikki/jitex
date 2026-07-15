@@ -14,6 +14,8 @@ import type {
 import type { PascalValue, PascalType } from './types/pascal-value'
 export { PascalValue, PascalType } from './types/pascal-value'
 export * from './types/pascal-value'
+import type { PascalIO } from './io'
+import { createDefaultIO } from './io'
 import {
   makeDefaultValue,
   findType,
@@ -117,6 +119,9 @@ export interface State {
   systemProcedures: Map<string, (args: ExpressionNode[], state: State) => void>
   /** 系统函数：优先查找用户定义，未命中则回退到系统函数 */
   systemFunctions: Map<string, (args: ExpressionNode[], scope: Scope, state: State) => PascalValue>
+
+  /** 运行时 IO 层：文件操作 + 控制台 IO */
+  io: PascalIO
 }
 
 // ============================================================================
@@ -411,6 +416,7 @@ export function createState(program: ProgramNode): State {
     inputQueue: [],
     systemProcedures: new Map(),
     systemFunctions: new Map(),
+    io: createDefaultIO(),
   }
 
   // 先求值常量，供类型解析使用

@@ -14,8 +14,9 @@ import {
   run,
   State,
   PascalFile,
-  fileReset,
-  fileRewrite,
+  setMemoryFileContent,
+  getMemoryFileLines,
+  createDefaultFileHandle,
 } from '../../src/interpreter'
 
 describe('Tangle bootstrapping: compile tangle.web -> tangle.pas', () => {
@@ -31,7 +32,7 @@ describe('Tangle bootstrapping: compile tangle.web -> tangle.pas', () => {
 
     const state = createInterpreterState(result.astNode)
 
-    // 预填充 WEBFILE：将 tangle.web 的内容按行存入文件的 lines
+    // 预填充 WEBFILE：将 tangle.web 的内容按行存入文件
     const webContent = fs.readFileSync(tangleWebPath, 'utf-8')
     const webLines = webContent.split('\n')
 
@@ -39,31 +40,30 @@ describe('Tangle bootstrapping: compile tangle.web -> tangle.pas', () => {
     expect(webFileValue).toBeDefined()
     if (!webFileValue) return
     const webFile = webFileValue.rawValue as PascalFile
-    webFile.lines = webLines
-    webFile.writable = false
-    fileReset(webFile)
+    setMemoryFileContent(webFile, webLines, false)
+    state.io.file.reset(webFile)
 
     // CHANGEFILE：空文件（无变更文件）
     const changeFileValue = state.globalScope.variables.get('CHANGEFILE')
     expect(changeFileValue).toBeDefined()
     if (!changeFileValue) return
     const changeFile = changeFileValue.rawValue as PascalFile
-    changeFile.lines = []
-    fileReset(changeFile)
+    setMemoryFileContent(changeFile, [])
+    state.io.file.reset(changeFile)
 
     // TERMIN：空终端输入
     const terminValue = state.globalScope.variables.get('TERMIN')
     if (terminValue) {
       const termin = terminValue.rawValue as PascalFile
-      termin.lines = []
-      fileReset(termin)
+      setMemoryFileContent(termin, [])
+      state.io.file.reset(termin)
     }
 
     // TERMOUT：终端输出
     const termoutValue = state.globalScope.variables.get('TERMOUT')
     if (termoutValue) {
       const termout = termoutValue.rawValue as PascalFile
-      fileRewrite(termout)
+      state.io.file.rewrite(termout)
     }
 
     // PASCALFILE：输出文件，初始化为可写
@@ -71,21 +71,21 @@ describe('Tangle bootstrapping: compile tangle.web -> tangle.pas', () => {
     expect(pasFileValue).toBeDefined()
     if (!pasFileValue) return
     const pasFile = pasFileValue.rawValue as PascalFile
-    fileRewrite(pasFile)
+    state.io.file.rewrite(pasFile)
 
     // POOL：字符串池文件，初始化为可写
     const poolValue = state.globalScope.variables.get('POOL')
     expect(poolValue).toBeDefined()
     if (!poolValue) return
     const pool = poolValue.rawValue as PascalFile
-    fileRewrite(pool)
+    state.io.file.rewrite(pool)
 
     // 运行到终止
     runToCompletion(state)
     expect(state.status).toBe('terminated')
 
     // 收集 PASCALFILE 的输出内容
-    const pasOutput = pasFile.lines.join('\n')
+    const pasOutput = getMemoryFileLines(pasFile).join('\n')
     expect(pasOutput.length).toBeGreaterThan(0)
 
     // 如果输出不为空，写入临时文件并验证解析

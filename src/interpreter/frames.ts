@@ -54,25 +54,15 @@ import {
   RecordType,
   FileType, PascalArray,
   PascalRecord,
-  PascalFile,
-  createEmptyFile,
   arrayIndex,
   createEmptyArray,
   getNum,
   getCharCode,
   getStringChars,
   getBoolValue,
-  fileBufferChar,
-  fileReset,
-  fileRewrite,
-  fileGet,
-  fileReadln,
-  fileWrite,
-  fileWriteln,
-  fileClose,
-  fileEof,
-  fileEoln,
 } from './types/pascal-value'
+import type { PascalFile } from './io'
+import { createEmptyFile } from './io'
 
 export function createProgramFrame(program: ProgramNode): Frame {
   let pushed = false
@@ -315,8 +305,7 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
   for (const v of varArgs) {
     let value: PascalValue
     if (fileArg) {
-      // 从文件读取（文本文件逐字符/逐值）
-      const ch = fileBufferChar(fileArg)
+      const ch = state.io.file.bufferChar(fileArg)
       if (v.type.kind === 'char') {
         value = makeChar(ch)
       } else if (v.type.kind === 'integer') {
@@ -324,26 +313,21 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
       } else {
         value = makeChar(ch)
       }
-      fileGet(fileArg)
+      state.io.file.get(fileArg)
     } else {
-      // 从 inputQueue 读取
+      const input = state.io.console.read()
       if (v.type.kind === 'char') {
-        const input = state.inputQueue.shift() || ''
         value = makeChar(input.charCodeAt(0) || 0)
       } else if (v.type.kind === 'integer') {
-        const input = state.inputQueue.shift() || '0'
         const num = parseInt(input, 10) || 0
         value = v.type === findType('LONGINT') || v.type === findType('LONGWORD')
           ? { type: v.type, rawValue: BigInt(num) }
           : makeInteger(num)
       } else if (v.type.kind === 'real') {
-        const input = state.inputQueue.shift() || '0'
         value = makeReal(parseFloat(input) || 0)
       } else if (v.type.kind === 'string') {
-        const input = state.inputQueue.shift() || ''
         value = makeString(input)
       } else {
-        const input = state.inputQueue.shift() || ''
         value = makeString(input)
       }
     }
@@ -357,14 +341,9 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
 
   if (isReadln) {
     if (fileArg) {
-      fileReadln(fileArg)
+      state.io.file.readln(fileArg)
     } else {
-      while (state.inputQueue.length > 0 && state.inputQueue[0] !== '\n') {
-        state.inputQueue.shift()
-      }
-      if (state.inputQueue[0] === '\n') {
-        state.inputQueue.shift()
-      }
+      state.io.console.readln()
     }
   }
 }
@@ -388,26 +367,22 @@ function formatOutputArg(arg: ExpressionNode, state: State): string {
 
 function handleWrite(args: ExpressionNode[], state: State, writeln: boolean): void {
   if (args.length === 0) {
-    if (writeln) state.outputBuffer.push('\n')
+    if (writeln) state.io.console.writeln()
     return
   }
 
   const firstValue = evalExpr(args[0], state.currentScope, state)
   if (firstValue.type.kind === 'file') {
     const file = firstValue.rawValue as PascalFile
-    let text = ''
     for (let i = 1; i < args.length; i++) {
-      text += formatOutputArg(args[i], state)
+      state.io.file.write(file, formatOutputArg(args[i], state))
     }
-    fileWrite(file, text)
-    if (writeln) fileWriteln(file)
+    if (writeln) state.io.file.writeln(file)
   } else {
-    let text = ''
     for (const arg of args) {
-      text += formatOutputArg(arg, state)
+      state.io.console.write(formatOutputArg(arg, state))
     }
-    state.outputBuffer.push(text)
-    if (writeln) state.outputBuffer.push('\n')
+    if (writeln) state.io.console.writeln()
   }
 }
 
@@ -433,35 +408,35 @@ function handleFileReset(args: ExpressionNode[], state: State): void {
   if (args.length === 0) return
   const fileValue = getFileValue(args[0], state)
   if (!fileValue || fileValue.type.kind !== 'file') return
-  fileReset(fileValue.rawValue as PascalFile)
+  state.io.file.reset(fileValue.rawValue as PascalFile)
 }
 
 function handleFileRewrite(args: ExpressionNode[], state: State): void {
   if (args.length === 0) return
   const fileValue = getFileValue(args[0], state)
   if (!fileValue || fileValue.type.kind !== 'file') return
-  fileRewrite(fileValue.rawValue as PascalFile)
+  state.io.file.rewrite(fileValue.rawValue as PascalFile)
 }
 
 function handleFileGet(args: ExpressionNode[], state: State): void {
   if (args.length === 0) return
   const fileValue = getFileValue(args[0], state)
   if (!fileValue || fileValue.type.kind !== 'file') return
-  fileGet(fileValue.rawValue as PascalFile)
+  state.io.file.get(fileValue.rawValue as PascalFile)
 }
 
 function handleFilePut(args: ExpressionNode[], state: State): void {
   if (args.length === 0) return
   const fileValue = getFileValue(args[0], state)
   if (!fileValue || fileValue.type.kind !== 'file') return
-  // PUT 在文本文件中不常用，这里忽略
+  state.io.file.put(fileValue.rawValue as PascalFile)
 }
 
 function handleFileClose(args: ExpressionNode[], state: State): void {
   if (args.length === 0) return
   const fileValue = getFileValue(args[0], state)
   if (!fileValue || fileValue.type.kind !== 'file') return
-  fileClose(fileValue.rawValue as PascalFile)
+  state.io.file.close(fileValue.rawValue as PascalFile)
 }
 
 // --- IfFrame ---

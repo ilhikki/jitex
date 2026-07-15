@@ -27,7 +27,6 @@ import {
   ArrayType,
   RecordType,
   FileType,
-  createEmptyFile,
   arrayIndex,
   getNum,
   getCharCode,
@@ -36,11 +35,8 @@ import {
   getBigInt,
   PascalArray,
   PascalRecord,
-  PascalFile,
-  fileBufferChar,
-  fileEof,
-  fileEoln,
 } from './types/pascal-value'
+import type { PascalFile } from './io'
 import type {
   IntegerLiteralNode,
   RealLiteralNode,
@@ -178,7 +174,7 @@ function evalFieldRead(access: FieldAccessNode, scope: Scope, state: State): Pas
     const fieldName = access.field.name
     if (fieldName === '^') {
       const file = objValue.rawValue as PascalFile
-      return makeChar(fileBufferChar(file))
+      return makeChar(state.io.file.bufferChar(file))
     }
     throw new Error(`Unknown file field: ${fieldName}`)
   }
@@ -298,19 +294,19 @@ export function populateSystemFunctions(state: State): void {
     if (args.length > 0) {
       const arg = evalExpr(args[0], scope, state)
       if (arg.type.kind === 'file') {
-        return makeBoolean(fileEof(arg.rawValue as PascalFile))
+        return makeBoolean(state.io.file.eof(arg.rawValue as PascalFile))
       }
     }
-    return makeBoolean(state.inputQueue.length === 0)
+    return makeBoolean(state.io.console.eof())
   })
   state.systemFunctions.set('EOLN', (args, scope, state) => {
     if (args.length > 0) {
       const arg = evalExpr(args[0], scope, state)
       if (arg.type.kind === 'file') {
-        return makeBoolean(fileEoln(arg.rawValue as PascalFile))
+        return makeBoolean(state.io.file.eoln(arg.rawValue as PascalFile))
       }
     }
-    return makeBoolean(state.inputQueue.length === 0 || state.inputQueue[0] === '\n')
+    return makeBoolean(state.io.console.eoln())
   })
   state.systemFunctions.set('SQR', (args, scope, state) => {
     const arg = evalExpr(args[0], scope, state)

@@ -4,6 +4,8 @@ export { run, runToCompletion } from './run'
 export { createStatementFrame, populateSystemProcedures } from './frames'
 export { evalExpr, inferExprType, lookupVariableType, populateSystemFunctions } from './evaluator'
 export * from './types/pascal-value'
+export type { PascalFile, PascalConsole, PascalFileOps, PascalIO } from './io'
+export { createDefaultIO, createDefaultFileHandle, createEmptyFile, setMemoryFileContent, getMemoryFileLines } from './io'
 
 // Convenience: create state with all system handlers registered
 import type { ProgramNode } from '../ast/types'

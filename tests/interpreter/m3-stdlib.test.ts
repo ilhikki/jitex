@@ -5,8 +5,15 @@ function makeState(source: string, input?: string[]): State {
   const result = parse(source)
   if (!result.success) throw new Error(`Parse failed: ${result.error}`)
   const state = createInterpreterState(result.astNode)
-  if (input) {
-    state.inputQueue = [...input]
+  const inputQueue = input ? [...input] : []
+  // 替换默认的无操作控制台为测试用实现，将 IO 桥接到 outputBuffer/inputQueue
+  state.io.console = {
+    write(text: string) { state.outputBuffer.push(text) },
+    writeln() { state.outputBuffer.push('\n') },
+    read() { return inputQueue.shift() || '' },
+    readln() { return inputQueue.shift() || '' },
+    eof() { return inputQueue.length === 0 },
+    eoln() { return inputQueue.length === 0 || inputQueue[0] === '\n' },
   }
   return state
 }
