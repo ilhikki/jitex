@@ -19,11 +19,11 @@ run(state: State, mode: RunMode): void
 
 ### RunMode
 
-| Mode | 行为 |
-|------|------|
-| `STEP_INTO` | 推进一个控制步骤，进入函数调用 |
+| Mode        | 行为                 |
+|-------------|--------------------|
+| `STEP_INTO` | 推进一个控制步骤，进入函数调用    |
 | `STEP_OVER` | (后续) 推进一个步骤，但不进入函数 |
-| `RUN` | (后续) 运行到断点或结束 |
+| `RUN`       | (后续) 运行到断点或结束      |
 
 第一阶段只实现 `STEP_INTO`。
 
@@ -31,25 +31,25 @@ run(state: State, mode: RunMode): void
 
 ```typescript
 interface State {
-  // 执行栈
-  stack: Frame[]
+    // 执行栈
+    stack: Frame[]
 
-  // 作用域链
-  globalScope: Scope
-  currentScope: Scope
+    // 作用域链
+    globalScope: Scope
+    currentScope: Scope
 
-  // 程序信息
-  program: ProgramNode
-  declarations: DeclarationTable  // 查表：名字 -> 声明
+    // 程序信息
+    program: ProgramNode
+    declarations: DeclarationTable  // 查表：名字 -> 声明
 
-  // 运行状态
-  status: 'running' | 'terminated'
-  returnValue: Value | null
+    // 运行状态
+    status: 'running' | 'terminated'
+    returnValue: Value | null
 
-  // Debugger observer (后续)
-  breakpoints: Set<string>
-  watches: Map<string, WatchCallback>
-  stepCallback: (() => void) | null
+    // Debugger observer (后续)
+    breakpoints: Set<string>
+    watches: Map<string, WatchCallback>
+    stepCallback: (() => void) | null
 }
 ```
 
@@ -57,14 +57,15 @@ interface State {
 
 ```typescript
 interface Scope {
-  variables: Map<string, Value>
-  parent: Scope | null  // 静态父作用域
-  functionDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null
-  // functionDecl === null 表示全局作用域
+    variables: Map<string, Value>
+    parent: Scope | null  // 静态父作用域
+    functionDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null
+    // functionDecl === null 表示全局作用域
 }
 ```
 
 作用域链遵循 Pascal 的词法嵌套规则：
+
 - 全局作用域 → parent = null
 - 过程局部作用域 → parent = 该过程定义所在的作用域（静态链接）
 
@@ -74,33 +75,34 @@ interface Scope {
 
 ```typescript
 interface Frame {
-  kind: string          // 鸭子类型标识
-  done: boolean         // 是否完成
-  step(state: State): void  // 推进一个步骤
+    kind: string          // 鸭子类型标识
+    done: boolean         // 是否完成
+    step(state: State): void  // 推进一个步骤
 }
 ```
 
 `step(state)` 可以做三件事：
+
 1. **修改自身状态**（如推进语句索引）
 2. **push 新 Frame**（如进入函数体）
 3. **标记自身 done**（让 `run` 自动 pop）
 
 ### Frame 类型与 step 行为
 
-| Frame kind | 对应 AST 节点 | step 行为 |
-|------------|-------------|----------|
-| `Program` | `ProgramNode` | push 主 block 的 CompoundFrame，然后 done |
-| `Function` | `ProcedureCallNode` / `FunctionCallNode` | 建局部 scope，push block 的 CompoundFrame；block done 时 pop scope 并 return |
-| `Compound` | `CompoundStatementNode` | 逐条 push 子语句的 Frame；全部执行完则 done |
-| `If` | `IfStatementNode` | (M0) 评估条件，push then/else 分支 Frame |
-| `While` | `WhileStatementNode` | (M0) 评估条件，若 true 则 push body Frame，下一轮再检查 |
-| `Repeat` | `RepeatStatementNode` | push statements 的 CompoundFrame，完后评估 until 条件 |
-| `For` | `ForStatementNode` | 初始化变量，push body Frame，每轮后递增/递减并检查 |
-| `Case` | `CaseStatementNode` | 评估表达式，匹配分支，push 对应 statement Frame |
-| `Goto` | `GotoStatementNode` | 搜索 label，跳转到对应语句（ unwind/rebuild stack） |
-| `Assignment` | `AssignmentNode` | (M1) 评估右值，赋给左值 |
-| `ProcedureCall` | `ProcedureCallNode` | push FunctionFrame |
-| `Empty` | `EmptyStatementNode` | 立即 done |
+| Frame kind      | 对应 AST 节点                                | step 行为                                                              |
+|-----------------|------------------------------------------|----------------------------------------------------------------------|
+| `Program`       | `ProgramNode`                            | push 主 block 的 CompoundFrame，然后 done                                 |
+| `Function`      | `ProcedureCallNode` / `FunctionCallNode` | 建局部 scope，push block 的 CompoundFrame；block done 时 pop scope 并 return |
+| `Compound`      | `CompoundStatementNode`                  | 逐条 push 子语句的 Frame；全部执行完则 done                                       |
+| `If`            | `IfStatementNode`                        | (M0) 评估条件，push then/else 分支 Frame                                    |
+| `While`         | `WhileStatementNode`                     | (M0) 评估条件，若 true 则 push body Frame，下一轮再检查                            |
+| `Repeat`        | `RepeatStatementNode`                    | push statements 的 CompoundFrame，完后评估 until 条件                        |
+| `For`           | `ForStatementNode`                       | 初始化变量，push body Frame，每轮后递增/递减并检查                                    |
+| `Case`          | `CaseStatementNode`                      | 评估表达式，匹配分支，push 对应 statement Frame                                   |
+| `Goto`          | `GotoStatementNode`                      | 搜索 label，跳转到对应语句（ unwind/rebuild stack）                              |
+| `Assignment`    | `AssignmentNode`                         | (M1) 评估右值，赋给左值                                                       |
+| `ProcedureCall` | `ProcedureCallNode`                      | push FunctionFrame                                                   |
+| `Empty`         | `EmptyStatementNode`                     | 立即 done                                                              |
 
 ### run 函数逻辑
 
@@ -128,12 +130,14 @@ function run(state, mode):
 #### Baby M0 — 最小验证
 
 只验证机制正确性：
+
 - ✅ 函数调用（push FunctionFrame）
 - ✅ 函数返回（pop FunctionFrame + scope 清理）
 - ✅ scope 生命周期（创建/销毁）
 - ✅ stack trace（打印调用栈）
 
 不实现：
+
 - ❌ expression 求值（条件用 mock）
 - ❌ type system
 - ❌ heap / 复杂对象
@@ -165,6 +169,7 @@ BEGIN C END.
 ```
 
 预期验证：
+
 - 每步 step 后 stack 的深度和 kind 正确
 - 进入函数时 scope 创建，退出时 scope 不再可访问
 - stackTrace() 输出函数调用链
@@ -172,6 +177,7 @@ BEGIN C END.
 #### M0 Full — 所有 statement 的控制流
 
 在 Baby M0 基础上，为每种 statement 实现 Frame：
+
 - CompoundFrame：语句遍历
 - IfFrame：条件分支（条件求值用 mock，始终走 then）
 - WhileFrame / RepeatFrame / ForFrame：循环控制（条件用 mock）
@@ -190,6 +196,7 @@ BEGIN C END.
 - 支持：一元运算 (NOT - +)
 - 实现 assignment
 - 支持：函数调用作为表达式
+* 执行 knuth/web/tangle-official.pas 为验收标准, 但mock：遇到不认识的类型，循环和 goto 递归第二次遇到时直接跳过。
 
 ### M2 — Pascal 类型系统
 
@@ -256,21 +263,23 @@ src/
 
 ```typescript
 interface DeclarationTable {
-  // 全局声明
-  procedures: Map<string, ProcedureDeclarationNode>
-  functions: Map<string, FunctionDeclarationNode>
-  variables: Map<string, VariableDeclarationNode>
-  constants: Map<string, ConstDeclarationNode>
-  types: Map<string, TypeDeclarationNode>
-  labels: Map<number, StatementNode>  // label -> target statement
+    // 全局声明
+    procedures: Map<string, ProcedureDeclarationNode>
+    functions: Map<string, FunctionDeclarationNode>
+    variables: Map<string, VariableDeclarationNode>
+    constants: Map<string, ConstDeclarationNode>
+    types: Map<string, TypeDeclarationNode>
+    labels: Map<number, StatementNode>  // label -> target statement
 
-  // 嵌套查找：根据 scope 链查找
-  findProcedure(name: string, scope: Scope): ProcedureDeclarationNode | null
-  findFunction(name: string, scope: Scope): FunctionDeclarationNode | null
+    // 嵌套查找：根据 scope 链查找
+    findProcedure(name: string, scope: Scope): ProcedureDeclarationNode | null
+
+    findFunction(name: string, scope: Scope): FunctionDeclarationNode | null
 }
 ```
 
 Pascal 的嵌套声明需要考虑：
+
 - 过程/函数内部可以声明自己的过程/函数
 - 查找时从当前 scope 开始，沿静态链向上查找
 

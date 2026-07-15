@@ -15,38 +15,13 @@ import type {
   WithStatementNode,
   ExpressionNode,
   IntegerLiteralNode,
-  BooleanLiteralNode,
-  IdentifierNode,
   CaseBranchNode,
+  AssignmentNode,
+  IdentifierNode,
 } from '../ast/types'
 import type { Frame, State, Scope, Value } from './types'
 import { createScope } from './types'
-
-// ============================================================================
-// Mock Expression Evaluator (M0)
-// ============================================================================
-
-function evalExpr(expr: ExpressionNode, _scope: Scope): Value {
-  switch (expr.kind) {
-    case 'IntegerLiteral':
-      return (expr as IntegerLiteralNode).value
-    case 'BooleanLiteral':
-      return (expr as BooleanLiteralNode).value
-    case 'Identifier':
-      return 0
-    default:
-      return 0
-  }
-}
-
-function evalCondition(expr: ExpressionNode, scope: Scope): boolean {
-  const value = evalExpr(expr, scope)
-  return Boolean(value)
-}
-
-// ============================================================================
-// Frame constructors
-// ============================================================================
+import { evalExpr, evalCondition } from './evaluator'
 
 export function createProgramFrame(program: ProgramNode): Frame {
   let pushed = false
@@ -89,7 +64,7 @@ export function createEmptyFrame(_node: EmptyStatementNode): Frame {
 export function createFunctionFrame(
   decl: ProcedureDeclarationNode | FunctionDeclarationNode,
   _args: Value[]
-): Frame & { decl: ProcedureDeclarationNode | FunctionDeclarationNode } {
+): Frame & { decl: ProcedureDeclarationNode | FunctionDeclarationNode; savedScope: Scope | null } {
   let phase: 'init' | 'running' = 'init'
   let savedScope: Scope | null = null
 
@@ -97,22 +72,28 @@ export function createFunctionFrame(
     kind: 'Function',
     done: false,
     decl,
+    savedScope,
     step(state: State) {
       if (phase === 'init') {
-        const fnScope = createScope(state.globalScope, decl)
-        savedScope = state.currentScope
+        const fnScope = createScope(state.currentScope, decl)
+        this.savedScope = state.currentScope
         state.currentScope = fnScope
 
         if (decl.block) {
+          decl.block.variableDeclarations.forEach(v => {
+            v.names.forEach(n => {
+              fnScope.variables.set(n.name.toUpperCase(), 0)
+            })
+          })
           state.stack.push(createCompoundFrame(decl.block.compound))
         }
         phase = 'running'
         return
       }
 
-      if (savedScope) {
-        state.currentScope = savedScope
-        savedScope = null
+      if (this.savedScope) {
+        state.currentScope = this.savedScope
+        this.savedScope = null
       }
       this.done = true
     },
@@ -124,7 +105,59 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
     kind: 'ProcedureCall',
     done: false,
     step(state: State) {
-      const name = node.name.name
+      const name = node.name.name.toUpperCase()
+
+      if (name === 'WRITE' || name === 'WRITELN') {
+        for (const arg of node.arguments) {
+          const value = evalExpr(arg, state.currentScope, state)
+          state.outputBuffer.push(String(value))
+        }
+        if (name === 'WRITELN') {
+          state.outputBuffer.push('\n')
+        }
+        this.done = true
+        return
+      }
+
+      if (name === 'READ' || name === 'READLN') {
+        for (const arg of node.arguments) {
+          if (arg.kind === 'Identifier') {
+            const varName = (arg as IdentifierNode).name.toUpperCase()
+            const inputValue = state.inputQueue.shift() || ''
+            const numValue = parseFloat(inputValue)
+            state.currentScope.variables.set(varName, isNaN(numValue) ? inputValue : numValue)
+          }
+        }
+        if (name === 'READLN') {
+          state.inputQueue.shift()
+        }
+        this.done = true
+        return
+      }
+
+      if (name === 'EXIT') {
+        while (state.stack.length > 0) {
+          const frame = state.stack[state.stack.length - 1]
+          if (frame.kind === 'Function') {
+            const fnFrame = frame as any
+            if (fnFrame.savedScope) {
+              state.currentScope = fnFrame.savedScope
+            }
+            frame.done = true
+            state.stack.pop()
+            break
+          }
+          if (frame.kind === 'Program') {
+            frame.done = true
+            state.stack.pop()
+            break
+          }
+          state.stack.pop()
+        }
+        this.done = true
+        return
+      }
+
       const procDecl = state.declarations.findProcedure(name, state.currentScope)
       if (procDecl) {
         state.stack.push(createFunctionFrame(procDecl, []))
@@ -145,8 +178,6 @@ export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
 }
 
 // --- IfFrame ---
-// Phase 'eval':  evaluate condition, push then/else branch
-// Phase 'done':  branch executed, we're top again
 export function createIfFrame(node: IfStatementNode): Frame {
   let phase: 'eval' | 'done' = 'eval'
 
@@ -155,7 +186,7 @@ export function createIfFrame(node: IfStatementNode): Frame {
     done: false,
     step(state: State) {
       if (phase === 'eval') {
-        const condition = evalCondition(node.condition, state.currentScope)
+        const condition = evalCondition(node.condition, state.currentScope, state)
         if (condition && node.thenBranch) {
           state.stack.push(createStatementFrame(node.thenBranch))
         } else if (!condition && node.elseBranch) {
@@ -170,10 +201,6 @@ export function createIfFrame(node: IfStatementNode): Frame {
 }
 
 // --- WhileFrame ---
-// Phase 'eval':  evaluate condition
-//   - if true: push body, -> 'running'
-//   - if false: -> 'done'
-// Phase 'running': body done (we're top again), -> 'done' (M0: single iteration)
 export function createWhileFrame(node: WhileStatementNode): Frame {
   let phase: 'eval' | 'running' = 'eval'
 
@@ -182,7 +209,7 @@ export function createWhileFrame(node: WhileStatementNode): Frame {
     done: false,
     step(state: State) {
       if (phase === 'eval') {
-        const condition = evalCondition(node.condition, state.currentScope)
+        const condition = evalCondition(node.condition, state.currentScope, state)
         if (condition) {
           state.stack.push(createStatementFrame(node.body))
           phase = 'running'
@@ -192,14 +219,12 @@ export function createWhileFrame(node: WhileStatementNode): Frame {
         return
       }
 
-      this.done = true
+      phase = 'eval'
     },
   }
 }
 
 // --- RepeatFrame ---
-// Phase 'body':  push statements compound
-// Phase 'eval':  body done, -> 'done' (M0: single iteration)
 export function createRepeatFrame(node: RepeatStatementNode): Frame {
   let phase: 'body' | 'eval' = 'body'
 
@@ -217,40 +242,70 @@ export function createRepeatFrame(node: RepeatStatementNode): Frame {
         return
       }
 
-      this.done = true
+      const condition = evalCondition(node.untilCondition, state.currentScope, state)
+      if (condition) {
+        this.done = true
+      } else {
+        phase = 'body'
+      }
     },
   }
 }
 
 // --- ForFrame ---
-// Phase 'init':  initialize variable (skip in M0), push body, -> 'running'
-// Phase 'running': body done (we're top again), increment, check boundary
-//   - if within range: push body again, -> 'running'
-//   - if out of range: -> 'done'
-// Note: M0 uses mock values - direction is ignored
 export function createForFrame(node: ForStatementNode): Frame {
-  let phase: 'init' | 'running' = 'init'
+  let phase: 'init' | 'eval' | 'body' = 'init'
+  let finalValue: Value | null = null
+  let isDownTo = false
 
   return {
     kind: 'For',
     done: false,
     step(state: State) {
       if (phase === 'init') {
+        const initial = evalExpr(node.initial, state.currentScope, state)
+        finalValue = evalExpr(node.final, state.currentScope, state)
+        isDownTo = node.direction === 'DOWNTO'
+
+        const varName = node.variable.name.toUpperCase()
+        state.currentScope.variables.set(varName, initial)
+
+        phase = 'body'
         state.stack.push(createStatementFrame(node.body))
-        phase = 'running'
         return
       }
 
-      // M0: execute body once then done
-      // M1 will handle proper iteration
+      if (phase === 'body') {
+        phase = 'eval'
+        return
+      }
+
+      if (phase === 'eval') {
+        const varName = node.variable.name.toUpperCase()
+        const current = state.currentScope.variables.get(varName) ?? 0
+
+        let shouldContinue = false
+        if (isDownTo) {
+          shouldContinue = (current as number) > (finalValue as number)
+        } else {
+          shouldContinue = (current as number) < (finalValue as number)
+        }
+
+        if (shouldContinue) {
+          const increment = isDownTo ? -1 : 1
+          state.currentScope.variables.set(varName, (current as number) + increment)
+          phase = 'body'
+          state.stack.push(createStatementFrame(node.body))
+          return
+        }
+      }
+
       this.done = true
     },
   }
 }
 
 // --- CaseFrame ---
-// Phase 'eval':  evaluate expression, match branch, push statement
-// Phase 'done':  branch executed, we're top again
 export function createCaseFrame(node: CaseStatementNode): Frame {
   let phase: 'eval' | 'done' = 'eval'
 
@@ -259,12 +314,12 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
     done: false,
     step(state: State) {
       if (phase === 'eval') {
-        const exprValue = evalExpr(node.expression, state.currentScope)
+        const exprValue = evalExpr(node.expression, state.currentScope, state)
         let matchedBranch: CaseBranchNode | null = null
 
         for (const branch of node.branches) {
           for (const label of branch.labels) {
-            const labelValue = evalExpr(label, state.currentScope)
+            const labelValue = evalExpr(label, state.currentScope, state)
             if (exprValue === labelValue) {
               matchedBranch = branch
               break
@@ -288,9 +343,6 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
 }
 
 // --- GotoFrame ---
-// Phase 'find':  find label target in declarations, rebuild stack to target
-// Phase 'done':  jump completed
-// Note: M0 uses simple approach - just skip to next statement
 export function createGotoFrame(node: GotoStatementNode): Frame {
   const labelValue = (node.label as IntegerLiteralNode).value
 
@@ -308,8 +360,6 @@ export function createGotoFrame(node: GotoStatementNode): Frame {
 }
 
 // --- WithFrame ---
-// Phase 'init':  create scope for record fields (skip in M0), push body
-// Phase 'done':  body done, cleanup scope
 export function createWithFrame(node: WithStatementNode): Frame {
   let phase: 'init' | 'done' = 'init'
 
@@ -328,9 +378,44 @@ export function createWithFrame(node: WithStatementNode): Frame {
 }
 
 // --- AssignmentFrame ---
-// M0: skip evaluation, just done
-export function createAssignmentFrame(_node: any): Frame {
-  return { kind: 'Assignment', done: true, step() {} }
+export function createAssignmentFrame(node: AssignmentNode): Frame {
+  return {
+    kind: 'Assignment',
+    done: false,
+    step(state: State) {
+      const rightValue = evalExpr(node.right, state.currentScope, state)
+      assignToLeft(node.left, rightValue, state.currentScope, state)
+      this.done = true
+    },
+  }
+}
+
+function assignToLeft(left: ExpressionNode, value: Value, scope: Scope, state: State): void {
+  if (left.kind === 'Identifier') {
+    const name = (left as IdentifierNode).name.toUpperCase()
+
+    if (scope.functionDecl && scope.functionDecl.name.name.toUpperCase() === name) {
+      state.returnValue = value
+    } else {
+      let targetScope = findVariableScope(name, scope)
+      if (targetScope) {
+        targetScope.variables.set(name, value)
+      } else {
+        scope.variables.set(name, value)
+      }
+    }
+  }
+}
+
+function findVariableScope(name: string, scope: Scope): Scope | null {
+  let s: Scope | null = scope
+  while (s) {
+    if (s.variables.has(name)) {
+      return s
+    }
+    s = s.parent
+  }
+  return null
 }
 
 // --- Dispatch ---
@@ -346,7 +431,7 @@ export function createStatementFrame(stmt: StatementNode): Frame {
       return createEmptyFrame(stmt as EmptyStatementNode)
 
     case 'Assignment':
-      return createAssignmentFrame(stmt)
+      return createAssignmentFrame(stmt as AssignmentNode)
 
     case 'IfStatement':
       return createIfFrame(stmt as IfStatementNode)

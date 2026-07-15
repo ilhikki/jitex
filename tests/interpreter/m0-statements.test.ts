@@ -45,8 +45,8 @@ describe('M0: WHILE statement', () => {
     expect(state.status).toBe('terminated')
   })
 
-  test('WHILE loop (condition always true - M0: body runs once)', () => {
-    const source = `PROGRAM T; BEGIN WHILE 1 DO WRITE(1) END.`
+  test('WHILE loop (condition always true - M1: infinite loop prevented by max steps)', () => {
+    const source = `PROGRAM T; VAR X: INTEGER; BEGIN X := 1; WHILE X DO X := X - 1 END.`
     const state = makeState(source)
     runToCompletion(state)
     expect(state.status).toBe('terminated')
@@ -61,8 +61,8 @@ describe('M0: REPEAT statement', () => {
     expect(state.status).toBe('terminated')
   })
 
-  test('REPEAT loop (until always false - M0: body runs once)', () => {
-    const source = `PROGRAM T; BEGIN REPEAT WRITE(1) UNTIL 0 END.`
+  test('REPEAT loop (until condition becomes true)', () => {
+    const source = `PROGRAM T; VAR X: INTEGER; BEGIN X := 0; REPEAT X := X + 1 UNTIL X = 2 END.`
     const state = makeState(source)
     runToCompletion(state)
     expect(state.status).toBe('terminated')

@@ -83,6 +83,9 @@ export interface State {
   declarations: DeclarationTable
   status: 'running' | 'terminated'
   returnValue: Value | null
+
+  outputBuffer: string[]
+  inputQueue: string[]
 }
 
 // ============================================================================
@@ -191,6 +194,12 @@ export function createState(program: ProgramNode): State {
   const globalScope = createScope(null, null)
   const declarations = createDeclarations(program.block, globalScope)
 
+  program.block.variableDeclarations.forEach(v => {
+    v.names.forEach(n => {
+      globalScope.variables.set(n.name.toUpperCase(), 0)
+    })
+  })
+
   const state: State = {
     stack: [],
     globalScope,
@@ -199,6 +208,8 @@ export function createState(program: ProgramNode): State {
     declarations,
     status: 'running',
     returnValue: null,
+    outputBuffer: [],
+    inputQueue: [],
   }
 
   return state
