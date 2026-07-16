@@ -1,9 +1,9 @@
 import { parse } from '../../src/index'
 import {
   createState,
-  runToCompletion,
-  populateSystemProcedures,
   populateSystemFunctions,
+  populateSystemProcedures,
+  runToCompletion,
   State,
 } from '../../src/interpreter'
 
