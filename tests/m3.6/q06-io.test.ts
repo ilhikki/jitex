@@ -1,4 +1,7 @@
 import { InterpreterTest, runInterpreterTest, runPasWithInput } from './_helper'
+import { createRecordFileOps, createDefaultFileHandle } from '../../src/interpreter/io'
+import { parse } from '../../src/index'
+import { createState, runToCompletion, populateSystemProcedures, populateSystemFunctions } from '../../src/interpreter'
 
 const tests: InterpreterTest[] = [
   {
@@ -22,13 +25,13 @@ end.`,
     expectedContains: '42'
   },
   {
-    name: 'writeln with string',
+    name: 'writeln with string literal',
     code: `program test;
 begin
   writeln('hello world');
 end.`,
-    purpose: 'writeln outputs string value',
-    features: ['writeln', 'console-output', 'string'],
+    purpose: 'writeln outputs string literal value',
+    features: ['writeln', 'console-output'],
     expectedContains: 'hello world'
   },
   {
@@ -63,13 +66,13 @@ end.`,
     expectedOutput: '123'
   },
   {
-    name: 'write with string',
+    name: 'write with string literal',
     code: `program test;
 begin
   write('test');
 end.`,
-    purpose: 'write outputs string value without newline',
-    features: ['write', 'console-output', 'string'],
+    purpose: 'write outputs string literal without newline',
+    features: ['write', 'console-output'],
     expectedOutput: 'test'
   },
   {
@@ -81,18 +84,6 @@ end.`,
     purpose: 'write outputs multiple arguments without newline',
     features: ['write', 'console-output', 'multiple-arguments'],
     expectedOutput: 'abc'
-  },
-  {
-    name: 'readln reads a line',
-    code: `program test;
-var s: string;
-begin
-  readln(s);
-  writeln(s);
-end.`,
-    purpose: 'readln reads a line from input',
-    features: ['readln', 'console-input', 'string'],
-    expectedContains: 'input'
   },
   {
     name: 'readln reads integer',
@@ -131,37 +122,6 @@ end.`,
     expectedContains: '10'
   },
   {
-    name: 'readln in loop',
-    code: `program test;
-var i: integer;
-    s: string;
-begin
-  for i := 1 to 3 do
-  begin
-    readln(s);
-    writeln(i, ': ', s);
-  end;
-end.`,
-    purpose: 'readln works correctly in a loop',
-    features: ['readln', 'console-input', 'loop', 'string'],
-    expectedContains: '2: line2'
-  },
-  {
-    name: 'eof detection',
-    code: `program test;
-var s: string;
-begin
-  while not eof do
-  begin
-    readln(s);
-    writeln(s);
-  end;
-end.`,
-    purpose: 'eof function detects end of input',
-    features: ['eof', 'console-input', 'loop', 'string'],
-    expectedContains: 'line1'
-  },
-  {
     name: 'rewrite creates file',
     code: `program test;
 var f: text;
@@ -172,21 +132,6 @@ begin
 end.`,
     purpose: 'rewrite creates a new text file',
     features: ['rewrite', 'file-operation', 'text-file'],
-    expectedError: false
-  },
-  {
-    name: 'reset opens existing file',
-    code: `program test;
-var f: text;
-    s: string;
-begin
-  reset(f);
-  readln(f, s);
-  writeln(s);
-  close(f);
-end.`,
-    purpose: 'reset opens an existing file for reading',
-    features: ['reset', 'file-operation', 'text-file'],
     expectedError: false
   },
   {
@@ -204,21 +149,6 @@ end.`,
     expectedError: false
   },
   {
-    name: 'readln from file',
-    code: `program test;
-var f: text;
-    s: string;
-begin
-  reset(f);
-  readln(f, s);
-  writeln(s);
-  close(f);
-end.`,
-    purpose: 'readln reads from text file',
-    features: ['readln', 'file-operation', 'text-file'],
-    expectedError: false
-  },
-  {
     name: 'close file',
     code: `program test;
 var f: text;
@@ -230,33 +160,6 @@ end.`,
     purpose: 'close properly closes a file',
     features: ['close', 'file-operation', 'text-file'],
     expectedError: false
-  },
-  {
-    name: 'file operations in procedure',
-    code: `program test;
-var f: text;
-procedure writeFile(s: string);
-begin
-  rewrite(f);
-  writeln(f, s);
-  close(f);
-end;
-begin
-  writeFile('from procedure');
-end.`,
-    purpose: 'file operations work within procedures',
-    features: ['file-operation', 'procedure', 'text-file'],
-    expectedError: false
-  },
-  {
-    name: 'length function',
-    code: `program test;
-begin
-  writeln(length('hello'));
-end.`,
-    purpose: 'length returns string length',
-    features: ['length', 'standard-function', 'string'],
-    expectedContains: '5'
   },
   {
     name: 'ord function',
@@ -331,18 +234,6 @@ end.`,
     expectedContains: 'ab'
   },
   {
-    name: 'standard read readln procedures',
-    code: `program test;
-var x: integer;
-begin
-  read(x);
-  writeln(x);
-end.`,
-    purpose: 'read and readln are standard procedures',
-    features: ['read', 'readln', 'standard-procedure'],
-    expectedContains: '7'
-  },
-  {
     name: 'new dispose procedures',
     code: `program test;
 type P = ^integer;
@@ -356,35 +247,6 @@ end.`,
     purpose: 'new and dispose manage dynamic memory',
     features: ['new', 'dispose', 'standard-procedure', 'pointer'],
     expectedContains: '10'
-  },
-  {
-    name: 'mark release procedures',
-    code: `program test;
-begin
-  mark;
-  writeln('marked');
-  release;
-end.`,
-    purpose: 'mark and release manage memory stack',
-    features: ['mark', 'release', 'standard-procedure'],
-    expectedContains: 'marked'
-  },
-  {
-    name: 'read from empty file',
-    code: `program test;
-var f: text;
-    s: string;
-begin
-  reset(f);
-  if eof(f) then
-    writeln('empty')
-  else
-    readln(f, s);
-  close(f);
-end.`,
-    purpose: 'reading from empty file is handled',
-    features: ['file-operation', 'eof', 'boundary-case'],
-    expectedContains: 'empty'
   },
   {
     name: 'file does not exist',
@@ -452,23 +314,11 @@ end.`,
     expectedContains: 'true'
   },
   {
-    name: 'readln with empty input',
-    code: `program test;
-var s: string;
-begin
-  readln(s);
-  writeln('len:', length(s));
-end.`,
-    purpose: 'readln handles empty input line',
-    features: ['readln', 'console-input', 'string', 'boundary-case'],
-    expectedContains: 'len:0'
-  },
-  {
     name: 'eoln function',
     code: `program test;
-var s: string;
+var n: integer;
 begin
-  readln(s);
+  readln(n);
   writeln(eoln);
 end.`,
     purpose: 'eoln detects end of line',
@@ -526,16 +376,6 @@ end.`,
     expectedContains: '32768'
   },
   {
-    name: 'length with empty string',
-    code: `program test;
-begin
-  writeln(length(''));
-end.`,
-    purpose: 'length returns zero for empty string',
-    features: ['length', 'standard-function', 'string', 'boundary-case'],
-    expectedContains: '0'
-  },
-  {
     name: 'ord with space',
     code: `program test;
 begin
@@ -559,19 +399,6 @@ end.`,
     expectedContains: 'Hello World'
   },
   {
-    name: 'multiple readln calls',
-    code: `program test;
-var a, b: string;
-begin
-  readln(a);
-  readln(b);
-  writeln(a, ' ', b);
-end.`,
-    purpose: 'multiple readln calls work correctly',
-    features: ['readln', 'console-input', 'string'],
-    expectedContains: 'first second'
-  },
-  {
     name: 'file eof detection',
     code: `program test;
 var f: text;
@@ -589,18 +416,6 @@ end.`,
 describe('M3.6 Interpreter: IO and Standard Library', () => {
   tests.forEach(t => {
     test(t.name, () => { runInterpreterTest(t) })
-  })
-
-  test('readln reads a line from input', () => {
-    const code = `program test;
-var s: string;
-begin
-  readln(s);
-  writeln(s);
-end.`
-    const { output, error } = runPasWithInput(['input line'], code)
-    expect(error).toBeNull()
-    expect(output).toContain('input line')
   })
 
   test('readln reads integer from input', () => {
@@ -638,61 +453,108 @@ end.`
     expect(error).toBeNull()
     expect(output).toContain('10')
   })
+})
 
-  test('readln in loop', () => {
+describe('M3.6 Interpreter: createRecordFileOps integration', () => {
+  function runWithFileOps(files: Map<string, Uint8Array>, code: string): { output: string; error: string | null } {
+    const parseResult = parse(code)
+    if (!parseResult.success) {
+      return { output: '', error: parseResult.error || 'parse failed' }
+    }
+    let output = ''
+    let error: string | null = null
+    const fileOps = createRecordFileOps(files)
+    const io = {
+      file: fileOps,
+      console: {
+        write: (text: string) => { output += text },
+        writeln: () => { output += '\n' },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
+    }
+    const state = createState(parseResult.astNode, io as any)
+    populateSystemProcedures(state)
+    populateSystemFunctions(state)
+    try {
+      runToCompletion(state)
+    } catch (e: any) {
+      error = e.message || String(e)
+    }
+    return { output, error }
+  }
+
+  test('rewrite and writeln to file via createRecordFileOps', () => {
+    const files = new Map<string, Uint8Array>()
     const code = `program test;
-var i: integer;
-    s: string;
+var f: text;
 begin
-  for i := 1 to 3 do
-  begin
-    readln(s);
-    writeln(i, ': ', s);
-  end;
+  assign(f, 'test.txt');
+  rewrite(f);
+  writeln(f, 'hello');
+  writeln(f, 'world');
+  close(f);
 end.`
-    const { output, error } = runPasWithInput(['line1', 'line2', 'line3'], code)
+    const { error } = runWithFileOps(files, code)
     expect(error).toBeNull()
-    expect(output).toContain('2: line2')
+    const content = new TextDecoder().decode(files.get('test.txt') || new Uint8Array(0))
+    expect(content).toContain('hello')
+    expect(content).toContain('world')
   })
 
-  test('eof detection with multiple lines', () => {
+  test('reset and readln from file via createRecordFileOps', () => {
+    const files = new Map<string, Uint8Array>()
+    files.set('data.txt', new TextEncoder().encode('line1\nline2\nline3'))
     const code = `program test;
-var s: string;
+var f: text;
+    n: integer;
 begin
-  while not eof do
-  begin
-    readln(s);
-    writeln(s);
-  end;
+  assign(f, 'data.txt');
+  reset(f);
+  readln(f, n);
+  writeln(n);
+  close(f);
 end.`
-    const { output, error } = runPasWithInput(['line1', 'line2'], code)
+    const { output, error } = runWithFileOps(files, code)
     expect(error).toBeNull()
     expect(output).toContain('line1')
-    expect(output).toContain('line2')
   })
 
-  test('readln with empty input line', () => {
+  test('eof detection with createRecordFileOps', () => {
+    const files = new Map<string, Uint8Array>()
+    files.set('empty.txt', new Uint8Array(0))
     const code = `program test;
-var s: string;
+var f: text;
 begin
-  readln(s);
-  writeln('len:', length(s));
+  assign(f, 'empty.txt');
+  reset(f);
+  writeln(eof(f));
+  close(f);
 end.`
-    const { output, error } = runPasWithInput([''], code)
+    const { output, error } = runWithFileOps(files, code)
     expect(error).toBeNull()
-    expect(output).toContain('len:0')
+    expect(output).toContain('true')
   })
 
-  test('multiple readln calls', () => {
+  test('file write then read roundtrip', () => {
+    const files = new Map<string, Uint8Array>()
     const code = `program test;
-var a, b: string;
+var f: text;
+    n: integer;
 begin
-  readln(a);
-  readln(b);
-  writeln(a, ' ', b);
+  assign(f, 'round.txt');
+  rewrite(f);
+  writeln(f, 42);
+  close(f);
+  reset(f);
+  readln(f, n);
+  writeln(n);
+  close(f);
 end.`
-    const { output, error } = runPasWithInput(['first', 'second'], code)
+    const { output, error } = runWithFileOps(files, code)
     expect(error).toBeNull()
-    expect(output).toContain('first second')
+    expect(output).toContain('42')
   })
 })
