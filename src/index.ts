@@ -6,6 +6,7 @@ export { parseExpression, parseIdentifier, parseExpressionList } from './parser/
 export { parseStatement, parseCompoundStatement } from './parser/statements'
 export { parseType, parseVariableDeclaration } from './parser/types'
 export * from './parser/helpers'
+export { nodeToCode } from './ast/printer'
 
 import { lex } from './lexer/lexer'
 import { parseProgram } from './parser/declarations'

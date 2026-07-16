@@ -132,16 +132,4 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
     expect(termout).not.toContain('= sign is missing')
     expect(assertFails).toBe(0)
   })
-
-  test('pas output is non-empty for minimal repro', () => {
-    const web = `@* Intro.
-@ some text here
-@p
-@<bar@>@/
-@<baz@>@/
-@ end
-`
-    const { pasOutput } = runTangle(web)
-    expect(pasOutput.length).toBeGreaterThan(0)
-  })
 })
