@@ -32,6 +32,7 @@ import type {
   ArrayTypeNode,
   RecordTypeNode,
   FileTypeNode,
+  EnumerationTypeNode,
   IntegerLiteralNode,
   IdentifierNode,
   BinaryExpressionNode,
@@ -183,6 +184,14 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
       const file = typeNode as FileTypeNode
       const elementType = file.elementType ? resolveType(file.elementType, state) : null
       return new FileType(`FILE`, elementType)
+    }
+
+    case 'EnumerationType': {
+      // Pascal82 枚举类型：每个枚举值对应一个序号（0, 1, 2, ...）
+      // 用 SubrangeType(0..n-1) 表示，枚举值作为常量注册到全局 scope
+      const enumNode = typeNode as EnumerationTypeNode
+      const count = enumNode.values.length
+      return new SubrangeType(`ENUM`, INTEGER_TYPE, 0, Math.max(0, count - 1))
     }
 
     default:
@@ -436,6 +445,15 @@ export function createState(program: ProgramNode, io?: PascalIO): State {
   program.block.typeDeclarations.forEach((t: TypeDeclarationNode) => {
     const resolved = resolveType(t.typeDef, state)
     registerType(t.name.name.toUpperCase(), resolved)
+
+    // Pascal82 枚举类型：将枚举值注册为全局常量（值=序号，类型=枚举类型）
+    if (t.typeDef.kind === 'EnumerationType') {
+      const enumNode = t.typeDef as EnumerationTypeNode
+      enumNode.values.forEach((id, index) => {
+        globalScope.variables.set(id.name.toUpperCase(), { type: resolved, rawValue: index })
+        globalScope.variableTypes.set(id.name.toUpperCase(), resolved)
+      })
+    }
   })
 
   // 初始化变量

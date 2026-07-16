@@ -81,7 +81,7 @@
 
 | # | 问题 | 现象 | 状态 |
 |---|------|------|------|
-| 8 | 枚举类型作为参数 | 枚举参数测试失败（resolveType 不支持 EnumerationType） | Open |
+| 8 | 枚举类型作为参数 | 枚举参数测试失败（resolveType 不支持 EnumerationType） | **Fixed**（resolveType 添加 EnumerationType case；枚举值注册为全局常量） |
 | 9 | 数组类型参数传递 | 数组参数测试失败（测试代码不符合 Pascal82 块结构顺序） | **Fixed**（测试代码修正为 Pascal82 标准） |
 | 10 | 记录类型参数传递 | 记录参数测试失败（测试用了非标 string[10] 且块顺序错误） | **Fixed**（测试代码修正为 Pascal82 标准） |
 
