@@ -186,7 +186,7 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
     }
 
     default:
-      return INTEGER_TYPE
+      throw new Error(`Unknown type node kind: ${typeNode.kind}`)
   }
 }
 

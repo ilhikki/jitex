@@ -230,18 +230,24 @@ function handleExit(state: State): void {
  * 将所有内置过程注册到 state.systemProcedures 中，
  * 供 createProcedureCallFrame 在用户定义过程未命中时回退查找。
  */
-export function populateSystemProcedures(state: State): void {
+export function populateSystemProcedures(state: State, extensions: boolean = false): void {
+  // Pascal82 standard procedures
   state.systemProcedures.set('WRITE', (args, s) => handleWrite(args, s, false))
   state.systemProcedures.set('WRITELN', (args, s) => handleWrite(args, s, true))
   state.systemProcedures.set('READ', (args, s) => handleRead(args, s, false))
   state.systemProcedures.set('READLN', (args, s) => handleRead(args, s, true))
-  state.systemProcedures.set('BREAK', (_args, s) => handleBreak(s))
-  state.systemProcedures.set('EXIT', (_args, s) => handleExit(s))
   state.systemProcedures.set('RESET', (args, s) => handleFileReset(args, s))
   state.systemProcedures.set('REWRITE', (args, s) => handleFileRewrite(args, s))
   state.systemProcedures.set('GET', (args, s) => handleFileGet(args, s))
   state.systemProcedures.set('PUT', (args, s) => handleFilePut(args, s))
-  state.systemProcedures.set('CLOSE', (args, s) => handleFileClose(args, s))
+
+  // Non-standard extensions (not Pascal82, must be explicitly enabled)
+  if (extensions) {
+    state.systemProcedures.set('BREAK', (_args, s) => handleBreak(s))
+    state.systemProcedures.set('EXIT', (_args, s) => handleExit(s))
+    state.systemProcedures.set('CLOSE', (args, s) => handleFileClose(args, s))
+    state.systemProcedures.set('ASSIGN', (args, s) => handleFileAssign(args, s))
+  }
 }
 
 export function createProcedureCallFrame(node: ProcedureCallNode): Frame {
@@ -309,20 +315,96 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
     }
   }
 
-  for (const v of varArgs) {
-    let value: PascalValue
-    if (fileArg) {
-      const ch = state.io.file.bufferChar(fileArg)
+  if (fileArg) {
+    // File-based read: parse values from file buffer per Pascal82 text-file semantics.
+    // For numeric types, skip leading whitespace/line-marks, then read a token of
+    // digit/sign characters and parse it. For char, read exactly one character.
+    // For array of char, read characters up to array length or line end.
+    for (const v of varArgs) {
+      let value: PascalValue
+
       if (v.type.kind === 'char') {
+        // char: read exactly one character (may be whitespace)
+        const ch = state.io.file.eof(fileArg) ? 0 : state.io.file.bufferChar(fileArg)
+        if (!state.io.file.eof(fileArg)) {
+          state.io.file.get(fileArg)
+        }
         value = makeChar(ch)
-      } else if (v.type.kind === 'integer') {
-        value = makeInteger(ch)
+      } else if (v.type.kind === 'integer' || v.type.kind === 'real') {
+        // numeric: skip leading blanks, tabs, and line marks
+        while (!state.io.file.eof(fileArg)) {
+          if (state.io.file.eoln(fileArg)) {
+            state.io.file.readln(fileArg)
+            continue
+          }
+          const ch = state.io.file.bufferChar(fileArg)
+          if (ch === 32 || ch === 9) {
+            state.io.file.get(fileArg)
+          } else {
+            break
+          }
+        }
+        // read token until whitespace or EOF
+        let token = ''
+        while (!state.io.file.eof(fileArg) && !state.io.file.eoln(fileArg)) {
+          const ch = state.io.file.bufferChar(fileArg)
+          if (ch === 32 || ch === 9) break
+          token += String.fromCharCode(ch)
+          state.io.file.get(fileArg)
+        }
+        if (v.type.kind === 'integer') {
+          const num = parseInt(token, 10) || 0
+          value = v.type === findType('LONGINT') || v.type === findType('LONGWORD')
+            ? { type: v.type, rawValue: BigInt(num) }
+            : makeInteger(num)
+        } else {
+          value = makeReal(parseFloat(token) || 0)
+        }
+      } else if (v.type.kind === 'array') {
+        // array of char: read characters up to array length or line end
+        const arrType = v.type as ArrayType
+        const elementType = arrType.elementType
+        if (elementType.kind === 'char' && arrType.dimensions.length === 1) {
+          const dim = arrType.dimensions[0]
+          const len = dim.high - dim.low + 1
+          const chars: number[] = []
+          for (let i = 0; i < len; i++) {
+            if (state.io.file.eof(fileArg) || state.io.file.eoln(fileArg)) {
+              chars.push(0)
+            } else {
+              const ch = state.io.file.bufferChar(fileArg)
+              chars.push(ch)
+              state.io.file.get(fileArg)
+            }
+          }
+          value = { type: v.type, rawValue: chars }
+        } else {
+          value = makeDefaultValue(v.type)
+        }
       } else {
-        value = makeChar(ch)
+        value = makeDefaultValue(v.type)
       }
-      state.io.file.get(fileArg)
-    } else {
-      const input = state.io.console.read()
+
+      if (v.scope) {
+        v.scope.variables.set(v.name, value)
+      } else {
+        state.currentScope.variables.set(v.name, value)
+      }
+    }
+    if (isReadln) {
+      state.io.file.readln(fileArg)
+    }
+  } else {
+    // Console-based read: get input line and parse values from it
+    const inputLine = isReadln
+      ? state.io.console.readln()
+      : state.io.console.read()
+    const tokens = inputLine.trim().split(/\s+/).filter(t => t.length > 0)
+    let tokenIdx = 0
+
+    for (const v of varArgs) {
+      let value: PascalValue
+      const input = tokens[tokenIdx++] || ''
       if (v.type.kind === 'char') {
         value = makeChar(input.charCodeAt(0) || 0)
       } else if (v.type.kind === 'integer') {
@@ -353,20 +435,12 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
       } else {
         value = makeDefaultValue(v.type)
       }
-    }
 
-    if (v.scope) {
-      v.scope.variables.set(v.name, value)
-    } else {
-      state.currentScope.variables.set(v.name, value)
-    }
-  }
-
-  if (isReadln) {
-    if (fileArg) {
-      state.io.file.readln(fileArg)
-    } else {
-      state.io.console.readln()
+      if (v.scope) {
+        v.scope.variables.set(v.name, value)
+      } else {
+        state.currentScope.variables.set(v.name, value)
+      }
     }
   }
 }
@@ -460,6 +534,19 @@ function handleFileClose(args: ExpressionNode[], state: State): void {
   const fileValue = getFileValue(args[0], state)
   if (!fileValue || fileValue.type.kind !== 'file') return
   state.io.file.close(fileValue.rawValue as PascalFile)
+}
+
+function handleFileAssign(args: ExpressionNode[], state: State): void {
+  if (args.length < 2) throw new Error('ASSIGN requires 2 arguments: file variable and filename')
+  const fileValue = getFileValue(args[0], state)
+  if (!fileValue || fileValue.type.kind !== 'file') throw new Error('ASSIGN first argument must be a file variable')
+  const nameValue = evalExpr(args[1], state.currentScope, state)
+  const filename = typeof nameValue.rawValue === 'string'
+    ? nameValue.rawValue
+    : Array.isArray(nameValue.rawValue)
+      ? String.fromCharCode(...nameValue.rawValue)
+      : String(nameValue.rawValue)
+  state.io.file.assign(fileValue.rawValue as PascalFile, filename)
 }
 
 // --- IfFrame ---

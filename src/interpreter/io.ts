@@ -44,6 +44,7 @@ export interface PascalFileOps {
   get(file: PascalFile): void
   put(file: PascalFile): void
   close(file: PascalFile): void
+  assign(file: PascalFile, name: string): void
   bufferChar(file: PascalFile): number
   eof(file: PascalFile): boolean
   eoln(file: PascalFile): boolean
@@ -76,6 +77,7 @@ function createDefaultFileOps(): PascalFileOps {
     get() { throwNotImplemented('file.get') },
     put() { throwNotImplemented('file.put') },
     close() { throwNotImplemented('file.close') },
+    assign() { throwNotImplemented('file.assign') },
     bufferChar() { throwNotImplemented('file.bufferChar') },
     eof() { throwNotImplemented('file.eof') },
     eoln() { throwNotImplemented('file.eoln') },
@@ -192,6 +194,11 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
         s.currentLine = ''
       }
       writeBack(file)
+    },
+
+    assign(file: PascalFile, name: string): void {
+      file.url = name
+      handleState.delete(file)
     },
 
     bufferChar(file: PascalFile): number {

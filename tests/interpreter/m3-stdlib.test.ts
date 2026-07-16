@@ -1,10 +1,10 @@
 import { parse } from '../../src/index'
 import { createInterpreterState, runToCompletion, State, PascalValue } from '../../src/interpreter'
 
-function makeState(source: string, input?: string[]): State {
+function makeState(source: string, input?: string[], extensions: boolean = false): State {
   const result = parse(source)
   if (!result.success) throw new Error(`Parse failed: ${result.error}`)
-  const state = createInterpreterState(result.astNode)
+  const state = createInterpreterState(result.astNode, extensions)
   const inputQueue = input ? [...input] : []
   // 替换默认的无操作控制台为测试用实现，将 IO 桥接到 outputBuffer/inputQueue
   state.io.console = {
@@ -182,17 +182,17 @@ describe('M3: EOF/EOLN', () => {
 // ============================================================================
 // Test EXIT
 // ============================================================================
-describe('M3: EXIT', () => {
+describe('M3: EXIT (non-standard extension)', () => {
   test('EXIT from procedure', () => {
     const source = `PROGRAM T; VAR X: INTEGER; PROCEDURE P; BEGIN X := 1; EXIT; X := 2 END; BEGIN X := 0; P END.`
-    const state = makeState(source)
+    const state = makeState(source, undefined, true) // extensions: EXIT
     runToCompletion(state)
     expect(getVar(state, 'X')).toBe(1)
   })
 
   test('EXIT from nested procedure', () => {
     const source = `PROGRAM T; VAR X: INTEGER; PROCEDURE OUTER; PROCEDURE INNER; BEGIN X := 10; EXIT; X := 99 END; BEGIN X := 5; INNER; X := 20 END; BEGIN X := 0; OUTER END.`
-    const state = makeState(source)
+    const state = makeState(source, undefined, true) // extensions: EXIT
     runToCompletion(state)
     expect(getVar(state, 'X')).toBe(20)
   })

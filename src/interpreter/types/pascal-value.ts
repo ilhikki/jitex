@@ -682,6 +682,7 @@ const TYPE_TABLE: Record<string, PascalType> = {
   'REAL': REAL_TYPE,
   'CHAR': CHAR_TYPE,
   'BOOLEAN': BOOLEAN_TYPE,
+  'TEXT': new FileType('TEXT', CHAR_TYPE),
 }
 
 export function findType(name: string): PascalType | undefined {

@@ -13,9 +13,9 @@ import { createState as _createState } from './types'
 import { populateSystemProcedures as _populateProcs } from './frames'
 import { populateSystemFunctions as _populateFuncs } from './evaluator'
 
-export function createInterpreterState(program: ProgramNode) {
+export function createInterpreterState(program: ProgramNode, extensions: boolean = false) {
   const state = _createState(program)
-  _populateProcs(state)
+  _populateProcs(state, extensions)
   _populateFuncs(state)
   return state
 }
