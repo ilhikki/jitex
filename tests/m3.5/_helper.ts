@@ -62,6 +62,10 @@ export function makeProgramWithVars(vars: string, b?: string, c?: string): strin
     return `program test;\nvar\n  ${vars}\n${b}\nbegin\n${c}\nend.`
   }
   if (b !== undefined) {
+    const trimmed = b.trimEnd()
+    if (trimmed.endsWith('end.')) {
+      return `program test;\nvar\n  ${vars}\n${b}`
+    }
     return `program test;\nvar\n  ${vars}\n${b}\nbegin\nend.`
   }
   return `program test;\nvar\n  ${vars}\nbegin\nend.`

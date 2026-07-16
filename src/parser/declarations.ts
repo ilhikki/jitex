@@ -416,6 +416,15 @@ export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
   if (!dotResult.success) return fail(dotResult.error, dotResult.position)
   pos = dotResult.newPosition
 
+  // Ensure all tokens are consumed (no trailing garbage after program)
+  const trailing = peek({ tokens: input.tokens, position: pos })
+  if (trailing.type !== 'EOF') {
+    return fail(
+      `Unexpected token ${trailing.type} (${trailing.content}) after program end at line ${trailing.start.line}:${trailing.start.column}`,
+      pos
+    )
+  }
+
   return ok(pos, {
     kind: 'Program',
     name: nameResult.astNode,
