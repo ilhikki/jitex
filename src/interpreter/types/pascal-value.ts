@@ -424,66 +424,6 @@ class BooleanType implements PascalType {
 }
 
 // ============================================================================
-// 字符串类型 - 用 ASCII 数组表示
-// ============================================================================
-
-class StringType implements PascalType {
-  readonly name = 'STRING'
-  readonly kind = 'string' as const
-
-  checkRange(value: number | bigint): boolean {
-    return true
-  }
-
-  isAssignableFrom(other: PascalType): boolean {
-    return other.kind === 'string' || other.kind === 'char'
-  }
-
-  eq(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const a = getStringChars(left)
-    const b = getStringChars(right)
-    if (a.length !== b.length) return makeBoolean(false)
-    for (let i = 0; i < a.length; i++) {
-      if (a[i] !== b[i]) return makeBoolean(false)
-    }
-    return makeBoolean(true)
-  }
-
-  ne(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const eq = this.eq(other, left, right)
-    return makeBoolean(!getBoolValue(eq))
-  }
-
-  lt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const a = getStringChars(left)
-    const b = getStringChars(right)
-    const len = Math.min(a.length, b.length)
-    for (let i = 0; i < len; i++) {
-      if (a[i] < b[i]) return makeBoolean(true)
-      if (a[i] > b[i]) return makeBoolean(false)
-    }
-    return makeBoolean(a.length < b.length)
-  }
-
-  le(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const lt = this.lt(other, left, right)
-    if (getBoolValue(lt)) return makeBoolean(true)
-    const eq = this.eq(other, left, right)
-    return eq
-  }
-
-  gt(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const le = this.le(other, left, right)
-    return makeBoolean(!getBoolValue(le))
-  }
-
-  ge(other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
-    const lt = this.lt(other, left, right)
-    return makeBoolean(!getBoolValue(lt))
-  }
-}
-
-// ============================================================================
 // 子界类型
 // ============================================================================
 
@@ -650,7 +590,6 @@ export const WORD_TYPE: PascalType = new WordType()
 export const REAL_TYPE: PascalType = new RealType()
 export const CHAR_TYPE: PascalType = new CharType()
 export const BOOLEAN_TYPE: PascalType = new BooleanType()
-export const STRING_TYPE: PascalType = new StringType()
 
 // ============================================================================
 // 工厂函数
@@ -680,17 +619,6 @@ export function makeChar(value: number | string): PascalValue {
 
 export function makeBoolean(value: boolean): PascalValue {
   return { type: BOOLEAN_TYPE, rawValue: value ? 1 : 0 }
-}
-
-export function makeString(value: string | number[]): PascalValue {
-  if (typeof value === 'string') {
-    const chars: number[] = []
-    for (let i = 0; i < value.length; i++) {
-      chars.push(value.charCodeAt(i) & 0xFF)
-    }
-    return { type: STRING_TYPE, rawValue: chars }
-  }
-  return { type: STRING_TYPE, rawValue: value }
 }
 
 export function makeDefaultValue(type: PascalType): PascalValue {
@@ -754,7 +682,6 @@ const TYPE_TABLE: Record<string, PascalType> = {
   'REAL': REAL_TYPE,
   'CHAR': CHAR_TYPE,
   'BOOLEAN': BOOLEAN_TYPE,
-  'STRING': STRING_TYPE,
 }
 
 export function findType(name: string): PascalType | undefined {
@@ -850,11 +777,6 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
   // 整数到实数
   if (value.type.kind === 'integer' && targetType.kind === 'real') {
     return makeReal(getNum(value))
-  }
-
-  // 字符到字符串
-  if (value.type.kind === 'char' && targetType.kind === 'string') {
-    return { type: STRING_TYPE, rawValue: [getCharCode(value)] }
   }
 
   // 字符到整数/子界（Pascal 中 ord(ch) 返回字符的 ASCII 码）

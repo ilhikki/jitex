@@ -4,6 +4,7 @@ import {
   runToCompletion,
   populateSystemProcedures,
   populateSystemFunctions,
+  State,
 } from '../../src/interpreter'
 
 export interface InterpreterTest {
@@ -35,10 +36,11 @@ export function runPas(code: string): { output: string; error: string | null } {
       eoln: () => true,
     },
   }
-  const state = createState(parseResult.astNode, io as any)
-  populateSystemProcedures(state)
-  populateSystemFunctions(state)
+  let state: State
   try {
+    state = createState(parseResult.astNode, io as any)
+    populateSystemProcedures(state)
+    populateSystemFunctions(state)
     runToCompletion(state)
   } catch (e: any) {
     error = e.message || String(e)
@@ -65,10 +67,11 @@ export function runPasWithInput(inputLines: string[], code: string): { output: s
       eoln: () => true,
     },
   }
-  const state = createState(parseResult.astNode, io as any)
-  populateSystemProcedures(state)
-  populateSystemFunctions(state)
+  let state: State
   try {
+    state = createState(parseResult.astNode, io as any)
+    populateSystemProcedures(state)
+    populateSystemFunctions(state)
     runToCompletion(state)
   } catch (e: any) {
     error = e.message || String(e)

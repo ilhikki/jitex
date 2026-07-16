@@ -136,11 +136,13 @@ describe('M3: READ/READLN', () => {
     expect(getVar(state, 'B')).toBe(20)
   })
 
-  test('READ string', () => {
-    const source = `PROGRAM T; VAR S: STRING; BEGIN READ(S) END.`
+  test('READ packed array of char', () => {
+    const source = `PROGRAM T; VAR S: PACKED ARRAY[1..10] OF CHAR; BEGIN READ(S) END.`
     const state = makeState(source, ['Hello'])
     runToCompletion(state)
-    expect(getVar(state, 'S')).toBe('Hello')
+    const s = getVar(state, 'S') as number[]
+    const str = s.map(c => String.fromCharCode(c)).join('')
+    expect(str.substring(0, 5)).toBe('Hello')
   })
 })
 

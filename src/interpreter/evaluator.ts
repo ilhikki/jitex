@@ -11,7 +11,6 @@ import {
   makeReal,
   makeChar,
   makeBoolean,
-  makeString,
   makeDefaultValue,
   makeLongInt,
   findType,
@@ -20,7 +19,6 @@ import {
   REAL_TYPE,
   CHAR_TYPE,
   BOOLEAN_TYPE,
-  STRING_TYPE,
   BYTE_TYPE,
   LONGINT_TYPE,
   LONGWORD_TYPE,
@@ -67,8 +65,15 @@ export function evalExpr(expr: ExpressionNode, scope: Scope, state: State): Pasc
     case 'RealLiteral':
       return makeReal((expr as RealLiteralNode).value)
 
-    case 'StringLiteral':
-      return makeString((expr as StringLiteralNode).value)
+    case 'StringLiteral': {
+      const str = (expr as StringLiteralNode).value
+      const chars: number[] = []
+      for (let i = 0; i < str.length; i++) {
+        chars.push(str.charCodeAt(i) & 0xFF)
+      }
+      const arrayType = new ArrayType(`array[1..${str.length}] of char`, CHAR_TYPE, [{ low: 1, high: str.length }])
+      return { type: arrayType, rawValue: chars }
+    }
 
     case 'CharLiteral':
       return makeChar((expr as CharLiteralNode).value)
@@ -469,8 +474,10 @@ export function inferExprType(expr: ExpressionNode, scope: Scope, state: State):
       return INTEGER_TYPE
     case 'RealLiteral':
       return REAL_TYPE
-    case 'StringLiteral':
-      return STRING_TYPE
+    case 'StringLiteral': {
+      const len = (expr as StringLiteralNode).value.length
+      return new ArrayType(`array[1..${len}] of char`, CHAR_TYPE, [{ low: 1, high: len }])
+    }
     case 'CharLiteral':
       return CHAR_TYPE
     case 'BooleanLiteral':
@@ -538,8 +545,13 @@ export function formatValue(value: PascalValue): string {
   switch (value.type.kind) {
     case 'char':
       return String.fromCharCode(getCharCode(value))
-    case 'string':
-      return getStringChars(value).map(c => String.fromCharCode(c)).join('')
+    case 'array': {
+      const arrType = value.type as ArrayType
+      if (arrType.elementType.kind === 'char') {
+        return (value.rawValue as number[]).map(c => String.fromCharCode(c)).join('')
+      }
+      return String(value.rawValue)
+    }
     case 'boolean':
       return getBoolValue(value) ? 'TRUE' : 'FALSE'
     case 'integer':

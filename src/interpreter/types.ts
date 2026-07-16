@@ -150,7 +150,7 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
         return resolved
       }
 
-      return INTEGER_TYPE
+      throw new Error(`Undefined type: ${name}`)
     }
 
     case 'RangeType': {

@@ -39,7 +39,6 @@ import {
   makeInteger,
   makeReal,
   makeBoolean,
-  makeString,
   makeChar,
   makeDefaultValue,
   findType,
@@ -49,7 +48,6 @@ import {
   REAL_TYPE,
   CHAR_TYPE,
   BOOLEAN_TYPE,
-  STRING_TYPE,
   ArrayType,
   RecordType,
   FileType, PascalArray,
@@ -334,10 +332,26 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
           : makeInteger(num)
       } else if (v.type.kind === 'real') {
         value = makeReal(parseFloat(input) || 0)
-      } else if (v.type.kind === 'string') {
-        value = makeString(input)
+      } else if (v.type.kind === 'array') {
+        const arrType = v.type as ArrayType
+        const elementType = arrType.elementType
+        if (elementType.kind === 'char' && arrType.dimensions.length === 1) {
+          const dim = arrType.dimensions[0]
+          const len = dim.high - dim.low + 1
+          const chars: number[] = []
+          for (let i = 0; i < len; i++) {
+            if (i < input.length) {
+              chars.push(input.charCodeAt(i) & 0xFF)
+            } else {
+              chars.push(0)
+            }
+          }
+          value = { type: v.type, rawValue: chars }
+        } else {
+          value = makeDefaultValue(v.type)
+        }
       } else {
-        value = makeString(input)
+        value = makeDefaultValue(v.type)
       }
     }
 
