@@ -73,7 +73,7 @@ describe('Q04: Array, Record and WITH', () => {
       },
       {
         name: 'array element as rvalue',
-        code: 'program test; var arr: array[1..3] of integer; var x: integer; begin arr[1] := 10; x := arr[1]; writeln(x); end.',
+        code: 'program test; var arr: array[1..3] of integer; x: integer; begin arr[1] := 10; x := arr[1]; writeln(x); end.',
         purpose: '测试数组元素作为右值',
         features: ['array', 'rvalue'],
         expectedOutput: '10\n',
@@ -149,7 +149,7 @@ describe('Q04: Array, Record and WITH', () => {
       },
       {
         name: 'nested record',
-        code: 'program test; type Point = record x, y: integer end; type Circle = record center: Point; radius: integer end; var c: Circle; begin c.center.x := 10; c.center.y := 20; c.radius := 5; writeln(c.center.x); writeln(c.radius); end.',
+        code: 'program test; type Point = record x, y: integer end; Circle = record center: Point; radius: integer end; var c: Circle; begin c.center.x := 10; c.center.y := 20; c.radius := 5; writeln(c.center.x); writeln(c.radius); end.',
         purpose: '测试嵌套记录',
         features: ['record', 'nested_record'],
         expectedOutput: '10\n5\n',

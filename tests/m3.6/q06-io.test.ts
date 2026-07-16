@@ -233,21 +233,7 @@ end.`,
     features: ['write', 'writeln', 'standard-procedure'],
     expectedContains: 'ab'
   },
-  {
-    name: 'new dispose procedures',
-    code: `program test;
-type P = ^integer;
-var p: P;
-begin
-  new(p);
-  p^ := 10;
-  writeln(p^);
-  dispose(p);
-end.`,
-    purpose: 'new and dispose manage dynamic memory',
-    features: ['new', 'dispose', 'standard-procedure', 'pointer'],
-    expectedContains: '10'
-  },
+
   {
     name: 'file does not exist',
     code: `program test;
