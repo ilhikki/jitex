@@ -256,6 +256,8 @@ export function evaluateConstExpr(expr: ExpressionNode, state: State): number {
   switch (expr.kind) {
     case 'IntegerLiteral':
       return (expr as IntegerLiteralNode).value
+    case 'RealLiteral':
+      return (expr as any).value
 
     case 'Identifier': {
       const name = (expr as IdentifierNode).name.toUpperCase()

@@ -216,13 +216,13 @@ describe('GOTO scope (intra-procedural)', () => {
       // 快速失败！
     const source = `PROGRAM T; LABEL 99; VAR X: INTEGER; PROCEDURE P; BEGIN GOTO 99; X := 1 END; BEGIN X := 0; P; 99: X := 42 END.`
     const state = makeState(source)
-    expect(()=>runToCompletion(state)).toThrow()
+    expect(() => runToCompletion(state)).toThrow()
   })
 
   test('GOTO to non-existent label in same procedure throws (fast fail)', () => {
     const source = `PROGRAM T; LABEL 10; VAR X: INTEGER; BEGIN X := 0; GOTO 99; X := 1; 10: X := 42 END.`
     const state = makeState(source)
-    expect(()=>runToCompletion(state)).toThrow()
+    expect(() => runToCompletion(state)).toThrow()
   })
 })
 

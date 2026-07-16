@@ -426,6 +426,100 @@ function walkForLabels(stmt: StatementNode | null | undefined, seen: Set<number>
   return { success: true }
 }
 
+// Pascal82 §6.1.1: GOTO 目标 label 必须在同一 block 内可见（声明或带 label 的语句）
+function checkGotoTargets(
+  labelDecl: LabelDeclarationNode | null,
+  compound: StatementNode
+): { success: true } | { success: false; error: string; position: number } {
+  const validLabels = new Set<number>()
+  if (labelDecl) {
+    for (const l of labelDecl.labels) validLabels.add(l.value)
+  }
+  collectLabelsFromCompound(compound, validLabels)
+  return validateGotos(compound, validLabels)
+}
+
+function collectLabelsFromCompound(stmt: StatementNode | null | undefined, labels: Set<number>): void {
+  if (!stmt) return
+  if ((stmt as any).kind === 'LabeledStatement') {
+    labels.add((stmt as any).label.value)
+    collectLabelsFromCompound((stmt as any).statement, labels)
+    return
+  }
+  if ((stmt as any).kind === 'CompoundStatement') {
+    for (const s of (stmt as any).statements) collectLabelsFromCompound(s, labels)
+    return
+  }
+  if ((stmt as any).kind === 'IfStatement') {
+    collectLabelsFromCompound((stmt as any).thenBranch, labels)
+    if ((stmt as any).elseBranch) collectLabelsFromCompound((stmt as any).elseBranch, labels)
+    return
+  }
+  if ((stmt as any).kind === 'WhileStatement' || (stmt as any).kind === 'ForStatement') {
+    collectLabelsFromCompound((stmt as any).body, labels)
+    return
+  }
+  if ((stmt as any).kind === 'RepeatStatement') {
+    for (const s of (stmt as any).statements) collectLabelsFromCompound(s, labels)
+    return
+  }
+  if ((stmt as any).kind === 'CaseStatement') {
+    for (const branch of (stmt as any).branches) collectLabelsFromCompound(branch.statement, labels)
+    return
+  }
+  if ((stmt as any).kind === 'WithStatement') {
+    collectLabelsFromCompound((stmt as any).statement, labels)
+  }
+}
+
+function validateGotos(stmt: StatementNode | null | undefined, validLabels: Set<number>): { success: true } | { success: false; error: string; position: number } {
+  if (!stmt) return { success: true }
+  if ((stmt as any).kind === 'GotoStatement') {
+    const value = (stmt as any).label.value
+    if (!validLabels.has(value)) {
+      return { success: false, error: `GOTO target label ${value} is not declared in this block`, position: 0 }
+    }
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'LabeledStatement') {
+    return validateGotos((stmt as any).statement, validLabels)
+  }
+  if ((stmt as any).kind === 'CompoundStatement') {
+    for (const s of (stmt as any).statements) {
+      const r = validateGotos(s, validLabels)
+      if (!r.success) return r
+    }
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'IfStatement') {
+    let r = validateGotos((stmt as any).thenBranch, validLabels)
+    if (!r.success) return r
+    if ((stmt as any).elseBranch) return validateGotos((stmt as any).elseBranch, validLabels)
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'WhileStatement' || (stmt as any).kind === 'ForStatement') {
+    return validateGotos((stmt as any).body, validLabels)
+  }
+  if ((stmt as any).kind === 'RepeatStatement') {
+    for (const s of (stmt as any).statements) {
+      const r = validateGotos(s, validLabels)
+      if (!r.success) return r
+    }
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'CaseStatement') {
+    for (const branch of (stmt as any).branches) {
+      const r = validateGotos(branch.statement, validLabels)
+      if (!r.success) return r
+    }
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'WithStatement') {
+    return validateGotos((stmt as any).statement, validLabels)
+  }
+  return { success: true }
+}
+
 // PROGRAM identifier ( identifier_list ) ; block .
 export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
   let pos = input.position

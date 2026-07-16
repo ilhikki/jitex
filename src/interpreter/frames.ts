@@ -34,7 +34,7 @@ import {
   bindArguments,
   formatValue,
 } from './evaluator'
-import { resolveType, findVarRef, findWithRecord } from './types'
+import { resolveType, findVarRef, findWithRecord, evaluateConstExpr } from './types'
 import {
   makeInteger,
   makeReal,
@@ -164,6 +164,12 @@ export function createFunctionFrame(
                 throw new Error(`Duplicate identifier '${n.name}': parameter name conflicts with local variable`)
               }
             })
+          })
+          // 注册 procedure/function 内的常量到 fnScope（Pascal82 §6.2.2.1: block 可包含 const 段）
+          decl.block.constDeclarations.forEach(c => {
+            const value = evaluateConstExpr(c.value, state)
+            fnScope.variables.set(c.name.name.toUpperCase(), { type: INTEGER_TYPE, rawValue: value })
+            fnScope.variableTypes.set(c.name.name.toUpperCase(), INTEGER_TYPE)
           })
           // 初始化局部变量
           decl.block.variableDeclarations.forEach(v => {

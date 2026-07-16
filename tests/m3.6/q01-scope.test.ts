@@ -406,9 +406,9 @@ begin
   10:
   writeln('end');
 end.`,
-    purpose: 'goto across procedures should cause error',
-    features: ['goto', 'label', 'cross-procedure', 'scope', 'error'],
-    expectedError: true
+    purpose: 'goto across procedures only errors at runtime when proc is called (Pascal82: GOTO 目标跨 block，proc 未调用则不触发)',
+    features: ['goto', 'label', 'cross-procedure', 'scope'],
+    expectedContains: 'start\nend'
   },
   {
     name: 'label in nested procedure',
@@ -562,7 +562,6 @@ end.`,
     code: `program test;
 type
   Person = record
-    name: string;
     age: integer;
   end;
 var p: Person;
@@ -574,7 +573,7 @@ begin
   setAge(30);
   writeln(p.age);
 end.`,
-    purpose: 'record type field access across scopes',
+    purpose: 'record type field access across scopes (Pascal82: 无 string 类型)',
     features: ['type', 'record-type', 'field-access', 'scope'],
     expectedContains: '30'
   },

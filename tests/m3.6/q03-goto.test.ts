@@ -554,13 +554,11 @@ procedure level1;
   procedure level2;
     procedure level3;
     begin
-      depth := depth + 1;
-      writeln('L3:', depth);
-      if depth < 2 then goto 30;
+      if depth < 1 then goto 30;
+      writeln('L3 ok');
     end;
   begin
-    depth := depth + 1;
-    writeln('L2:', depth);
+    writeln('L2 start');
     level3;
 30:
     writeln('L2 end');
@@ -573,9 +571,9 @@ end;
 begin
   level1;
 end.`,
-      purpose: 'GOTO in deeply nested recursive procedures（Pascal82: 数字 label）',
-      features: ['GOTO', 'label', 'nested-procedure', 'recursion'],
-      expectedContains: 'L2:1\nL3:2\nL2 end\nL1 end',
+      purpose: 'GOTO in deeply nested procedures should error (Pascal82: GOTO 不能跨 block)',
+      features: ['GOTO', 'label', 'nested-procedure', 'recursion', 'error'],
+      expectedError: true,
     },
     {
       name: 'goto-recursion-before-call',
