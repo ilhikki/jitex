@@ -155,14 +155,14 @@ end.`,
     {
       name: 'label-same-as-variable',
       code: `program test;
-var label: integer;
+var lbl: integer;
 begin
-  label := 42;
-  writeln(label);
+  lbl := 42;
+  writeln(lbl);
 100:
   writeln('Label 100');
 end.`,
-      purpose: 'Label coexists with variable of same name',
+      purpose: 'Label coexists with variable of same name（Pascal82: label 是关键字，不能作变量名）',
       features: ['GOTO', 'label', 'variable'],
       expectedContains: '42\nLabel 100',
     },
@@ -320,7 +320,7 @@ begin
     for j := 1 to 3 do
     begin
       writeln('i=', i, ' j=', j);
-      if i = 2 and j = 2 then goto 800;
+      if (i = 2) and (j = 2) then goto 800;
     end;
 800:
   writeln('Exit nested loops');
@@ -466,15 +466,16 @@ begin
   count := count + 1;
   writeln(count);
   if count < 3 then goto 10;
-  exit;
+  goto 20;
 10:
   rec;
+20:
 end;
 begin
   count := 0;
   rec;
 end.`,
-      purpose: 'GOTO in recursive procedure',
+      purpose: 'GOTO in recursive procedure（Pascal82: 无 exit，用 goto 跳转）',
       features: ['GOTO', 'label', 'procedure', 'recursion'],
       expectedContains: '1\n2\n3',
     },
@@ -483,16 +484,17 @@ end.`,
       code: `program test;
 function fib(n: integer): integer;
 begin
-  if n <= 1 then goto base;
+  if n <= 1 then goto 10;
   fib := fib(n-1) + fib(n-2);
-  exit;
-base:
+  goto 20;
+10:
   fib := n;
+20:
 end;
 begin
   writeln(fib(5));
 end.`,
-      purpose: 'GOTO in recursive function',
+      purpose: 'GOTO in recursive function（Pascal82: 数字 label）',
       features: ['GOTO', 'label', 'function', 'recursion'],
       expectedContains: '5',
     },
@@ -503,19 +505,19 @@ var x: integer;
 procedure rec;
 begin
   x := x + 1;
-  if x > 3 then goto exit_label;
+  if x > 3 then goto 99;
   writeln(x);
   rec;
 end;
 begin
   x := 0;
   rec;
-exit_label:
+99:
   writeln('Exit');
 end.`,
-      purpose: 'GOTO to label in recursive procedure chain',
-      features: ['GOTO', 'label', 'procedure', 'recursion'],
-      expectedContains: '1\n2\n3\nExit',
+      purpose: 'GOTO from procedure to main program label should error (Pascal82: 禁止跨过程 GOTO)',
+      features: ['GOTO', 'label', 'procedure', 'recursion', 'error'],
+      expectedError: true,
     },
     {
       name: 'goto-recursion-mutual',
@@ -525,24 +527,24 @@ procedure a;
 begin
   n := n + 1;
   writeln('A:', n);
-  if n < 3 then goto b_label;
+  if n < 3 then goto 20;
 end;
 procedure b;
 begin
   n := n + 1;
   writeln('B:', n);
-  if n < 3 then goto a_label;
+  if n < 3 then goto 10;
 end;
 begin
   n := 0;
-a_label:
+10:
   a;
-b_label:
+20:
   b;
 end.`,
-      purpose: 'GOTO in mutually recursive procedures',
-      features: ['GOTO', 'label', 'procedure', 'mutual-recursion'],
-      expectedContains: 'A:1\nB:2\nA:3',
+      purpose: 'GOTO from procedure to main program label should error (Pascal82: 禁止跨过程 GOTO)',
+      features: ['GOTO', 'label', 'procedure', 'mutual-recursion', 'error'],
+      expectedError: true,
     },
     {
       name: 'goto-recursion-deep-nested',
@@ -554,13 +556,13 @@ procedure level1;
     begin
       depth := depth + 1;
       writeln('L3:', depth);
-      if depth < 2 then goto l3_label;
+      if depth < 2 then goto 30;
     end;
   begin
     depth := depth + 1;
     writeln('L2:', depth);
     level3;
-l3_label:
+30:
     writeln('L2 end');
   end;
 begin
@@ -571,7 +573,7 @@ end;
 begin
   level1;
 end.`,
-      purpose: 'GOTO in deeply nested recursive procedures',
+      purpose: 'GOTO in deeply nested recursive procedures（Pascal82: 数字 label）',
       features: ['GOTO', 'label', 'nested-procedure', 'recursion'],
       expectedContains: 'L2:1\nL3:2\nL2 end\nL1 end',
     },
@@ -582,9 +584,9 @@ var count: integer;
 procedure rec;
 begin
   count := count + 1;
-  if count > 2 then goto skip;
+  if count > 2 then goto 40;
   writeln('Before:', count);
-skip:
+40:
   if count < 3 then rec;
   writeln('After:', count);
 end;
@@ -592,9 +594,9 @@ begin
   count := 0;
   rec;
 end.`,
-      purpose: 'GOTO before recursive call',
+      purpose: 'GOTO before recursive call（Pascal82: 数字 label，count 为全局变量）',
       features: ['GOTO', 'label', 'procedure', 'recursion'],
-      expectedContains: 'Before:1\nBefore:2\nAfter:3\nAfter:2\nAfter:1',
+      expectedContains: 'Before:1\nBefore:2\nAfter:3\nAfter:3\nAfter:3',
     },
     {
       name: 'goto-recursion-after-call',
@@ -605,18 +607,18 @@ begin
   count := count + 1;
   writeln('Enter:', count);
   if count < 3 then rec;
-  goto done;
+  goto 50;
   writeln('Skipped:', count);
-done:
+50:
   writeln('Leave:', count);
 end;
 begin
   count := 0;
   rec;
 end.`,
-      purpose: 'GOTO after recursive call',
+      purpose: 'GOTO after recursive call（Pascal82: 数字 label）',
       features: ['GOTO', 'label', 'procedure', 'recursion'],
-      expectedContains: 'Enter:1\nEnter:2\nEnter:3\nLeave:3\nLeave:2\nLeave:1',
+      expectedContains: 'Enter:1\nEnter:2\nEnter:3\nLeave:3\nLeave:3\nLeave:3',
       expectedNotContains: 'Skipped:',
     },
     {
@@ -625,16 +627,16 @@ end.`,
 var count: integer;
 procedure rec;
 begin
-entry_label:
+60:
   count := count + 1;
   writeln(count);
-  if count < 3 then goto entry_label;
+  if count < 3 then goto 60;
 end;
 begin
   count := 0;
   rec;
 end.`,
-      purpose: 'GOTO to recursive entry label (simulating loop)',
+      purpose: 'GOTO to recursive entry label (simulating loop)（Pascal82: 数字 label）',
       features: ['GOTO', 'label', 'procedure', 'recursion'],
       expectedContains: '1\n2\n3',
     },

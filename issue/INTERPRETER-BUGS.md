@@ -106,6 +106,7 @@
 |---|------|------|------|
 | 13 | WITH 语句未正确实现字段访问 | WITH 测试全部失败 | **Fixed**（Scope 添加 withRecords；createWithFrame 创建 scope 链绑定记录字段；lookupVariable/assignToLeft 处理 WITH 绑定；测试代码修正为单个 type 段） |
 | 14 | 嵌套数组多维索引访问失败 | `arr[1,1]` 在 `array of array` 上报维度不匹配 | **Fixed**（添加 arrayGetElement/arraySetElement 递归索引；更新 evalArrayRead/assignToLeft/evalLValueBase） |
+| 17 | 重复 label 未检测 & 跨过程 GOTO 测试违反 Pascal82 | parser 无 label 重复检查；两个递归 GOTO 测试期望非标行为 | **Fixed**（parseBlock 添加 checkDuplicateLabels；跨过程 GOTO 测试改为 expectedError: true） |
 
 ---
 

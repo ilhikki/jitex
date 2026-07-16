@@ -247,8 +247,8 @@ end.`,
   {
     name: 'while with break via goto',
     code: `program test;
-var i: integer;
 label 10;
+var i: integer;
 begin
   i := 1;
   while i <= 10 do
@@ -618,21 +618,21 @@ end.`,
   {
     name: 'while with if and break',
     code: `program test;
+label 50;
 var i: integer;
-label exit;
 begin
   i := 1;
   while i <= 100 do
   begin
     if i = 5 then
-      goto exit;
+      goto 50;
     writeln(i);
     i := i + 1;
   end;
-  exit:
+  50:
   writeln('done');
 end.`,
-    purpose: 'WHILE loop with IF and GOTO break',
+    purpose: 'WHILE loop with IF and GOTO break (Pascal82: 数字 label)',
     features: ['while-loop', 'if-statement', 'goto', 'break'],
     expectedNotContains: '5'
   },
@@ -711,9 +711,9 @@ begin
     sum := sum + i;
   writeln(sum);
 end.`,
-    purpose: 'FOR loop sums even numbers from 2 to 8',
+    purpose: 'FOR loop sums numbers from 2 to 8 (Pascal82: 无 step，递增 +1)',
     features: ['for-loop', 'accumulator'],
-    expectedContains: '30'
+    expectedContains: '35'
   },
   {
     name: 'while loop with boolean flag',

@@ -356,6 +356,10 @@ export function parseBlock(input: ParserInput): ParseResult<BlockNode> {
   if (!compoundResult.success) return fail(compoundResult.error, compoundResult.position)
   pos = compoundResult.newPosition
 
+  // Pascal82 语义检查：label 在同一 block 内必须唯一
+  const labelCheck = checkDuplicateLabels(compoundResult.astNode)
+  if (!labelCheck.success) return fail(labelCheck.error, labelCheck.position)
+
   return ok(pos, {
     kind: 'Block',
     labelDeclarations,
@@ -366,6 +370,60 @@ export function parseBlock(input: ParserInput): ParseResult<BlockNode> {
     functionDeclarations: funcDecls,
     compound: compoundResult.astNode,
   } as BlockNode)
+}
+
+// Pascal82 要求同一 block 内不能重复声明 label。跨 block（不同 procedure/function）允许同名 label。
+function checkDuplicateLabels(stmt: StatementNode | null): { success: true } | { success: false; error: string; position: number } {
+  if (!stmt) return { success: true }
+  const seen = new Set<number>()
+  return walkForLabels(stmt, seen)
+}
+
+function walkForLabels(stmt: StatementNode | null | undefined, seen: Set<number>): { success: true } | { success: false; error: string; position: number } {
+  if (!stmt) return { success: true }
+  if ((stmt as any).kind === 'LabeledStatement') {
+    const ls = stmt as any
+    const value = ls.label.value
+    if (seen.has(value)) {
+      return { success: false, error: `Duplicate label ${value}`, position: 0 }
+    }
+    seen.add(value)
+    return walkForLabels(ls.statement, seen)
+  }
+  if ((stmt as any).kind === 'CompoundStatement') {
+    for (const s of (stmt as any).statements) {
+      const r = walkForLabels(s, seen)
+      if (!r.success) return r
+    }
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'IfStatement') {
+    const r = walkForLabels((stmt as any).thenBranch, seen)
+    if (!r.success) return r
+    if ((stmt as any).elseBranch) return walkForLabels((stmt as any).elseBranch, seen)
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'WhileStatement' || (stmt as any).kind === 'ForStatement') {
+    return walkForLabels((stmt as any).body, seen)
+  }
+  if ((stmt as any).kind === 'RepeatStatement') {
+    for (const s of (stmt as any).statements) {
+      const r = walkForLabels(s, seen)
+      if (!r.success) return r
+    }
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'CaseStatement') {
+    for (const branch of (stmt as any).branches) {
+      const r = walkForLabels(branch.statement, seen)
+      if (!r.success) return r
+    }
+    return { success: true }
+  }
+  if ((stmt as any).kind === 'WithStatement') {
+    return walkForLabels((stmt as any).statement, seen)
+  }
+  return { success: true }
 }
 
 // PROGRAM identifier ( identifier_list ) ; block .
