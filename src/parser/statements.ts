@@ -78,7 +78,9 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
 
 // BEGIN statements END
 export function parseCompoundStatement(input: ParserInput): ParseResult<CompoundStatementNode> {
-  let pos = input.position + 1 // skip BEGIN
+  const beginResult = expectKeyword(input, 'BEGIN')
+  if (!beginResult.success) return fail(beginResult.error, beginResult.position)
+  let pos = beginResult.newPosition
   const statements: StatementNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'END') {
