@@ -34,7 +34,7 @@ import {
   bindArguments,
   formatValue,
 } from './evaluator'
-import { resolveType, findVarRef } from './types'
+import { resolveType, findVarRef, findWithRecord } from './types'
 import {
   makeInteger,
   makeReal,
@@ -856,15 +856,39 @@ export function createLabeledFrame(node: LabeledStatementNode): Frame {
 // --- WithFrame ---
 export function createWithFrame(node: WithStatementNode): Frame {
   let phase: 'init' | 'done' = 'init'
+  let savedScope: Scope | null = null
 
   return {
     kind: 'With',
     done: false,
     step(state: State) {
       if (phase === 'init') {
+        savedScope = state.currentScope
+        // Pascal82: with R1, R2, ... do S 等价于 with R1 do with R2 do ... do S
+        // 后绑定的记录优先（内层 scope）
+        let currentParent = savedScope
+        for (const recordExpr of node.records) {
+          const recordValue = evalExpr(recordExpr, currentParent, state)
+          if (recordValue.type.kind !== 'record') {
+            throw new Error(`WITH expression must be a record, got ${recordValue.type.kind}`)
+          }
+          const withScope = createScope(currentParent, null)
+          withScope.withRecords = new Map()
+          const recType = recordValue.type as RecordType
+          for (const fieldName of recType.fieldTypes.keys()) {
+            withScope.withRecords.set(fieldName, recordValue)
+          }
+          currentParent = withScope
+        }
+        state.currentScope = currentParent
         state.stack.push(createStatementFrame(node.body))
         phase = 'done'
         return
+      }
+      // 恢复 scope
+      if (savedScope) {
+        state.currentScope = savedScope
+        savedScope = null
       }
       this.done = true
     },
@@ -910,6 +934,14 @@ function assignToLeft(left: ExpressionNode, value: PascalValue, state: State): v
       varRef.scope.variables.set(varRef.name, finalValue)
       // 同时更新函数 scope 中的本地副本（供后续读取）
       scope.variables.set(name, finalValue)
+      return
+    }
+
+    // 检查是否是 WITH 绑定的记录字段：赋值到记录字段
+    const withRecord = findWithRecord(name, scope)
+    if (withRecord) {
+      const rec = withRecord.rawValue as PascalRecord
+      rec.fields.set(name, finalValue)
       return
     }
 

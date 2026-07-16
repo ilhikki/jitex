@@ -49,6 +49,8 @@ export interface Scope {
   variableTypes: Map<string, PascalType>
   /** var 参数绑定：参数名 -> 调用方 scope 和变量名 */
   varBindings: Map<string, { scope: Scope; name: string }> | null
+  /** WITH 语句绑定：字段名 -> 记录值引用（PascalValue，rawValue 是 PascalRecord） */
+  withRecords: Map<string, PascalValue> | null
   parent: Scope | null
   functionDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null
 }
@@ -61,6 +63,7 @@ export function createScope(
     variables: new Map(),
     variableTypes: new Map(),
     varBindings: null,
+    withRecords: null,
     parent,
     functionDecl,
   }
@@ -72,6 +75,18 @@ export function findVarRef(name: string, scope: Scope | null): { scope: Scope; n
   while (s) {
     if (s.varBindings && s.varBindings.has(name)) {
       return s.varBindings.get(name)!
+    }
+    s = s.parent
+  }
+  return null
+}
+
+/** 查找 WITH 语句绑定的记录（沿 scope 链向上查找） */
+export function findWithRecord(name: string, scope: Scope | null): PascalValue | null {
+  let s: Scope | null = scope
+  while (s) {
+    if (s.withRecords && s.withRecords.has(name)) {
+      return s.withRecords.get(name)!
     }
     s = s.parent
   }

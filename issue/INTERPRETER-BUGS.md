@@ -98,13 +98,13 @@
 
 ---
 
-## P4: WITH 语句
+## P4: WITH 语句（已修复）
 **影响**: 高
 **风险**: 高
 
 | # | 问题 | 现象 | 状态 |
 |---|------|------|------|
-| 13 | WITH 语句未正确实现字段访问 | WITH 测试全部失败 | Open |
+| 13 | WITH 语句未正确实现字段访问 | WITH 测试全部失败 | **Fixed**（Scope 添加 withRecords；createWithFrame 创建 scope 链绑定记录字段；lookupVariable/assignToLeft 处理 WITH 绑定；测试代码修正为单个 type 段） |
 
 ---
 

@@ -50,7 +50,7 @@ import type {
   ParenthesizedExpressionNode,
   VariableDeclarationNode,
 } from '../ast/types'
-import { createScope, resolveType, findVarRef } from './types'
+import { createScope, resolveType, findVarRef, findWithRecord } from './types'
 import { createFunctionFrame } from './frames'
 
 // ============================================================================
@@ -233,6 +233,12 @@ function lookupVariable(name: string, scope: Scope): PascalValue | null {
       const ref = s.varBindings.get(name)!
       return ref.scope.variables.get(ref.name) || null
     }
+    // 检查 WITH 绑定：WITH 语句中的标识符可能是记录字段
+    if (s.withRecords && s.withRecords.has(name)) {
+      const recordValue = s.withRecords.get(name)!
+      const rec = recordValue.rawValue as PascalRecord
+      return rec.fields.get(name) || null
+    }
     if (s.variables.has(name)) {
       return s.variables.get(name)!
     }
@@ -244,6 +250,12 @@ function lookupVariable(name: string, scope: Scope): PascalValue | null {
 export function lookupVariableType(name: string, scope: Scope): PascalType | null {
   let s: Scope | null = scope
   while (s) {
+    // 检查 WITH 绑定的字段类型
+    if (s.withRecords && s.withRecords.has(name)) {
+      const recordValue = s.withRecords.get(name)!
+      const recType = recordValue.type as RecordType
+      return recType.fieldTypes.get(name) || null
+    }
     if (s.variableTypes.has(name)) {
       return s.variableTypes.get(name)!
     }
