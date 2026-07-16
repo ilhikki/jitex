@@ -48,7 +48,7 @@ export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDecl
     labels.push({
       kind: 'IntegerLiteral',
       value: parseInt(token.content, 10),
-      raw: token.content,
+      raw: token,
     } as IntegerLiteralNode)
     pos++
 

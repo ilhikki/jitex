@@ -42,7 +42,7 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       return ok(input.position + 1, {
         kind: 'IntegerLiteral',
         value: parseInt(token.content, 10),
-        raw: token.content,
+        raw: token,
       } as IntegerLiteralNode)
     }
 
@@ -50,7 +50,7 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       return ok(input.position + 1, {
         kind: 'IntegerLiteral',
         value: parseInt(token.content.substring(1), 16),
-        raw: token.content,
+        raw: token,
       } as IntegerLiteralNode)
     }
 
@@ -58,7 +58,7 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       return ok(input.position + 1, {
         kind: 'RealLiteral',
         value: parseFloat(token.content),
-        raw: token.content,
+        raw: token,
       } as RealLiteralNode)
     }
 
@@ -67,13 +67,13 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
         return ok(input.position + 1, {
           kind: 'CharLiteral',
           value: token.content,
-          raw: token.content,
+          raw: token,
         } as CharLiteralNode)
       }
       return ok(input.position + 1, {
         kind: 'StringLiteral',
         value: token.content,
-        raw: token.content,
+        raw: token,
       } as StringLiteralNode)
     }
 
@@ -89,7 +89,7 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       return ok(input.position + 1, {
         kind: 'CharLiteral',
         value: String.fromCharCode(value),
-        raw: token.content,
+        raw: token,
       } as CharLiteralNode)
     }
 

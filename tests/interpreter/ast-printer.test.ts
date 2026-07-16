@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { parse, nodeToCode } from '../../src/index'
+import { parse, nodeToCode, SourceMap } from '../../src/index'
 import type { ProgramNode } from '../../src/ast/types'
 
 const tanglePasPath = path.join(__dirname, '..', 'resources', 'tangle-official.pas')
@@ -115,5 +115,84 @@ describe('AST printer 幂等性 - 简单程序', () => {
       const s2 = nodeToCode(n1)
       expect(s2).toBe(s1)
     })
+  })
+})
+
+describe('SourceMap integration tests (tangle.pas)', () => {
+  let originalSource: string
+  let ast: ProgramNode
+  let sourceMap: SourceMap
+
+  beforeAll(() => {
+    originalSource = fs.readFileSync(tanglePasPath, 'utf-8')
+    ast = parseOrThrow(originalSource)
+    sourceMap = new SourceMap(ast)
+  })
+
+  test('program 节点有行号信息', () => {
+    const info = sourceMap.getNodeLine(ast)
+    expect(info).not.toBeNull()
+    expect(info!.startLine).toBeGreaterThanOrEqual(1)
+    expect(info!.endLine).toBeGreaterThan(1)
+  })
+
+  test('行号查找：program 节点覆盖的行范围内能找到节点', () => {
+    const info = sourceMap.getNodeLine(ast)
+    expect(info).not.toBeNull()
+    // 查 program 起始行附近
+    const nodes = sourceMap.getNodesAtLine(info!.startLine)
+    expect(nodes.length).toBeGreaterThan(0)
+  })
+
+  test('模糊查找：有效行号范围内能找到节点', () => {
+    const info = sourceMap.getNodeLine(ast)
+    expect(info).not.toBeNull()
+    const midLine = Math.floor((info!.startLine + info!.endLine) / 2)
+    const node = sourceMap.getNodeNearLine(midLine)
+    expect(node).not.toBeNull()
+  })
+
+  test('模糊查找：超出范围的行号仍能返回最近节点', () => {
+    const veryHighLine = 99999
+    const node = sourceMap.getNodeNearLine(veryHighLine)
+    expect(node).not.toBeNull()
+  })
+})
+
+describe('SourceMap 集成测试 - 简单程序', () => {
+  test('含字面量的程序行号映射', () => {
+    const source = `program hello;
+const
+  c = 42;
+var
+  a: integer;
+begin
+  a := c;
+end.`
+    const ast = parseOrThrow(source)
+    const sm = new SourceMap(ast)
+
+    // program 节点有行号信息（因为子树中有字面量 42）
+    const programInfo = sm.getNodeLine(ast)
+    expect(programInfo).not.toBeNull()
+    expect(programInfo!.startLine).toBeGreaterThanOrEqual(1)
+    expect(programInfo!.endLine).toBeGreaterThanOrEqual(programInfo!.startLine)
+
+    // 第 3 行（c = 42）应该能找到节点
+    const nodes = sm.getNodesAtLine(3)
+    expect(nodes.length).toBeGreaterThan(0)
+  })
+
+  test('含字面量的程序模糊查找', () => {
+    const source = `program hello;
+const
+  n = 10;
+begin
+end.`
+    const ast = parseOrThrow(source)
+    const sm = new SourceMap(ast)
+
+    const node = sm.getNodeNearLine(3)
+    expect(node).not.toBeNull()
   })
 })
