@@ -34,7 +34,7 @@ import {
   bindArguments,
   formatValue,
 } from './evaluator'
-import { resolveType } from './types'
+import { resolveType, findVarRef } from './types'
 import {
   makeInteger,
   makeReal,
@@ -150,6 +150,19 @@ export function createFunctionFrame(
         state.currentScope = fnScope
 
         if (decl.block) {
+          // Pascal82 语义检查：参数名不能与局部变量名重复
+          const localVarNames = new Set<string>()
+          decl.block.variableDeclarations.forEach(v => {
+            v.names.forEach(n => localVarNames.add(n.name.toUpperCase()))
+          })
+          decl.parameters.forEach(p => {
+            p.names.forEach(n => {
+              const name = n.name.toUpperCase()
+              if (localVarNames.has(name)) {
+                throw new Error(`Duplicate identifier '${n.name}': parameter name conflicts with local variable`)
+              }
+            })
+          })
           // 初始化局部变量
           decl.block.variableDeclarations.forEach(v => {
             initVariables(v, fnScope, state)
@@ -890,6 +903,15 @@ function assignToLeft(left: ExpressionNode, value: PascalValue, state: State): v
 
     const targetType = lookupVariableType(name, scope)
     const finalValue = targetType ? coerceToType(value, targetType) : value
+
+    // 检查是否是 var 参数：var 参数赋值转发到调用方 scope
+    const varRef = findVarRef(name, scope)
+    if (varRef) {
+      varRef.scope.variables.set(varRef.name, finalValue)
+      // 同时更新函数 scope 中的本地副本（供后续读取）
+      scope.variables.set(name, finalValue)
+      return
+    }
 
     const targetScope = findVariableScope(name, scope)
     if (targetScope) {

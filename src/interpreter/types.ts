@@ -47,6 +47,8 @@ import type {
 export interface Scope {
   variables: Map<string, PascalValue>
   variableTypes: Map<string, PascalType>
+  /** var 参数绑定：参数名 -> 调用方 scope 和变量名 */
+  varBindings: Map<string, { scope: Scope; name: string }> | null
   parent: Scope | null
   functionDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null
 }
@@ -58,9 +60,22 @@ export function createScope(
   return {
     variables: new Map(),
     variableTypes: new Map(),
+    varBindings: null,
     parent,
     functionDecl,
   }
+}
+
+/** 查找 var 参数绑定（沿 scope 链向上查找） */
+export function findVarRef(name: string, scope: Scope | null): { scope: Scope; name: string } | null {
+  let s: Scope | null = scope
+  while (s) {
+    if (s.varBindings && s.varBindings.has(name)) {
+      return s.varBindings.get(name)!
+    }
+    s = s.parent
+  }
+  return null
 }
 
 // ============================================================================

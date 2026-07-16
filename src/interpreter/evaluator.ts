@@ -50,7 +50,7 @@ import type {
   ParenthesizedExpressionNode,
   VariableDeclarationNode,
 } from '../ast/types'
-import { createScope, resolveType } from './types'
+import { createScope, resolveType, findVarRef } from './types'
 import { createFunctionFrame } from './frames'
 
 // ============================================================================
@@ -228,6 +228,11 @@ function evalLValueBase(expr: ExpressionNode, scope: Scope, state: State): Pasca
 function lookupVariable(name: string, scope: Scope): PascalValue | null {
   let s: Scope | null = scope
   while (s) {
+    // 优先检查 var 绑定：var 参数的值从调用方 scope 读取
+    if (s.varBindings && s.varBindings.has(name)) {
+      const ref = s.varBindings.get(name)!
+      return ref.scope.variables.get(ref.name) || null
+    }
     if (s.variables.has(name)) {
       return s.variables.get(name)!
     }
@@ -441,16 +446,31 @@ export function bindArguments(
         const name = nameNode.name.toUpperCase()
 
         if (isVar) {
-          // var 参数：传递引用（通过左值寻址）
+          // var 参数：传递引用（Pascal82 标准）
+          // 必须传变量标识符，不能传表达式
           fnScope.variableTypes.set(name, paramType)
-          // 对于简单变量 var 参数，我们直接复制当前值，但标记为引用
-          // 更严格的实现需要左值引用对象
-          if (argExpr.kind === 'Identifier') {
-            const varName = (argExpr as IdentifierNode).name.toUpperCase()
-            const value = lookupVariable(varName, callerScope)
-            if (value) {
-              fnScope.variables.set(name, value)
+          if (argExpr.kind !== 'Identifier') {
+            throw new Error(`VAR parameter must be a variable, got ${argExpr.kind}`)
+          }
+          const varName = (argExpr as IdentifierNode).name.toUpperCase()
+
+          // 检查实参本身是否也是 var 参数（递归传递 var 参数）
+          // 如果是，直接复用其引用绑定，确保始终指向原始调用方变量
+          const existingRef = findVarRef(varName, callerScope)
+          if (existingRef) {
+            if (!fnScope.varBindings) fnScope.varBindings = new Map()
+            fnScope.varBindings.set(name, existingRef)
+            const value = existingRef.scope.variables.get(existingRef.name)
+            if (value) fnScope.variables.set(name, value)
+          } else {
+            const targetScope = findVariableScope(varName, callerScope)
+            if (!targetScope) {
+              throw new Error(`Unknown variable '${varName}' as VAR parameter`)
             }
+            if (!fnScope.varBindings) fnScope.varBindings = new Map()
+            fnScope.varBindings.set(name, { scope: targetScope, name: varName })
+            const value = targetScope.variables.get(varName)
+            if (value) fnScope.variables.set(name, value)
           }
         } else {
           // 值参：求值并复制
