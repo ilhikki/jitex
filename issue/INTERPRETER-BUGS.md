@@ -34,14 +34,14 @@
 
 ---
 
-## P1: Parser Crash
+## P1: Parser Crash（已修复）
 **影响**: 高（parser 崩溃而非返回错误）
 **风险**: 高
 
-| # | 问题 | 现象 |
-|---|------|------|
-| 16 | 未闭合注释导致 parser crash | `Cannot read properties of undefined` |
-| 17 | EOF 后读 token 导致 crash | parser 越界访问 |
+| # | 问题 | 现象 | 状态 |
+|---|------|------|------|
+| 16 | 未闭合注释导致 parser crash | `Cannot read properties of undefined` | **Fixed** |
+| 17 | EOF 后读 token 导致 crash | parser 越界访问 | **Fixed** |
 
 ---
 
