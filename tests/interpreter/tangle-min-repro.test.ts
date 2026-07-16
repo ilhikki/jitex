@@ -87,7 +87,7 @@ function runTangle(webContent: string, stepCallback?: StepCallback): { pasOutput
 
   const io = { file: fileOps, console: pascalConsole }
   const state = createState(parseResult.astNode, io)
-  populateSystemProcedures(state)
+  populateSystemProcedures(state, true)
   populateSystemFunctions(state)
 
   if (stepCallback) {
@@ -410,7 +410,7 @@ function runTangleWithProxySpy(
 
   const io = { file: fileOps, console: pascalConsole }
   const state = createState(parseResult.astNode, io)
-  populateSystemProcedures(state)
+  populateSystemProcedures(state, true)
   populateSystemFunctions(state)
 
   if (stepCallback) {
@@ -580,7 +580,7 @@ function runTangleWithFileSpy(
 
   const io = { file: fileOps, console: pascalConsole }
   const state = createState(parseResult.astNode, io)
-  populateSystemProcedures(state)
+  populateSystemProcedures(state, true)
   populateSystemFunctions(state)
 
   if (stepCallback) {

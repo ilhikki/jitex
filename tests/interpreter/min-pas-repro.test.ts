@@ -53,7 +53,7 @@ end.`
       } 
     }
     const state = createState(parseResult.astNode, io)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
 
     runToCompletion(state)
@@ -101,7 +101,7 @@ end.`
       } 
     }
     const state = createState(parseResult.astNode, io as any)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
 
     runToCompletion(state)
@@ -139,7 +139,7 @@ end.`
       } 
     }
     const state = createState(parseResult.astNode, io as any)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
 
     runToCompletion(state)
@@ -167,7 +167,7 @@ end.`
       console: { write: (text: string) => { output += text }, writeln: () => { output += '\n' }, read: () => '', readln: () => '', eof: () => true, eoln: () => true } 
     }
     const state = createState(parseResult.astNode, io as any)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
     runToCompletion(state)
     console.log('output:', output)
@@ -195,7 +195,7 @@ end.`
       console: { write: (text: string) => { output += text }, writeln: () => { output += '\n' }, read: () => '', readln: () => '', eof: () => true, eoln: () => true } 
     }
     const state = createState(parseResult.astNode, io as any)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
     runToCompletion(state)
     console.log('output:', output)
@@ -223,7 +223,7 @@ end.`
       console: { write: (text: string) => { output += text }, writeln: () => { output += '\n' }, read: () => '', readln: () => '', eof: () => true, eoln: () => true } 
     }
     const state = createState(parseResult.astNode, io as any)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
     runToCompletion(state)
     console.log('output:', output)
@@ -280,7 +280,7 @@ end.`
       } 
     }
     const state = createState(parseResult.astNode, io as any)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
 
     runToCompletion(state)

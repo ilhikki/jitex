@@ -115,7 +115,8 @@
 
 | # | 问题 | 现象 | 状态 |
 |---|------|------|------|
-| - | TANGLE 在 module 2 报 "Pascal text flushed, = sign is missing" | 多 module_name 引用导致 loc 状态异常 | Open |
+| 15 | TANGLE 测试未启用非标准扩展 | `Unknown procedure: BREAK` | **Fixed**（测试传 extensions=true） |
+| - | TANGLE 在 module 2 报 "Pascal text flushed, = sign is missing" | 多 module_name 引用导致 loc 状态异常 | Open（min-repro 已通过，完整 tangle.web 仍有深层 bug） |
 
 ---
 

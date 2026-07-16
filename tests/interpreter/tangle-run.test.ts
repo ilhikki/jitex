@@ -50,7 +50,7 @@ describe('tangle bootstrapping', () => {
 
     const io = { file: fileOps, console: pascalConsole }
     const state = createState(parseResult.astNode, io)
-    populateSystemProcedures(state)
+    populateSystemProcedures(state, true)
     populateSystemFunctions(state)
 
     // 注册 ASSERT / LOG_DEBUG
