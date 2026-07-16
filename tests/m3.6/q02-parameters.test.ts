@@ -691,21 +691,19 @@ end.
       code: `
 program Test;
 type IntArray = array[1..2] of integer;
-procedure SumArray(a: IntArray; var result: integer);
-begin
-  result := a[1] + a[2];
-end;
 var arr: IntArray;
-var s: integer;
+function SumArray(a: IntArray): integer;
+begin
+  SumArray := a[1] + a[2];
+end;
 begin
   arr[1] := 10;
   arr[2] := 20;
-  SumArray(arr, s);
-  writeln(s);
+  writeln(SumArray(arr));
 end.
       `,
-      purpose: '测试数组类型参数',
-      features: ['procedure', 'array parameter', 'var parameter'],
+      purpose: '测试数组类型参数（Pascal82 标准：var 在 function 之前；var 参数作为 P3 单独测试）',
+      features: ['function', 'array parameter'],
       expectedOutput: '30\n',
     },
     {
