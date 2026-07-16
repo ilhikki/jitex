@@ -19,11 +19,11 @@ run(state: State, mode: RunMode): void
 
 ### RunMode
 
-| Mode        | 行为                 |
-|-------------|--------------------|
-| `STEP_INTO` | 推进一个控制步骤，进入函数调用    |
-| `STEP_OVER` | (后续) 推进一个步骤，但不进入函数 |
-| `RUN`       | (后续) 运行到断点或结束      |
+| Mode        | 行为                 | 状态 |
+|-------------|--------------------|------|
+| `STEP_INTO` | 推进一个控制步骤，进入函数调用    | ✅ 已实现 |
+| `STEP_OVER` | (后续) 推进一个步骤，但不进入函数 | ❌ 未实现 |
+| `RUN`       | (后续) 运行到断点或结束      | ❌ 未实现 |
 
 第一阶段只实现 `STEP_INTO`。
 
@@ -96,20 +96,20 @@ interface Frame {
 
 ### Frame 类型与 step 行为
 
-| Frame kind      | 对应 AST 节点                                | step 行为                                                              |
-|-----------------|------------------------------------------|----------------------------------------------------------------------|
-| `Program`       | `ProgramNode`                            | push 主 block 的 CompoundFrame，然后 done                                 |
-| `Function`      | `ProcedureCallNode` / `FunctionCallNode` | 建局部 scope，push block 的 CompoundFrame；block done 时 pop scope 并 return |
-| `Compound`      | `CompoundStatementNode`                  | 逐条 push 子语句的 Frame；全部执行完则 done                                       |
-| `If`            | `IfStatementNode`                        | (M0) 评估条件，push then/else 分支 Frame                                    |
-| `While`         | `WhileStatementNode`                     | (M0) 评估条件，若 true 则 push body Frame，下一轮再检查                            |
-| `Repeat`        | `RepeatStatementNode`                    | push statements 的 CompoundFrame，完后评估 until 条件                        |
-| `For`           | `ForStatementNode`                       | 初始化变量，push body Frame，每轮后递增/递减并检查                                    |
-| `Case`          | `CaseStatementNode`                      | 评估表达式，匹配分支，push 对应 statement Frame                                   |
-| `Goto`          | `GotoStatementNode`                      | 搜索 label，跳转到对应语句（ unwind/rebuild stack）                              |
-| `Assignment`    | `AssignmentNode`                         | (M1) 评估右值，赋给左值                                                       |
-| `ProcedureCall` | `ProcedureCallNode`                      | push FunctionFrame                                                   |
-| `Empty`         | `EmptyStatementNode`                     | 立即 done                                                              |
+| Frame kind      | 对应 AST 节点                                | step 行为                                                              | 状态 |
+|-----------------|------------------------------------------|----------------------------------------------------------------------|------|
+| `Program`       | `ProgramNode`                            | push 主 block 的 CompoundFrame，然后 done                                 | ✅ |
+| `Function`      | `ProcedureCallNode` / `FunctionCallNode` | 建局部 scope，push block 的 CompoundFrame；block done 时 pop scope 并 return | ✅ |
+| `Compound`      | `CompoundStatementNode`                  | 逐条 push 子语句的 Frame；全部执行完则 done                                       | ✅ |
+| `If`            | `IfStatementNode`                        | 评估条件，push then/else 分支 Frame                                    | ✅ |
+| `While`         | `WhileStatementNode`                     | 评估条件，若 true 则 push body Frame，下一轮再检查                            | ✅ |
+| `Repeat`        | `RepeatStatementNode`                    | push statements 的 CompoundFrame，完后评估 until 条件                        | ✅ |
+| `For`           | `ForStatementNode`                       | 初始化变量，push body Frame，每轮后递增/递减并检查                                    | ✅ |
+| `Case`          | `CaseStatementNode`                      | 评估表达式，匹配分支，push 对应 statement Frame                                   | ✅ |
+| `Goto`          | `GotoStatementNode`                      | 搜索 label，跳转到对应语句（ unwind/rebuild stack）                              | ✅ |
+| `Assignment`    | `AssignmentNode`                         | 评估右值，赋给左值                                                       | ✅ |
+| `ProcedureCall` | `ProcedureCallNode`                      | push FunctionFrame                                                   | ✅ |
+| `Empty`         | `EmptyStatementNode`                     | 立即 done                                                              | ✅ |
 
 ### run 函数逻辑
 
@@ -130,11 +130,11 @@ function run(state, mode):
 
 ## 里程碑
 
-### M0 — 控制流和函数跳转
+### M0 — 控制流和函数跳转 ✅
 
 实现 execution stack、FunctionFrame、StatementFrame、procedure call/return、statement traversal。
 
-#### Baby M0 — 最小验证
+#### Baby M0 — 最小验证 ✅
 
 只验证机制正确性：
 
@@ -143,112 +143,116 @@ function run(state, mode):
 - ✅ scope 生命周期（创建/销毁）
 - ✅ stack trace（打印调用栈）
 
-不实现：
+**Baby M0 测试用例**：见 `tests/interpreter/baby-m0.test.ts`
 
-- ❌ expression 求值（条件用 mock）
-- ❌ type system
-- ❌ heap / 复杂对象
-- ❌ IO (WRITE/READ 等)
-
-**Baby M0 测试用例**：
-
-```pascal
-(* test 1: simple call/return + stack trace *)
-PROGRAM TEST1;
-PROCEDURE FOO;
-BEGIN END;
-BEGIN FOO END.
-
-(* test 2: nested call + scope *)
-PROGRAM TEST2;
-PROCEDURE OUTER;
-  PROCEDURE INNER;
-  BEGIN END;
-BEGIN INNER END;
-BEGIN OUTER END.
-
-(* test 3: multiple calls + return *)
-PROGRAM TEST3;
-PROCEDURE A; BEGIN END;
-PROCEDURE B; BEGIN A; END;
-PROCEDURE C; BEGIN B; END;
-BEGIN C END.
-```
-
-预期验证：
-
-- 每步 step 后 stack 的深度和 kind 正确
-- 进入函数时 scope 创建，退出时 scope 不再可访问
-- stackTrace() 输出函数调用链
-
-#### M0 Full — 所有 statement 的控制流
+#### M0 Full — 所有 statement 的控制流 ✅
 
 在 Baby M0 基础上，为每种 statement 实现 Frame：
 
-- CompoundFrame：语句遍历
-- IfFrame：条件分支（条件求值用 mock，始终走 then）
-- WhileFrame / RepeatFrame / ForFrame：循环控制（条件用 mock）
-- CaseFrame：分支选择
-- GotoFrame：标签跳转
-- AssignmentFrame：占位（M1 实现）
-- EmptyFrame：立即完成
+- ✅ CompoundFrame：语句遍历
+- ✅ IfFrame：条件分支
+- ✅ WhileFrame / RepeatFrame / ForFrame：循环控制
+- ✅ CaseFrame：分支选择
+- ✅ GotoFrame：标签跳转
+- ✅ AssignmentFrame：占位（M1 实现）
+- ✅ EmptyFrame：立即完成
 
-### M1 — 简单表达式和赋值
+### M1 — 简单表达式和赋值 ✅
 
-- 实现 expression evaluator：`evalExpr(expr, scope): Value`
-- 支持：整数、字符串、char、boolean 字面量
-- 支持：标识符查找
-- 支持：二元运算 (+ - * / DIV MOD AND OR)
-- 支持：比较运算 (= <> < <= > >=)
-- 支持：一元运算 (NOT - +)
-- 实现 assignment
-- 支持：函数调用作为表达式
-* 执行 knuth/web/tangle-official.pas 为验收标准, 但mock：遇到不认识的类型，循环和 goto 递归第二次遇到时直接跳过。
+- ✅ 实现 expression evaluator：`evalExpr(expr, scope): Value`
+- ✅ 支持：整数、字符串、char、boolean 字面量
+- ✅ 支持：标识符查找
+- ✅ 支持：二元运算 (+ - * / DIV MOD AND OR)
+- ✅ 支持：比较运算 (= <> < <= > >=)
+- ✅ 支持：一元运算 (NOT - +)
+- ✅ 实现 assignment
+- ✅ 支持：函数调用作为表达式
+- ✅ 执行 knuth/web/tangle-official.pas 为验收标准
 
-### M2 — Pascal 类型系统
+### M2 — Pascal 类型系统 ⚠️ 部分实现
 
-- 实现 range 检查
-- 实现 array / record / file 类型
-- 实现 VAR 参数（引用传递）
-- 实现类型转换
+- ✅ 实现 range 检查
+- ✅ 实现 array / record / file 类型
+- ⚠️ 实现 VAR 参数（引用传递）— **部分实现，存在 bug**
+- ✅ 实现类型转换
 
-### M3 — 标准库
+**待修复 bug**：VAR 参数不修改原变量（INTERPRETER-BUGS.md #11）
 
-- 实现 I/O：WRITE / WRITELN / READ / READLN
-- 实现：RESET / REWRITE / GET / PUT / EOF / EOLN
-- 实现：CHR / ORD / ROUND / TRUNC / ABS
-- 实现：BREAK / CONTINUE / EXIT
+### M3 — 标准库 ⚠️ 部分实现
+
+- ✅ 实现 I/O：WRITE / WRITELN / READ / READLN
+- ⚠️ 实现：RESET / REWRITE / GET / PUT / EOF / EOLN — **部分实现**
+- ✅ 实现：CHR / ORD / ROUND / TRUNC / ABS
+- ✅ 实现：BREAK / CONTINUE / EXIT
 - ✅ **IO 抽象层重构**：PascalFile 抽象为仅含 url+offset 的接口，通过 `state.io`（包含 file 和 console）实现。默认内存实现，控制台默认无操作，可替换为网络/本地文件
 
-### M4 — 非 debugger 模式和优化
+**待修复问题**：
+- writeln 多参数输出异常（INTERPRETER-BUGS.md #5）
+- readln 输入读取问题（INTERPRETER-BUGS.md #6）
+- eof/eoln 检测失败（INTERPRETER-BUGS.md #7）
 
-- 实现 RUN 模式（跳过断点检查，减少帧操作开销）
-- 实现 STEP_OVER 模式
-- 直接执行模式（不走 step-by-step）
-- 性能优化
+### M4 — 非 debugger 模式和优化 ❌
+
+- ❌ 实现 RUN 模式（跳过断点检查，减少帧操作开销）
+- ❌ 实现 STEP_OVER 模式
+- ❌ 直接执行模式（不走 step-by-step）
+- ❌ 性能优化
 
 ## 项目结构
 
 ```
 src/
-├── ast/                        # ❄️ 冻结
-├── lexer/                      # ❄️ 冻结
-├── parser/                     # ❄️ 冻结
+├── ast/                        # ❄️ 冻结 ✅
+├── lexer/                      # ❄️ 冻结 ✅
+├── parser/                     # ❄️ 冻结 ✅
 ├── interpreter/                # 🆕 PDI
-│   ├── types.ts                # State, Frame, Scope, Value 类型 + 工厂函数
+│   ├── types.ts                # State, Frame, Scope, Value 类型 + 工厂函数 ✅
 │   ├── types/
-│   │   └── pascal-value.ts     # PascalValue, PascalType, 类型系统实现
-│   ├── io.ts                   # 抽象 IO 层 (PascalFile, PascalIO, PascalConsole, 默认内存实现)
-│   ├── frames.ts               # 所有 Frame 类型 (Program, Compound, Function, ProcedureCall, If, While, Repeat, For, Case, Goto, Assignment, Empty)
-│   ├── evaluator.ts            # 表达式求值器 + 系统函数注册
-│   ├── run.ts                  # run(state, mode)
-│   └── index.ts                # 公开 API
+│   │   └── pascal-value.ts     # PascalValue, PascalType, 类型系统实现 ✅
+│   ├── io.ts                   # 抽象 IO 层 (PascalFile, PascalIO, PascalConsole, 默认内存实现) ✅
+│   ├── frames.ts               # 所有 Frame 类型 ✅
+│   ├── evaluator.ts            # 表达式求值器 + 系统函数注册 ✅
+│   ├── run.ts                  # run(state, mode) ✅
+│   └── index.ts                # 公开 API ✅
 ├── tests/
-│   └── interpreter/
-│       ├── baby-m0-call-return.test.ts
-│       ├── baby-m0-scope.test.ts
-│       └── baby-m0-stack-trace.test.ts
-└── index.ts                    # 更新入口
+│   ├── lexer/                  # ✅
+│   │   └── lexer.test.ts
+│   ├── parser/                 # ✅
+│   │   ├── productions.test.ts
+│   │   └── statements-decls.test.ts
+│   ├── m3.5/                   # ✅ Parser 测试 (p01-p08)
+│   │   ├── _helper.ts
+│   │   ├── p01-parser-boundary.test.ts
+│   │   ├── p02-operator-precedence.test.ts
+│   │   ├── p03-scope.test.ts
+│   │   ├── p04-procedure-function.test.ts
+│   │   ├── p05-recursion.test.ts
+│   │   ├── p06-error-handling.test.ts
+│   │   ├── p07-fuzz.test.ts
+│   │   └── p08-parser-robustness.test.ts
+│   ├── m3.6/                   # ⚠️ Interpreter 测试 (q01-q07, q09)
+│   │   ├── _helper.ts
+│   │   ├── q01-scope.test.ts
+│   │   ├── q02-parameters.test.ts
+│   │   ├── q03-goto.test.ts
+│   │   ├── q04-array-record.test.ts
+│   │   ├── q05-operations.test.ts
+│   │   ├── q06-io.test.ts
+│   │   ├── q07-control.test.ts
+│   │   └── q09-nonstandard-rejected.test.ts
+│   └── interpreter/            # ⚠️ 集成测试
+│       ├── baby-m0.test.ts
+│       ├── m0-statements.test.ts
+│       ├── m1-expressions.test.ts
+│       ├── m1-labels.test.ts
+│       ├── m2-parameters.test.ts
+│       ├── m3-stdlib.test.ts
+│       ├── io-record-file-ops.test.ts
+│       ├── tangle-min-repro.test.ts
+│       ├── tangle-functions.test.ts
+│       ├── tangle-run.test.ts
+│       └── min-pas-repro.test.ts
+└── index.ts                    # 更新入口 ✅
 ```
 
 ## DeclarationTable
@@ -277,24 +281,54 @@ Pascal 的嵌套声明需要考虑：
 - 过程/函数内部可以声明自己的过程/函数
 - 查找时从当前 scope 开始，沿静态链向上查找
 
-## Value (M0 占位)
+## Value
 
 ```typescript
-type Value = number | string | boolean | null | undefined
-// M0 中 Value 不重要，只验证控制流
-// M1/M2 会扩展为完整的类型系统
+interface PascalValue {
+    type: PascalType
+    value: number | boolean | string | Uint8Array | null | Map<string, PascalValue>
+}
 ```
 
 ## Git 策略
 
-- 每个 milestone 完成后提交
-- 每个 issue 修复后提交
-- Baby M0 完成后提交
-- M0 Full 完成后提交
+- ✅ 每个 milestone 完成后提交
+- ✅ 每个 issue 修复后提交
+- ✅ 遵循 issue-fixing skill 的工作流
 
 ## 测试策略
 
-- Baby M0 使用最小 Pascal 程序（手写）
-- 验证 stack 状态而非输出结果
-- 验证 scope 创建/销毁
-- 验证 stackTrace 输出
+- ✅ Baby M0 使用最小 Pascal 程序（手写）
+- ✅ 验证 stack 状态而非输出结果
+- ✅ 验证 scope 创建/销毁
+- ✅ 验证 stackTrace 输出
+- ✅ m3.5: 300+ Parser 测试
+- ⚠️ m3.6: 300+ Interpreter 运行时测试（部分完成）
+
+## 当前状态
+
+### 已完成
+- ✅ Parser (M0-M3.5)：所有 parser 测试通过
+- ✅ Lexer：所有 lexer 测试通过
+- ✅ M0 控制流：所有 statement frame 实现完成
+- ✅ M1 表达式和赋值：表达式求值器完成
+- ✅ M2 基础类型系统：array/record/file 类型实现
+- ✅ M3 标准库基础：WRITE/WRITELN/READ/READLN 实现
+- ✅ IO 抽象层：内存文件操作实现
+
+### 进行中
+- ⚠️ P0 测试代码问题：q04/q06 中的非标准语法测试
+- ⚠️ P1 IO 库：eof/eoln/get/put 实现
+- ⚠️ P2 类型系统：枚举/数组/记录参数传递
+- ⚠️ P3 VAR 参数：引用传递修复
+- ⚠️ P4 WITH 语句：字段访问实现
+- ⚠️ P4 TANGLE module 扫描：修复多 module_name 引用 bug
+
+### 待开始
+- ❌ M4 非 debugger 模式
+- ❌ 性能优化
+
+## 参考文档
+
+- [issue-fixing skill](.trae/skills/issue-fixing/SKILL.md)：问题修复工作流和优先级矩阵
+- [INTERPRETER-BUGS.md](issue/INTERPRETER-BUGS.md)：完整 bug 列表和修复顺序
