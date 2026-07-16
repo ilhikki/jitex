@@ -38,6 +38,8 @@
 | 2 | 字符串连接 `s1+s2` | q04 | 测试中不存在此模式，无需处理 | **Closed** |
 | 3 | `length()` 函数 | q06 | tangle-official.pas 不使用 `length()`（WEB 宏非 Pascal 函数），Pascal82 无此函数。若测试期望它工作则改为 `expectedError` | **Closed** |
 | 4 | `new/dispose` 指针语法 `^` | q06 | `new/dispose` 和 `^` 是 Pascal82 标准，但参考实现未使用。未实现前应友好报错。测试改为 `expectedError: true` | **Fixed**（测试改为期望错误） |
+| 020 | q05 三个测试用例使用非标准多 `var` 段 | q05 | `var i: integer; var c: char;` 违反 Pascal82 §6.2.2.1（每块最多一个 var 段）。parser 正确拒绝，测试代码错误 | **Fixed**（合并为单 `var` 段） |
+| 021 | q05 `integer overflow` 测试期望 16 位溢出 | q05 | 测试期望 `32767+1=-32768`，但实现 INTEGER 为 32 位（`Integer32Type`）。Pascal82 INTEGER 范围为实现定义，测试期望错误 | **Fixed**（改为 `2147483647+1=-2147483648`，验证 32 位回绕） |
 
 ---
 
@@ -49,6 +51,8 @@
 |---|------|------|------|
 | 14 | `string` 类型被默认支持 | `var s: string` 被当作合法类型 | **Fixed** |
 | 15 | `resolveType` 对未知类型静默回退到 `INTEGER` | 未定义的类型名不报错 | **Fixed** |
+| 018 | 未定义标识符静默返回 0 | `evalIdentifier` 末尾 `return makeInteger(0)` 让未定义变量/函数静默求值为 0 | **Fixed**（改为抛出 `Unknown identifier`；同时修复 TANGLE 使用非标准 `OTHERS:` CASE 默认分支） |
+| 019 | 子界类型赋值不检查范围 | `coerceToType` 未对 subrange 目标调用 `checkRange`，越界值静默接受 | **Fixed**（三条赋值路径添加 `checkRange` 检查：整数↔子界、字符→子界、子界→子界） |
 
 ---
 
@@ -107,6 +111,16 @@
 | 13 | WITH 语句未正确实现字段访问 | WITH 测试全部失败 | **Fixed**（Scope 添加 withRecords；createWithFrame 创建 scope 链绑定记录字段；lookupVariable/assignToLeft 处理 WITH 绑定；测试代码修正为单个 type 段） |
 | 14 | 嵌套数组多维索引访问失败 | `arr[1,1]` 在 `array of array` 上报维度不匹配 | **Fixed**（添加 arrayGetElement/arraySetElement 递归索引；更新 evalArrayRead/assignToLeft/evalLValueBase） |
 | 17 | 重复 label 未检测 & 跨过程 GOTO 测试违反 Pascal82 | parser 无 label 重复检查；两个递归 GOTO 测试期望非标行为 | **Fixed**（parseBlock 添加 checkDuplicateLabels；跨过程 GOTO 测试改为 expectedError: true） |
+
+---
+
+## P3: SET 类型（核心功能缺失，已修复）
+**影响**: 中等（Pascal82 标准类型，但 plan.md M2 未规划）
+**风险**: 中等
+
+| # | 问题 | 现象 | 状态 |
+|---|------|------|------|
+| 022 | SET 类型未实现 | `set of 1..10` 报 `Unknown type node kind: SetType`；`[1,2,3]` 和 `x in s` 无法求值 | **Fixed**（新增 `SetType` 类、`resolveType` case、`SetConstructor`/`InExpression` 求值、集合运算 + - * = <> <= >=、赋值范围检查） |
 
 ---
 

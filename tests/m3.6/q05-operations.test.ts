@@ -232,14 +232,14 @@ describe('Q05: Operations and Types', () => {
     const tests: InterpreterTest[] = [
       {
         name: 'integer to char',
-        code: 'program test; var i: integer; var c: char; begin i := 65; c := chr(i); writeln(c); end.',
+        code: 'program test; var i: integer; c: char; begin i := 65; c := chr(i); writeln(c); end.',
         purpose: '测试integer转换为char',
         features: ['type_conversion', 'integer_to_char', 'chr_function'],
         expectedOutput: 'A\n',
       },
       {
         name: 'char to integer',
-        code: "program test; var c: char; var i: integer; begin c := 'B'; i := ord(c); writeln(i); end.",
+        code: "program test; var c: char; i: integer; begin c := 'B'; i := ord(c); writeln(i); end.",
         purpose: '测试char转换为integer',
         features: ['type_conversion', 'char_to_integer', 'ord_function'],
         expectedOutput: '66\n',
@@ -267,7 +267,7 @@ describe('Q05: Operations and Types', () => {
       },
       {
         name: 'mixed type operations',
-        code: "program test; var i: integer; var c: char; begin i := ord('A'); writeln(i); c := chr(i); writeln(c); end.",
+        code: "program test; var i: integer; c: char; begin i := ord('A'); writeln(i); c := chr(i); writeln(c); end.",
         purpose: '测试类型混合运算',
         features: ['type_conversion', 'mixed_types'],
         expectedOutput: '65\nA\n',
@@ -315,17 +315,17 @@ describe('Q05: Operations and Types', () => {
       },
       {
         name: 'maximum value operations',
-        code: 'program test; var x: integer; begin x := 32767; writeln(x); writeln(x - 1); end.',
+        code: 'program test; var x: integer; begin x := 2147483647; writeln(x); writeln(x - 1); end.',
         purpose: '测试最大值运算',
         features: ['boundary', 'max_value'],
-        expectedOutput: '32767\n32766\n',
+        expectedOutput: '2147483647\n2147483646\n',
       },
       {
         name: 'integer overflow',
-        code: 'program test; var x: integer; begin x := 32767; x := x + 1; writeln(x); end.',
-        purpose: '测试整数溢出',
+        code: 'program test; var x: integer; begin x := 2147483647; x := x + 1; writeln(x); end.',
+        purpose: '测试整数溢出（INTEGER 为 32 位有符号）',
         features: ['boundary', 'integer_overflow'],
-        expectedOutput: '-32768\n',
+        expectedOutput: '-2147483648\n',
       },
       {
         name: 'subrange boundary check',

@@ -1,69 +1,52 @@
 import type {
-  ProgramNode,
-  CompoundStatementNode,
-  ProcedureDeclarationNode,
-  FunctionDeclarationNode,
-  ProcedureCallNode,
-  EmptyStatementNode,
-  StatementNode,
-  IfStatementNode,
-  WhileStatementNode,
-  RepeatStatementNode,
-  ForStatementNode,
-  CaseStatementNode,
-  GotoStatementNode,
-  WithStatementNode,
-  ExpressionNode,
-  IntegerLiteralNode,
+  ArrayAccessNode,
+  AssignmentNode,
   BinaryExpressionNode,
   CaseBranchNode,
-  AssignmentNode,
-  IdentifierNode,
-  ArrayAccessNode,
+  CaseStatementNode,
+  CompoundStatementNode,
+  EmptyStatementNode,
+  ExpressionNode,
   FieldAccessNode,
-  VariableDeclarationNode,
-  ParenthesizedExpressionNode,
+  ForStatementNode,
+  FunctionDeclarationNode,
+  GotoStatementNode,
+  IdentifierNode,
+  IfStatementNode,
+  IntegerLiteralNode,
   LabeledStatementNode,
+  ParenthesizedExpressionNode,
+  ProcedureCallNode,
+  ProcedureDeclarationNode,
+  ProgramNode,
+  RepeatStatementNode,
+  StatementNode,
+  VariableDeclarationNode,
+  WhileStatementNode,
+  WithStatementNode,
 } from '../ast/types'
-import type { Frame, State, Scope, PascalValue, PascalType } from './types'
-import { createScope } from './types'
+import type { Frame, PascalType, PascalValue, Scope, State } from './types'
+import { createScope, evaluateConstExpr, findVarRef, findWithRecord, resolveType } from './types'
+import { bindArguments, evalExpr, formatValue, lookupVariableType } from './evaluator'
 import {
-  evalExpr,
-  inferExprType,
-  lookupVariableType,
-  bindArguments,
-  formatValue,
-} from './evaluator'
-import { resolveType, findVarRef, findWithRecord, evaluateConstExpr } from './types'
-import {
-  makeInteger,
-  makeReal,
-  makeBoolean,
-  makeChar,
-  makeDefaultValue,
-  findType,
-  coerceToType,
-  binaryOp,
-  INTEGER_TYPE,
-  REAL_TYPE,
-  CHAR_TYPE,
-  BOOLEAN_TYPE,
-  ArrayType,
-  RecordType,
-  FileType,
-  PascalArray,
-  PascalRecord,
-  arrayIndex,
   arrayGetElement,
   arraySetElement,
-  createEmptyArray,
-  getNum,
-  getCharCode,
-  getStringChars,
+  ArrayType,
+  binaryOp,
+  coerceToType,
+  findType,
   getBoolValue,
+  getNum,
+  INTEGER_TYPE,
+  makeChar,
+  makeDefaultValue,
+  makeInteger,
+  makeReal,
+  PascalArray,
+  PascalRecord,
+  RecordType,
 } from './types/pascal-value'
 import type { PascalFile } from './io'
-import { createEmptyFile } from './io'
 
 export function createProgramFrame(program: ProgramNode): Frame {
   let pushed = false
@@ -776,6 +759,12 @@ export function createForFrame(node: ForStatementNode): Frame {
 export function createCaseFrame(node: CaseStatementNode): Frame {
   let phase: 'eval' | 'done' = 'eval'
 
+  // TANGLE 等非标准 Pascal 使用 `OTHERS:` 作为 CASE 的默认分支（Pascal82 标准是
+  // 没有 OTHERWISE 的；parser 已将 OTHERWISE 关键字解析为 node.otherwise，但 OTHERS
+  // 不是关键字，会被当作普通标识符 case 标签。此处把 OTHERS 分支分离出来作为默认分支。）
+  const isOthersLabel = (label: ExpressionNode): boolean =>
+    label.kind === 'Identifier' && (label as IdentifierNode).name.toUpperCase() === 'OTHERS'
+
   return {
     kind: 'Case',
     done: false,
@@ -783,9 +772,17 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
       if (phase === 'eval') {
         const exprValue = evalExpr(node.expression, state.currentScope, state)
         let matchedBranch: CaseBranchNode | null = null
+        let othersBranch: CaseBranchNode | null = null
 
         for (const branch of node.branches) {
+          // 分离 OTHERS 默认分支
+          if (branch.labels.length === 1 && isOthersLabel(branch.labels[0])) {
+            othersBranch = branch
+            continue
+          }
           for (const label of branch.labels) {
+            // 跳过 OTHERS 标签（防止求值时抛出未定义标识符错误）
+            if (isOthersLabel(label)) continue
             const labelValue = evalExpr(label, state.currentScope, state)
             const cmp = binaryOp('=', exprValue, labelValue)
             if (getBoolValue(cmp)) {
@@ -800,6 +797,8 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
           state.stack.push(createStatementFrame(matchedBranch.statement))
         } else if (node.otherwise) {
           state.stack.push(createStatementFrame(node.otherwise))
+        } else if (othersBranch) {
+          state.stack.push(createStatementFrame(othersBranch.statement))
         }
 
         phase = 'done'

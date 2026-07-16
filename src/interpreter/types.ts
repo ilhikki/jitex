@@ -1,44 +1,44 @@
 import type {
-  ProgramNode,
-  ProcedureDeclarationNode,
-  FunctionDeclarationNode,
-  VariableDeclarationNode,
-  ConstDeclarationNode,
-  TypeDeclarationNode,
-  StatementNode,
+  ArrayTypeNode,
+  BinaryExpressionNode,
   BlockNode,
-  LabelDeclarationNode,
+  ConstDeclarationNode,
+  EnumerationTypeNode,
+  ExpressionNode,
+  FileTypeNode,
+  FunctionDeclarationNode,
+  IdentifierNode,
+  IntegerLiteralNode,
+  ProcedureDeclarationNode,
+  ProgramNode,
+  RangeTypeNode,
+  RecordTypeNode,
+  SetTypeNode,
+  SimpleTypeNode,
+  StatementNode,
+  TypeDeclarationNode,
   TypeNode,
+  UnaryExpressionNode,
+  VariableDeclarationNode,
 } from '../ast/types'
 
-import type { PascalValue, PascalType } from './types/pascal-value'
-export { PascalValue, PascalType } from './types/pascal-value'
-export * from './types/pascal-value'
+import type { PascalType, PascalValue } from './types/pascal-value'
+import {
+  ArrayType,
+  FileType,
+  findType,
+  INTEGER_TYPE,
+  makeDefaultValue,
+  RecordType,
+  registerType,
+  SetType,
+  SubrangeType,
+} from './types/pascal-value'
 import type { PascalIO } from './io'
 import { createDefaultIO } from './io'
-import {
-  makeDefaultValue,
-  findType,
-  registerType,
-  INTEGER_TYPE,
-  SubrangeType,
-  ArrayType,
-  RecordType,
-  FileType,
-} from './types/pascal-value'
-import type {
-  SimpleTypeNode,
-  RangeTypeNode,
-  ArrayTypeNode,
-  RecordTypeNode,
-  FileTypeNode,
-  EnumerationTypeNode,
-  IntegerLiteralNode,
-  IdentifierNode,
-  BinaryExpressionNode,
-  UnaryExpressionNode,
-  ExpressionNode,
-} from '../ast/types'
+
+export { PascalValue, PascalType } from './types/pascal-value'
+export * from './types/pascal-value'
 
 // ============================================================================
 // Scope
@@ -170,7 +170,8 @@ export interface State {
 export function resolveType(typeNode: TypeNode | null, state: State): PascalType {
   if (!typeNode) return INTEGER_TYPE
 
-  switch (typeNode.kind) {
+  const kind: string = typeNode.kind
+  switch (kind) {
     case 'SimpleType': {
       const name = (typeNode as SimpleTypeNode).name.name.toUpperCase()
       const builtin = findType(name)
@@ -219,6 +220,31 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
       return new FileType(`FILE`, elementType)
     }
 
+    case 'SetType': {
+      // Pascal82 SET OF baseType：baseType 必须是序数类型（整数/子界/字符/布尔/枚举）
+      const setNode = typeNode as SetTypeNode
+      const baseType = resolveType(setNode.baseType, state)
+      // 计算元素序数范围：子界用 min/max，其它类型用类型自身范围
+      let min = 0
+      let max = 255
+      if (baseType.kind === 'subrange') {
+        const sub = baseType as SubrangeType
+        min = sub.min
+        max = sub.max
+      } else if (baseType.kind === 'char') {
+        min = 0
+        max = 255
+      } else if (baseType.kind === 'boolean') {
+        min = 0
+        max = 1
+      } else if (baseType.kind === 'integer') {
+        // 整数集合：限制到 0..255（Pascal82 实现限制，避免过大位图）
+        min = 0
+        max = 255
+      }
+      return new SetType(`SET`, baseType, min, max)
+    }
+
     case 'EnumerationType': {
       // Pascal82 枚举类型：每个枚举值对应一个序号（0, 1, 2, ...）
       // 用 SubrangeType(0..n-1) 表示，枚举值作为常量注册到全局 scope
@@ -228,7 +254,7 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
     }
 
     default:
-      throw new Error(`Unknown type node kind: ${typeNode.kind}`)
+      throw new Error(`Unknown type node kind: ${kind}`)
   }
 }
 

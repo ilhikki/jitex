@@ -2,56 +2,52 @@
  * Pascal 表达式求值器 (M2/M3 - 类型系统 + 复合类型)
  */
 
-import type { ExpressionNode } from '../ast/types'
-import type { State, Scope, PascalValue, PascalType } from './types'
-import {
-  binaryOp,
-  unaryOp,
-  makeInteger,
-  makeReal,
-  makeChar,
-  makeBoolean,
-  makeDefaultValue,
-  makeLongInt,
-  findType,
-  coerceToType,
-  INTEGER_TYPE,
-  REAL_TYPE,
-  CHAR_TYPE,
-  BOOLEAN_TYPE,
-  BYTE_TYPE,
-  LONGINT_TYPE,
-  LONGWORD_TYPE,
-  ArrayType,
-  RecordType,
-  FileType,
-  arrayIndex,
-  arrayGetElement,
-  getNum,
-  getCharCode,
-  getBoolValue,
-  getStringChars,
-  getBigInt,
-  PascalArray,
-  PascalRecord,
-} from './types/pascal-value'
-import type { PascalFile } from './io'
 import type {
-  IntegerLiteralNode,
-  RealLiteralNode,
-  StringLiteralNode,
+  ArrayAccessNode,
+  BinaryExpressionNode,
   BooleanLiteralNode,
   CharLiteralNode,
-  IdentifierNode,
-  BinaryExpressionNode,
-  UnaryExpressionNode,
-  FunctionCallNode,
-  ArrayAccessNode,
+  ExpressionNode,
   FieldAccessNode,
+  FunctionCallNode,
+  IdentifierNode,
+  InExpressionNode,
+  IntegerLiteralNode,
   ParenthesizedExpressionNode,
-  VariableDeclarationNode,
+  RealLiteralNode,
+  SetConstructorNode,
+  StringLiteralNode,
+  UnaryExpressionNode,
 } from '../ast/types'
-import { createScope, resolveType, findVarRef, findWithRecord } from './types'
+import type { PascalType, PascalValue, Scope, State } from './types'
+import { findVarRef, resolveType } from './types'
+import {
+  arrayGetElement,
+  ArrayType,
+  binaryOp,
+  BOOLEAN_TYPE,
+  CHAR_TYPE,
+  coerceToType,
+  getBigInt,
+  getBoolValue,
+  getCharCode,
+  getNum,
+  INTEGER_TYPE,
+  LONGINT_TYPE,
+  LONGWORD_TYPE,
+  makeBoolean,
+  makeChar,
+  makeInteger,
+  makeLongInt,
+  makeReal,
+  PascalArray,
+  PascalRecord,
+  REAL_TYPE,
+  RecordType,
+  SetType,
+  unaryOp,
+} from './types/pascal-value'
+import type { PascalFile } from './io'
 import { createFunctionFrame } from './frames'
 
 // ============================================================================
@@ -148,8 +144,63 @@ export function evalExpr(expr: ExpressionNode, scope: Scope, state: State): Pasc
       return evalExpr(paren.expression, scope, state)
     }
 
+    case 'SetConstructor': {
+      // Pascal82 集合构造器 [1, 2, 3] 或 [1..3] 或 [1, 3..5]
+      // 元素以序数值存入 Set<number>。类型在赋值时由 coerceToType 确定目标类型。
+      const ctor = expr as SetConstructorNode
+      const result = new Set<number>()
+      for (const [startExpr, endExpr] of ctor.elements) {
+        const startVal = evalExpr(startExpr, scope, state)
+        const startOrd = ordinalOf(startVal)
+        if (endExpr === null) {
+          result.add(startOrd)
+        } else {
+          const endVal = evalExpr(endExpr, scope, state)
+          const endOrd = ordinalOf(endVal)
+          if (startOrd > endOrd) {
+            throw new Error(`Invalid set range ${startOrd}..${endOrd}`)
+          }
+          for (let i = startOrd; i <= endOrd; i++) result.add(i)
+        }
+      }
+      // 临时集合类型：baseType 为 INTEGER，范围 0..255（赋值时由目标类型重新约束）
+      const tmpType = new SetType('SET', INTEGER_TYPE, 0, 255)
+      return { type: tmpType, rawValue: result }
+    }
+
+    case 'InExpression': {
+      // Pascal82: expr IN set —— 判断元素是否属于集合
+      const inExpr = expr as InExpressionNode
+      const elemVal = evalExpr(inExpr.left, scope, state)
+      const setVal = evalExpr(inExpr.right, scope, state)
+      if (setVal.type.kind !== 'set') {
+        throw new Error(`IN operator requires a set on the right, got ${setVal.type.name}`)
+      }
+      const ord = ordinalOf(elemVal)
+      const set = setVal.rawValue as Set<number>
+      return makeBoolean(set.has(ord))
+    }
+
     default:
-      throw new Error(`Unsupported expression type: ${expr.kind}`)
+      throw new Error(`Unsupported expression type: ${(expr as { kind: string }).kind}`)
+  }
+}
+
+/**
+ * 计算一个 PascalValue 的序数值（整数用数值，字符用 ASCII 码，布尔用 0/1）。
+ * 用于集合元素存储和 IN 运算。
+ */
+function ordinalOf(v: PascalValue): number {
+  switch (v.type.kind) {
+    case 'integer':
+    case 'subrange':
+      return getNum(v)
+    case 'char':
+      return getCharCode(v)
+    case 'boolean':
+      return getBoolValue(v) ? 1 : 0
+    default:
+      throw new Error(`Cannot convert ${v.type.name} to set element ordinal`)
   }
 }
 
@@ -174,8 +225,8 @@ function evalIdentifier(expr: IdentifierNode, scope: Scope, state: State): Pasca
     return handler([], scope, state)
   }
 
-  // 未找到，返回默认整数（兼容 TANGLE 等使用无参 procedure 名的表达式）
-  return makeInteger(0)
+  // Pascal82: 未定义标识符必须报错（不能静默返回 0）
+  throw new Error(`Unknown identifier: ${expr.name}`)
 }
 
 // ============================================================================
@@ -589,6 +640,14 @@ export function inferExprType(expr: ExpressionNode, scope: Scope, state: State):
         )
       }
       return INTEGER_TYPE
+    }
+    case 'SetConstructor': {
+      // 集合构造器的具体类型由赋值目标决定；此处返回通用集合类型
+      return new SetType('SET', INTEGER_TYPE, 0, 255)
+    }
+    case 'InExpression': {
+      // IN 运算结果为布尔
+      return BOOLEAN_TYPE
     }
     default:
       return INTEGER_TYPE

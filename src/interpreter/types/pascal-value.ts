@@ -15,7 +15,6 @@
  * - 文件：用 PascalFile（抽象句柄，来自 io.ts）
  */
 
-import type { PascalFile } from '../io'
 import { createEmptyFile } from '../io'
 
 // ============================================================================
@@ -32,7 +31,16 @@ export interface PascalValue {
 // ============================================================================
 
 export type PascalTypeKind =
-  'integer' | 'real' | 'char' | 'boolean' | 'string' | 'subrange' | 'array' | 'record' | 'file'
+  | 'integer'
+  | 'real'
+  | 'char'
+  | 'boolean'
+  | 'string'
+  | 'subrange'
+  | 'array'
+  | 'record'
+  | 'file'
+  | 'set'
 
 export interface PascalType {
   readonly name: string
@@ -570,6 +578,100 @@ export class FileType implements PascalType {
 }
 
 // ============================================================================
+// 集合类型
+// ============================================================================
+
+/**
+ * Pascal SET 类型。
+ * rawValue 使用 Set<number> 存储「元素的序数值」（整数用其数值，字符用 ASCII 码）。
+ * baseType 是元素类型（通常为 SubrangeType 或 CharType）。
+ * min/max 是合法元素的序数范围，用于运行时范围检查。
+ */
+export class SetType implements PascalType {
+  readonly kind = 'set' as const
+
+  constructor(
+    readonly name: string,
+    readonly baseType: PascalType,
+    readonly min: number,
+    readonly max: number
+  ) {}
+
+  checkRange(value: number | bigint): boolean {
+    const num = typeof value === 'bigint' ? Number(value) : value
+    return num >= this.min && num <= this.max
+  }
+
+  isAssignableFrom(other: PascalType): boolean {
+    // 同为集合类型即可互相赋值（兼容的元素类型在 coerceToType 中做范围检查）
+    return other.kind === 'set'
+  }
+
+  /** 检查元素序数值是否在集合的合法范围内 */
+  checkElement(ord: number): void {
+    if (ord < this.min || ord > this.max) {
+      throw new Error(`Set element ${ord} out of range ${this.min}..${this.max}`)
+    }
+  }
+
+  add(_other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    const ls = left.rawValue as Set<number>
+    const rs = right.rawValue as Set<number>
+    const result = new Set<number>(ls)
+    for (const v of rs) result.add(v)
+    return { type: left.type, rawValue: result }
+  }
+
+  sub(_other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    const ls = left.rawValue as Set<number>
+    const rs = right.rawValue as Set<number>
+    const result = new Set<number>()
+    for (const v of ls) {
+      if (!rs.has(v)) result.add(v)
+    }
+    return { type: left.type, rawValue: result }
+  }
+
+  mul(_other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    const ls = left.rawValue as Set<number>
+    const rs = right.rawValue as Set<number>
+    const result = new Set<number>()
+    for (const v of ls) {
+      if (rs.has(v)) result.add(v)
+    }
+    return { type: left.type, rawValue: result }
+  }
+
+  eq(_other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    const ls = left.rawValue as Set<number>
+    const rs = right.rawValue as Set<number>
+    if (ls.size !== rs.size) return makeBoolean(false)
+    for (const v of ls) if (!rs.has(v)) return makeBoolean(false)
+    return makeBoolean(true)
+  }
+
+  ne(_other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    return makeBoolean(!getBoolValue(this.eq(_other, left, right)))
+  }
+
+  /** 子集：left <= right */
+  le(_other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    const ls = left.rawValue as Set<number>
+    const rs = right.rawValue as Set<number>
+    for (const v of ls) if (!rs.has(v)) return makeBoolean(false)
+    return makeBoolean(true)
+  }
+
+  /** 超集：left >= right */
+  ge(_other: PascalType, left: PascalValue, right: PascalValue): PascalValue {
+    const ls = left.rawValue as Set<number>
+    const rs = right.rawValue as Set<number>
+    for (const v of rs) if (!ls.has(v)) return makeBoolean(false)
+    return makeBoolean(true)
+  }
+}
+
+// ============================================================================
 // 类型单例
 // ============================================================================
 
@@ -635,6 +737,8 @@ export function makeDefaultValue(type: PascalType): PascalValue {
       return createEmptyRecord(type as RecordType)
     case 'file':
       return { type, rawValue: createEmptyFile() }
+    case 'set':
+      return { type, rawValue: new Set<number>() }
     default:
       return { type: INTEGER_TYPE, rawValue: 0 }
   }
@@ -770,6 +874,14 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
     (value.type.kind === 'integer' && targetType.kind === 'subrange') ||
     (value.type.kind === 'subrange' && targetType.kind === 'integer')
   ) {
+    // Pascal82: 赋值给子界类型必须检查运行时范围
+    if (targetType.kind === 'subrange') {
+      const sub = targetType as SubrangeType
+      const num = getNum(value)
+      if (!sub.checkRange(num)) {
+        throw new Error(`Value ${num} out of range ${sub.min}..${sub.max}`)
+      }
+    }
     return { type: targetType, rawValue: value.rawValue }
   }
 
@@ -783,6 +895,13 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
     value.type.kind === 'char' &&
     (targetType.kind === 'integer' || targetType.kind === 'subrange')
   ) {
+    if (targetType.kind === 'subrange') {
+      const sub = targetType as SubrangeType
+      const code = getCharCode(value)
+      if (!sub.checkRange(code)) {
+        throw new Error(`Value ${code} out of range ${sub.min}..${sub.max}`)
+      }
+    }
     return { type: targetType, rawValue: getCharCode(value) }
   }
 
@@ -798,6 +917,27 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
 
   // 同类类型之间可以赋值
   if (value.type.kind === targetType.kind) {
+    // 子界→子界：必须检查目标范围
+    if (targetType.kind === 'subrange') {
+      const sub = targetType as SubrangeType
+      const num = getNum(value)
+      if (!sub.checkRange(num)) {
+        throw new Error(`Value ${num} out of range ${sub.min}..${sub.max}`)
+      }
+      return { type: targetType, rawValue: value.rawValue }
+    }
+    // 集合→集合：必须检查每个元素是否在目标集合的范围内
+    if (targetType.kind === 'set') {
+      const targetSet = targetType as SetType
+      const src = value.rawValue as Set<number>
+      for (const ord of src) {
+        if (!targetSet.checkRange(ord)) {
+          throw new Error(`Set element ${ord} out of range ${targetSet.min}..${targetSet.max}`)
+        }
+      }
+      // 复制 Set 避免共享引用
+      return { type: targetType, rawValue: new Set<number>(src) }
+    }
     return value
   }
 

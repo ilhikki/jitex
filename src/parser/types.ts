@@ -1,29 +1,19 @@
 import {
-  ParserInput,
-  ParseResult,
-  TypeNode,
-  SimpleTypeNode,
-  RangeTypeNode,
   ArrayTypeNode,
-  RecordTypeNode,
-  FileTypeNode,
-  SetTypeNode,
   EnumerationTypeNode,
-  VariableDeclarationNode,
+  FileTypeNode,
   IdentifierNode,
-  ExpressionNode,
+  ParseResult,
+  ParserInput,
+  RangeTypeNode,
+  RecordTypeNode,
+  SetTypeNode,
+  SimpleTypeNode,
+  TypeNode,
+  VariableDeclarationNode,
 } from '../ast/types'
-import {
-  peek,
-  ok,
-  fail,
-  matchKeyword,
-  matchType,
-  expectKeyword,
-  expectType,
-  parseList,
-} from './helpers'
-import { parseIdentifier, parseExpression } from './expressions'
+import { expectKeyword, expectType, fail, ok, parseList, peek } from './helpers'
+import { parseExpression, parseIdentifier } from './expressions'
 
 // ============================================================================
 // Type Parsers
