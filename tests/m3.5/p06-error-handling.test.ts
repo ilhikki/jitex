@@ -91,48 +91,42 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: '表达式缺少右操作数',
-    code: makeProgramWithVars('a: integer;',
-      'begin\n  a := 5 + ;\nend.'),
+    code: makeProgramWithVars('a: integer;', 'begin\n  a := 5 + ;\nend.'),
     purpose: '验证二元运算符缺少右操作数会报错',
     features: ['expression', 'missing-operand', 'error'],
     shouldParse: false,
   },
   {
     name: '表达式缺少左操作数',
-    code: makeProgramWithVars('a: integer;',
-      'begin\n  a := * 5;\nend.'),
+    code: makeProgramWithVars('a: integer;', 'begin\n  a := * 5;\nend.'),
     purpose: '验证乘号缺少左操作数会报错（一元运算符只有 +/-/NOT）',
     features: ['expression', 'missing-operand', 'error'],
     shouldParse: false,
   },
   {
     name: '括号不匹配 - 缺少右括号',
-    code: makeProgramWithVars('a: integer;',
-      'begin\n  a := (5 + 3;\nend.'),
+    code: makeProgramWithVars('a: integer;', 'begin\n  a := (5 + 3;\nend.'),
     purpose: '验证左括号缺少匹配的右括号会报错',
     features: ['expression', 'mismatched-parenthesis', 'error'],
     shouldParse: false,
   },
   {
     name: '运算符连续出现',
-    code: makeProgramWithVars('a, b: integer;',
-      'begin\n  a := b + * 2;\nend.'),
+    code: makeProgramWithVars('a, b: integer;', 'begin\n  a := b + * 2;\nend.'),
     purpose: '验证连续两个二元运算符（如 + *）会报错',
     features: ['expression', 'consecutive-operators', 'error'],
     shouldParse: false,
   },
   {
     name: '赋值语句 := 写成 =',
-    code: makeProgramWithVars('a: integer;',
-      'begin\n  a = 5;\nend.'),
+    code: makeProgramWithVars('a: integer;', 'begin\n  a = 5;\nend.'),
     purpose: '验证使用 = 代替 := 进行赋值会报错',
     features: ['assignment', 'wrong-operator', 'error'],
     shouldParse: false,
   },
   {
     name: '相等比较 = 写成 :=',
-    code: makeProgramWithVars('a, b: integer;',
-      'begin\n  if a := 5 then\n    b := 1;\nend.'),
+    code: makeProgramWithVars('a, b: integer;', 'begin\n  if a := 5 then\n    b := 1;\nend.'),
     purpose: '验证在条件表达式中使用 := 代替 = 会报错',
     features: ['expression', 'wrong-operator', 'error'],
     shouldParse: false,
@@ -143,40 +137,35 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: 'IF 缺少 THEN',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  if x > 0\n    x := 1;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  if x > 0\n    x := 1;\nend.'),
     purpose: '验证 IF 语句缺少 THEN 关键字会报错',
     features: ['if-statement', 'missing-then', 'error'],
     shouldParse: false,
   },
   {
     name: 'WHILE 缺少 DO',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  while x > 0\n    x := x - 1;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  while x > 0\n    x := x - 1;\nend.'),
     purpose: '验证 WHILE 语句缺少 DO 关键字会报错',
     features: ['while-statement', 'missing-do', 'error'],
     shouldParse: false,
   },
   {
     name: 'FOR 缺少 TO/DOWNTO',
-    code: makeProgramWithVars('i: integer;',
-      'begin\n  for i := 1 10 do\n    writeln(i);\nend.'),
+    code: makeProgramWithVars('i: integer;', 'begin\n  for i := 1 10 do\n    writeln(i);\nend.'),
     purpose: '验证 FOR 语句缺少 TO 或 DOWNTO 会报错',
     features: ['for-statement', 'missing-to', 'error'],
     shouldParse: false,
   },
   {
     name: 'CASE 缺少 OF',
-    code: makeProgramWithVars('x, y: integer;',
-      'begin\n  case x\n    1: y := 10;\n  end;\nend.'),
+    code: makeProgramWithVars('x, y: integer;', 'begin\n  case x\n    1: y := 10;\n  end;\nend.'),
     purpose: '验证 CASE 语句缺少 OF 关键字会报错',
     features: ['case-statement', 'missing-of', 'error'],
     shouldParse: false,
   },
   {
     name: 'REPEAT 缺少 UNTIL',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  repeat\n    x := x + 1;\n  end;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  repeat\n    x := x + 1;\n  end;\nend.'),
     purpose: '验证 REPEAT 语句缺少 UNTIL（误用 END）会报错',
     features: ['repeat-statement', 'missing-until', 'error'],
     shouldParse: false,
@@ -287,7 +276,9 @@ const tests: ConformanceTest[] = [
 ]
 
 describe('M3.5 Error Handling Conformance', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runParseTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runParseTest(t)
+    })
   })
 })

@@ -50,7 +50,8 @@ import {
   BOOLEAN_TYPE,
   ArrayType,
   RecordType,
-  FileType, PascalArray,
+  FileType,
+  PascalArray,
   PascalRecord,
   arrayIndex,
   arrayGetElement,
@@ -106,7 +107,7 @@ export function createCompoundFrame(node: CompoundStatementNode, startIndex: num
       index++
     },
     hasTag(label: number): boolean {
-      return statements.some(s => statementHasLabel(s, label))
+      return statements.some((s) => statementHasLabel(s, label))
     },
     gotoTag(label: number, state: State): void {
       for (let i = 0; i < statements.length; i++) {
@@ -154,25 +155,30 @@ export function createFunctionFrame(
         if (decl.block) {
           // Pascal82 语义检查：参数名不能与局部变量名重复
           const localVarNames = new Set<string>()
-          decl.block.variableDeclarations.forEach(v => {
-            v.names.forEach(n => localVarNames.add(n.name.toUpperCase()))
+          decl.block.variableDeclarations.forEach((v) => {
+            v.names.forEach((n) => localVarNames.add(n.name.toUpperCase()))
           })
-          decl.parameters.forEach(p => {
-            p.names.forEach(n => {
+          decl.parameters.forEach((p) => {
+            p.names.forEach((n) => {
               const name = n.name.toUpperCase()
               if (localVarNames.has(name)) {
-                throw new Error(`Duplicate identifier '${n.name}': parameter name conflicts with local variable`)
+                throw new Error(
+                  `Duplicate identifier '${n.name}': parameter name conflicts with local variable`
+                )
               }
             })
           })
           // 注册 procedure/function 内的常量到 fnScope（Pascal82 §6.2.2.1: block 可包含 const 段）
-          decl.block.constDeclarations.forEach(c => {
+          decl.block.constDeclarations.forEach((c) => {
             const value = evaluateConstExpr(c.value, state)
-            fnScope.variables.set(c.name.name.toUpperCase(), { type: INTEGER_TYPE, rawValue: value })
+            fnScope.variables.set(c.name.name.toUpperCase(), {
+              type: INTEGER_TYPE,
+              rawValue: value,
+            })
             fnScope.variableTypes.set(c.name.name.toUpperCase(), INTEGER_TYPE)
           })
           // 初始化局部变量
-          decl.block.variableDeclarations.forEach(v => {
+          decl.block.variableDeclarations.forEach((v) => {
             initVariables(v, fnScope, state)
           })
           // 绑定参数
@@ -207,7 +213,7 @@ export function createFunctionFrame(
 // 初始化变量声明（支持数组、记录、文件）
 function initVariables(v: VariableDeclarationNode, scope: Scope, state: State): void {
   const varType = resolveType(v.type, state)
-  v.names.forEach(n => {
+  v.names.forEach((n) => {
     const name = n.name.toUpperCase()
     scope.variables.set(name, makeDefaultValue(varType))
     scope.variableTypes.set(name, varType)
@@ -375,9 +381,10 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
         }
         if (v.type.kind === 'integer') {
           const num = parseInt(token, 10) || 0
-          value = v.type === findType('LONGINT') || v.type === findType('LONGWORD')
-            ? { type: v.type, rawValue: BigInt(num) }
-            : makeInteger(num)
+          value =
+            v.type === findType('LONGINT') || v.type === findType('LONGWORD')
+              ? { type: v.type, rawValue: BigInt(num) }
+              : makeInteger(num)
         } else {
           value = makeReal(parseFloat(token) || 0)
         }
@@ -425,10 +432,11 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
 
     const nextToken = (): string => {
       if (tokenIdx >= tokens.length) {
-        const line = isReadln
-          ? state.io.console.readln()
-          : state.io.console.read()
-        tokens = line.trim().split(/\s+/).filter(t => t.length > 0)
+        const line = isReadln ? state.io.console.readln() : state.io.console.read()
+        tokens = line
+          .trim()
+          .split(/\s+/)
+          .filter((t) => t.length > 0)
         tokenIdx = 0
       }
       return tokens[tokenIdx++] || ''
@@ -441,9 +449,10 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
         value = makeChar(input.charCodeAt(0) || 0)
       } else if (v.type.kind === 'integer') {
         const num = parseInt(input, 10) || 0
-        value = v.type === findType('LONGINT') || v.type === findType('LONGWORD')
-          ? { type: v.type, rawValue: BigInt(num) }
-          : makeInteger(num)
+        value =
+          v.type === findType('LONGINT') || v.type === findType('LONGWORD')
+            ? { type: v.type, rawValue: BigInt(num) }
+            : makeInteger(num)
       } else if (v.type.kind === 'real') {
         value = makeReal(parseFloat(input) || 0)
       } else if (v.type.kind === 'array') {
@@ -455,7 +464,7 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
           const chars: number[] = []
           for (let i = 0; i < len; i++) {
             if (i < input.length) {
-              chars.push(input.charCodeAt(i) & 0xFF)
+              chars.push(input.charCodeAt(i) & 0xff)
             } else {
               chars.push(0)
             }
@@ -571,13 +580,15 @@ function handleFileClose(args: ExpressionNode[], state: State): void {
 function handleFileAssign(args: ExpressionNode[], state: State): void {
   if (args.length < 2) throw new Error('ASSIGN requires 2 arguments: file variable and filename')
   const fileValue = getFileValue(args[0], state)
-  if (!fileValue || fileValue.type.kind !== 'file') throw new Error('ASSIGN first argument must be a file variable')
+  if (!fileValue || fileValue.type.kind !== 'file')
+    throw new Error('ASSIGN first argument must be a file variable')
   const nameValue = evalExpr(args[1], state.currentScope, state)
-  const filename = typeof nameValue.rawValue === 'string'
-    ? nameValue.rawValue
-    : Array.isArray(nameValue.rawValue)
-      ? String.fromCharCode(...nameValue.rawValue)
-      : String(nameValue.rawValue)
+  const filename =
+    typeof nameValue.rawValue === 'string'
+      ? nameValue.rawValue
+      : Array.isArray(nameValue.rawValue)
+        ? String.fromCharCode(...nameValue.rawValue)
+        : String(nameValue.rawValue)
   state.io.file.assign(fileValue.rawValue as PascalFile, filename)
 }
 
@@ -603,8 +614,10 @@ export function createIfFrame(node: IfStatementNode): Frame {
       this.done = true
     },
     hasTag(label: number): boolean {
-      return statementHasLabel(node.thenBranch, label) ||
+      return (
+        statementHasLabel(node.thenBranch, label) ||
         (node.elseBranch ? statementHasLabel(node.elseBranch, label) : false)
+      )
     },
     gotoTag(label: number, state: State): void {
       if (statementHasLabel(node.thenBranch, label)) {
@@ -676,7 +689,7 @@ export function createRepeatFrame(node: RepeatStatementNode): Frame {
       }
     },
     hasTag(label: number): boolean {
-      return node.statements.some(s => statementHasLabel(s, label))
+      return node.statements.some((s) => statementHasLabel(s, label))
     },
     gotoTag(label: number, state: State): void {
       const compound: CompoundStatementNode = {
@@ -795,8 +808,10 @@ export function createCaseFrame(node: CaseStatementNode): Frame {
       this.done = true
     },
     hasTag(label: number): boolean {
-      return node.branches.some(b => statementHasLabel(b.statement, label)) ||
+      return (
+        node.branches.some((b) => statementHasLabel(b.statement, label)) ||
         (node.otherwise ? statementHasLabel(node.otherwise, label) : false)
+      )
     },
     gotoTag(label: number, state: State): void {
       for (const b of node.branches) {
@@ -980,7 +995,7 @@ function assignToLeft(left: ExpressionNode, value: PascalValue, state: State): v
       throw new Error('Array assignment target is not an array')
     }
     const arr = arrValue.rawValue as PascalArray
-    const indices = access.indices.map(idx => getNum(evalExpr(idx, state.currentScope, state)))
+    const indices = access.indices.map((idx) => getNum(evalExpr(idx, state.currentScope, state)))
     arraySetElement(arr, indices, coerceToType(value, arr.elementType))
     return
   }
@@ -1028,7 +1043,7 @@ function evalLValueBase(expr: ExpressionNode, scope: Scope, state: State): Pasca
       throw new Error(`Array access on non-array type ${arrValue.type.name}`)
     }
     const arr = arrValue.rawValue as PascalArray
-    const indices = access.indices.map(idx => getNum(evalExpr(idx, scope, state)))
+    const indices = access.indices.map((idx) => getNum(evalExpr(idx, scope, state)))
     return arrayGetElement(arr, indices)
   }
   if (expr.kind === 'ParenthesizedExpression') {
@@ -1117,8 +1132,10 @@ function statementHasLabel(stmt: StatementNode, label: number): boolean {
       return (stmt as any).statements.some((s: StatementNode) => statementHasLabel(s, label))
     case 'IfStatement': {
       const s = stmt as any
-      return statementHasLabel(s.thenBranch, label) ||
+      return (
+        statementHasLabel(s.thenBranch, label) ||
         (s.elseBranch ? statementHasLabel(s.elseBranch, label) : false)
+      )
     }
     case 'WhileStatement':
     case 'ForStatement':
@@ -1127,8 +1144,10 @@ function statementHasLabel(stmt: StatementNode, label: number): boolean {
       return (stmt as any).statements.some((s: StatementNode) => statementHasLabel(s, label))
     case 'CaseStatement': {
       const s = stmt as any
-      return s.branches.some((b: any) => statementHasLabel(b.statement, label)) ||
+      return (
+        s.branches.some((b: any) => statementHasLabel(b.statement, label)) ||
         (s.otherwise ? statementHasLabel(s.otherwise, label) : false)
+      )
     }
     case 'WithStatement':
       return statementHasLabel((stmt as any).body, label)

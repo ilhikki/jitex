@@ -58,7 +58,10 @@ function getFullStack(state: State): string {
 /**
  * 用最小的 web 字符串跑 TANGLE，定位 "Pascal text flushed, = sign is missing" 的最小复现。
  */
-function runTangle(webContent: string, stepCallback?: StepCallback): { pasOutput: string; termout: string; messages: string[] } {
+function runTangle(
+  webContent: string,
+  stepCallback?: StepCallback
+): { pasOutput: string; termout: string; messages: string[] } {
   const pasSource = fs.readFileSync(tanglePasPath, 'utf-8')
   const parseResult = parse(pasSource)
   if (!parseResult.success) {
@@ -79,10 +82,18 @@ function runTangle(webContent: string, stepCallback?: StepCallback): { pasOutput
   const pascalConsole = {
     write(_text: string) {},
     writeln() {},
-    read() { return '' },
-    readln() { return '' },
-    eof() { return true },
-    eoln() { return true },
+    read() {
+      return ''
+    },
+    readln() {
+      return ''
+    },
+    eof() {
+      return true
+    },
+    eoln() {
+      return true
+    },
   }
 
   const io = { file: fileOps, console: pascalConsole }
@@ -104,8 +115,10 @@ function runTangle(webContent: string, stepCallback?: StepCallback): { pasOutput
   state.systemProcedures.set('LOG_DEBUG', (args, s) => {
     if (args.length > 0) {
       const arg = evalExpr(args[0], s.currentScope, s)
-      const text = typeof arg.rawValue === 'number' ? String(arg.rawValue)
-        : String.fromCharCode(...((arg.rawValue as number[]) || []))
+      const text =
+        typeof arg.rawValue === 'number'
+          ? String(arg.rawValue)
+          : String.fromCharCode(...((arg.rawValue as number[]) || []))
       messages.push(text)
     }
   })
@@ -199,7 +212,7 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
     }
 
     const { termout } = runTangle(web, callback)
-    
+
     console.log('\n=== Execution path before bug ===')
     console.log('Call stack transitions (top → bottom):')
     traceLines.forEach((line, i) => {
@@ -223,19 +236,19 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
 
     const callback: StepCallback = (state) => {
       const stack = getFullStack(state)
-      
+
       const locVal = state.globalScope.variables.get('LOC')
       const limitVal = state.globalScope.variables.get('LIMIT')
       const nextControlVal = state.globalScope.variables.get('NEXTCONTROL')
       const lineVal = state.globalScope.variables.get('LINE')
       const curModuleVal = state.globalScope.variables.get('CURMODULE')
-      
+
       const loc = locVal ? (locVal.rawValue as number) : -1
       const limit = limitVal ? (limitVal.rawValue as number) : -1
       const nextControl = nextControlVal ? (nextControlVal.rawValue as number) : -1
       const line = lineVal ? (lineVal.rawValue as number) : -1
       const curModule = curModuleVal ? (curModuleVal.rawValue as number) : -1
-      
+
       if (stack.includes('SCAN_MODULE') && loc >= 0) {
         const key = `[scan_module] line=${line} loc=${loc}/${limit} nc=${nextControl} mod=${curModule}`
         if (traceLog.length === 0 || traceLog[traceLog.length - 1] !== key) {
@@ -257,13 +270,13 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
     }
 
     const { termout, messages } = runTangleWithFileSpy(web, callback, traceLog)
-    
+
     console.log('\n=== Execution Trace (minimal repro) ===')
     traceLog.forEach((line, i) => {
       console.log(`  ${i}: ${line}`)
     })
     console.log('===')
-    
+
     console.log('\n=== LOG_DEBUG messages (minimal repro) ===')
     messages.forEach((msg, i) => {
       console.log(`  ${i}: ${msg}`)
@@ -285,19 +298,19 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
 
     const callback: StepCallback = (state) => {
       const stack = getFullStack(state)
-      
+
       const locVal = state.globalScope.variables.get('LOC')
       const limitVal = state.globalScope.variables.get('LIMIT')
       const nextControlVal = state.globalScope.variables.get('NEXTCONTROL')
       const lineVal = state.globalScope.variables.get('LINE')
       const curModuleVal = state.globalScope.variables.get('CURMODULE')
-      
+
       const loc = locVal ? (locVal.rawValue as number) : -1
       const limit = limitVal ? (limitVal.rawValue as number) : -1
       const nextControl = nextControlVal ? (nextControlVal.rawValue as number) : -1
       const line = lineVal ? (lineVal.rawValue as number) : -1
       const curModule = curModuleVal ? (curModuleVal.rawValue as number) : -1
-      
+
       if (stack.includes('SCAN_MODULE') && loc >= 0) {
         const key = `[scan_module] line=${line} loc=${loc}/${limit} nc=${nextControl} mod=${curModule}`
         if (traceLog.length === 0 || traceLog[traceLog.length - 1] !== key) {
@@ -319,7 +332,7 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
     }
 
     const { termout, messages } = runTangleWithFileSpy(web, callback, traceLog)
-    
+
     console.log('\n=== Control Trace (1 module_name) ===')
     traceLog.forEach((line, i) => {
       console.log(`  ${i}: ${line}`)
@@ -344,11 +357,10 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
     const maxLogs = 100
     let logCount = 0
 
-    const callback: StepCallback = (state) => {
-    }
+    const callback: StepCallback = (state) => {}
 
     runTangleWithProxySpy(web, callback, functionsSet, globalVarsSet, keyVars, maxLogs, logCount)
-    
+
     console.log('\n=== Functions/Procedures called ===')
     const sortedFuncs = Array.from(functionsSet).sort()
     sortedFuncs.forEach((fn, i) => {
@@ -356,7 +368,7 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
     })
     console.log(`Total: ${sortedFuncs.length}`)
     console.log('===')
-    
+
     console.log('\n=== Global variables modified ===')
     const sortedVars = Array.from(globalVarsSet).sort()
     sortedVars.forEach((v, i) => {
@@ -374,7 +386,7 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
  * 使用 Proxy 拦截 state.globalScope.variables 和 state.stack 的操作
  */
 function runTangleWithProxySpy(
-  webContent: string, 
+  webContent: string,
   stepCallback?: StepCallback,
   functionsSet?: Set<string>,
   globalVarsSet?: Set<string>,
@@ -402,10 +414,18 @@ function runTangleWithProxySpy(
   const pascalConsole = {
     write(_text: string) {},
     writeln() {},
-    read() { return '' },
-    readln() { return '' },
-    eof() { return true },
-    eoln() { return true },
+    read() {
+      return ''
+    },
+    readln() {
+      return ''
+    },
+    eof() {
+      return true
+    },
+    eoln() {
+      return true
+    },
   }
 
   const io = { file: fileOps, console: pascalConsole }
@@ -427,8 +447,10 @@ function runTangleWithProxySpy(
   state.systemProcedures.set('LOG_DEBUG', (args, s) => {
     if (args.length > 0) {
       const arg = evalExpr(args[0], s.currentScope, s)
-      const text = typeof arg.rawValue === 'number' ? String(arg.rawValue)
-        : String.fromCharCode(...((arg.rawValue as number[]) || []))
+      const text =
+        typeof arg.rawValue === 'number'
+          ? String(arg.rawValue)
+          : String.fromCharCode(...((arg.rawValue as number[]) || []))
       messages.push(text)
     }
   })
@@ -438,7 +460,7 @@ function runTangleWithProxySpy(
     const origVars = state.globalScope.variables
     const prevValues = new Map<string, any>()
     const logCounter = { count: 0 }
-    
+
     state.globalScope.variables = new Proxy(origVars, {
       get(target, prop) {
         const result = Reflect.get(target, prop)
@@ -446,11 +468,11 @@ function runTangleWithProxySpy(
           return (...args: any[]) => {
             const varName = args[0]
             const newValue = args[1]
-            
+
             if (globalVarsSet) {
               globalVarsSet.add(varName)
             }
-            
+
             if (keyVars && keyVars.includes(varName) && logCounter.count < maxLogs) {
               const prev = prevValues.get(varName)
               const curr = newValue.rawValue
@@ -479,7 +501,7 @@ function runTangleWithProxySpy(
                 }
               }
             }
-            
+
             return result.apply(target, args)
           }
         }
@@ -487,7 +509,7 @@ function runTangleWithProxySpy(
           return result.bind(target)
         }
         return result
-      }
+      },
     })
   }
 
@@ -511,7 +533,7 @@ function runTangleWithProxySpy(
           return result.bind(target)
         }
         return result
-      }
+      },
     })
   }
 
@@ -548,7 +570,7 @@ function runTangleWithProxySpy(
  * 带追踪的 TANGLE 运行函数
  */
 function runTangleWithFileSpy(
-  webContent: string, 
+  webContent: string,
   stepCallback?: StepCallback,
   traceLog?: string[]
 ): { pasOutput: string; termout: string; messages: string[] } {
@@ -572,10 +594,18 @@ function runTangleWithFileSpy(
   const pascalConsole = {
     write(_text: string) {},
     writeln() {},
-    read() { return '' },
-    readln() { return '' },
-    eof() { return true },
-    eoln() { return true },
+    read() {
+      return ''
+    },
+    readln() {
+      return ''
+    },
+    eof() {
+      return true
+    },
+    eoln() {
+      return true
+    },
   }
 
   const io = { file: fileOps, console: pascalConsole }
@@ -597,8 +627,10 @@ function runTangleWithFileSpy(
   state.systemProcedures.set('LOG_DEBUG', (args, s) => {
     if (args.length > 0) {
       const arg = evalExpr(args[0], s.currentScope, s)
-      const text = typeof arg.rawValue === 'number' ? String(arg.rawValue)
-        : String.fromCharCode(...((arg.rawValue as number[]) || []))
+      const text =
+        typeof arg.rawValue === 'number'
+          ? String(arg.rawValue)
+          : String.fromCharCode(...((arg.rawValue as number[]) || []))
       messages.push(text)
     }
   })
@@ -606,7 +638,7 @@ function runTangleWithFileSpy(
   // 文件读取打桩 - 追踪 inputln 调用（行级）
   const origReadln = state.io.file.readln.bind(state.io.file)
   let readlnCount = 0
-  
+
   state.io.file.readln = (file) => {
     if (file.url === 'webfile' && traceLog) {
       readlnCount++

@@ -26,10 +26,25 @@ export function runPas(code: string): { output: string; error: string | null } {
   let output = ''
   let error: string | null = null
   const io = {
-    file: { read: () => '', write: () => {}, readln: () => '', writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {}, assign: () => {}, eof: () => true, eoln: () => true },
+    file: {
+      read: () => '',
+      write: () => {},
+      readln: () => '',
+      writeln: () => {},
+      reset: () => {},
+      rewrite: () => {},
+      close: () => {},
+      assign: () => {},
+      eof: () => true,
+      eoln: () => true,
+    },
     console: {
-      write: (text: string) => { output += text },
-      writeln: () => { output += '\n' },
+      write: (text: string) => {
+        output += text
+      },
+      writeln: () => {
+        output += '\n'
+      },
       read: () => '',
       readln: () => '',
       eof: () => true,
@@ -48,7 +63,10 @@ export function runPas(code: string): { output: string; error: string | null } {
   return { output, error }
 }
 
-export function runPasWithInput(inputLines: string[], code: string): { output: string; error: string | null } {
+export function runPasWithInput(
+  inputLines: string[],
+  code: string
+): { output: string; error: string | null } {
   const parseResult = parse(code)
   if (!parseResult.success) {
     return { output: '', error: parseResult.error || 'parse failed' }
@@ -57,12 +75,31 @@ export function runPasWithInput(inputLines: string[], code: string): { output: s
   let error: string | null = null
   let inputIdx = 0
   const io = {
-    file: { read: () => '', write: () => {}, readln: () => '', writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {}, assign: () => {}, eof: () => true, eoln: () => true },
+    file: {
+      read: () => '',
+      write: () => {},
+      readln: () => '',
+      writeln: () => {},
+      reset: () => {},
+      rewrite: () => {},
+      close: () => {},
+      assign: () => {},
+      eof: () => true,
+      eoln: () => true,
+    },
     console: {
-      write: (text: string) => { output += text },
-      writeln: () => { output += '\n' },
-      read: () => { return inputLines[inputIdx++] || '' },
-      readln: () => { return inputLines[inputIdx++] || '' },
+      write: (text: string) => {
+        output += text
+      },
+      writeln: () => {
+        output += '\n'
+      },
+      read: () => {
+        return inputLines[inputIdx++] || ''
+      },
+      readln: () => {
+        return inputLines[inputIdx++] || ''
+      },
       eof: () => inputIdx >= inputLines.length,
       eoln: () => true,
     },
@@ -81,14 +118,14 @@ export function runPasWithInput(inputLines: string[], code: string): { output: s
 
 export function runInterpreterTest(t: InterpreterTest) {
   const { output, error } = runPas(t.code)
-  
+
   if (t.expectedError) {
     expect(error).not.toBeNull()
     return
   }
-  
+
   expect(error).toBeNull()
-  
+
   if (t.expectedOutput !== undefined) {
     expect(output).toBe(t.expectedOutput)
   }

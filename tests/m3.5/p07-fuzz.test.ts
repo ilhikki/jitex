@@ -68,40 +68,35 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: '深层嵌套 BEGIN/END（20层）',
-    code: makeProgramWithVars('x: integer;', '',
-      genDeepNested(20, '  x := x + 1')),
+    code: makeProgramWithVars('x: integer;', '', genDeepNested(20, '  x := x + 1')),
     purpose: '测试20层 BEGIN/END 复合语句嵌套，验证 parser 递归深度处理能力',
     features: ['compound-statement', 'deep-nesting', '20-levels'],
     shouldParse: true,
   },
   {
     name: '深层嵌套 BEGIN/END（50层）',
-    code: makeProgramWithVars('x: integer;', '',
-      genDeepNested(30, '  x := x + 1')),
+    code: makeProgramWithVars('x: integer;', '', genDeepNested(30, '  x := x + 1')),
     purpose: '测试30层 BEGIN/END 复合语句嵌套，验证 parser 递归深度处理能力',
     features: ['compound-statement', 'deep-nesting', '30-levels'],
     shouldParse: true,
   },
   {
     name: '深层嵌套 IF 语句（20层）',
-    code: makeProgramWithVars('x: integer;', '',
-      genDeepIf(20)),
+    code: makeProgramWithVars('x: integer;', '', genDeepIf(20)),
     purpose: '测试20层 IF 语句嵌套，验证条件语句递归解析',
     features: ['if-statement', 'deep-nesting', '20-levels'],
     shouldParse: true,
   },
   {
     name: '深层嵌套 WHILE 语句（20层）',
-    code: makeProgramWithVars('x: integer;', '',
-      `begin\n  x := 0;\n  ${genDeepWhile(20)}\nend`),
+    code: makeProgramWithVars('x: integer;', '', `begin\n  x := 0;\n  ${genDeepWhile(20)}\nend`),
     purpose: '测试20层 WHILE 循环嵌套，验证循环语句递归解析',
     features: ['while-statement', 'deep-nesting', '20-levels'],
     shouldParse: true,
   },
   {
     name: '深层嵌套 CASE 语句（10层）',
-    code: makeProgramWithVars('x: integer;', '',
-      genDeepCase(10)),
+    code: makeProgramWithVars('x: integer;', '', genDeepCase(10)),
     purpose: '测试10层 CASE 语句嵌套，验证多分支语句递归解析',
     features: ['case-statement', 'deep-nesting', '10-levels'],
     shouldParse: true,
@@ -124,47 +119,59 @@ end.`,
   },
   {
     name: '深层嵌套过程/函数（10层）',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 ${genDeepProc(10)}
-`, `
+`,
+      `
   p10
-`),
+`
+    ),
     purpose: '测试10层嵌套过程声明，验证过程声明递归解析',
     features: ['procedure-declaration', 'nested-procedure', '10-levels'],
     shouldParse: true,
   },
   {
     name: '深层嵌套表达式括号（30层）',
-    code: makeProgramWithVars('x, y: integer;', '',
-      `begin\n  y := ${genDeepParens(30, 'x + 1')};\nend`),
+    code: makeProgramWithVars(
+      'x, y: integer;',
+      '',
+      `begin\n  y := ${genDeepParens(30, 'x + 1')};\nend`
+    ),
     purpose: '测试30层括号嵌套表达式，验证表达式递归解析',
     features: ['expression', 'parentheses', 'deep-nesting', '30-levels'],
     shouldParse: true,
   },
   {
     name: '深层嵌套 REPEAT-UNTIL（15层）',
-    code: makeProgramWithVars('x: integer;', '',
+    code: makeProgramWithVars(
+      'x: integer;',
+      '',
       (() => {
         let result = 'x := x + 1'
         for (let i = 0; i < 15; i++) {
           result = `repeat\n  ${result}\nuntil x > ${i}`
         }
         return result
-      })()),
+      })()
+    ),
     purpose: '测试15层 REPEAT-UNTIL 嵌套，验证 repeat 语句递归解析',
     features: ['repeat-statement', 'deep-nesting', '15-levels'],
     shouldParse: true,
   },
   {
     name: '深层嵌套 FOR 循环（15层）',
-    code: makeProgramWithVars('i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, x: integer;', '',
+    code: makeProgramWithVars(
+      'i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, x: integer;',
+      '',
       (() => {
         let result = 'x := x + 1'
         for (let i = 15; i >= 1; i--) {
           result = `for i${i} := 1 to 10 do\n  ${result}`
         }
         return 'x := 0;\n  ' + result
-      })()),
+      })()
+    ),
     purpose: '测试15层 FOR 循环嵌套，验证 for 语句递归解析',
     features: ['for-statement', 'deep-nesting', '15-levels'],
     shouldParse: true,
@@ -189,7 +196,8 @@ ${genDeepProc(10)}
           stmts.push(`  v${i} := ${i}`)
         }
         return stmts.join(';\n')
-      })()),
+      })()
+    ),
     purpose: '测试100个变量在单个 VAR 块中声明，验证长声明序列处理',
     features: ['variable-declaration', 'long-sequence', '100-variables'],
     shouldParse: true,
@@ -210,45 +218,55 @@ ${genDeepProc(10)}
           calls.push(`  p${i}`)
         }
         return calls.join(';\n')
-      })()),
+      })()
+    ),
     purpose: '测试50个顶层过程声明，验证长过程序列处理',
     features: ['procedure-declaration', 'long-sequence', '50-procedures'],
     shouldParse: true,
   },
   {
     name: '长参数列表（20个参数）',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure LongParams(
   a1, a2, a3, a4, a5, a6, a7, a8, a9, a10: integer;
   b1, b2, b3, b4, b5, b6, b7, b8, b9, b10: char
 );
 begin
 end;
-`, `
+`,
+      `
   LongParams(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j')
-`),
+`
+    ),
     purpose: '测试20个参数的过程声明和调用',
     features: ['parameter-list', 'long-sequence', '20-parameters'],
     shouldParse: true,
   },
   {
     name: '长 CASE 语句（30个分支）',
-    code: makeProgramWithVars('x, y: integer;', '',
+    code: makeProgramWithVars(
+      'x, y: integer;',
+      '',
       (() => {
         let branches = ''
         for (let i = 1; i <= 30; i++) {
           branches += `    ${i}: y := ${i * 10};\n`
         }
         return `begin\n  case x of\n${branches}  end;\nend`
-      })()),
+      })()
+    ),
     purpose: '测试30个分支的 CASE 语句，验证长分支序列处理',
     features: ['case-statement', 'long-sequence', '30-branches'],
     shouldParse: true,
   },
   {
     name: '长表达式链（a+b+...+z）',
-    code: makeProgramWithVars('a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, result: integer;', '',
-      `begin\n  result := a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t + u + v + w + x + y + z;\nend`),
+    code: makeProgramWithVars(
+      'a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, result: integer;',
+      '',
+      `begin\n  result := a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t + u + v + w + x + y + z;\nend`
+    ),
     purpose: '测试26个变量的长加法表达式链',
     features: ['expression', 'long-sequence', 'addition-chain'],
     shouldParse: true,
@@ -269,8 +287,11 @@ end.`,
   },
   {
     name: '长乘法表达式链',
-    code: makeProgramWithVars('a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, result: integer;', '',
-      `begin\n  result := a1 * a2 * a3 * a4 * a5 * a6 * a7 * a8 * a9 * a10;\nend`),
+    code: makeProgramWithVars(
+      'a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, result: integer;',
+      '',
+      `begin\n  result := a1 * a2 * a3 * a4 * a5 * a6 * a7 * a8 * a9 * a10;\nend`
+    ),
     purpose: '测试10个操作数的长乘法表达式链',
     features: ['expression', 'long-sequence', 'multiplication-chain'],
     shouldParse: true,
@@ -307,13 +328,16 @@ end.`,
   },
   {
     name: '长过程调用参数列表（20个参数）',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure ManyArgs(n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15, n16, n17, n18, n19, n20: integer);
 begin
 end;
-`, `
+`,
+      `
   ManyArgs(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
-`),
+`
+    ),
     purpose: '测试20个实参的过程调用',
     features: ['procedure-call', 'long-sequence', '20-arguments'],
     shouldParse: true,
@@ -339,16 +363,21 @@ end.`,
   {
     name: '超长标识符（128字符）',
     code: makeProgramWithVars(
-      repeatStr('a', 128) + ': integer;', '',
-      `begin\n  ${repeatStr('a', 128)} := 42;\nend`),
+      repeatStr('a', 128) + ': integer;',
+      '',
+      `begin\n  ${repeatStr('a', 128)} := 42;\nend`
+    ),
     purpose: '测试128字符超长标识符',
     features: ['identifier', 'extreme-length', '128-chars'],
     shouldParse: true,
   },
   {
     name: '所有字母数字组合标识符',
-    code: makeProgramWithVars('a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5: integer;', '',
-      'begin\n  a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5 := 1;\nend'),
+    code: makeProgramWithVars(
+      'a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5: integer;',
+      '',
+      'begin\n  a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5 := 1;\nend'
+    ),
     purpose: '测试包含所有字母和数字的标识符',
     features: ['identifier', 'alphanumeric', 'mixed-chars'],
     shouldParse: true,
@@ -356,16 +385,21 @@ end.`,
   {
     name: '最大合法长度标识符（128字符）',
     code: makeProgramWithVars(
-      repeatStr('x', 128) + ': integer;', '',
-      `begin\n  ${repeatStr('x', 128)} := 100;\nend`),
+      repeatStr('x', 128) + ': integer;',
+      '',
+      `begin\n  ${repeatStr('x', 128)} := 100;\nend`
+    ),
     purpose: '测试128字符长度标识符（常见最大长度边界）',
     features: ['identifier', 'boundary-length', '128-chars'],
     shouldParse: true,
   },
   {
     name: '标识符每个字符都不同',
-    code: makeProgramWithVars('abcdefghijklmnopqrstuvwxyz: integer;', '',
-      'begin\n  abcdefghijklmnopqrstuvwxyz := 1;\nend'),
+    code: makeProgramWithVars(
+      'abcdefghijklmnopqrstuvwxyz: integer;',
+      '',
+      'begin\n  abcdefghijklmnopqrstuvwxyz := 1;\nend'
+    ),
     purpose: '测试每个字符都不同的标识符（26个不同字母）',
     features: ['identifier', 'unique-chars', 'all-letters'],
     shouldParse: true,
@@ -373,24 +407,32 @@ end.`,
   {
     name: '全大写超长标识符',
     code: makeProgramWithVars(
-      repeatStr('X', 100) + ': integer;', '',
-      `begin\n  ${repeatStr('X', 100)} := 1;\nend`),
+      repeatStr('X', 100) + ': integer;',
+      '',
+      `begin\n  ${repeatStr('X', 100)} := 1;\nend`
+    ),
     purpose: '测试100字符全大写标识符',
     features: ['identifier', 'uppercase', '100-chars'],
     shouldParse: true,
   },
   {
     name: '大小写混合超长标识符',
-    code: makeProgramWithVars('AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz: integer;', '',
-      'begin\n  AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz := 1;\nend'),
+    code: makeProgramWithVars(
+      'AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz: integer;',
+      '',
+      'begin\n  AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz := 1;\nend'
+    ),
     purpose: '测试大小写交替的长标识符',
     features: ['identifier', 'mixed-case', 'long-identifier'],
     shouldParse: true,
   },
   {
     name: '数字结尾的长标识符',
-    code: makeProgramWithVars('var123456789012345678901234567890: integer;', '',
-      'begin\n  var123456789012345678901234567890 := 1;\nend'),
+    code: makeProgramWithVars(
+      'var123456789012345678901234567890: integer;',
+      '',
+      'begin\n  var123456789012345678901234567890 := 1;\nend'
+    ),
     purpose: '测试带有长数字后缀的标识符',
     features: ['identifier', 'digit-suffix', 'long-identifier'],
     shouldParse: true,
@@ -398,8 +440,10 @@ end.`,
   {
     name: '多个长标识符变量声明',
     code: makeProgramWithVars(
-      `${repeatStr('a', 50)}, ${repeatStr('b', 50)}, ${repeatStr('c', 50)}: integer;`, '',
-      `begin\n  ${repeatStr('a', 50)} := 1;\n  ${repeatStr('b', 50)} := 2;\n  ${repeatStr('c', 50)} := 3;\nend`),
+      `${repeatStr('a', 50)}, ${repeatStr('b', 50)}, ${repeatStr('c', 50)}: integer;`,
+      '',
+      `begin\n  ${repeatStr('a', 50)} := 1;\n  ${repeatStr('b', 50)} := 2;\n  ${repeatStr('c', 50)} := 3;\nend`
+    ),
     purpose: '测试多个50字符长标识符在同一声明中',
     features: ['identifier', 'multiple-long-ids', 'variable-declaration'],
     shouldParse: true,
@@ -410,40 +454,35 @@ end.`,
   // ==========================================================================
   {
     name: '非常大的整数（20位）',
-    code: makeProgramWithVars('x: integer;', '',
-      `begin\n  x := ${repeatStr('9', 20)};\nend`),
+    code: makeProgramWithVars('x: integer;', '', `begin\n  x := ${repeatStr('9', 20)};\nend`),
     purpose: '测试20位超大整数字面量',
     features: ['integer-literal', 'extreme-large', '20-digits'],
     shouldParse: true,
   },
   {
     name: '零值整数',
-    code: makeProgramWithVars('x: integer;', '',
-      'begin\n  x := 0;\nend'),
+    code: makeProgramWithVars('x: integer;', '', 'begin\n  x := 0;\nend'),
     purpose: '测试零值整数（边界值）',
     features: ['integer-literal', 'zero', 'boundary-value'],
     shouldParse: true,
   },
   {
     name: '全零长整数',
-    code: makeProgramWithVars('x: integer;', '',
-      `begin\n  x := ${repeatStr('0', 20)};\nend`),
+    code: makeProgramWithVars('x: integer;', '', `begin\n  x := ${repeatStr('0', 20)};\nend`),
     purpose: '测试20个零组成的整数',
     features: ['integer-literal', 'all-zeros', 'long-number'],
     shouldParse: true,
   },
   {
     name: '连续数字长整数',
-    code: makeProgramWithVars('x: integer;', '',
-      'begin\n  x := 12345678901234567890;\nend'),
+    code: makeProgramWithVars('x: integer;', '', 'begin\n  x := 12345678901234567890;\nend'),
     purpose: '测试20位连续递增数字的整数',
     features: ['integer-literal', 'sequential-digits', '20-digits'],
     shouldParse: true,
   },
   {
     name: '负数大数（20位）',
-    code: makeProgramWithVars('x: integer;', '',
-      `begin\n  x := -${repeatStr('9', 20)};\nend`),
+    code: makeProgramWithVars('x: integer;', '', `begin\n  x := -${repeatStr('9', 20)};\nend`),
     purpose: '测试20位负整数',
     features: ['integer-literal', 'negative', '20-digits'],
     shouldParse: true,
@@ -454,40 +493,43 @@ end.`,
   // ==========================================================================
   {
     name: '超长字符串（200字符）',
-    code: makeProgramWithVars('s: string;', '',
-      `begin\n  s := '${repeatStr('a', 200)}';\nend`),
+    code: makeProgramWithVars('s: string;', '', `begin\n  s := '${repeatStr('a', 200)}';\nend`),
     purpose: '测试200字符超长字符串字面量',
     features: ['string-literal', 'extreme-long', '200-chars'],
     shouldParse: true,
   },
   {
     name: '全是转义引号的字符串',
-    code: makeProgramWithVars('s: string;', '',
-      `begin\n  s := '${repeatStr("''", 50)}';\nend`),
+    code: makeProgramWithVars('s: string;', '', `begin\n  s := '${repeatStr("''", 50)}';\nend`),
     purpose: '测试包含50对转义单引号的字符串（100个引号字符）',
     features: ['string-literal', 'escaped-quotes', 'all-quotes'],
     shouldParse: true,
   },
   {
     name: '空字符串重复出现',
-    code: makeProgramWithVars('s1, s2, s3, s4, s5, s6, s7, s8, s9, s10: string;', '',
-      `begin\n  s1 := '';\n  s2 := '';\n  s3 := '';\n  s4 := '';\n  s5 := '';\n  s6 := '';\n  s7 := '';\n  s8 := '';\n  s9 := '';\n  s10 := '';\nend`),
+    code: makeProgramWithVars(
+      's1, s2, s3, s4, s5, s6, s7, s8, s9, s10: string;',
+      '',
+      `begin\n  s1 := '';\n  s2 := '';\n  s3 := '';\n  s4 := '';\n  s5 := '';\n  s6 := '';\n  s7 := '';\n  s8 := '';\n  s9 := '';\n  s10 := '';\nend`
+    ),
     purpose: '测试多个空字符串字面量连续出现',
     features: ['string-literal', 'empty-string', 'multiple-empty'],
     shouldParse: true,
   },
   {
     name: '特殊字符密集字符串',
-    code: makeProgramWithVars('s: string;', '',
-      `begin\n  s := '${repeatStr('!@#$%^&*()_+-=[]{}|;:,.?', 10)}';\nend`),
+    code: makeProgramWithVars(
+      's: string;',
+      '',
+      `begin\n  s := '${repeatStr('!@#$%^&*()_+-=[]{}|;:,.?', 10)}';\nend`
+    ),
     purpose: '测试包含大量特殊字符的字符串',
     features: ['string-literal', 'special-chars', 'dense-special'],
     shouldParse: true,
   },
   {
     name: '单字符重复长字符串',
-    code: makeProgramWithVars('s: string;', '',
-      `begin\n  s := '${repeatStr('z', 200)}';\nend`),
+    code: makeProgramWithVars('s: string;', '', `begin\n  s := '${repeatStr('z', 200)}';\nend`),
     purpose: '测试200个相同字符组成的字符串',
     features: ['string-literal', 'repeated-char', '200-chars'],
     shouldParse: true,
@@ -590,8 +632,7 @@ end.`,
   },
   {
     name: '无空格的紧凑代码',
-    code: makeProgramWithVars('a,b,c,d,e:integer;',
-      'begin\na:=b+c*d/e;end.'),
+    code: makeProgramWithVars('a,b,c,d,e:integer;', 'begin\na:=b+c*d/e;end.'),
     purpose: '测试表达式中完全没有空格的紧凑代码',
     features: ['whitespace', 'compact-code', 'no-spaces'],
     shouldParse: true,
@@ -609,7 +650,8 @@ end.`,
   // ==========================================================================
   {
     name: '过程内包含所有语句类型',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure AllStatements;
 label
   10, 20;
@@ -639,16 +681,19 @@ begin
   goto 20;
 20:
 end;
-`, `
+`,
+      `
   AllStatements
-`),
+`
+    ),
     purpose: '测试一个过程中包含所有类型的语句',
     features: ['combination', 'all-statement-types', 'procedure'],
     shouldParse: true,
   },
   {
     name: '函数 + CASE + WHILE + GOTO 组合',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function ComplexFunc(n: integer): integer;
 label
   99;
@@ -675,16 +720,19 @@ begin
 99:
   ComplexFunc := result;
 end;
-`, `
+`,
+      `
   x := ComplexFunc(10)
-`),
+`
+    ),
     purpose: '测试函数中组合使用 CASE、WHILE 和 GOTO',
     features: ['combination', 'function', 'case', 'while', 'goto'],
     shouldParse: true,
   },
   {
     name: 'FORWARD + 相互递归 + 嵌套过程',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure A(n: integer); forward;
 procedure B(n: integer); forward;
 
@@ -708,9 +756,11 @@ begin
   if n > 0 then
     B(n - 1);
 end;
-`, `
+`,
+      `
   Outer
-`),
+`
+    ),
     purpose: '测试 FORWARD 声明、相互递归和嵌套过程的组合',
     features: ['combination', 'forward', 'mutual-recursion', 'nested-procedure'],
     shouldParse: true,
@@ -754,7 +804,8 @@ end.`,
   },
   {
     name: '复杂表达式 + 函数调用 + 数组访问',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Add(a, b: integer): integer;
 begin
   Add := a + b;
@@ -764,16 +815,19 @@ function Mul(a, b: integer): integer;
 begin
   Mul := a * b;
 end;
-`, `
+`,
+      `
   x := Add(Mul(arr[1], arr[2]) + arr[3], Mul(arr[4] + arr[5], arr[6]))
-`),
+`
+    ),
     purpose: '测试复杂表达式中嵌套函数调用和数组访问',
     features: ['combination', 'complex-expression', 'function-call', 'array-access'],
     shouldParse: true,
   },
   {
     name: '多过程多函数多变量大杂烩',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 const
   MAX = 100;
   MIN = 0;
@@ -818,12 +872,14 @@ procedure P3(var x: integer);
 begin
   x := InnerF(x);
 end;
-`, `
+`,
+      `
   P1;
   P2(5);
   g1 := F2(3, 4);
   P3(g2)
-`),
+`
+    ),
     purpose: '测试常量、类型、变量、过程、函数混合声明的大杂烩程序',
     features: ['combination', 'mixed-declarations', 'multi-procedure', 'multi-function'],
     shouldParse: true,
@@ -940,7 +996,8 @@ end.`,
   },
   {
     name: '过程参数 + 嵌套函数 + 复杂表达式',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Calc(x: integer; var y: integer): integer;
   function Square(n: integer): integer;
   begin
@@ -954,9 +1011,11 @@ begin
   y := Square(x) + Cube(x);
   Calc := y mod 100;
 end;
-`, `
+`,
+      `
   r := Calc(5, x)
-`),
+`
+    ),
     purpose: '测试过程参数、嵌套函数和复杂表达式的组合',
     features: ['combination', 'var-parameter', 'nested-function', 'complex-expression'],
     shouldParse: true,
@@ -987,7 +1046,8 @@ end.`,
   },
   {
     name: 'FORWARD 函数 + 嵌套过程 + 递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Fib(n: integer): integer; forward;
 
 procedure ComputeFibs;
@@ -1009,9 +1069,11 @@ begin
   else
     Fib := Fib(n - 1) + Fib(n - 2);
 end;
-`, `
+`,
+      `
   ComputeFibs
-`),
+`
+    ),
     purpose: '测试 FORWARD 函数、嵌套过程和递归的组合',
     features: ['combination', 'forward', 'nested-function', 'recursion'],
     shouldParse: true,
@@ -1044,7 +1106,8 @@ end.`,
   },
   {
     name: '字符串 + 过程调用 + 循环',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure PrintStr(s: string);
 begin
 end;
@@ -1053,10 +1116,12 @@ function Concat(a, b: string): string;
 begin
   Concat := a + b;
 end;
-`, `
+`,
+      `
   for i := 1 to 10 do
     PrintStr(Concat('hello', 'world'))
-`),
+`
+    ),
     purpose: '测试字符串、过程调用和循环的组合',
     features: ['combination', 'string', 'procedure-call', 'loop'],
     shouldParse: true,
@@ -1111,23 +1176,30 @@ end.`,
   },
   {
     name: 'IF 嵌套 + ELSE 悬挂 + 复合语句',
-    code: makeProgramWithVars('a, b, c, x: integer;', '',
-      `begin\n  if a > 0 then\n    if b > 0 then\n      if c > 0 then\n        x := 1\n      else\n        x := 2\n    else\n      begin\n        x := 3;\n      end\n  else\n    x := 4;\nend`),
+    code: makeProgramWithVars(
+      'a, b, c, x: integer;',
+      '',
+      `begin\n  if a > 0 then\n    if b > 0 then\n      if c > 0 then\n        x := 1\n      else\n        x := 2\n    else\n      begin\n        x := 3;\n      end\n  else\n    x := 4;\nend`
+    ),
     purpose: '测试多层 IF-ELSE 嵌套，验证悬挂 else 绑定',
     features: ['combination', 'nested-if', 'dangling-else', 'compound-statement'],
     shouldParse: true,
   },
   {
     name: 'REPEAT + WHILE + FOR 三种循环嵌套',
-    code: makeProgramWithVars('i, j, k, sum: integer;', '',
-      `begin\n  sum := 0;\n  i := 0;\n  repeat\n    j := 0;\n    while j < 5 do\n      begin\n        for k := 1 to 3 do\n          sum := sum + i + j + k;\n        j := j + 1;\n      end;\n    i := i + 1;\n  until i >= 3;\nend`),
+    code: makeProgramWithVars(
+      'i, j, k, sum: integer;',
+      '',
+      `begin\n  sum := 0;\n  i := 0;\n  repeat\n    j := 0;\n    while j < 5 do\n      begin\n        for k := 1 to 3 do\n          sum := sum + i + j + k;\n        j := j + 1;\n      end;\n    i := i + 1;\n  until i >= 3;\nend`
+    ),
     purpose: '测试 REPEAT、WHILE、FOR 三种循环互相嵌套',
     features: ['combination', 'three-loop-types', 'nested-loops'],
     shouldParse: true,
   },
   {
     name: '常量 + 类型 + 变量 + 过程 + 函数完整声明',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 label
   9999;
 const
@@ -1155,10 +1227,12 @@ function Sum: integer;
       s := s + data[i];
     Sum := s;
   end;
-`, `
+`,
+      `
   Init;
   total := Sum
-`),
+`
+    ),
     purpose: '测试包含所有声明段的完整程序结构',
     features: ['combination', 'full-declarations', 'all-sections'],
     shouldParse: true,
@@ -1213,7 +1287,9 @@ end.`,
 ]
 
 describe('M3.5 Fuzz Tests', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runParseTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runParseTest(t)
+    })
   })
 })

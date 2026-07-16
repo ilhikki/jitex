@@ -4,9 +4,15 @@ import { parseExpression, parseIdentifier, parseExpressionList } from '../../src
 import { parseType, parseVariableDeclaration } from '../../src/parser/types'
 import { parseStatement, parseCompoundStatement } from '../../src/parser/statements'
 import {
-  parseLabelDeclaration, parseConstDeclarations, parseTypeDeclarations,
-  parseVariableDeclarations, parseProcedureDeclaration, parseFunctionDeclaration,
-  parseParameterList, parseBlock, parseProgram,
+  parseLabelDeclaration,
+  parseConstDeclarations,
+  parseTypeDeclarations,
+  parseVariableDeclarations,
+  parseProcedureDeclaration,
+  parseFunctionDeclaration,
+  parseParameterList,
+  parseBlock,
+  parseProgram,
 } from '../../src/parser/declarations'
 
 function makeInput(source: string): ParserInput {
@@ -623,7 +629,9 @@ describe('Production: function_declaration', () => {
   })
 
   test('should parse function with parameters', () => {
-    const result = parseFunctionDeclaration(makeInput('FUNCTION BAR(X: INTEGER): BOOLEAN; BEGIN END;'))
+    const result = parseFunctionDeclaration(
+      makeInput('FUNCTION BAR(X: INTEGER): BOOLEAN; BEGIN END;')
+    )
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.astNode.parameters).toHaveLength(1)
@@ -687,7 +695,9 @@ describe('Production: program', () => {
   })
 
   test('should parse program with label and const', () => {
-    const result = parseProgram(makeInput('PROGRAM TEST; LABEL 9999; CONST MAX = 100; BEGIN GOTO 9999 END.'))
+    const result = parseProgram(
+      makeInput('PROGRAM TEST; LABEL 9999; CONST MAX = 100; BEGIN GOTO 9999 END.')
+    )
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.astNode.block.labelDeclarations).not.toBeNull()

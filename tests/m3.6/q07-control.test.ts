@@ -12,7 +12,7 @@ begin
 end.`,
     purpose: 'IF-THEN with true condition',
     features: ['if-statement', 'condition'],
-    expectedContains: 'positive'
+    expectedContains: 'positive',
   },
   {
     name: 'if-then simple false',
@@ -26,7 +26,7 @@ begin
 end.`,
     purpose: 'IF-THEN with false condition',
     features: ['if-statement', 'condition'],
-    expectedContains: 'done'
+    expectedContains: 'done',
   },
   {
     name: 'if-then-else true',
@@ -41,7 +41,7 @@ begin
 end.`,
     purpose: 'IF-THEN-ELSE with true condition',
     features: ['if-statement', 'else', 'condition'],
-    expectedContains: 'greater'
+    expectedContains: 'greater',
   },
   {
     name: 'if-then-else false',
@@ -56,7 +56,7 @@ begin
 end.`,
     purpose: 'IF-THEN-ELSE with false condition',
     features: ['if-statement', 'else', 'condition'],
-    expectedContains: 'less'
+    expectedContains: 'less',
   },
   {
     name: 'nested if',
@@ -71,7 +71,7 @@ begin
 end.`,
     purpose: 'nested IF statements',
     features: ['if-statement', 'nested-if', 'condition'],
-    expectedContains: 'both positive'
+    expectedContains: 'both positive',
   },
   {
     name: 'if-elseif via nested if',
@@ -89,7 +89,7 @@ begin
 end.`,
     purpose: 'IF-ELSEIF simulated via nested IF',
     features: ['if-statement', 'else', 'nested-if', 'condition'],
-    expectedContains: 'two'
+    expectedContains: 'two',
   },
   {
     name: 'if in loop',
@@ -102,7 +102,7 @@ begin
 end.`,
     purpose: 'IF statement inside loop',
     features: ['if-statement', 'for-loop', 'condition'],
-    expectedContains: '2'
+    expectedContains: '2',
   },
   {
     name: 'if in procedure',
@@ -120,7 +120,7 @@ begin
 end.`,
     purpose: 'IF statement in procedure',
     features: ['if-statement', 'procedure', 'condition'],
-    expectedContains: 'positive'
+    expectedContains: 'positive',
   },
   {
     name: 'boolean expression as condition',
@@ -136,7 +136,7 @@ begin
 end.`,
     purpose: 'boolean variable as condition',
     features: ['if-statement', 'boolean', 'condition'],
-    expectedContains: 'true'
+    expectedContains: 'true',
   },
   {
     name: 'complex condition expression',
@@ -153,7 +153,7 @@ begin
 end.`,
     purpose: 'complex logical expression as condition',
     features: ['if-statement', 'logical-operator', 'condition'],
-    expectedContains: 'ok'
+    expectedContains: 'ok',
   },
   {
     name: 'while simple loop',
@@ -169,7 +169,7 @@ begin
 end.`,
     purpose: 'simple WHILE loop',
     features: ['while-loop', 'condition'],
-    expectedContains: '3'
+    expectedContains: '3',
   },
   {
     name: 'while condition false initially',
@@ -183,7 +183,7 @@ begin
 end.`,
     purpose: 'WHILE loop with false condition does not execute',
     features: ['while-loop', 'condition'],
-    expectedContains: 'done'
+    expectedContains: 'done',
   },
   {
     name: 'while multiple iterations',
@@ -201,7 +201,7 @@ begin
 end.`,
     purpose: 'WHILE loop with multiple iterations',
     features: ['while-loop', 'condition', 'accumulator'],
-    expectedContains: '55'
+    expectedContains: '55',
   },
   {
     name: 'while in procedure',
@@ -221,7 +221,7 @@ begin
 end.`,
     purpose: 'WHILE loop in procedure',
     features: ['while-loop', 'procedure', 'condition'],
-    expectedContains: '3'
+    expectedContains: '3',
   },
   {
     name: 'nested while',
@@ -242,7 +242,7 @@ begin
 end.`,
     purpose: 'nested WHILE loops',
     features: ['while-loop', 'nested-loop', 'condition'],
-    expectedContains: '2 2'
+    expectedContains: '2 2',
   },
   {
     name: 'while with break via goto',
@@ -263,7 +263,7 @@ begin
 end.`,
     purpose: 'WHILE loop with break using GOTO',
     features: ['while-loop', 'goto', 'break', 'condition'],
-    expectedContains: 'exited'
+    expectedContains: 'exited',
   },
   {
     name: 'for-to simple',
@@ -275,7 +275,7 @@ begin
 end.`,
     purpose: 'simple FOR-TO loop',
     features: ['for-loop', 'for-to'],
-    expectedContains: '3'
+    expectedContains: '3',
   },
   {
     name: 'for-downto simple',
@@ -287,7 +287,7 @@ begin
 end.`,
     purpose: 'simple FOR-DOWNTO loop',
     features: ['for-loop', 'for-downto'],
-    expectedContains: '1'
+    expectedContains: '1',
   },
   {
     name: 'for boundary values',
@@ -302,7 +302,7 @@ begin
 end.`,
     purpose: 'FOR loop boundary conditions',
     features: ['for-loop', 'boundary'],
-    expectedContains: 'single'
+    expectedContains: 'single',
   },
   {
     name: 'for in procedure',
@@ -320,7 +320,7 @@ begin
 end.`,
     purpose: 'FOR loop in procedure',
     features: ['for-loop', 'procedure'],
-    expectedContains: '15'
+    expectedContains: '15',
   },
   {
     name: 'nested for',
@@ -333,7 +333,7 @@ begin
 end.`,
     purpose: 'nested FOR loops',
     features: ['for-loop', 'nested-loop'],
-    expectedContains: '2 2'
+    expectedContains: '2 2',
   },
   {
     name: 'for variable after loop',
@@ -346,7 +346,7 @@ begin
 end.`,
     purpose: 'FOR loop variable accessible after loop',
     features: ['for-loop', 'loop-variable'],
-    expectedContains: 'after:'
+    expectedContains: 'after:',
   },
   {
     name: 'repeat simple',
@@ -361,7 +361,7 @@ begin
 end.`,
     purpose: 'simple REPEAT loop',
     features: ['repeat-loop', 'condition'],
-    expectedContains: '3'
+    expectedContains: '3',
   },
   {
     name: 'repeat executes at least once',
@@ -376,7 +376,7 @@ begin
 end.`,
     purpose: 'REPEAT loop executes at least once',
     features: ['repeat-loop', 'condition'],
-    expectedContains: 'executed'
+    expectedContains: 'executed',
   },
   {
     name: 'repeat multiple iterations',
@@ -393,7 +393,7 @@ begin
 end.`,
     purpose: 'REPEAT loop with multiple iterations',
     features: ['repeat-loop', 'condition', 'factorial'],
-    expectedContains: '120'
+    expectedContains: '120',
   },
   {
     name: 'repeat in procedure',
@@ -412,7 +412,7 @@ begin
 end.`,
     purpose: 'REPEAT loop in procedure',
     features: ['repeat-loop', 'procedure'],
-    expectedContains: '1'
+    expectedContains: '1',
   },
   {
     name: 'nested repeat',
@@ -431,7 +431,7 @@ begin
 end.`,
     purpose: 'nested REPEAT loops',
     features: ['repeat-loop', 'nested-loop'],
-    expectedContains: '2 2'
+    expectedContains: '2 2',
   },
   {
     name: 'case simple',
@@ -447,7 +447,7 @@ begin
 end.`,
     purpose: 'simple CASE statement',
     features: ['case-statement', 'selection'],
-    expectedContains: 'two'
+    expectedContains: 'two',
   },
   {
     name: 'case multiple values',
@@ -463,7 +463,7 @@ begin
 end.`,
     purpose: 'CASE statement with multiple values per case',
     features: ['case-statement', 'multiple-values'],
-    expectedContains: 'medium'
+    expectedContains: 'medium',
   },
   {
     name: 'case otherwise',
@@ -479,7 +479,7 @@ begin
 end.`,
     purpose: 'CASE statement with OTHERWISE clause',
     features: ['case-statement', 'otherwise'],
-    expectedContains: 'other'
+    expectedContains: 'other',
   },
   {
     name: 'case in loop',
@@ -495,7 +495,7 @@ begin
 end.`,
     purpose: 'CASE statement inside loop',
     features: ['case-statement', 'for-loop'],
-    expectedContains: 'c'
+    expectedContains: 'c',
   },
   {
     name: 'case in procedure',
@@ -514,7 +514,7 @@ begin
 end.`,
     purpose: 'CASE statement in procedure',
     features: ['case-statement', 'procedure'],
-    expectedContains: 'first'
+    expectedContains: 'first',
   },
   {
     name: 'nested case',
@@ -533,7 +533,7 @@ begin
 end.`,
     purpose: 'nested CASE statements',
     features: ['case-statement', 'nested-case'],
-    expectedContains: '1-2'
+    expectedContains: '1-2',
   },
   {
     name: 'loop with nested if',
@@ -546,7 +546,7 @@ begin
 end.`,
     purpose: 'loop with nested IF for filtering',
     features: ['for-loop', 'if-statement', 'nested-control'],
-    expectedContains: '9'
+    expectedContains: '9',
   },
   {
     name: 'case with nested loop',
@@ -562,7 +562,7 @@ begin
 end.`,
     purpose: 'CASE statement with nested loop',
     features: ['case-statement', 'for-loop', 'nested-control'],
-    expectedContains: 'b3'
+    expectedContains: 'b3',
   },
   {
     name: 'recursion with loop',
@@ -588,7 +588,7 @@ begin
 end.`,
     purpose: 'recursion combined with loop',
     features: ['recursion', 'for-loop', 'function', 'nested-control'],
-    expectedContains: '120'
+    expectedContains: '120',
   },
   {
     name: 'procedure call with control flow',
@@ -613,7 +613,7 @@ begin
 end.`,
     purpose: 'procedure calls with embedded control flow',
     features: ['procedure', 'if-statement', 'for-loop', 'nested-control'],
-    expectedContains: 'positive'
+    expectedContains: 'positive',
   },
   {
     name: 'while with if and break',
@@ -634,7 +634,7 @@ begin
 end.`,
     purpose: 'WHILE loop with IF and GOTO break (Pascal82: 数字 label)',
     features: ['while-loop', 'if-statement', 'goto', 'break'],
-    expectedNotContains: '5'
+    expectedNotContains: '5',
   },
   {
     name: 'for loop with case',
@@ -651,7 +651,7 @@ begin
 end.`,
     purpose: 'FOR loop with CASE statement',
     features: ['for-loop', 'case-statement', 'nested-control'],
-    expectedContains: 'end'
+    expectedContains: 'end',
   },
   {
     name: 'repeat with nested if',
@@ -667,7 +667,7 @@ begin
 end.`,
     purpose: 'REPEAT loop with nested IF',
     features: ['repeat-loop', 'if-statement', 'nested-control'],
-    expectedContains: '5'
+    expectedContains: '5',
   },
   {
     name: 'if with complex expression',
@@ -683,7 +683,7 @@ begin
 end.`,
     purpose: 'IF with complex logical expression',
     features: ['if-statement', 'logical-operator', 'condition'],
-    expectedContains: 'true'
+    expectedContains: 'true',
   },
   {
     name: 'case with no match',
@@ -699,7 +699,7 @@ begin
 end.`,
     purpose: 'CASE statement with no matching case',
     features: ['case-statement', 'no-match'],
-    expectedContains: 'done'
+    expectedContains: 'done',
   },
   {
     name: 'for loop with step implicit',
@@ -713,7 +713,7 @@ begin
 end.`,
     purpose: 'FOR loop sums numbers from 2 to 8 (Pascal82: 无 step，递增 +1)',
     features: ['for-loop', 'accumulator'],
-    expectedContains: '35'
+    expectedContains: '35',
   },
   {
     name: 'while loop with boolean flag',
@@ -733,12 +733,14 @@ begin
 end.`,
     purpose: 'WHILE loop controlled by boolean flag',
     features: ['while-loop', 'boolean', 'flag'],
-    expectedContains: '3'
-  }
+    expectedContains: '3',
+  },
 ]
 
 describe('M3.6 Interpreter: Control Flow', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runInterpreterTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runInterpreterTest(t)
+    })
   })
 })

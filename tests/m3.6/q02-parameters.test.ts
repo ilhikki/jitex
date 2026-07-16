@@ -726,7 +726,8 @@ begin
   PrintPerson(p);
 end.
       `,
-      purpose: '测试记录类型参数（Pascal82 标准：var 在 procedure 之前；不使用非标 string[n] 类型）',
+      purpose:
+        '测试记录类型参数（Pascal82 标准：var 在 procedure 之前；不使用非标 string[n] 类型）',
       features: ['procedure', 'record parameter'],
       expectedOutput: 'A\n25\n',
     },

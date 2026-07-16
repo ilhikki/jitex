@@ -1,11 +1,32 @@
 import {
-  ParserInput, ParseResult, AstNode,
-  LabelDeclarationNode, ConstDeclarationNode, TypeDeclarationNode,
-  VariableDeclarationNode, ProcedureDeclarationNode, FunctionDeclarationNode,
-  ParameterDeclarationNode, BlockNode, ProgramNode, IdentifierNode,
-  IntegerLiteralNode, TypeNode, StatementNode, CompoundStatementNode,
+  ParserInput,
+  ParseResult,
+  AstNode,
+  LabelDeclarationNode,
+  ConstDeclarationNode,
+  TypeDeclarationNode,
+  VariableDeclarationNode,
+  ProcedureDeclarationNode,
+  FunctionDeclarationNode,
+  ParameterDeclarationNode,
+  BlockNode,
+  ProgramNode,
+  IdentifierNode,
+  IntegerLiteralNode,
+  TypeNode,
+  StatementNode,
+  CompoundStatementNode,
 } from '../ast/types'
-import { peek, ok, fail, matchType, matchKeyword, expectType, expectKeyword, parseList } from './helpers'
+import {
+  peek,
+  ok,
+  fail,
+  matchType,
+  matchKeyword,
+  expectType,
+  expectKeyword,
+  parseList,
+} from './helpers'
 import { parseIdentifier, parseExpression } from './expressions'
 import { parseType, parseVariableDeclaration } from './types'
 import { parseStatement, parseCompoundStatement } from './statements'
@@ -116,7 +137,9 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
 }
 
 // VAR { identifier_list : type ; }
-export function parseVariableDeclarations(input: ParserInput): ParseResult<VariableDeclarationNode[]> {
+export function parseVariableDeclarations(
+  input: ParserInput
+): ParseResult<VariableDeclarationNode[]> {
   if (peek(input).type !== 'VAR') {
     return ok(input.position, [])
   }
@@ -158,11 +181,7 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
       pos++
     }
 
-    const namesResult = parseList(
-      { tokens: input.tokens, position: pos },
-      parseIdentifier,
-      'COMMA'
-    )
+    const namesResult = parseList({ tokens: input.tokens, position: pos }, parseIdentifier, 'COMMA')
     if (!namesResult.success) return fail(namesResult.error, namesResult.position)
     pos = namesResult.newPosition
 
@@ -192,7 +211,9 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
   return ok(pos, params)
 }
 
-export function parseProcedureDeclaration(input: ParserInput): ParseResult<ProcedureDeclarationNode> {
+export function parseProcedureDeclaration(
+  input: ParserInput
+): ParseResult<ProcedureDeclarationNode> {
   let pos = input.position + 1 // skip PROCEDURE
 
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
@@ -373,13 +394,18 @@ export function parseBlock(input: ParserInput): ParseResult<BlockNode> {
 }
 
 // Pascal82 要求同一 block 内不能重复声明 label。跨 block（不同 procedure/function）允许同名 label。
-function checkDuplicateLabels(stmt: StatementNode | null): { success: true } | { success: false; error: string; position: number } {
+function checkDuplicateLabels(
+  stmt: StatementNode | null
+): { success: true } | { success: false; error: string; position: number } {
   if (!stmt) return { success: true }
   const seen = new Set<number>()
   return walkForLabels(stmt, seen)
 }
 
-function walkForLabels(stmt: StatementNode | null | undefined, seen: Set<number>): { success: true } | { success: false; error: string; position: number } {
+function walkForLabels(
+  stmt: StatementNode | null | undefined,
+  seen: Set<number>
+): { success: true } | { success: false; error: string; position: number } {
   if (!stmt) return { success: true }
   if ((stmt as any).kind === 'LabeledStatement') {
     const ls = stmt as any
@@ -439,7 +465,10 @@ function checkGotoTargets(
   return validateGotos(compound, validLabels)
 }
 
-function collectLabelsFromCompound(stmt: StatementNode | null | undefined, labels: Set<number>): void {
+function collectLabelsFromCompound(
+  stmt: StatementNode | null | undefined,
+  labels: Set<number>
+): void {
   if (!stmt) return
   if ((stmt as any).kind === 'LabeledStatement') {
     labels.add((stmt as any).label.value)
@@ -472,12 +501,19 @@ function collectLabelsFromCompound(stmt: StatementNode | null | undefined, label
   }
 }
 
-function validateGotos(stmt: StatementNode | null | undefined, validLabels: Set<number>): { success: true } | { success: false; error: string; position: number } {
+function validateGotos(
+  stmt: StatementNode | null | undefined,
+  validLabels: Set<number>
+): { success: true } | { success: false; error: string; position: number } {
   if (!stmt) return { success: true }
   if ((stmt as any).kind === 'GotoStatement') {
     const value = (stmt as any).label.value
     if (!validLabels.has(value)) {
-      return { success: false, error: `GOTO target label ${value} is not declared in this block`, position: 0 }
+      return {
+        success: false,
+        error: `GOTO target label ${value} is not declared in this block`,
+        position: 0,
+      }
     }
     return { success: true }
   }

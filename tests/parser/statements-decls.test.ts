@@ -1,7 +1,12 @@
 import { lex } from '../../src/lexer/lexer'
 import { ParserInput, ProgramNode, CaseStatementNode } from '../../src/ast/types'
 import { parseStatement } from '../../src/parser/statements'
-import { parseProgram, parseProcedureDeclaration, parseFunctionDeclaration, parseBlock } from '../../src/parser/declarations'
+import {
+  parseProgram,
+  parseProcedureDeclaration,
+  parseFunctionDeclaration,
+  parseBlock,
+} from '../../src/parser/declarations'
 import { parse } from '../../src/index'
 
 function makeInput(source: string): ParserInput {

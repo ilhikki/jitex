@@ -19,8 +19,8 @@ import {
   WhileStatementNode,
   WithStatementNode,
 } from '../ast/types'
-import {expectKeyword, expectType, fail, ok, parseList, peek} from './helpers'
-import {parseExpression, parseIdentifier, parsePrimary} from './expressions'
+import { expectKeyword, expectType, fail, ok, parseList, peek } from './helpers'
+import { parseExpression, parseIdentifier, parsePrimary } from './expressions'
 
 // ============================================================================
 // Statement Parsers
@@ -123,7 +123,11 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
 
   return ok(stmtResult.newPosition, {
     kind: 'LabeledStatement',
-    label: { kind: 'IntegerLiteral', value: labelValue, raw: labelToken.content } as IntegerLiteralNode,
+    label: {
+      kind: 'IntegerLiteral',
+      value: labelValue,
+      raw: labelToken.content,
+    } as IntegerLiteralNode,
     statement: stmtResult.astNode,
   } as LabeledStatementNode)
 }
@@ -364,7 +368,10 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
     direction = 'DOWNTO'
     pos++
   } else {
-    return fail(`Expected TO or DOWNTO but got ${dirToken.type} at line ${dirToken.start.line}`, pos)
+    return fail(
+      `Expected TO or DOWNTO but got ${dirToken.type} at line ${dirToken.start.line}`,
+      pos
+    )
   }
 
   const finalResult = parseExpression({ tokens: input.tokens, position: pos })
@@ -484,11 +491,7 @@ function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> 
 function parseWithStatement(input: ParserInput): ParseResult<WithStatementNode> {
   let pos = input.position + 1 // skip WITH
 
-  const recordsResult = parseList(
-    { tokens: input.tokens, position: pos },
-    parseExpression,
-    'COMMA'
-  )
+  const recordsResult = parseList({ tokens: input.tokens, position: pos }, parseExpression, 'COMMA')
   if (!recordsResult.success) return fail(recordsResult.error, recordsResult.position)
   pos = recordsResult.newPosition
 

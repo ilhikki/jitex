@@ -15,7 +15,7 @@ import {
   StringLiteralNode,
   UnaryExpressionNode,
 } from '../ast/types'
-import {expectType, fail, ok, parseList, peek} from './helpers'
+import { expectType, fail, ok, parseList, peek } from './helpers'
 
 // ============================================================================
 // Expression Parsers
@@ -25,7 +25,10 @@ import {expectType, fail, ok, parseList, peek} from './helpers'
 export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode> {
   const token = peek(input)
   if (token.type !== 'IDENTIFIER') {
-    return fail(`Expected identifier but got ${token.type} (${token.content}) at line ${token.start.line}:${token.start.column}`, input.position)
+    return fail(
+      `Expected identifier but got ${token.type} (${token.content}) at line ${token.start.line}:${token.start.column}`,
+      input.position
+    )
   }
   return ok(input.position + 1, { kind: 'Identifier', name: token.content })
 }
@@ -181,7 +184,6 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       return parseSetConstructor(input)
     }
 
-
     case 'NOT':
       return parseNot(input)
 
@@ -307,7 +309,11 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
     } else if (token.type === 'CARET') {
       // Pointer dereference (treat as field access for simplicity)
       pos++
-      expr = { kind: 'FieldAccess', object: expr, field: { kind: 'Identifier', name: '^' } } as FieldAccessNode
+      expr = {
+        kind: 'FieldAccess',
+        object: expr,
+        field: { kind: 'Identifier', name: '^' },
+      } as FieldAccessNode
     } else {
       break
     }
@@ -346,11 +352,21 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
     let operator: string | null = null
 
     switch (token.type) {
-      case 'STAR': operator = '*'; break
-      case 'SLASH': operator = '/'; break
-      case 'DIV': operator = 'DIV'; break
-      case 'MOD': operator = 'MOD'; break
-      case 'AND': operator = 'AND'; break
+      case 'STAR':
+        operator = '*'
+        break
+      case 'SLASH':
+        operator = '/'
+        break
+      case 'DIV':
+        operator = 'DIV'
+        break
+      case 'MOD':
+        operator = 'MOD'
+        break
+      case 'AND':
+        operator = 'AND'
+        break
     }
 
     if (!operator) break
@@ -400,9 +416,15 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
     let operator: string | null = null
 
     switch (token.type) {
-      case 'PLUS': operator = '+'; break
-      case 'MINUS': operator = '-'; break
-      case 'OR': operator = 'OR'; break
+      case 'PLUS':
+        operator = '+'
+        break
+      case 'MINUS':
+        operator = '-'
+        break
+      case 'OR':
+        operator = 'OR'
+        break
     }
 
     if (!operator) break
@@ -435,14 +457,30 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
     let operator: string | null = null
 
     switch (token.type) {
-      case 'EQUAL': operator = '='; break
-      case 'NE': operator = '<>'; break
-      case 'LT': operator = '<'; break
-      case 'LE': operator = '<='; break
-      case 'GT': operator = '>'; break
-      case 'GE': operator = '>='; break
-      case 'EQEQ': operator = '=='; break
-      case 'IN': operator = 'IN'; break
+      case 'EQUAL':
+        operator = '='
+        break
+      case 'NE':
+        operator = '<>'
+        break
+      case 'LT':
+        operator = '<'
+        break
+      case 'LE':
+        operator = '<='
+        break
+      case 'GT':
+        operator = '>'
+        break
+      case 'GE':
+        operator = '>='
+        break
+      case 'EQEQ':
+        operator = '=='
+        break
+      case 'IN':
+        operator = 'IN'
+        break
     }
 
     if (!operator) break

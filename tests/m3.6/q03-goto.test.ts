@@ -162,7 +162,8 @@ begin
 100:
   writeln('Label 100');
 end.`,
-      purpose: 'Label coexists with variable of same name（Pascal82: label 是关键字，不能作变量名）',
+      purpose:
+        'Label coexists with variable of same name（Pascal82: label 是关键字，不能作变量名）',
       features: ['GOTO', 'label', 'variable'],
       expectedContains: '42\nLabel 100',
     },

@@ -16,10 +16,13 @@ export function runParseTest(t: ConformanceTest) {
     if (t.shouldParse) {
       throw new Error(
         `Expected parse to succeed but it threw:\n` +
-        `  Test: ${t.name}\n` +
-        `  Purpose: ${t.purpose}\n` +
-        `  Exception: ${e.message}\n` +
-        `  Code:\n${t.code.split('\n').map(l => '    ' + l).join('\n')}`
+          `  Test: ${t.name}\n` +
+          `  Purpose: ${t.purpose}\n` +
+          `  Exception: ${e.message}\n` +
+          `  Code:\n${t.code
+            .split('\n')
+            .map((l) => '    ' + l)
+            .join('\n')}`
       )
     }
     return
@@ -28,10 +31,13 @@ export function runParseTest(t: ConformanceTest) {
     if (!result.success) {
       throw new Error(
         `Expected parse to succeed but it failed:\n` +
-        `  Test: ${t.name}\n` +
-        `  Purpose: ${t.purpose}\n` +
-        `  Error: ${result.error}\n` +
-        `  Code:\n${t.code.split('\n').map(l => '    ' + l).join('\n')}`
+          `  Test: ${t.name}\n` +
+          `  Purpose: ${t.purpose}\n` +
+          `  Error: ${result.error}\n` +
+          `  Code:\n${t.code
+            .split('\n')
+            .map((l) => '    ' + l)
+            .join('\n')}`
       )
     }
     expect(result.astNode).toBeDefined()
@@ -39,9 +45,12 @@ export function runParseTest(t: ConformanceTest) {
     if (result.success) {
       throw new Error(
         `Expected parse to fail but it succeeded:\n` +
-        `  Test: ${t.name}\n` +
-        `  Purpose: ${t.purpose}\n` +
-        `  Code:\n${t.code.split('\n').map(l => '    ' + l).join('\n')}`
+          `  Test: ${t.name}\n` +
+          `  Purpose: ${t.purpose}\n` +
+          `  Code:\n${t.code
+            .split('\n')
+            .map((l) => '    ' + l)
+            .join('\n')}`
       )
     }
   }

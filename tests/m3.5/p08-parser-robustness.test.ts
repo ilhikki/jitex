@@ -129,7 +129,7 @@ const silentAcceptTests: RobustnessTest[] = [
 ]
 
 describe('M3.5 Parser Robustness (crash bugs)', () => {
-  crashTests.forEach(t => {
+  crashTests.forEach((t) => {
     test(t.name, () => {
       let threw = false
       try {
@@ -143,7 +143,7 @@ describe('M3.5 Parser Robustness (crash bugs)', () => {
 })
 
 describe('M3.5 Parser Robustness (silent accept bugs)', () => {
-  silentAcceptTests.forEach(t => {
+  silentAcceptTests.forEach((t) => {
     test(t.name, () => {
       const result = parse(t.code)
       expect(result.success).toBe(false)

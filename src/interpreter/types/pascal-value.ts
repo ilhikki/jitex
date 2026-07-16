@@ -32,15 +32,7 @@ export interface PascalValue {
 // ============================================================================
 
 export type PascalTypeKind =
-  | 'integer'
-  | 'real'
-  | 'char'
-  | 'boolean'
-  | 'string'
-  | 'subrange'
-  | 'array'
-  | 'record'
-  | 'file'
+  'integer' | 'real' | 'char' | 'boolean' | 'string' | 'subrange' | 'array' | 'record' | 'file'
 
 export interface PascalType {
   readonly name: string
@@ -614,7 +606,7 @@ export function makeChar(value: number | string): PascalValue {
   if (typeof value === 'string') {
     return { type: CHAR_TYPE, rawValue: value.charCodeAt(0) }
   }
-  return { type: CHAR_TYPE, rawValue: value & 0xFF }
+  return { type: CHAR_TYPE, rawValue: value & 0xff }
 }
 
 export function makeBoolean(value: boolean): PascalValue {
@@ -654,7 +646,11 @@ export function createEmptyArray(arrayType: ArrayType): PascalValue {
   for (let i = 0; i < totalSize; i++) {
     elements.push(makeDefaultValue(arrayType.elementType))
   }
-  const arr: PascalArray = { elements, dimensions: arrayType.dimensions, elementType: arrayType.elementType }
+  const arr: PascalArray = {
+    elements,
+    dimensions: arrayType.dimensions,
+    elementType: arrayType.elementType,
+  }
   return { type: arrayType, rawValue: arr }
 }
 
@@ -673,16 +669,16 @@ export function createEmptyRecord(recordType: RecordType): PascalValue {
 // ============================================================================
 
 const TYPE_TABLE: Record<string, PascalType> = {
-  'INTEGER': INTEGER_TYPE,
-  'SMALLINT': SMALLINT_TYPE,
-  'LONGINT': LONGINT_TYPE,
-  'LONGWORD': LONGWORD_TYPE,
-  'BYTE': BYTE_TYPE,
-  'WORD': WORD_TYPE,
-  'REAL': REAL_TYPE,
-  'CHAR': CHAR_TYPE,
-  'BOOLEAN': BOOLEAN_TYPE,
-  'TEXT': new FileType('TEXT', CHAR_TYPE),
+  INTEGER: INTEGER_TYPE,
+  SMALLINT: SMALLINT_TYPE,
+  LONGINT: LONGINT_TYPE,
+  LONGWORD: LONGWORD_TYPE,
+  BYTE: BYTE_TYPE,
+  WORD: WORD_TYPE,
+  REAL: REAL_TYPE,
+  CHAR: CHAR_TYPE,
+  BOOLEAN: BOOLEAN_TYPE,
+  TEXT: new FileType('TEXT', CHAR_TYPE),
 }
 
 export function findType(name: string): PascalType | undefined {
@@ -770,8 +766,10 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
   }
 
   // 整数到子界类型 或 子界到整数
-  if ((value.type.kind === 'integer' && targetType.kind === 'subrange') ||
-      (value.type.kind === 'subrange' && targetType.kind === 'integer')) {
+  if (
+    (value.type.kind === 'integer' && targetType.kind === 'subrange') ||
+    (value.type.kind === 'subrange' && targetType.kind === 'integer')
+  ) {
     return { type: targetType, rawValue: value.rawValue }
   }
 
@@ -781,7 +779,10 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
   }
 
   // 字符到整数/子界（Pascal 中 ord(ch) 返回字符的 ASCII 码）
-  if (value.type.kind === 'char' && (targetType.kind === 'integer' || targetType.kind === 'subrange')) {
+  if (
+    value.type.kind === 'char' &&
+    (targetType.kind === 'integer' || targetType.kind === 'subrange')
+  ) {
     return { type: targetType, rawValue: getCharCode(value) }
   }
 
@@ -809,7 +810,9 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
 
 export function arrayIndex(array: PascalArray, indices: number[]): number {
   if (indices.length !== array.dimensions.length) {
-    throw new Error(`Array index dimension mismatch: expected ${array.dimensions.length}, got ${indices.length}`)
+    throw new Error(
+      `Array index dimension mismatch: expected ${array.dimensions.length}, got ${indices.length}`
+    )
   }
 
   let index = 0
@@ -831,7 +834,9 @@ export function arrayIndex(array: PascalArray, indices: number[]): number {
 export function arrayGetElement(arr: PascalArray, indices: number[]): PascalValue {
   const dims = arr.dimensions
   if (indices.length < dims.length) {
-    throw new Error(`Array index dimension mismatch: expected at least ${dims.length}, got ${indices.length}`)
+    throw new Error(
+      `Array index dimension mismatch: expected at least ${dims.length}, got ${indices.length}`
+    )
   }
   let flatIndex = 0
   for (let i = 0; i < dims.length; i++) {
@@ -858,7 +863,9 @@ export function arrayGetElement(arr: PascalArray, indices: number[]): PascalValu
 export function arraySetElement(arr: PascalArray, indices: number[], value: PascalValue): void {
   const dims = arr.dimensions
   if (indices.length < dims.length) {
-    throw new Error(`Array index dimension mismatch: expected at least ${dims.length}, got ${indices.length}`)
+    throw new Error(
+      `Array index dimension mismatch: expected at least ${dims.length}, got ${indices.length}`
+    )
   }
   let flatIndex = 0
   for (let i = 0; i < dims.length; i++) {

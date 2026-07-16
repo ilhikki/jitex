@@ -6,22 +6,26 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: '简单递归过程',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure CountDown(n: integer);
 begin
   if n > 0 then
     CountDown(n - 1)
 end;
-`, `
+`,
+      `
   CountDown(10)
-`),
+`
+    ),
     purpose: '测试最简单的直接递归过程：过程调用自身',
     features: ['procedure declaration', 'direct recursion', 'if statement', 'procedure call'],
     shouldParse: true,
   },
   {
     name: '带参数递归过程',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure SumTo(n: integer; var s: integer);
 begin
   if n = 0 then
@@ -31,16 +35,25 @@ begin
     s := s + n
   end
 end;
-`, `
+`,
+      `
   SumTo(5, total)
-`),
+`
+    ),
     purpose: '测试带多个参数的递归过程，包含值参数和 VAR 参数',
-    features: ['procedure declaration', 'direct recursion', 'value parameter', 'var parameter', 'compound statement'],
+    features: [
+      'procedure declaration',
+      'direct recursion',
+      'value parameter',
+      'var parameter',
+      'compound statement',
+    ],
     shouldParse: true,
   },
   {
     name: '带 var 参数递归过程',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure FactorialProc(n: integer; var result: integer);
 var
   temp: integer;
@@ -52,16 +65,25 @@ begin
     result := n * temp
   end
 end;
-`, `
+`,
+      `
   FactorialProc(5, f)
-`),
+`
+    ),
     purpose: '测试通过 VAR 参数返回结果的递归过程',
-    features: ['procedure declaration', 'direct recursion', 'var parameter', 'local variables', 'if-else'],
+    features: [
+      'procedure declaration',
+      'direct recursion',
+      'var parameter',
+      'local variables',
+      'if-else',
+    ],
     shouldParse: true,
   },
   {
     name: '递归过程 + 局部变量',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure RecurseWithLocal(n: integer);
 var
   x, y: integer;
@@ -72,16 +94,24 @@ begin
     RecurseWithLocal(n - 1);
   y := x + y
 end;
-`, `
+`,
+      `
   RecurseWithLocal(5)
-`),
+`
+    ),
     purpose: '测试递归过程中使用局部变量',
-    features: ['procedure declaration', 'direct recursion', 'local variables', 'variable declaration'],
+    features: [
+      'procedure declaration',
+      'direct recursion',
+      'local variables',
+      'variable declaration',
+    ],
     shouldParse: true,
   },
   {
     name: '递归过程 + label/goto',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure RecurseWithGoto(n: integer);
 label
   10, 20;
@@ -93,9 +123,11 @@ begin
     RecurseWithGoto(n - 1);
   20:
 end;
-`, `
+`,
+      `
   RecurseWithGoto(5)
-`),
+`
+    ),
     purpose: '测试递归过程中使用 label 和 goto 语句',
     features: ['procedure declaration', 'direct recursion', 'label declaration', 'goto statement'],
     shouldParse: true,
@@ -106,7 +138,8 @@ end;
   // ==========================================================================
   {
     name: '阶乘递归函数',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Factorial(n: integer): integer;
 begin
   if n <= 1 then
@@ -114,16 +147,25 @@ begin
   else
     Factorial := n * Factorial(n - 1)
 end;
-`, `
+`,
+      `
   f := Factorial(5)
-`),
+`
+    ),
     purpose: '测试经典的阶乘递归函数模式',
-    features: ['function declaration', 'direct recursion', 'if-else', 'return value assignment', 'arithmetic expression'],
+    features: [
+      'function declaration',
+      'direct recursion',
+      'if-else',
+      'return value assignment',
+      'arithmetic expression',
+    ],
     shouldParse: true,
   },
   {
     name: '斐波那契递归函数',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Fibonacci(n: integer): integer;
 begin
   if n <= 1 then
@@ -131,16 +173,25 @@ begin
   else
     Fibonacci := Fibonacci(n - 1) + Fibonacci(n - 2)
 end;
-`, `
+`,
+      `
   fib := Fibonacci(10)
-`),
+`
+    ),
     purpose: '测试斐波那契数列递归函数，包含多次自调用',
-    features: ['function declaration', 'direct recursion', 'multiple recursive calls', 'if-else', 'arithmetic expression'],
+    features: [
+      'function declaration',
+      'direct recursion',
+      'multiple recursive calls',
+      'if-else',
+      'arithmetic expression',
+    ],
     shouldParse: true,
   },
   {
     name: '递归函数 + 条件分支',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Ackermann(m, n: integer): integer;
 begin
   if m = 0 then
@@ -150,16 +201,25 @@ begin
   else
     Ackermann := Ackermann(m - 1, Ackermann(m, n - 1))
 end;
-`, `
+`,
+      `
   a := Ackermann(3, 3)
-`),
+`
+    ),
     purpose: '测试包含复杂条件分支的递归函数（Ackermann函数）',
-    features: ['function declaration', 'direct recursion', 'nested if-else', 'nested recursive calls', 'multiple parameters'],
+    features: [
+      'function declaration',
+      'direct recursion',
+      'nested if-else',
+      'nested recursive calls',
+      'multiple parameters',
+    ],
     shouldParse: true,
   },
   {
     name: '递归函数 + 局部变量',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function SumSquares(n: integer): integer;
 var
   temp: integer;
@@ -171,16 +231,25 @@ begin
     SumSquares := temp + n * n
   end
 end;
-`, `
+`,
+      `
   s := SumSquares(5)
-`),
+`
+    ),
     purpose: '测试递归函数中使用局部变量存储中间结果',
-    features: ['function declaration', 'direct recursion', 'local variables', 'compound statement', 'if-else'],
+    features: [
+      'function declaration',
+      'direct recursion',
+      'local variables',
+      'compound statement',
+      'if-else',
+    ],
     shouldParse: true,
   },
   {
     name: '递归函数作为表达式',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Power(base: integer; exp: integer): integer;
 begin
   if exp = 0 then
@@ -188,12 +257,19 @@ begin
   else
     Power := base * Power(base, exp - 1)
 end;
-`, `
+`,
+      `
   x := Power(2, 3) + Power(3, 2);
   y := Power(Power(2, 2), 2)
-`),
+`
+    ),
     purpose: '测试递归函数调用作为表达式的一部分，包括嵌套调用',
-    features: ['function declaration', 'direct recursion', 'function call in expression', 'nested calls'],
+    features: [
+      'function declaration',
+      'direct recursion',
+      'function call in expression',
+      'nested calls',
+    ],
     shouldParse: true,
   },
 
@@ -202,7 +278,8 @@ end;
   // ==========================================================================
   {
     name: '两个过程相互递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure A(n: integer); forward;
 procedure B(n: integer);
 begin
@@ -214,16 +291,24 @@ begin
   if n > 0 then
     B(n - 1)
 end;
-`, `
+`,
+      `
   A(10)
-`),
+`
+    ),
     purpose: '测试两个过程通过 forward 声明实现相互递归',
-    features: ['procedure declaration', 'mutual recursion', 'forward declaration', 'indirect recursion'],
+    features: [
+      'procedure declaration',
+      'mutual recursion',
+      'forward declaration',
+      'indirect recursion',
+    ],
     shouldParse: true,
   },
   {
     name: '两个函数相互递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function IsEven(n: integer): boolean; forward;
 function IsOdd(n: integer): boolean;
 begin
@@ -239,17 +324,26 @@ begin
   else
     IsEven := IsOdd(n - 1)
 end;
-`, `
+`,
+      `
   e := IsEven(5);
   o := IsOdd(5)
-`),
+`
+    ),
     purpose: '测试两个函数通过 forward 声明实现相互递归',
-    features: ['function declaration', 'mutual recursion', 'forward declaration', 'indirect recursion', 'boolean type'],
+    features: [
+      'function declaration',
+      'mutual recursion',
+      'forward declaration',
+      'indirect recursion',
+      'boolean type',
+    ],
     shouldParse: true,
   },
   {
     name: '三个过程链式递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure A(n: integer); forward;
 procedure B(n: integer); forward;
 procedure C(n: integer);
@@ -267,16 +361,25 @@ begin
   if n > 0 then
     B(n - 1)
 end;
-`, `
+`,
+      `
   A(9)
-`),
+`
+    ),
     purpose: '测试三个过程形成链式递归：A -> B -> C -> A',
-    features: ['procedure declaration', 'mutual recursion', 'forward declaration', 'chain recursion', 'three procedures'],
+    features: [
+      'procedure declaration',
+      'mutual recursion',
+      'forward declaration',
+      'chain recursion',
+      'three procedures',
+    ],
     shouldParse: true,
   },
   {
     name: '过程与函数混合递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure ProcA(n: integer; var r: integer); forward;
 function FuncB(n: integer): integer;
 begin
@@ -294,16 +397,25 @@ begin
   else
     r := 0
 end;
-`, `
+`,
+      `
   ProcA(5, x)
-`),
+`
+    ),
     purpose: '测试过程和函数混合的相互递归',
-    features: ['procedure declaration', 'function declaration', 'mutual recursion', 'forward declaration', 'mixed recursion'],
+    features: [
+      'procedure declaration',
+      'function declaration',
+      'mutual recursion',
+      'forward declaration',
+      'mixed recursion',
+    ],
     shouldParse: true,
   },
   {
     name: '深层相互递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure P1(n: integer); forward;
 procedure P2(n: integer); forward;
 procedure P3(n: integer); forward;
@@ -333,11 +445,19 @@ begin
   if n > 0 then
     P2(n - 1)
 end;
-`, `
+`,
+      `
   P1(10)
-`),
+`
+    ),
     purpose: '测试五个过程形成的深层相互递归链',
-    features: ['procedure declaration', 'mutual recursion', 'forward declaration', 'deep recursion chain', 'multiple procedures'],
+    features: [
+      'procedure declaration',
+      'mutual recursion',
+      'forward declaration',
+      'deep recursion chain',
+      'multiple procedures',
+    ],
     shouldParse: true,
   },
 
@@ -346,7 +466,8 @@ end;
   // ==========================================================================
   {
     name: '嵌套过程调用外层递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure Outer(n: integer);
   procedure Inner(k: integer);
   begin
@@ -357,16 +478,19 @@ begin
   if n > 0 then
     Inner(n - 1)
 end;
-`, `
+`,
+      `
   Outer(5)
-`),
+`
+    ),
     purpose: '测试嵌套过程调用外层过程形成的间接递归',
     features: ['nested procedure', 'indirect recursion', 'outer procedure', 'inner procedure'],
     shouldParse: true,
   },
   {
     name: '递归过程中定义嵌套过程',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure RecurseOuter(n: integer);
   procedure Helper(x: integer);
   begin
@@ -376,16 +500,24 @@ begin
   if n > 0 then
     RecurseOuter(n - 1)
 end;
-`, `
+`,
+      `
   RecurseOuter(5)
-`),
+`
+    ),
     purpose: '测试递归过程内部定义嵌套过程（非递归的辅助过程）',
-    features: ['nested procedure', 'direct recursion', 'helper procedure', 'procedure contains procedure'],
+    features: [
+      'nested procedure',
+      'direct recursion',
+      'helper procedure',
+      'procedure contains procedure',
+    ],
     shouldParse: true,
   },
   {
     name: '递归函数中定义嵌套函数',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function RecurseOuter(n: integer): integer;
   function Double(x: integer): integer;
   begin
@@ -397,16 +529,24 @@ begin
   else
     RecurseOuter := Double(n) + RecurseOuter(n - 1)
 end;
-`, `
+`,
+      `
   s := RecurseOuter(5)
-`),
+`
+    ),
     purpose: '测试递归函数内部定义嵌套辅助函数',
-    features: ['nested function', 'direct recursion', 'helper function', 'function contains function'],
+    features: [
+      'nested function',
+      'direct recursion',
+      'helper function',
+      'function contains function',
+    ],
     shouldParse: true,
   },
   {
     name: '嵌套过程自身递归',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure Outer;
   procedure InnerCount(n: integer);
   begin
@@ -416,11 +556,18 @@ procedure Outer;
 begin
   InnerCount(5)
 end;
-`, `
+`,
+      `
   Outer
-`),
+`
+    ),
     purpose: '测试嵌套在过程内部的过程自身递归（不依赖外层）',
-    features: ['nested procedure', 'direct recursion', 'inner recursion', 'nested recursive procedure'],
+    features: [
+      'nested procedure',
+      'direct recursion',
+      'inner recursion',
+      'nested recursive procedure',
+    ],
     shouldParse: true,
   },
 
@@ -429,7 +576,8 @@ end;
   // ==========================================================================
   {
     name: '递归 + CASE 语句',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Eval(n: integer): integer;
 begin
   case n of
@@ -438,16 +586,19 @@ begin
     otherwise Eval := Eval(n - 1) + Eval(n - 2)
   end
 end;
-`, `
+`,
+      `
   e := Eval(10)
-`),
+`
+    ),
     purpose: '测试递归函数中使用 CASE 语句进行分支控制',
     features: ['function declaration', 'direct recursion', 'case statement', 'branching'],
     shouldParse: true,
   },
   {
     name: '递归 + WHILE 循环',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure RecurseWhile(n: integer);
 var
   i: integer;
@@ -458,16 +609,25 @@ begin
     i := i + 1
   end
 end;
-`, `
+`,
+      `
   RecurseWhile(3)
-`),
+`
+    ),
     purpose: '测试递归过程中包含 WHILE 循环',
-    features: ['procedure declaration', 'direct recursion', 'while statement', 'loop', 'local variables'],
+    features: [
+      'procedure declaration',
+      'direct recursion',
+      'while statement',
+      'loop',
+      'local variables',
+    ],
     shouldParse: true,
   },
   {
     name: '递归 + FOR 循环',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function SumRec(n: integer): integer;
 var
   i, temp: integer;
@@ -477,16 +637,25 @@ begin
     temp := temp + SumRec(i - 1);
   SumRec := temp
 end;
-`, `
+`,
+      `
   s := SumRec(5)
-`),
+`
+    ),
     purpose: '测试递归函数中包含 FOR 循环',
-    features: ['function declaration', 'direct recursion', 'for statement', 'loop', 'local variables'],
+    features: [
+      'function declaration',
+      'direct recursion',
+      'for statement',
+      'loop',
+      'local variables',
+    ],
     shouldParse: true,
   },
   {
     name: '递归 + REPEAT 循环',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 procedure RecurseRepeat(n: integer);
 var
   i: integer;
@@ -498,16 +667,26 @@ begin
     i := i + 1
   until i >= n
 end;
-`, `
+`,
+      `
   RecurseRepeat(3)
-`),
+`
+    ),
     purpose: '测试递归过程中包含 REPEAT-UNTIL 循环',
-    features: ['procedure declaration', 'direct recursion', 'repeat statement', 'loop', 'local variables'],
+    features: [
+      'procedure declaration',
+      'direct recursion',
+      'repeat statement',
+      'loop',
+      'local variables',
+    ],
     shouldParse: true,
   },
   {
     name: '递归 + WITH 语句',
-    code: makeProgramWithVars('R: RECORD X: INTEGER; Y: INTEGER END', `
+    code: makeProgramWithVars(
+      'R: RECORD X: INTEGER; Y: INTEGER END',
+      `
 procedure RecurseWith(var r: RECORD X: INTEGER; Y: INTEGER END; n: integer);
 begin
   with r do begin
@@ -517,16 +696,25 @@ begin
       RecurseWith(r, n - 1)
   end
 end;
-`, `
+`,
+      `
   RecurseWith(R, 5)
-`),
+`
+    ),
     purpose: '测试递归过程中使用 WITH 语句访问记录字段',
-    features: ['procedure declaration', 'direct recursion', 'with statement', 'record type', 'var parameter'],
+    features: [
+      'procedure declaration',
+      'direct recursion',
+      'with statement',
+      'record type',
+      'var parameter',
+    ],
     shouldParse: true,
   },
   {
     name: '递归过程调用递归函数',
-    code: makeProgram(`
+    code: makeProgram(
+      `
 function Fac(n: integer): integer;
 begin
   if n <= 1 then
@@ -540,17 +728,26 @@ begin
     PrintFac(n - 1);
   WriteLn(Fac(n))
 end;
-`, `
+`,
+      `
   PrintFac(5)
-`),
+`
+    ),
     purpose: '测试递归过程调用递归函数，两种递归形式组合',
-    features: ['procedure declaration', 'function declaration', 'direct recursion', 'recursive procedure calls recursive function'],
+    features: [
+      'procedure declaration',
+      'function declaration',
+      'direct recursion',
+      'recursive procedure calls recursive function',
+    ],
     shouldParse: true,
   },
 ]
 
 describe('M3.5 Recursion Conformance', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runParseTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runParseTest(t)
+    })
   })
 })

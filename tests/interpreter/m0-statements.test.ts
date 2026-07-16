@@ -1,5 +1,11 @@
 import { parse } from '../../src/index'
-import { createInterpreterState, runToCompletion, run, stackTrace, State } from '../../src/interpreter'
+import {
+  createInterpreterState,
+  runToCompletion,
+  run,
+  stackTrace,
+  State,
+} from '../../src/interpreter'
 
 function makeState(source: string): State {
   const result = parse(source)
@@ -8,16 +14,24 @@ function makeState(source: string): State {
   state.io.console = {
     write() {},
     writeln() {},
-    read() { return '' },
-    readln() { return '' },
-    eof() { return true },
-    eoln() { return true },
+    read() {
+      return ''
+    },
+    readln() {
+      return ''
+    },
+    eof() {
+      return true
+    },
+    eoln() {
+      return true
+    },
   }
   return state
 }
 
 function stackKinds(state: State): string[] {
-  return state.stack.map(f => f.kind)
+  return state.stack.map((f) => f.kind)
 }
 
 // ============================================================================

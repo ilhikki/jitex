@@ -59,7 +59,7 @@ describe('Q04: Array, Record and WITH', () => {
         expectedError: true,
       },
     ]
-    tests.forEach(t => test(t.name, () => runInterpreterTest(t)))
+    tests.forEach((t) => test(t.name, () => runInterpreterTest(t)))
   })
 
   describe('Array Operations', () => {
@@ -107,7 +107,7 @@ describe('Q04: Array, Record and WITH', () => {
         expectedOutput: '99\n',
       },
     ]
-    tests.forEach(t => test(t.name, () => runInterpreterTest(t)))
+    tests.forEach((t) => test(t.name, () => runInterpreterTest(t)))
   })
 
   describe('Record Basics', () => {
@@ -155,7 +155,7 @@ describe('Q04: Array, Record and WITH', () => {
         expectedOutput: '10\n5\n',
       },
     ]
-    tests.forEach(t => test(t.name, () => runInterpreterTest(t)))
+    tests.forEach((t) => test(t.name, () => runInterpreterTest(t)))
   })
 
   describe('WITH Statement', () => {
@@ -203,7 +203,7 @@ describe('Q04: Array, Record and WITH', () => {
         expectedOutput: '10\n',
       },
     ]
-    tests.forEach(t => test(t.name, () => runInterpreterTest(t)))
+    tests.forEach((t) => test(t.name, () => runInterpreterTest(t)))
   })
 
   describe('Array and Record Combination', () => {
@@ -243,7 +243,7 @@ describe('Q04: Array, Record and WITH', () => {
         expectedOutput: '10\n20\n',
       },
     ]
-    tests.forEach(t => test(t.name, () => runInterpreterTest(t)))
+    tests.forEach((t) => test(t.name, () => runInterpreterTest(t)))
   })
 
   // Note: String Handling tests removed because 'string' type is not part of

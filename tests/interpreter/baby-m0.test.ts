@@ -1,5 +1,12 @@
 import { parse } from '../../src/index'
-import { createInterpreterState, run, runToCompletion, stackTrace, State, Scope } from '../../src/interpreter'
+import {
+  createInterpreterState,
+  run,
+  runToCompletion,
+  stackTrace,
+  State,
+  Scope,
+} from '../../src/interpreter'
 
 function makeState(source: string): State {
   const result = parse(source)
@@ -8,11 +15,11 @@ function makeState(source: string): State {
 }
 
 function stackKinds(state: State): string[] {
-  return state.stack.map(f => f.kind)
+  return state.stack.map((f) => f.kind)
 }
 
 function hasFrame(state: State, kind: string): boolean {
-  return state.stack.some(f => f.kind === kind)
+  return state.stack.some((f) => f.kind === kind)
 }
 
 // ============================================================================
@@ -32,23 +39,33 @@ describe('Baby M0: call/return', () => {
   })
 
   test('step 2: ProgramFrame pushes CompoundFrame', () => {
-    run(state); run(state)
+    run(state)
+    run(state)
     expect(hasFrame(state, 'Program')).toBe(true)
     expect(hasFrame(state, 'Compound')).toBe(true)
   })
 
   test('step 3: Compound pushes ProcedureCall', () => {
-    run(state); run(state); run(state)
+    run(state)
+    run(state)
+    run(state)
     expect(hasFrame(state, 'ProcedureCall')).toBe(true)
   })
 
   test('step 4: ProcedureCall pushes FunctionFrame', () => {
-    run(state); run(state); run(state); run(state)
+    run(state)
+    run(state)
+    run(state)
+    run(state)
     expect(hasFrame(state, 'Function')).toBe(true)
   })
 
   test('step 5: FunctionFrame creates scope, pushes body Compound', () => {
-    run(state); run(state); run(state); run(state); run(state)
+    run(state)
+    run(state)
+    run(state)
+    run(state)
+    run(state)
     expect(hasFrame(state, 'Function')).toBe(true)
     // Scope changed
     expect(state.currentScope).not.toBe(state.globalScope)
@@ -62,12 +79,17 @@ describe('Baby M0: call/return', () => {
   })
 
   test('stack trace shows FOO during execution', () => {
-    run(state); run(state); run(state); run(state); run(state)
+    run(state)
+    run(state)
+    run(state)
+    run(state)
+    run(state)
     expect(stackTrace(state)).toContain('FOO')
   })
 
   test('stack trace empty when no function active', () => {
-    run(state); run(state)
+    run(state)
+    run(state)
     expect(stackTrace(state)).toEqual([])
   })
 })

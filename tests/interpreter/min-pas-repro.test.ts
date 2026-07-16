@@ -41,16 +41,20 @@ end.`
 
     const fileOps = createRecordFileOps(files)
     let output = ''
-    const io = { 
-      file: fileOps, 
-      console: { 
-        write: (text: string) => { output += text }, 
-        writeln: () => { output += '\n' }, 
-        read: () => '', 
-        readln: () => '', 
-        eof: () => true, 
-        eoln: () => true 
-      } 
+    const io = {
+      file: fileOps,
+      console: {
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
     }
     const state = createState(parseResult.astNode, io)
     populateSystemProcedures(state, true)
@@ -89,16 +93,28 @@ end.`
     }
 
     let output = ''
-    const io = { 
-      file: { read: () => '', write: () => {}, readln: () => {}, writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {} }, 
-      console: { 
-        write: (text: string) => { output += text }, 
-        writeln: () => { output += '\n' }, 
-        read: () => '', 
-        readln: () => '', 
-        eof: () => true, 
-        eoln: () => true 
-      } 
+    const io = {
+      file: {
+        read: () => '',
+        write: () => {},
+        readln: () => {},
+        writeln: () => {},
+        reset: () => {},
+        rewrite: () => {},
+        close: () => {},
+      },
+      console: {
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
     }
     const state = createState(parseResult.astNode, io as any)
     populateSystemProcedures(state, true)
@@ -127,16 +143,28 @@ end.`
     }
 
     let output = ''
-    const io = { 
-      file: { read: () => '', write: () => {}, readln: () => {}, writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {} }, 
-      console: { 
-        write: (text: string) => { output += text }, 
-        writeln: () => { output += '\n' }, 
-        read: () => '', 
-        readln: () => '', 
-        eof: () => true, 
-        eoln: () => true 
-      } 
+    const io = {
+      file: {
+        read: () => '',
+        write: () => {},
+        readln: () => {},
+        writeln: () => {},
+        reset: () => {},
+        rewrite: () => {},
+        close: () => {},
+      },
+      console: {
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
     }
     const state = createState(parseResult.astNode, io as any)
     populateSystemProcedures(state, true)
@@ -162,9 +190,28 @@ end.`
     const parseResult = parse(pasCode)
     if (!parseResult.success) throw new Error(`Parse failed: ${parseResult.error}`)
     let output = ''
-    const io = { 
-      file: { read: () => '', write: () => {}, readln: () => {}, writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {} }, 
-      console: { write: (text: string) => { output += text }, writeln: () => { output += '\n' }, read: () => '', readln: () => '', eof: () => true, eoln: () => true } 
+    const io = {
+      file: {
+        read: () => '',
+        write: () => {},
+        readln: () => {},
+        writeln: () => {},
+        reset: () => {},
+        rewrite: () => {},
+        close: () => {},
+      },
+      console: {
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
     }
     const state = createState(parseResult.astNode, io as any)
     populateSystemProcedures(state, true)
@@ -190,9 +237,28 @@ end.`
     const parseResult = parse(pasCode)
     if (!parseResult.success) throw new Error(`Parse failed: ${parseResult.error}`)
     let output = ''
-    const io = { 
-      file: { read: () => '', write: () => {}, readln: () => {}, writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {} }, 
-      console: { write: (text: string) => { output += text }, writeln: () => { output += '\n' }, read: () => '', readln: () => '', eof: () => true, eoln: () => true } 
+    const io = {
+      file: {
+        read: () => '',
+        write: () => {},
+        readln: () => {},
+        writeln: () => {},
+        reset: () => {},
+        rewrite: () => {},
+        close: () => {},
+      },
+      console: {
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
     }
     const state = createState(parseResult.astNode, io as any)
     populateSystemProcedures(state, true)
@@ -218,9 +284,28 @@ end.`
     const parseResult = parse(pasCode)
     if (!parseResult.success) throw new Error(`Parse failed: ${parseResult.error}`)
     let output = ''
-    const io = { 
-      file: { read: () => '', write: () => {}, readln: () => {}, writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {} }, 
-      console: { write: (text: string) => { output += text }, writeln: () => { output += '\n' }, read: () => '', readln: () => '', eof: () => true, eoln: () => true } 
+    const io = {
+      file: {
+        read: () => '',
+        write: () => {},
+        readln: () => {},
+        writeln: () => {},
+        reset: () => {},
+        rewrite: () => {},
+        close: () => {},
+      },
+      console: {
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
     }
     const state = createState(parseResult.astNode, io as any)
     populateSystemProcedures(state, true)
@@ -268,16 +353,28 @@ end.`
     }
 
     let output = ''
-    const io = { 
-      file: { read: () => '', write: () => {}, readln: () => {}, writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {} }, 
-      console: { 
-        write: (text: string) => { output += text }, 
-        writeln: () => { output += '\n' }, 
-        read: () => '', 
-        readln: () => '', 
-        eof: () => true, 
-        eoln: () => true 
-      } 
+    const io = {
+      file: {
+        read: () => '',
+        write: () => {},
+        readln: () => {},
+        writeln: () => {},
+        reset: () => {},
+        rewrite: () => {},
+        close: () => {},
+      },
+      console: {
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
+        read: () => '',
+        readln: () => '',
+        eof: () => true,
+        eoln: () => true,
+      },
     }
     const state = createState(parseResult.astNode, io as any)
     populateSystemProcedures(state, true)

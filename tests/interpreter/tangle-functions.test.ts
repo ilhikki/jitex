@@ -13,10 +13,22 @@ function runPas(pasCode: string): { output: string; state: any } {
   }
   let output = ''
   const io = {
-    file: { read: () => '', write: () => {}, readln: () => {}, writeln: () => {}, reset: () => {}, rewrite: () => {}, close: () => {} },
+    file: {
+      read: () => '',
+      write: () => {},
+      readln: () => {},
+      writeln: () => {},
+      reset: () => {},
+      rewrite: () => {},
+      close: () => {},
+    },
     console: {
-      write: (text: string) => { output += text },
-      writeln: () => { output += '\n' },
+      write: (text: string) => {
+        output += text
+      },
+      writeln: () => {
+        output += '\n'
+      },
       read: () => '',
       readln: () => '',
       eof: () => true,

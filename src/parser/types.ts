@@ -1,10 +1,28 @@
 import {
-  ParserInput, ParseResult, TypeNode, SimpleTypeNode, RangeTypeNode,
-  ArrayTypeNode, RecordTypeNode, FileTypeNode, SetTypeNode,
-  EnumerationTypeNode, VariableDeclarationNode, IdentifierNode,
+  ParserInput,
+  ParseResult,
+  TypeNode,
+  SimpleTypeNode,
+  RangeTypeNode,
+  ArrayTypeNode,
+  RecordTypeNode,
+  FileTypeNode,
+  SetTypeNode,
+  EnumerationTypeNode,
+  VariableDeclarationNode,
+  IdentifierNode,
   ExpressionNode,
 } from '../ast/types'
-import { peek, ok, fail, matchKeyword, matchType, expectKeyword, expectType, parseList } from './helpers'
+import {
+  peek,
+  ok,
+  fail,
+  matchKeyword,
+  matchType,
+  expectKeyword,
+  expectType,
+  parseList,
+} from './helpers'
 import { parseIdentifier, parseExpression } from './expressions'
 
 // ============================================================================
@@ -119,11 +137,7 @@ function parseArrayType(input: ParserInput, isPacked: boolean = false): ParseRes
   if (!openResult.success) return fail(openResult.error, openResult.position)
   pos = openResult.newPosition
 
-  const indexResult = parseList(
-    { tokens: input.tokens, position: pos },
-    parseType,
-    'COMMA'
-  )
+  const indexResult = parseList({ tokens: input.tokens, position: pos }, parseType, 'COMMA')
   if (!indexResult.success) return fail(indexResult.error, indexResult.position)
   pos = indexResult.newPosition
 
@@ -213,11 +227,7 @@ function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNo
   if (!openResult.success) return fail(openResult.error, openResult.position)
   let pos = openResult.newPosition
 
-  const valuesResult = parseList(
-    { tokens: input.tokens, position: pos },
-    parseIdentifier,
-    'COMMA'
-  )
+  const valuesResult = parseList({ tokens: input.tokens, position: pos }, parseIdentifier, 'COMMA')
   if (!valuesResult.success) return fail(valuesResult.error, valuesResult.position)
   pos = valuesResult.newPosition
 

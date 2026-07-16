@@ -6,60 +6,42 @@ const tests: ConformanceTest[] = [
   // =========================================================================
   {
     name: 'multiply has higher precedence than add',
-    code: makeProgramWithVars(
-      'a, b, c: integer;',
-      'begin\n  a := 2 + 3 * 4;\nend.'
-    ),
+    code: makeProgramWithVars('a, b, c: integer;', 'begin\n  a := 2 + 3 * 4;\nend.'),
     purpose: '验证 * 优先级高于 +，表达式 2 + 3 * 4 应解析为 2 + (3 * 4)',
     features: ['*', '+', 'assignment', 'integer literal'],
     shouldParse: true,
   },
   {
     name: 'divide has higher precedence than subtract',
-    code: makeProgramWithVars(
-      'a, b, c: real;',
-      'begin\n  a := 10.0 - 6.0 / 2.0;\nend.'
-    ),
+    code: makeProgramWithVars('a, b, c: real;', 'begin\n  a := 10.0 - 6.0 / 2.0;\nend.'),
     purpose: '验证 / 优先级高于 -，表达式 10 - 6 / 2 应解析为 10 - (6 / 2)',
     features: ['/', '-', 'assignment', 'real literal'],
     shouldParse: true,
   },
   {
     name: 'DIV has higher precedence than add',
-    code: makeProgramWithVars(
-      'a, b, c: integer;',
-      'begin\n  a := 5 + 10 DIV 3;\nend.'
-    ),
+    code: makeProgramWithVars('a, b, c: integer;', 'begin\n  a := 5 + 10 DIV 3;\nend.'),
     purpose: '验证 DIV 优先级高于 +，表达式 5 + 10 DIV 3 应解析为 5 + (10 DIV 3)',
     features: ['DIV', '+', 'assignment', 'integer literal'],
     shouldParse: true,
   },
   {
     name: 'MOD has higher precedence than subtract',
-    code: makeProgramWithVars(
-      'a, b, c: integer;',
-      'begin\n  a := 20 - 7 MOD 3;\nend.'
-    ),
+    code: makeProgramWithVars('a, b, c: integer;', 'begin\n  a := 20 - 7 MOD 3;\nend.'),
     purpose: '验证 MOD 优先级高于 -，表达式 20 - 7 MOD 3 应解析为 20 - (7 MOD 3)',
     features: ['MOD', '-', 'assignment', 'integer literal'],
     shouldParse: true,
   },
   {
     name: 'unary minus has higher precedence than multiply',
-    code: makeProgramWithVars(
-      'a, b: integer;',
-      'begin\n  a := -b * 5;\nend.'
-    ),
+    code: makeProgramWithVars('a, b: integer;', 'begin\n  a := -b * 5;\nend.'),
     purpose: '验证一元负号优先级高于 *，表达式 -b * 5 应解析为 (-b) * 5',
     features: ['unary -', '*', 'assignment'],
     shouldParse: true,
   },
   {
     name: 'parentheses change precedence',
-    code: makeProgramWithVars(
-      'a, b, c: integer;',
-      'begin\n  a := (2 + 3) * 4;\nend.'
-    ),
+    code: makeProgramWithVars('a, b, c: integer;', 'begin\n  a := (2 + 3) * 4;\nend.'),
     purpose: '验证括号可以改变优先级，(2 + 3) * 4 先算加法再算乘法',
     features: ['parentheses', '*', '+', 'assignment'],
     shouldParse: true,
@@ -76,10 +58,7 @@ const tests: ConformanceTest[] = [
   },
   {
     name: 'left associativity of same precedence operators',
-    code: makeProgramWithVars(
-      'a, b, c, d: integer;',
-      'begin\n  a := 10 - 3 - 2;\nend.'
-    ),
+    code: makeProgramWithVars('a, b, c, d: integer;', 'begin\n  a := 10 - 3 - 2;\nend.'),
     purpose: '验证同级运算符左结合，10 - 3 - 2 应解析为 (10 - 3) - 2',
     features: ['left associativity', '-', 'assignment'],
     shouldParse: true,
@@ -90,20 +69,14 @@ const tests: ConformanceTest[] = [
   // =========================================================================
   {
     name: 'equal operator in expression',
-    code: makeProgramWithVars(
-      'a, b: integer;\n  flag: boolean;',
-      'begin\n  flag := a = b;\nend.'
-    ),
+    code: makeProgramWithVars('a, b: integer;\n  flag: boolean;', 'begin\n  flag := a = b;\nend.'),
     purpose: '验证 = 关系运算符优先级低于算术运算符，a = b 作为布尔表达式',
     features: ['=', 'relation operator', 'boolean expression', 'assignment'],
     shouldParse: true,
   },
   {
     name: 'not equal operator in expression',
-    code: makeProgramWithVars(
-      'a, b: integer;\n  flag: boolean;',
-      'begin\n  flag := a <> b;\nend.'
-    ),
+    code: makeProgramWithVars('a, b: integer;\n  flag: boolean;', 'begin\n  flag := a <> b;\nend.'),
     purpose: '验证 <> 关系运算符在表达式中的解析',
     features: ['<>', 'relation operator', 'boolean expression', 'assignment'],
     shouldParse: true,
@@ -154,10 +127,7 @@ const tests: ConformanceTest[] = [
   // =========================================================================
   {
     name: 'NOT has highest precedence among logical operators',
-    code: makeProgramWithVars(
-      'a, b: boolean;\n  c: boolean;',
-      'begin\n  c := NOT a AND b;\nend.'
-    ),
+    code: makeProgramWithVars('a, b: boolean;\n  c: boolean;', 'begin\n  c := NOT a AND b;\nend.'),
     purpose: '验证 NOT 优先级高于 AND，NOT a AND b 应解析为 (NOT a) AND b',
     features: ['NOT', 'AND', 'logical operator', 'precedence'],
     shouldParse: true,
@@ -230,7 +200,7 @@ const tests: ConformanceTest[] = [
     name: 'IN operator with AND precedence',
     code: makeProgramWithVars(
       'n: integer;\n  flag: boolean;',
-      "begin\n  flag := n IN [1..10] AND n > 5;\nend."
+      'begin\n  flag := n IN [1..10] AND n > 5;\nend.'
     ),
     purpose: '验证 IN 优先级高于 AND，n IN [1..10] AND n > 5 中 IN 先于 AND',
     features: ['IN', 'AND', 'set constructor', 'precedence'],
@@ -240,7 +210,7 @@ const tests: ConformanceTest[] = [
     name: 'IN operator with arithmetic',
     code: makeProgramWithVars(
       'n, m: integer;\n  flag: boolean;',
-      "begin\n  flag := n + m IN [1..20];\nend."
+      'begin\n  flag := n + m IN [1..20];\nend.'
     ),
     purpose: '验证算术运算优先级高于 IN，n + m IN [1..20] 应解析为 (n + m) IN [1..20]',
     features: ['IN', '+', 'arithmetic', 'set constructor', 'precedence'],
@@ -385,10 +355,7 @@ const tests: ConformanceTest[] = [
   // =========================================================================
   {
     name: 'simple assignment',
-    code: makeProgramWithVars(
-      'a, b: integer;',
-      'begin\n  a := b;\nend.'
-    ),
+    code: makeProgramWithVars('a, b: integer;', 'begin\n  a := b;\nend.'),
     purpose: '验证简单赋值语句的解析',
     features: [':=', 'assignment', 'simple expression'],
     shouldParse: true,
@@ -487,7 +454,7 @@ const tests: ConformanceTest[] = [
 ]
 
 describe('M3.5 Operator Precedence Conformance', () => {
-  tests.forEach(t => {
+  tests.forEach((t) => {
     test(t.name, () => {
       runParseTest(t)
     })

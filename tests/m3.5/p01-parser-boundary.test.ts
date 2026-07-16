@@ -59,8 +59,10 @@ const tests: ConformanceTest[] = [
   },
   {
     name: '注释在语句之间',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  { comment before } x := 1;\n  { comment after }\nend.'),
+    code: makeProgramWithVars(
+      'x: integer;',
+      'begin\n  { comment before } x := 1;\n  { comment after }\nend.'
+    ),
     purpose: '验证注释出现在语句之间的情况',
     features: ['comment', 'statement-separator'],
     shouldParse: true,
@@ -92,16 +94,17 @@ const tests: ConformanceTest[] = [
   },
   {
     name: '长标识符',
-    code: makeProgramWithVars('thisIsAVeryLongVariableName: integer;',
-      'begin\n  thisIsAVeryLongVariableName := 1;\nend.'),
+    code: makeProgramWithVars(
+      'thisIsAVeryLongVariableName: integer;',
+      'begin\n  thisIsAVeryLongVariableName := 1;\nend.'
+    ),
     purpose: '验证较长的标识符能正确解析',
     features: ['identifier', 'long-identifier'],
     shouldParse: true,
   },
   {
     name: '大小写混合标识符',
-    code: makeProgramWithVars('MyVar: integer;',
-      'begin\n  myvar := 1;\n  MYVAR := 2;\nend.'),
+    code: makeProgramWithVars('MyVar: integer;', 'begin\n  myvar := 1;\n  MYVAR := 2;\nend.'),
     purpose: '验证 Pascal 标识符大小写不敏感',
     features: ['identifier', 'case-insensitive'],
     shouldParse: true,
@@ -115,8 +118,7 @@ const tests: ConformanceTest[] = [
   },
   {
     name: '数字结尾的标识符',
-    code: makeProgramWithVars('var123: integer;',
-      'begin\n  var123 := 1;\nend.'),
+    code: makeProgramWithVars('var123: integer;', 'begin\n  var123 := 1;\nend.'),
     purpose: '验证标识符可以以数字结尾',
     features: ['identifier', 'digit-suffix'],
     shouldParse: true,
@@ -134,40 +136,35 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: '零值整数',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  x := 0;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  x := 0;\nend.'),
     purpose: '验证零值整数常量',
     features: ['integer-literal', 'zero'],
     shouldParse: true,
   },
   {
     name: '大整数',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  x := 999999;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  x := 999999;\nend.'),
     purpose: '验证较大的整数值能解析',
     features: ['integer-literal', 'large-number'],
     shouldParse: true,
   },
   {
     name: '负数常量',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  x := -123;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  x := -123;\nend.'),
     purpose: '验证负整数表达式',
     features: ['integer-literal', 'negative-number', 'unary-minus'],
     shouldParse: true,
   },
   {
     name: '十六进制整数',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  x := $1A2B;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  x := $1A2B;\nend.'),
     purpose: '验证 $ 前缀的十六进制数',
     features: ['integer-literal', 'hex-number', 'dollar-prefix'],
     shouldParse: true,
   },
   {
     name: '前导零整数',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  x := 00123;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  x := 00123;\nend.'),
     purpose: '验证带前导零的整数（Pascal 中合法）',
     features: ['integer-literal', 'leading-zero'],
     shouldParse: true,
@@ -178,40 +175,38 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: '空字符串',
-    code: makeProgramWithVars('s: string;',
-      "begin\n  s := '';\nend."),
+    code: makeProgramWithVars('s: string;', "begin\n  s := '';\nend."),
     purpose: '验证空字符串字面量',
     features: ['string-literal', 'empty-string'],
     shouldParse: true,
   },
   {
     name: '单字符字符串',
-    code: makeProgramWithVars('s: string;',
-      "begin\n  s := 'a';\nend."),
+    code: makeProgramWithVars('s: string;', "begin\n  s := 'a';\nend."),
     purpose: '验证单字符字符串',
     features: ['string-literal', 'single-char'],
     shouldParse: true,
   },
   {
     name: '转义引号（双写单引号）',
-    code: makeProgramWithVars('s: string;',
-      "begin\n  s := 'it''s';\nend."),
+    code: makeProgramWithVars('s: string;', "begin\n  s := 'it''s';\nend."),
     purpose: '验证 Pascal 中通过双写单引号转义引号',
     features: ['string-literal', 'escaped-quote'],
     shouldParse: true,
   },
   {
     name: '长字符串',
-    code: makeProgramWithVars('s: string;',
-      "begin\n  s := 'abcdefghijklmnopqrstuvwxyz0123456789';\nend."),
+    code: makeProgramWithVars(
+      's: string;',
+      "begin\n  s := 'abcdefghijklmnopqrstuvwxyz0123456789';\nend."
+    ),
     purpose: '验证较长的字符串字面量',
     features: ['string-literal', 'long-string'],
     shouldParse: true,
   },
   {
     name: '字符串含特殊字符',
-    code: makeProgramWithVars('s: string;',
-      "begin\n  s := '!@#$%^&*()_+-=[]{}|;:,.<>?';\nend."),
+    code: makeProgramWithVars('s: string;', "begin\n  s := '!@#$%^&*()_+-=[]{}|;:,.<>?';\nend."),
     purpose: '验证字符串中可以包含各种特殊字符',
     features: ['string-literal', 'special-characters'],
     shouldParse: true,
@@ -222,32 +217,37 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: '只有 OTHERWISE 的 CASE',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  case x of\n    otherwise\n      x := 0;\n  end;\nend.'),
+    code: makeProgramWithVars(
+      'x: integer;',
+      'begin\n  case x of\n    otherwise\n      x := 0;\n  end;\nend.'
+    ),
     purpose: '验证 CASE 语句可以只有 OTHERWISE 分支',
     features: ['case-statement', 'otherwise', 'empty-branches'],
     shouldParse: true,
   },
   {
     name: '空 CASE 语句',
-    code: makeProgramWithVars('x: integer;',
-      'begin\n  case x of\n  end;\nend.'),
+    code: makeProgramWithVars('x: integer;', 'begin\n  case x of\n  end;\nend.'),
     purpose: '验证没有任何分支的空 CASE 语句',
     features: ['case-statement', 'empty-case'],
     shouldParse: true,
   },
   {
     name: '多值 CASE label',
-    code: makeProgramWithVars('x, y: integer;',
-      'begin\n  case x of\n    1, 2, 3: y := 10;\n    4, 5: y := 20;\n  end;\nend.'),
+    code: makeProgramWithVars(
+      'x, y: integer;',
+      'begin\n  case x of\n    1, 2, 3: y := 10;\n    4, 5: y := 20;\n  end;\nend.'
+    ),
     purpose: '验证 CASE 分支可以有多个 label 值',
     features: ['case-statement', 'multi-value-label'],
     shouldParse: true,
   },
   {
     name: '嵌套 CASE 语句',
-    code: makeProgramWithVars('x, y, z: integer;',
-      'begin\n  case x of\n    1:\n      case y of\n        1: z := 10;\n        2: z := 20;\n      end;\n    2: z := 30;\n  end;\nend.'),
+    code: makeProgramWithVars(
+      'x, y, z: integer;',
+      'begin\n  case x of\n    1:\n      case y of\n        1: z := 10;\n        2: z := 20;\n      end;\n    2: z := 30;\n  end;\nend.'
+    ),
     purpose: '验证 CASE 语句可以嵌套',
     features: ['case-statement', 'nested-case'],
     shouldParse: true,
@@ -261,8 +261,10 @@ const tests: ConformanceTest[] = [
   },
   {
     name: 'CASE label 为表达式',
-    code: makeProgramWithVars('x, y: integer;',
-      'begin\n  case x of\n    1 + 1: y := 10;\n    3 * 2: y := 20;\n  end;\nend.'),
+    code: makeProgramWithVars(
+      'x, y: integer;',
+      'begin\n  case x of\n    1 + 1: y := 10;\n    3 * 2: y := 20;\n  end;\nend.'
+    ),
     purpose: '验证 CASE label 可以是表达式',
     features: ['case-statement', 'expression-label'],
     shouldParse: true,
@@ -384,7 +386,9 @@ const tests: ConformanceTest[] = [
 ]
 
 describe('M3.5 Parser Boundary Conformance', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runParseTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runParseTest(t)
+    })
   })
 })

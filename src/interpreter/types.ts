@@ -70,7 +70,10 @@ export function createScope(
 }
 
 /** 查找 var 参数绑定（沿 scope 链向上查找） */
-export function findVarRef(name: string, scope: Scope | null): { scope: Scope; name: string } | null {
+export function findVarRef(
+  name: string,
+  scope: Scope | null
+): { scope: Scope; name: string } | null {
   let s: Scope | null = scope
   while (s) {
     if (s.varBindings && s.varBindings.has(name)) {
@@ -194,7 +197,7 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
     case 'ArrayType': {
       const arr = typeNode as ArrayTypeNode
       const elementType = resolveType(arr.elementType, state)
-      const dimensions = arr.indexTypes.map(idx => arrayDimension(idx, state))
+      const dimensions = arr.indexTypes.map((idx) => arrayDimension(idx, state))
       return new ArrayType(`ARRAY`, elementType, dimensions)
     }
 
@@ -264,7 +267,7 @@ export function evaluateConstExpr(expr: ExpressionNode, state: State): number {
       const value = state.globalScope.variables.get(name)
       if (value) {
         const raw = value.rawValue
-        return typeof raw === 'bigint' ? Number(raw) : raw as number
+        return typeof raw === 'bigint' ? Number(raw) : (raw as number)
       }
       throw new Error(`Unknown constant: ${name}`)
     }
@@ -274,13 +277,20 @@ export function evaluateConstExpr(expr: ExpressionNode, state: State): number {
       const left = evaluateConstExpr(bin.left, state)
       const right = evaluateConstExpr(bin.right, state)
       switch (bin.operator.toUpperCase()) {
-        case '+': return left + right
-        case '-': return left - right
-        case '*': return left * right
-        case 'DIV': return Math.trunc(left / right)
-        case '/': return Math.trunc(left / right)
-        case 'MOD': return left - Math.trunc(left / right) * right
-        default: throw new Error(`Unsupported constant operator: ${bin.operator}`)
+        case '+':
+          return left + right
+        case '-':
+          return left - right
+        case '*':
+          return left * right
+        case 'DIV':
+          return Math.trunc(left / right)
+        case '/':
+          return Math.trunc(left / right)
+        case 'MOD':
+          return left - Math.trunc(left / right) * right
+        default:
+          throw new Error(`Unsupported constant operator: ${bin.operator}`)
       }
     }
 
@@ -288,9 +298,12 @@ export function evaluateConstExpr(expr: ExpressionNode, state: State): number {
       const unary = expr as UnaryExpressionNode
       const val = evaluateConstExpr(unary.operand, state)
       switch (unary.operator.toUpperCase()) {
-        case '+': return val
-        case '-': return -val
-        default: throw new Error(`Unsupported constant unary operator: ${unary.operator}`)
+        case '+':
+          return val
+        case '-':
+          return -val
+        default:
+          throw new Error(`Unsupported constant unary operator: ${unary.operator}`)
       }
     }
 
@@ -322,19 +335,19 @@ export function createDeclarations(block: BlockNode, parentScope: Scope): Declar
   const labels = new Map<number, StatementNode>()
 
   // Collect block-level declarations
-  block.procedureDeclarations.forEach(p => {
+  block.procedureDeclarations.forEach((p) => {
     if (!p.isForward) procedures.set(p.name.name.toUpperCase(), p)
   })
-  block.functionDeclarations.forEach(f => {
+  block.functionDeclarations.forEach((f) => {
     if (!f.isForward) functions.set(f.name.name.toUpperCase(), f)
   })
-  block.variableDeclarations.forEach(v => {
-    v.names.forEach(n => variables.set(n.name.toUpperCase(), v))
+  block.variableDeclarations.forEach((v) => {
+    v.names.forEach((n) => variables.set(n.name.toUpperCase(), v))
   })
-  block.constDeclarations.forEach(c => {
+  block.constDeclarations.forEach((c) => {
     constants.set(c.name.name.toUpperCase(), c)
   })
-  block.typeDeclarations.forEach(t => {
+  block.typeDeclarations.forEach((t) => {
     types.set(t.name.name.toUpperCase(), t)
   })
 
@@ -489,9 +502,9 @@ export function createState(program: ProgramNode, io?: PascalIO): State {
   })
 
   // 初始化变量
-  program.block.variableDeclarations.forEach(v => {
+  program.block.variableDeclarations.forEach((v) => {
     const varType = resolveType(v.type, state)
-    v.names.forEach(n => {
+    v.names.forEach((n) => {
       globalScope.variables.set(n.name.toUpperCase(), makeDefaultValue(varType))
       globalScope.variableTypes.set(n.name.toUpperCase(), varType)
     })

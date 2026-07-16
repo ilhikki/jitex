@@ -70,9 +70,11 @@ export function evalExpr(expr: ExpressionNode, scope: Scope, state: State): Pasc
       const str = (expr as StringLiteralNode).value
       const chars: number[] = []
       for (let i = 0; i < str.length; i++) {
-        chars.push(str.charCodeAt(i) & 0xFF)
+        chars.push(str.charCodeAt(i) & 0xff)
       }
-      const arrayType = new ArrayType(`array[1..${str.length}] of char`, CHAR_TYPE, [{ low: 1, high: str.length }])
+      const arrayType = new ArrayType(`array[1..${str.length}] of char`, CHAR_TYPE, [
+        { low: 1, high: str.length },
+      ])
       return { type: arrayType, rawValue: chars }
     }
 
@@ -108,10 +110,14 @@ export function evalExpr(expr: ExpressionNode, scope: Scope, state: State): Pasc
       const left = evalExpr(bin.left, scope, state)
       const right = evalExpr(bin.right, scope, state)
       if (!left) {
-        throw new Error(`Left operand of ${bin.operator} evaluated to undefined: ${JSON.stringify(bin.left)}`)
+        throw new Error(
+          `Left operand of ${bin.operator} evaluated to undefined: ${JSON.stringify(bin.left)}`
+        )
       }
       if (!right) {
-        throw new Error(`Right operand of ${bin.operator} evaluated to undefined: ${JSON.stringify(bin.right)}`)
+        throw new Error(
+          `Right operand of ${bin.operator} evaluated to undefined: ${JSON.stringify(bin.right)}`
+        )
       }
       return binaryOp(bin.operator, left, right)
     }
@@ -183,7 +189,7 @@ function evalArrayRead(access: ArrayAccessNode, scope: Scope, state: State): Pas
   }
 
   const arr = arrValue.rawValue as PascalArray
-  const indices = access.indices.map(idx => getNum(evalExpr(idx, scope, state)))
+  const indices = access.indices.map((idx) => getNum(evalExpr(idx, scope, state)))
   return arrayGetElement(arr, indices)
 }
 
@@ -578,7 +584,9 @@ export function inferExprType(expr: ExpressionNode, scope: Scope, state: State):
       const access = expr as FieldAccessNode
       const objType = inferExprType(access.object, scope, state)
       if (objType.kind === 'record') {
-        return (objType as RecordType).fieldTypes.get(access.field.name.toUpperCase()) || INTEGER_TYPE
+        return (
+          (objType as RecordType).fieldTypes.get(access.field.name.toUpperCase()) || INTEGER_TYPE
+        )
       }
       return INTEGER_TYPE
     }
@@ -598,7 +606,7 @@ export function formatValue(value: PascalValue): string {
     case 'array': {
       const arrType = value.type as ArrayType
       if (arrType.elementType.kind === 'char') {
-        return (value.rawValue as number[]).map(c => String.fromCharCode(c)).join('')
+        return (value.rawValue as number[]).map((c) => String.fromCharCode(c)).join('')
       }
       return String(value.rawValue)
     }

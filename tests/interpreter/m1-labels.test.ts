@@ -1,5 +1,11 @@
 import { parse } from '../../src'
-import { createInterpreterState, runToCompletion, run, State, PascalValue } from '../../src/interpreter'
+import {
+  createInterpreterState,
+  runToCompletion,
+  run,
+  State,
+  PascalValue,
+} from '../../src/interpreter'
 
 function makeState(source: string): State {
   const result = parse(source)
@@ -15,7 +21,8 @@ function getVar(state: State, name: string): any {
       const value: PascalValue = s.variables.get(upper)
       if (value.type.kind === 'boolean') return value.rawValue === 1
       if (value.type.kind === 'char') return String.fromCharCode(value.rawValue as number)
-      if (value.type.kind === 'string') return (value.rawValue as number[]).map(c => String.fromCharCode(c)).join('')
+      if (value.type.kind === 'string')
+        return (value.rawValue as number[]).map((c) => String.fromCharCode(c)).join('')
       return value.rawValue
     }
     s = s.parent
@@ -213,7 +220,7 @@ describe('GOTO scope (intra-procedural)', () => {
   })
 
   test('GOTO cannot cross function boundary (label not found != ignored)', () => {
-      // 快速失败！
+    // 快速失败！
     const source = `PROGRAM T; LABEL 99; VAR X: INTEGER; PROCEDURE P; BEGIN GOTO 99; X := 1 END; BEGIN X := 0; P; 99: X := 42 END.`
     const state = makeState(source)
     expect(() => runToCompletion(state)).toThrow()

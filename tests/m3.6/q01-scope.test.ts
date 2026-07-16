@@ -11,7 +11,7 @@ begin
 end.`,
     purpose: 'global variable is accessible in main program',
     features: ['global-variable', 'scope'],
-    expectedContains: '42'
+    expectedContains: '42',
   },
   {
     name: 'global var used in procedure',
@@ -27,7 +27,7 @@ begin
 end.`,
     purpose: 'global variable is accessible in procedure',
     features: ['global-variable', 'procedure', 'scope'],
-    expectedContains: '100'
+    expectedContains: '100',
   },
   {
     name: 'global var used in nested procedure',
@@ -47,7 +47,7 @@ begin
 end.`,
     purpose: 'global variable is accessible in nested procedure',
     features: ['global-variable', 'nested-procedure', 'scope'],
-    expectedContains: '200'
+    expectedContains: '200',
   },
   {
     name: 'global var used in function',
@@ -63,7 +63,7 @@ begin
 end.`,
     purpose: 'global variable is accessible in function',
     features: ['global-variable', 'function', 'scope'],
-    expectedContains: '50'
+    expectedContains: '50',
   },
   {
     name: 'multiple global variables',
@@ -81,7 +81,7 @@ begin
 end.`,
     purpose: 'multiple global variables accessible',
     features: ['global-variable', 'multiple-variables', 'scope'],
-    expectedContains: '6'
+    expectedContains: '6',
   },
   {
     name: 'local var in procedure',
@@ -97,7 +97,7 @@ begin
 end.`,
     purpose: 'local variable in procedure',
     features: ['local-variable', 'procedure', 'scope'],
-    expectedContains: '10'
+    expectedContains: '10',
   },
   {
     name: 'local var in function',
@@ -113,7 +113,7 @@ begin
 end.`,
     purpose: 'local variable in function',
     features: ['local-variable', 'function', 'scope'],
-    expectedContains: '20'
+    expectedContains: '20',
   },
   {
     name: 'local var shadows global',
@@ -132,7 +132,7 @@ begin
 end.`,
     purpose: 'local variable shadows global variable',
     features: ['local-variable', 'global-variable', 'shadowing', 'scope'],
-    expectedContains: '99'
+    expectedContains: '99',
   },
   {
     name: 'inner nested var shadows outer',
@@ -155,7 +155,7 @@ begin
 end.`,
     purpose: 'inner nested local variable shadows outer local variable',
     features: ['local-variable', 'nested-procedure', 'shadowing', 'scope'],
-    expectedContains: '3'
+    expectedContains: '3',
   },
   {
     name: 'sibling procedures independent',
@@ -178,7 +178,7 @@ begin
 end.`,
     purpose: 'local variables in sibling procedures are independent',
     features: ['local-variable', 'sibling-procedures', 'scope'],
-    expectedContains: '10'
+    expectedContains: '10',
   },
   {
     name: 'local var not accessible outside scope',
@@ -193,7 +193,7 @@ begin
 end.`,
     purpose: 'local variable not accessible outside its scope',
     features: ['local-variable', 'scope', 'error'],
-    expectedError: true
+    expectedError: true,
   },
   {
     name: 'value parameter passing',
@@ -211,7 +211,7 @@ begin
 end.`,
     purpose: 'value parameter is a copy, does not modify original',
     features: ['value-parameter', 'scope'],
-    expectedContains: '11'
+    expectedContains: '11',
   },
   {
     name: 'var parameter passing',
@@ -228,7 +228,7 @@ begin
 end.`,
     purpose: 'var parameter modifies original variable',
     features: ['var-parameter', 'scope'],
-    expectedContains: '11'
+    expectedContains: '11',
   },
   {
     name: 'parameter shadows global',
@@ -244,7 +244,7 @@ begin
 end.`,
     purpose: 'parameter shadows global variable',
     features: ['parameter', 'global-variable', 'shadowing', 'scope'],
-    expectedContains: '5'
+    expectedContains: '5',
   },
   {
     name: 'parameter shadows local',
@@ -264,7 +264,7 @@ begin
 end.`,
     purpose: 'parameter shadows local variable',
     features: ['parameter', 'local-variable', 'shadowing', 'scope'],
-    expectedContains: '20'
+    expectedContains: '20',
   },
   {
     name: 'parameter in nested procedure',
@@ -282,7 +282,7 @@ begin
 end.`,
     purpose: 'parameter accessible in nested procedure',
     features: ['parameter', 'nested-procedure', 'scope'],
-    expectedContains: '42'
+    expectedContains: '42',
   },
   {
     name: 'multiple parameters',
@@ -296,7 +296,7 @@ begin
 end.`,
     purpose: 'multiple parameters in procedure',
     features: ['parameter', 'multiple-parameters', 'scope'],
-    expectedContains: '6'
+    expectedContains: '6',
   },
   {
     name: 'function name as return variable',
@@ -310,7 +310,7 @@ begin
 end.`,
     purpose: 'function name used as return value variable',
     features: ['function', 'return-value', 'scope'],
-    expectedContains: '10'
+    expectedContains: '10',
   },
   {
     name: 'function return in expression',
@@ -324,7 +324,7 @@ begin
 end.`,
     purpose: 'function return value used in expression',
     features: ['function', 'return-value', 'expression', 'scope'],
-    expectedContains: '14'
+    expectedContains: '14',
   },
   {
     name: 'nested function return',
@@ -342,7 +342,7 @@ begin
 end.`,
     purpose: 'nested function return value',
     features: ['function', 'nested-function', 'return-value', 'scope'],
-    expectedContains: '15'
+    expectedContains: '15',
   },
   {
     name: 'recursive function return',
@@ -359,7 +359,7 @@ begin
 end.`,
     purpose: 'recursive function return value',
     features: ['function', 'recursion', 'return-value', 'scope'],
-    expectedContains: '120'
+    expectedContains: '120',
   },
   {
     name: 'goto in procedure',
@@ -377,7 +377,7 @@ begin
 end.`,
     purpose: 'goto within procedure scope',
     features: ['goto', 'label', 'procedure', 'scope'],
-    expectedContains: 'ok'
+    expectedContains: 'ok',
   },
   {
     name: 'goto in main program',
@@ -391,7 +391,7 @@ begin
 end.`,
     purpose: 'goto within main program scope',
     features: ['goto', 'label', 'scope'],
-    expectedContains: 'done'
+    expectedContains: 'done',
   },
   {
     name: 'goto across procedures should error',
@@ -406,9 +406,10 @@ begin
   10:
   writeln('end');
 end.`,
-    purpose: 'goto across procedures only errors at runtime when proc is called (Pascal82: GOTO 目标跨 block，proc 未调用则不触发)',
+    purpose:
+      'goto across procedures only errors at runtime when proc is called (Pascal82: GOTO 目标跨 block，proc 未调用则不触发)',
     features: ['goto', 'label', 'cross-procedure', 'scope'],
-    expectedContains: 'start\nend'
+    expectedContains: 'start\nend',
   },
   {
     name: 'label in nested procedure',
@@ -430,7 +431,7 @@ begin
 end.`,
     purpose: 'label in nested procedure',
     features: ['goto', 'label', 'nested-procedure', 'scope'],
-    expectedContains: 'yes'
+    expectedContains: 'yes',
   },
   {
     name: 'labels in different scopes',
@@ -455,7 +456,7 @@ begin
 end.`,
     purpose: 'same label number in different scopes',
     features: ['goto', 'label', 'scope', 'sibling-procedures'],
-    expectedContains: 'p1'
+    expectedContains: 'p1',
   },
   {
     name: 'global constant in procedure',
@@ -470,7 +471,7 @@ begin
 end.`,
     purpose: 'global constant accessible in procedure',
     features: ['constant', 'global-constant', 'scope'],
-    expectedContains: '3.14'
+    expectedContains: '3.14',
   },
   {
     name: 'local constant shadows global',
@@ -486,7 +487,7 @@ begin
 end.`,
     purpose: 'local constant shadows global constant',
     features: ['constant', 'shadowing', 'scope'],
-    expectedContains: '20'
+    expectedContains: '20',
   },
   {
     name: 'constant in procedure',
@@ -501,7 +502,7 @@ begin
 end.`,
     purpose: 'local constant in procedure',
     features: ['constant', 'local-constant', 'procedure', 'scope'],
-    expectedContains: '100'
+    expectedContains: '100',
   },
   {
     name: 'constant visible in nested procedure',
@@ -520,7 +521,7 @@ begin
 end.`,
     purpose: 'constant visible in nested procedure',
     features: ['constant', 'nested-procedure', 'scope'],
-    expectedContains: '50'
+    expectedContains: '50',
   },
   {
     name: 'global type in procedure',
@@ -538,7 +539,7 @@ begin
 end.`,
     purpose: 'global type accessible in procedure',
     features: ['type', 'global-type', 'scope'],
-    expectedContains: '10'
+    expectedContains: '10',
   },
   {
     name: 'local type in procedure',
@@ -555,7 +556,7 @@ begin
 end.`,
     purpose: 'local type in procedure',
     features: ['type', 'local-type', 'scope'],
-    expectedContains: '20'
+    expectedContains: '20',
   },
   {
     name: 'record type field access',
@@ -575,7 +576,7 @@ begin
 end.`,
     purpose: 'record type field access across scopes (Pascal82: 无 string 类型)',
     features: ['type', 'record-type', 'field-access', 'scope'],
-    expectedContains: '30'
+    expectedContains: '30',
   },
   {
     name: 'array type usage',
@@ -595,7 +596,7 @@ begin
 end.`,
     purpose: 'array type usage across scopes',
     features: ['type', 'array-type', 'scope'],
-    expectedContains: '3'
+    expectedContains: '3',
   },
   {
     name: 'enum type usage',
@@ -613,7 +614,7 @@ begin
 end.`,
     purpose: 'enum type usage across scopes',
     features: ['type', 'enum-type', 'scope'],
-    expectedContains: 'ok'
+    expectedContains: 'ok',
   },
   {
     name: 'local var modifies global indirectly',
@@ -632,7 +633,7 @@ begin
 end.`,
     purpose: 'local variable can read and modify global through assignment',
     features: ['local-variable', 'global-variable', 'scope'],
-    expectedContains: '6'
+    expectedContains: '6',
   },
   {
     name: 'nested function access outer param',
@@ -650,7 +651,7 @@ begin
 end.`,
     purpose: 'nested function can access outer procedure parameter',
     features: ['function', 'nested-function', 'parameter', 'scope'],
-    expectedContains: '20'
+    expectedContains: '20',
   },
   {
     name: 'function param shadows outer local',
@@ -670,12 +671,14 @@ begin
 end.`,
     purpose: 'function parameter shadows outer procedure local variable',
     features: ['function', 'parameter', 'shadowing', 'scope'],
-    expectedContains: '6'
-  }
+    expectedContains: '6',
+  },
 ]
 
 describe('M3.6 Interpreter: Scope', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runInterpreterTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runInterpreterTest(t)
+    })
   })
 })

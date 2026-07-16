@@ -1,7 +1,12 @@
 import { InterpreterTest, runInterpreterTest, runPasWithInput } from './_helper'
 import { createRecordFileOps, createDefaultFileHandle } from '../../src/interpreter/io'
 import { parse } from '../../src/index'
-import { createState, runToCompletion, populateSystemProcedures, populateSystemFunctions } from '../../src/interpreter'
+import {
+  createState,
+  runToCompletion,
+  populateSystemProcedures,
+  populateSystemFunctions,
+} from '../../src/interpreter'
 
 const tests: InterpreterTest[] = [
   {
@@ -12,7 +17,7 @@ begin
 end.`,
     purpose: 'writeln without arguments outputs a newline',
     features: ['writeln', 'console-output'],
-    expectedOutput: '\n'
+    expectedOutput: '\n',
   },
   {
     name: 'writeln with integer',
@@ -22,7 +27,7 @@ begin
 end.`,
     purpose: 'writeln outputs integer value',
     features: ['writeln', 'console-output', 'integer'],
-    expectedContains: '42'
+    expectedContains: '42',
   },
   {
     name: 'writeln with string literal',
@@ -32,7 +37,7 @@ begin
 end.`,
     purpose: 'writeln outputs string literal value',
     features: ['writeln', 'console-output'],
-    expectedContains: 'hello world'
+    expectedContains: 'hello world',
   },
   {
     name: 'writeln with multiple arguments',
@@ -42,7 +47,7 @@ begin
 end.`,
     purpose: 'writeln outputs multiple arguments consecutively (no separator, per Pascal82)',
     features: ['writeln', 'console-output', 'multiple-arguments'],
-    expectedContains: '123'
+    expectedContains: '123',
   },
   {
     name: 'write with no newline',
@@ -53,7 +58,7 @@ begin
 end.`,
     purpose: 'write outputs without trailing newline',
     features: ['write', 'console-output'],
-    expectedOutput: 'helloworld'
+    expectedOutput: 'helloworld',
   },
   {
     name: 'write with integer',
@@ -63,7 +68,7 @@ begin
 end.`,
     purpose: 'write outputs integer value without newline',
     features: ['write', 'console-output', 'integer'],
-    expectedOutput: '123'
+    expectedOutput: '123',
   },
   {
     name: 'write with string literal',
@@ -73,7 +78,7 @@ begin
 end.`,
     purpose: 'write outputs string literal without newline',
     features: ['write', 'console-output'],
-    expectedOutput: 'test'
+    expectedOutput: 'test',
   },
   {
     name: 'write with multiple arguments',
@@ -83,7 +88,7 @@ begin
 end.`,
     purpose: 'write outputs multiple arguments without newline',
     features: ['write', 'console-output', 'multiple-arguments'],
-    expectedOutput: 'abc'
+    expectedOutput: 'abc',
   },
   {
     name: 'readln reads integer',
@@ -95,7 +100,7 @@ begin
 end.`,
     purpose: 'readln with empty input defaults to 0 (n+1=1)',
     features: ['readln', 'console-input', 'integer'],
-    expectedContains: '1'
+    expectedContains: '1',
   },
   {
     name: 'readln reads multiple values',
@@ -107,7 +112,7 @@ begin
 end.`,
     purpose: 'readln with empty input defaults to 0 (a+b=0)',
     features: ['readln', 'console-input', 'multiple-values', 'integer'],
-    expectedContains: '0'
+    expectedContains: '0',
   },
   {
     name: 'read reads single value',
@@ -119,7 +124,7 @@ begin
 end.`,
     purpose: 'read with empty input defaults to 0',
     features: ['read', 'console-input', 'integer'],
-    expectedContains: '0'
+    expectedContains: '0',
   },
   {
     name: 'rewrite creates file',
@@ -131,7 +136,7 @@ begin
 end.`,
     purpose: 'rewrite creates a new text file',
     features: ['rewrite', 'file-operation', 'text-file'],
-    expectedError: false
+    expectedError: false,
   },
   {
     name: 'writeln to file',
@@ -144,7 +149,7 @@ begin
 end.`,
     purpose: 'writeln writes to text file',
     features: ['writeln', 'file-operation', 'text-file'],
-    expectedError: false
+    expectedError: false,
   },
   {
     name: 'close file (non-standard extension, expect friendly error)',
@@ -157,7 +162,7 @@ begin
 end.`,
     purpose: 'close is not Pascal82 standard; must report friendly error when extensions disabled',
     features: ['close', 'file-operation', 'text-file', 'unsupported'],
-    expectedError: true
+    expectedError: true,
   },
   {
     name: 'ord function',
@@ -167,7 +172,7 @@ begin
 end.`,
     purpose: 'ord returns ASCII code of character',
     features: ['ord', 'standard-function', 'char'],
-    expectedContains: '65'
+    expectedContains: '65',
   },
   {
     name: 'chr function',
@@ -177,7 +182,7 @@ begin
 end.`,
     purpose: 'chr returns character from ASCII code',
     features: ['chr', 'standard-function', 'char'],
-    expectedContains: 'A'
+    expectedContains: 'A',
   },
   {
     name: 'pred function',
@@ -187,7 +192,7 @@ begin
 end.`,
     purpose: 'pred returns predecessor of integer',
     features: ['pred', 'standard-function', 'integer'],
-    expectedContains: '4'
+    expectedContains: '4',
   },
   {
     name: 'succ function',
@@ -197,7 +202,7 @@ begin
 end.`,
     purpose: 'succ returns successor of integer',
     features: ['succ', 'standard-function', 'integer'],
-    expectedContains: '6'
+    expectedContains: '6',
   },
   {
     name: 'abs function',
@@ -207,7 +212,7 @@ begin
 end.`,
     purpose: 'abs returns absolute value',
     features: ['abs', 'standard-function', 'integer'],
-    expectedContains: '10'
+    expectedContains: '10',
   },
   {
     name: 'sqr function',
@@ -217,7 +222,7 @@ begin
 end.`,
     purpose: 'sqr returns square of integer',
     features: ['sqr', 'standard-function', 'integer'],
-    expectedContains: '25'
+    expectedContains: '25',
   },
   {
     name: 'standard write writeln procedures',
@@ -229,7 +234,7 @@ begin
 end.`,
     purpose: 'write and writeln are standard procedures',
     features: ['write', 'writeln', 'standard-procedure'],
-    expectedContains: 'ab'
+    expectedContains: 'ab',
   },
   {
     name: 'new dispose procedures (unsupported, expect friendly error)',
@@ -244,7 +249,7 @@ begin
 end.`,
     purpose: 'Pascal82 standard feature not yet implemented; must report friendly error, not crash',
     features: ['new', 'dispose', 'pointer', 'unsupported'],
-    expectedError: true
+    expectedError: true,
   },
   {
     name: 'file does not exist (mock IO does not simulate file errors)',
@@ -253,9 +258,10 @@ var f: text;
 begin
   reset(f);
 end.`,
-    purpose: 'reset on file with no external association; mock IO does not simulate file-not-found errors',
+    purpose:
+      'reset on file with no external association; mock IO does not simulate file-not-found errors',
     features: ['reset', 'file-operation'],
-    expectedError: false
+    expectedError: false,
   },
   {
     name: 'file write error (mock IO does not simulate file errors)',
@@ -266,7 +272,7 @@ begin
 end.`,
     purpose: 'writing to unopened file; mock IO does not simulate file-state errors',
     features: ['writeln', 'file-operation', 'boundary-case'],
-    expectedError: false
+    expectedError: false,
   },
   {
     name: 'large output',
@@ -278,7 +284,7 @@ begin
 end.`,
     purpose: 'large output is handled correctly',
     features: ['writeln', 'loop', 'boundary-case'],
-    expectedContains: '5'
+    expectedContains: '5',
   },
   {
     name: 'writeln with negative integer',
@@ -288,7 +294,7 @@ begin
 end.`,
     purpose: 'writeln outputs negative integer',
     features: ['writeln', 'console-output', 'integer', 'negative'],
-    expectedContains: '-42'
+    expectedContains: '-42',
   },
   {
     name: 'writeln with real number',
@@ -298,7 +304,7 @@ begin
 end.`,
     purpose: 'writeln outputs real number',
     features: ['writeln', 'console-output', 'real'],
-    expectedContains: '3.14'
+    expectedContains: '3.14',
   },
   {
     name: 'writeln with boolean',
@@ -308,7 +314,7 @@ begin
 end.`,
     purpose: 'writeln outputs boolean value (case is implementation-defined per Pascal82)',
     features: ['writeln', 'console-output', 'boolean'],
-    expectedContains: 'TRUE'
+    expectedContains: 'TRUE',
   },
   {
     name: 'eoln function',
@@ -320,7 +326,7 @@ begin
 end.`,
     purpose: 'eoln detects end of line (case is implementation-defined per Pascal82)',
     features: ['eoln', 'standard-function', 'console-input'],
-    expectedContains: 'TRUE'
+    expectedContains: 'TRUE',
   },
   {
     name: 'chr with boundary value',
@@ -330,7 +336,7 @@ begin
 end.`,
     purpose: 'chr handles boundary ASCII values',
     features: ['chr', 'standard-function', 'char', 'boundary-case'],
-    expectedContains: ' '
+    expectedContains: ' ',
   },
   {
     name: 'abs with zero',
@@ -340,7 +346,7 @@ begin
 end.`,
     purpose: 'abs returns zero for zero input',
     features: ['abs', 'standard-function', 'integer', 'boundary-case'],
-    expectedContains: '0'
+    expectedContains: '0',
   },
   {
     name: 'sqr with negative',
@@ -350,7 +356,7 @@ begin
 end.`,
     purpose: 'sqr returns positive for negative input',
     features: ['sqr', 'standard-function', 'integer'],
-    expectedContains: '25'
+    expectedContains: '25',
   },
   {
     name: 'pred with zero',
@@ -360,7 +366,7 @@ begin
 end.`,
     purpose: 'pred returns -1 for zero',
     features: ['pred', 'standard-function', 'integer'],
-    expectedContains: '-1'
+    expectedContains: '-1',
   },
   {
     name: 'succ with max smallint',
@@ -370,7 +376,7 @@ begin
 end.`,
     purpose: 'succ returns next integer',
     features: ['succ', 'standard-function', 'integer'],
-    expectedContains: '32768'
+    expectedContains: '32768',
   },
   {
     name: 'ord with space',
@@ -380,7 +386,7 @@ begin
 end.`,
     purpose: 'ord returns ASCII code for space',
     features: ['ord', 'standard-function', 'char'],
-    expectedContains: '32'
+    expectedContains: '32',
   },
   {
     name: 'write writeln combination',
@@ -393,7 +399,7 @@ begin
 end.`,
     purpose: 'write and writeln work together',
     features: ['write', 'writeln', 'console-output'],
-    expectedContains: 'Hello World'
+    expectedContains: 'Hello World',
   },
   {
     name: 'file eof detection',
@@ -405,13 +411,15 @@ begin
 end.`,
     purpose: 'eof works with files (case is implementation-defined per Pascal82)',
     features: ['eof', 'file-operation', 'text-file'],
-    expectedContains: 'TRUE'
-  }
+    expectedContains: 'TRUE',
+  },
 ]
 
 describe('M3.6 Interpreter: IO and Standard Library', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runInterpreterTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runInterpreterTest(t)
+    })
   })
 
   test('readln reads integer from input', () => {
@@ -452,7 +460,10 @@ end.`
 })
 
 describe('M3.6 Interpreter: createRecordFileOps integration', () => {
-  function runWithFileOps(files: Map<string, Uint8Array>, code: string): { output: string; error: string | null } {
+  function runWithFileOps(
+    files: Map<string, Uint8Array>,
+    code: string
+  ): { output: string; error: string | null } {
     const parseResult = parse(code)
     if (!parseResult.success) {
       return { output: '', error: parseResult.error || 'parse failed' }
@@ -463,8 +474,12 @@ describe('M3.6 Interpreter: createRecordFileOps integration', () => {
     const io = {
       file: fileOps,
       console: {
-        write: (text: string) => { output += text },
-        writeln: () => { output += '\n' },
+        write: (text: string) => {
+          output += text
+        },
+        writeln: () => {
+          output += '\n'
+        },
         read: () => '',
         readln: () => '',
         eof: () => true,

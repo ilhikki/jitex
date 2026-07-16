@@ -67,34 +67,72 @@ export interface PascalIO {
 // ============================================================================
 
 function throwNotImplemented(method: string): never {
-  throw new Error(`IO.${method} is not implemented. Customize state.io to provide an implementation.`)
+  throw new Error(
+    `IO.${method} is not implemented. Customize state.io to provide an implementation.`
+  )
 }
 
 function createDefaultFileOps(): PascalFileOps {
   return {
-    reset() { throwNotImplemented('file.reset') },
-    rewrite() { throwNotImplemented('file.rewrite') },
-    get() { throwNotImplemented('file.get') },
-    put() { throwNotImplemented('file.put') },
-    close() { throwNotImplemented('file.close') },
-    assign() { throwNotImplemented('file.assign') },
-    bufferChar() { throwNotImplemented('file.bufferChar') },
-    eof() { throwNotImplemented('file.eof') },
-    eoln() { throwNotImplemented('file.eoln') },
-    readln() { throwNotImplemented('file.readln') },
-    write() { throwNotImplemented('file.write') },
-    writeln() { throwNotImplemented('file.writeln') },
+    reset() {
+      throwNotImplemented('file.reset')
+    },
+    rewrite() {
+      throwNotImplemented('file.rewrite')
+    },
+    get() {
+      throwNotImplemented('file.get')
+    },
+    put() {
+      throwNotImplemented('file.put')
+    },
+    close() {
+      throwNotImplemented('file.close')
+    },
+    assign() {
+      throwNotImplemented('file.assign')
+    },
+    bufferChar() {
+      throwNotImplemented('file.bufferChar')
+    },
+    eof() {
+      throwNotImplemented('file.eof')
+    },
+    eoln() {
+      throwNotImplemented('file.eoln')
+    },
+    readln() {
+      throwNotImplemented('file.readln')
+    },
+    write() {
+      throwNotImplemented('file.write')
+    },
+    writeln() {
+      throwNotImplemented('file.writeln')
+    },
   }
 }
 
 function createDefaultConsole(): PascalConsole {
   return {
-    write() { throwNotImplemented('console.write') },
-    writeln() { throwNotImplemented('console.writeln') },
-    read() { throwNotImplemented('console.read') },
-    readln() { throwNotImplemented('console.readln') },
-    eof() { throwNotImplemented('console.eof') },
-    eoln() { throwNotImplemented('console.eoln') },
+    write() {
+      throwNotImplemented('console.write')
+    },
+    writeln() {
+      throwNotImplemented('console.writeln')
+    },
+    read() {
+      throwNotImplemented('console.read')
+    },
+    readln() {
+      throwNotImplemented('console.readln')
+    },
+    eof() {
+      throwNotImplemented('console.eof')
+    },
+    eoln() {
+      throwNotImplemented('console.eoln')
+    },
   }
 }
 
@@ -184,8 +222,7 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
       }
     },
 
-    put(_file: PascalFile): void {
-    },
+    put(_file: PascalFile): void {},
 
     close(file: PascalFile): void {
       const s = getState(file)
@@ -205,7 +242,7 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
       const s = getState(file)
       const content = currentContent(file)
       if (s.eof || s.offset >= content.length) return 0
-      return content[s.offset] & 0xFF
+      return content[s.offset] & 0xff
     },
 
     eof(file: PascalFile): boolean {
@@ -259,14 +296,26 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
 
 export function createCallbackConsole(
   onWrite: (text: string) => void,
-  onRead: () => string,
+  onRead: () => string
 ): PascalConsole {
   return {
-    write(text: string) { onWrite(text) },
-    writeln() { onWrite('\n') },
-    read() { return onRead() },
-    readln() { return onRead() },
-    eof() { return false },
-    eoln() { return false },
+    write(text: string) {
+      onWrite(text)
+    },
+    writeln() {
+      onWrite('\n')
+    },
+    read() {
+      return onRead()
+    },
+    readln() {
+      return onRead()
+    },
+    eof() {
+      return false
+    },
+    eoln() {
+      return false
+    },
   }
 }

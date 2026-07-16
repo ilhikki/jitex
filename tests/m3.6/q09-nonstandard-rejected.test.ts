@@ -16,7 +16,9 @@ end.`,
 ]
 
 describe('Q09: Non-standard features should be rejected', () => {
-  tests.forEach(t => {
-    test(t.name, () => { runInterpreterTest(t) })
+  tests.forEach((t) => {
+    test(t.name, () => {
+      runInterpreterTest(t)
+    })
   })
 })

@@ -18,7 +18,9 @@ describe('Tangle Official', () => {
       for (let i = start; i < end; i++) {
         const t = tokens[i]
         const marker = i === pos ? ' >>> ' : '     '
-        console.error(`${marker}[${i}] ${t.type} (${t.content}) at ${t.start.line}:${t.start.column}`)
+        console.error(
+          `${marker}[${i}] ${t.type} (${t.content}) at ${t.start.line}:${t.start.column}`
+        )
       }
     }
     expect(result.success).toBe(true)

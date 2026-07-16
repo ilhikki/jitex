@@ -8,12 +8,24 @@ function makeState(source: string, input?: string[], extensions: boolean = false
   const inputQueue = input ? [...input] : []
   // 替换默认的无操作控制台为测试用实现，将 IO 桥接到 outputBuffer/inputQueue
   state.io.console = {
-    write(text: string) { state.outputBuffer.push(text) },
-    writeln() { state.outputBuffer.push('\n') },
-    read() { return inputQueue.shift() || '' },
-    readln() { return inputQueue.shift() || '' },
-    eof() { return inputQueue.length === 0 },
-    eoln() { return inputQueue.length === 0 || inputQueue[0] === '\n' },
+    write(text: string) {
+      state.outputBuffer.push(text)
+    },
+    writeln() {
+      state.outputBuffer.push('\n')
+    },
+    read() {
+      return inputQueue.shift() || ''
+    },
+    readln() {
+      return inputQueue.shift() || ''
+    },
+    eof() {
+      return inputQueue.length === 0
+    },
+    eoln() {
+      return inputQueue.length === 0 || inputQueue[0] === '\n'
+    },
   }
   return state
 }
@@ -26,7 +38,8 @@ function getVar(state: State, name: string): any {
       const value: PascalValue = s.variables.get(upper)
       if (value.type.kind === 'boolean') return value.rawValue === 1
       if (value.type.kind === 'char') return String.fromCharCode(value.rawValue as number)
-      if (value.type.kind === 'string') return (value.rawValue as number[]).map(c => String.fromCharCode(c)).join('')
+      if (value.type.kind === 'string')
+        return (value.rawValue as number[]).map((c) => String.fromCharCode(c)).join('')
       return value.rawValue
     }
     s = s.parent
@@ -141,7 +154,7 @@ describe('M3: READ/READLN', () => {
     const state = makeState(source, ['Hello'])
     runToCompletion(state)
     const s = getVar(state, 'S') as number[]
-    const str = s.map(c => String.fromCharCode(c)).join('')
+    const str = s.map((c) => String.fromCharCode(c)).join('')
     expect(str.substring(0, 5)).toBe('Hello')
   })
 })

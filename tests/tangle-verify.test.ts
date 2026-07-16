@@ -39,7 +39,7 @@ describe('Tangle Official Verification', () => {
 
     // Check const declarations (BUFSIZE, MAXBYTES, MAXTOKS, MAXNAMES, MAXTEXTS, HASHSIZE, LONGESTNAME, LINELENGTH, OUTBUFSIZE, STACKSIZE, MAXIDLENGTH, UNAMBIGLENGT)
     expect(block.constDeclarations.length).toBeGreaterThanOrEqual(12)
-    const constNames = block.constDeclarations.map(c => c.name.name)
+    const constNames = block.constDeclarations.map((c) => c.name.name)
     expect(constNames).toContain('BUFSIZE')
     expect(constNames).toContain('MAXBYTES')
     expect(constNames).toContain('MAXTOKS')
@@ -50,7 +50,7 @@ describe('Tangle Official Verification', () => {
 
     // Check type declarations (ASCIICODE, TEXTFILE, EIGHTBITS, SIXTEENBITS, NAMEPOINTER, TEXTPOINTER, OUTPUTSTATE)
     expect(block.typeDeclarations.length).toBeGreaterThanOrEqual(7)
-    const typeNames = block.typeDeclarations.map(t => t.name.name)
+    const typeNames = block.typeDeclarations.map((t) => t.name.name)
     expect(typeNames).toContain('ASCIICODE')
     expect(typeNames).toContain('TEXTFILE')
     expect(typeNames).toContain('EIGHTBITS')
@@ -64,7 +64,7 @@ describe('Tangle Official Verification', () => {
 
     // Check procedure declarations
     expect(block.procedureDeclarations.length).toBeGreaterThan(0)
-    const procNames = block.procedureDeclarations.map(p => p.name.name)
+    const procNames = block.procedureDeclarations.map((p) => p.name.name)
     expect(procNames).toContain('DEBUGHELP')
     expect(procNames).toContain('ERROR')
     expect(procNames).toContain('JUMPOUT')
@@ -73,7 +73,7 @@ describe('Tangle Official Verification', () => {
 
     // Check function declarations
     expect(block.functionDeclarations.length).toBeGreaterThan(0)
-    const funcNames = block.functionDeclarations.map(f => f.name.name)
+    const funcNames = block.functionDeclarations.map((f) => f.name.name)
     expect(funcNames).toContain('INPUTLN')
     expect(funcNames).toContain('IDLOOKUP')
   })
@@ -96,8 +96,8 @@ describe('Tangle Official Verification', () => {
     const program = result.astNode as ProgramNode
     const block = program.block as BlockNode
 
-    const nonForwardProcs = block.procedureDeclarations.filter(p => !p.isForward)
-    nonForwardProcs.forEach(proc => {
+    const nonForwardProcs = block.procedureDeclarations.filter((p) => !p.isForward)
+    nonForwardProcs.forEach((proc) => {
       expect(proc.block).not.toBeNull()
       expect(proc.block!.compound.statements.length).toBeGreaterThan(0)
     })
@@ -110,8 +110,8 @@ describe('Tangle Official Verification', () => {
     const program = result.astNode as ProgramNode
     const block = program.block as BlockNode
 
-    const nonForwardFuncs = block.functionDeclarations.filter(f => !f.isForward)
-    nonForwardFuncs.forEach(func => {
+    const nonForwardFuncs = block.functionDeclarations.filter((f) => !f.isForward)
+    nonForwardFuncs.forEach((func) => {
       expect(func.block).not.toBeNull()
     })
   })

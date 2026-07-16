@@ -1,8 +1,4 @@
-import {
-  createRecordFileOps,
-  PascalFile,
-  PascalFileOps,
-} from '../../src/interpreter'
+import { createRecordFileOps, PascalFile, PascalFileOps } from '../../src/interpreter'
 
 function makeHandle(url: string, offset = 0): PascalFile {
   return { url, offset }

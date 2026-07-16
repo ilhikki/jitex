@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import {parse} from '../../src/index'
+import { parse } from '../../src/index'
 import {
   createRecordFileOps,
   createState,
@@ -42,10 +42,18 @@ describe('tangle bootstrapping', () => {
       writeln() {
         process.stdout.write('\n')
       },
-      read() { return '' },
-      readln() { return '' },
-      eof() { return true },
-      eoln() { return true },
+      read() {
+        return ''
+      },
+      readln() {
+        return ''
+      },
+      eof() {
+        return true
+      },
+      eoln() {
+        return true
+      },
     }
 
     const io = { file: fileOps, console: pascalConsole }
@@ -66,8 +74,10 @@ describe('tangle bootstrapping', () => {
     state.systemProcedures.set('LOG_DEBUG', (args, s) => {
       if (args.length > 0) {
         const arg = evalExpr(args[0], s.currentScope, s)
-        const text = typeof arg.rawValue === 'number' ? String(arg.rawValue)
-          : String.fromCharCode(...((arg.rawValue as number[]) || []))
+        const text =
+          typeof arg.rawValue === 'number'
+            ? String(arg.rawValue)
+            : String.fromCharCode(...((arg.rawValue as number[]) || []))
         messages.push({ kind: 'log', text })
       }
     })
@@ -100,7 +110,7 @@ describe('tangle bootstrapping', () => {
     const termout = new TextDecoder().decode(files.get('termout') || new Uint8Array(0))
     console.info('termout==========\n', termout)
     console.info('debug messages==========')
-    messages.map(m => `[${m.kind}] ${m.text}`).join("\n")
+    messages.map((m) => `[${m.kind}] ${m.text}`).join('\n')
 
     expect(pasOutput.length).toBeGreaterThan(0)
   })
