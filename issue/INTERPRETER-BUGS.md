@@ -63,6 +63,17 @@
 
 ---
 
+## P5: 非标准特性被默认支持
+**影响**: 高（导致解释器与 Pascal82 标准不兼容）
+**风险**: 中等
+
+| # | 问题 | 现象 | 说明 |
+|---|------|------|------|
+| 14 | `string` 类型被默认支持 | `var s: string` 被当作合法类型 | Pascal82 无 string 类型；`tangle-official.pas` 也未使用。解释器中显式实现了 `StringType`、`STRING_TYPE`、`makeString`，且注册到 `TYPE_TABLE`。`frames.ts` 的 `readln` 和 `evaluator.ts` 的字符串字面量求值也依赖此类型。应删除。 |
+| 15 | `resolveType` 对未知类型静默回退到 `INTEGER` | 未定义的类型名不报错 | 删除 `STRING_TYPE` 后，若不修复此问题，`var s: string` 会静默变成 integer，无法检测 string 是否真正被删除。 |
+
+---
+
 ## 修复顺序建议
 1. **P0 先修复**：删除/修正测试代码中的语法问题
 2. **P1 IO 库**：逐个实现缺失的 IO 功能
