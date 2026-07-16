@@ -1,7 +1,12 @@
 # Interpreter Bug Analysis - Fix Order
 
-## 分类原则
-从影响小、修复简单、风险低的问题开始，逐步处理复杂的。
+## 分类原则（根据 issue-fixing skill）
+- **P0**: 测试代码问题 + Silent Bug（静默接受无效输入）
+- **P1**: Crash / Panic（parser crash，interpreter 未处理异常）
+- **P2**: Regression（之前通过的测试现在失败）
+- **P3**: Core feature missing（VAR 参数、WITH 语句等核心功能）
+- **P4**: Standard compliance（非标准特性）
+- **P5**: Refactor / Performance
 
 ---
 
@@ -9,12 +14,34 @@
 **影响**: 0（测试本身写错了）
 **风险**: 0
 
-| # | 问题 | 文件 | 修复 |
+| # | 问题 | 文件 | 修复 | 状态 |
+|---|------|------|------|------|
+| 1 | 数组初始化语法 `(10,20,30)` 不标准 | q04 | 删除或改用逐个赋值 | Open |
+| 2 | 字符串连接 `s1+s2` 未实现 | q04 | 删除或改用 concat 函数 | Open |
+| 3 | `length()` 函数调用方式不对 | q06 | 检查是否支持 | Open |
+| 4 | `new/dispose`、`mark/release` 未实现 | q06 | 删除这些测试 | Open |
+
+---
+
+## P0: Silent Bug（已修复）
+**影响**: 高（隐藏真正的 bug）
+**风险**: 高
+
+| # | 问题 | 现象 | 状态 |
 |---|------|------|------|
-| 1 | 数组初始化语法 `(10,20,30)` 不标准 | q04 | 删除或改用逐个赋值 |
-| 2 | 字符串连接 `s1+s2` 未实现 | q04 | 删除或改用 concat 函数 |
-| 3 | `length()` 函数调用方式不对 | q06 | 检查是否支持 |
-| 4 | `new/dispose`、`mark/release` 未实现 | q06 | 删除这些测试 |
+| 14 | `string` 类型被默认支持 | `var s: string` 被当作合法类型 | **Fixed** |
+| 15 | `resolveType` 对未知类型静默回退到 `INTEGER` | 未定义的类型名不报错 | **Fixed** |
+
+---
+
+## P1: Parser Crash
+**影响**: 高（parser 崩溃而非返回错误）
+**风险**: 高
+
+| # | 问题 | 现象 |
+|---|------|------|
+| 16 | 未闭合注释导致 parser crash | `Cannot read properties of undefined` |
+| 17 | EOF 后读 token 导致 crash | parser 越界访问 |
 
 ---
 
@@ -63,29 +90,19 @@
 
 ---
 
-## P5: 非标准特性被默认支持
-**影响**: 高（导致解释器与 Pascal82 标准不兼容）
-**风险**: 中等
-
-| # | 问题 | 现象 | 说明 |
-|---|------|------|------|
-| 14 | `string` 类型被默认支持 | `var s: string` 被当作合法类型 | Pascal82 无 string 类型；`tangle-official.pas` 也未使用。解释器中显式实现了 `StringType`、`STRING_TYPE`、`makeString`，且注册到 `TYPE_TABLE`。`frames.ts` 的 `readln` 和 `evaluator.ts` 的字符串字面量求值也依赖此类型。应删除。 |
-| 15 | `resolveType` 对未知类型静默回退到 `INTEGER` | 未定义的类型名不报错 | 删除 `STRING_TYPE` 后，若不修复此问题，`var s: string` 会静默变成 integer，无法检测 string 是否真正被删除。 |
-
----
-
 ## 修复顺序建议
-1. **P0 先修复**：删除/修正测试代码中的语法问题
-2. **P1 IO 库**：逐个实现缺失的 IO 功能
-3. **P2 类型系统**：补充枚举/数组/记录参数支持
-4. **P3 VAR 参数**：核心修复
-5. **P4 WITH 语句**：核心修复
+1. **P0 测试代码问题**：删除/修正测试代码中的语法问题
+2. **P1 Parser Crash**：修复 p08-parser-robustness 中的 crash bug
+3. **P1 IO 库**：逐个实现缺失的 IO 功能
+4. **P2 类型系统**：补充枚举/数组/记录参数支持
+5. **P3 VAR 参数**：核心修复
+6. **P4 WITH 语句**：核心修复
 
 ---
 
 ## 修复流程（每个问题）
 1. 先确认测试失败的具体原因
-2. 在 src/interpreter 相关文件中定位问题代码
+2. 在 src/ 相关文件中定位问题代码
 3. 修复
 4. 运行相关测试验证
 5. 提交代码
