@@ -4,7 +4,7 @@
   "description": "Pascal interpreter in TypeScript for browser environment",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --project tsconfig.build.json",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.ts"
