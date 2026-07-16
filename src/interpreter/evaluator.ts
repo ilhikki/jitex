@@ -87,6 +87,24 @@ export function evalExpr(expr: ExpressionNode, scope: Scope, state: State): Pasc
 
     case 'BinaryExpression': {
       const bin = expr as BinaryExpressionNode
+      const opLower = bin.operator.toLowerCase()
+      // Pascal82 短路求值：AND/OR 的右操作数按需计算
+      if (opLower === 'and') {
+        const left = evalExpr(bin.left, scope, state)
+        if (!left) throw new Error(`Left operand of and evaluated to undefined`)
+        if (!getBoolValue(left)) return makeBoolean(false)
+        const right = evalExpr(bin.right, scope, state)
+        if (!right) throw new Error(`Right operand of and evaluated to undefined`)
+        return makeBoolean(getBoolValue(right))
+      }
+      if (opLower === 'or') {
+        const left = evalExpr(bin.left, scope, state)
+        if (!left) throw new Error(`Left operand of or evaluated to undefined`)
+        if (getBoolValue(left)) return makeBoolean(true)
+        const right = evalExpr(bin.right, scope, state)
+        if (!right) throw new Error(`Right operand of or evaluated to undefined`)
+        return makeBoolean(getBoolValue(right))
+      }
       const left = evalExpr(bin.left, scope, state)
       const right = evalExpr(bin.right, scope, state)
       if (!left) {
@@ -150,7 +168,7 @@ function evalIdentifier(expr: IdentifierNode, scope: Scope, state: State): Pasca
     return handler([], scope, state)
   }
 
-  // 未找到，返回默认整数
+  // 未找到，返回默认整数（兼容 TANGLE 等使用无参 procedure 名的表达式）
   return makeInteger(0)
 }
 

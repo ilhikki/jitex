@@ -416,16 +416,27 @@ function handleRead(args: ExpressionNode[], state: State, isReadln: boolean): vo
       state.io.file.readln(fileArg)
     }
   } else {
-    // Console-based read: get input line and parse values from it
-    const inputLine = isReadln
-      ? state.io.console.readln()
-      : state.io.console.read()
-    const tokens = inputLine.trim().split(/\s+/).filter(t => t.length > 0)
+    // Console-based read: each var consumes one read() call. Pascal82
+    // semantics: a subsequent read() after a line is exhausted returns
+    // the next input line. We iterate var-by-var, reading a fresh line
+    // when the current token stream runs out.
+    let tokens: string[] = []
     let tokenIdx = 0
+
+    const nextToken = (): string => {
+      if (tokenIdx >= tokens.length) {
+        const line = isReadln
+          ? state.io.console.readln()
+          : state.io.console.read()
+        tokens = line.trim().split(/\s+/).filter(t => t.length > 0)
+        tokenIdx = 0
+      }
+      return tokens[tokenIdx++] || ''
+    }
 
     for (const v of varArgs) {
       let value: PascalValue
-      const input = tokens[tokenIdx++] || ''
+      const input = nextToken()
       if (v.type.kind === 'char') {
         value = makeChar(input.charCodeAt(0) || 0)
       } else if (v.type.kind === 'integer') {
