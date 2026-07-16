@@ -713,24 +713,24 @@ end.
       code: `
 program Test;
 type Person = record
-  name: string[10];
+  initial: char;
   age: integer;
 end;
+var p: Person;
 procedure PrintPerson(p: Person);
 begin
-  writeln(p.name);
+  writeln(p.initial);
   writeln(p.age);
 end;
-var p: Person;
 begin
-  p.name := 'Alice';
+  p.initial := 'A';
   p.age := 25;
   PrintPerson(p);
 end.
       `,
-      purpose: '测试记录类型参数',
-      features: ['procedure', 'record parameter', 'string'],
-      expectedOutput: 'Alice\n25\n',
+      purpose: '测试记录类型参数（Pascal82 标准：var 在 procedure 之前；不使用非标 string[n] 类型）',
+      features: ['procedure', 'record parameter'],
+      expectedOutput: 'A\n25\n',
     },
   ]
 
