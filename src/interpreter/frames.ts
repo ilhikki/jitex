@@ -53,6 +53,8 @@ import {
   FileType, PascalArray,
   PascalRecord,
   arrayIndex,
+  arrayGetElement,
+  arraySetElement,
   createEmptyArray,
   getNum,
   getCharCode,
@@ -962,8 +964,7 @@ function assignToLeft(left: ExpressionNode, value: PascalValue, state: State): v
     }
     const arr = arrValue.rawValue as PascalArray
     const indices = access.indices.map(idx => getNum(evalExpr(idx, state.currentScope, state)))
-    const flatIndex = arrayIndex(arr, indices)
-    arr.elements[flatIndex] = coerceToType(value, arr.elementType)
+    arraySetElement(arr, indices, coerceToType(value, arr.elementType))
     return
   }
 
@@ -1011,8 +1012,7 @@ function evalLValueBase(expr: ExpressionNode, scope: Scope, state: State): Pasca
     }
     const arr = arrValue.rawValue as PascalArray
     const indices = access.indices.map(idx => getNum(evalExpr(idx, scope, state)))
-    const flatIndex = arrayIndex(arr, indices)
-    return arr.elements[flatIndex]
+    return arrayGetElement(arr, indices)
   }
   if (expr.kind === 'ParenthesizedExpression') {
     return evalLValueBase((expr as ParenthesizedExpressionNode).expression, scope, state)

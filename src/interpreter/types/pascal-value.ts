@@ -823,3 +823,59 @@ export function arrayIndex(array: PascalArray, indices: number[]): number {
   }
   return index
 }
+
+/**
+ * 从数组中读取元素，支持多维索引访问嵌套数组。
+ * Pascal82: a[i,j] 等价于 a[i][j]（当 a 是 array of array 时）。
+ */
+export function arrayGetElement(arr: PascalArray, indices: number[]): PascalValue {
+  const dims = arr.dimensions
+  if (indices.length < dims.length) {
+    throw new Error(`Array index dimension mismatch: expected at least ${dims.length}, got ${indices.length}`)
+  }
+  let flatIndex = 0
+  for (let i = 0; i < dims.length; i++) {
+    const dim = dims[i]
+    const idx = indices[i]
+    if (idx < dim.low || idx > dim.high) {
+      throw new Error(`Array index out of bounds: ${idx} not in [${dim.low}, ${dim.high}]`)
+    }
+    flatIndex = flatIndex * (dim.high - dim.low + 1) + (idx - dim.low)
+  }
+  const element = arr.elements[flatIndex]
+  if (indices.length > dims.length) {
+    if (element.type.kind !== 'array') {
+      throw new Error(`Array index dimension mismatch: too many indices for non-array element`)
+    }
+    return arrayGetElement(element.rawValue as PascalArray, indices.slice(dims.length))
+  }
+  return element
+}
+
+/**
+ * 向数组中写入元素，支持多维索引访问嵌套数组。
+ */
+export function arraySetElement(arr: PascalArray, indices: number[], value: PascalValue): void {
+  const dims = arr.dimensions
+  if (indices.length < dims.length) {
+    throw new Error(`Array index dimension mismatch: expected at least ${dims.length}, got ${indices.length}`)
+  }
+  let flatIndex = 0
+  for (let i = 0; i < dims.length; i++) {
+    const dim = dims[i]
+    const idx = indices[i]
+    if (idx < dim.low || idx > dim.high) {
+      throw new Error(`Array index out of bounds: ${idx} not in [${dim.low}, ${dim.high}]`)
+    }
+    flatIndex = flatIndex * (dim.high - dim.low + 1) + (idx - dim.low)
+  }
+  if (indices.length > dims.length) {
+    const element = arr.elements[flatIndex]
+    if (element.type.kind !== 'array') {
+      throw new Error(`Array index dimension mismatch: too many indices for non-array element`)
+    }
+    arraySetElement(element.rawValue as PascalArray, indices.slice(dims.length), value)
+    return
+  }
+  arr.elements[flatIndex] = value
+}

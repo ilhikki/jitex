@@ -26,6 +26,7 @@ import {
   RecordType,
   FileType,
   arrayIndex,
+  arrayGetElement,
   getNum,
   getCharCode,
   getBoolValue,
@@ -165,8 +166,7 @@ function evalArrayRead(access: ArrayAccessNode, scope: Scope, state: State): Pas
 
   const arr = arrValue.rawValue as PascalArray
   const indices = access.indices.map(idx => getNum(evalExpr(idx, scope, state)))
-  const flatIndex = arrayIndex(arr, indices)
-  return arr.elements[flatIndex]
+  return arrayGetElement(arr, indices)
 }
 
 // ============================================================================
