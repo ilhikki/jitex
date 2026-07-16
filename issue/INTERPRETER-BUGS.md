@@ -53,7 +53,7 @@
 | 15 | `resolveType` 对未知类型静默回退到 `INTEGER` | 未定义的类型名不报错 | **Fixed** |
 | 018 | 未定义标识符静默返回 0 | `evalIdentifier` 末尾 `return makeInteger(0)` 让未定义变量/函数静默求值为 0 | **Fixed**（改为抛出 `Unknown identifier`；同时修复 TANGLE 使用非标准 `OTHERS:` CASE 默认分支） |
 | 019 | 子界类型赋值不检查范围 | `coerceToType` 未对 subrange 目标调用 `checkRange`，越界值静默接受 | **Fixed**（三条赋值路径添加 `checkRange` 检查：整数↔子界、字符→子界、子界→子界） |
-| 024 | 局部 type 声明被静默忽略，回退到全局同名 type | `createFunctionFrame` 不处理 `decl.block.typeDeclarations`；`resolveType` 'SimpleType' case 只查全局 declarations.types。局部 `type T = 1..n` 被忽略，使用全局 T | **Open** |
+| 024 | 局部 type 声明被静默忽略，回退到全局同名 type | `createFunctionFrame` 不处理 `decl.block.typeDeclarations`；`resolveType` 'SimpleType' case 只查全局 declarations.types。局部 `type T = 1..n` 被忽略，使用全局 T | **Fixed**（Scope 增加 types 字段；createFunctionFrame 处理局部 typeDeclarations；resolveType/evaluateConstExpr 沿 scope 链查找局部 type/const；局部 type 优先于全局 TYPE_TABLE 缓存） |
 
 ---
 
@@ -125,13 +125,13 @@
 
 ---
 
-## P3: 子界常量表达式（核心功能缺失）
+## P3: 子界常量表达式（核心功能缺失，已修复）
 **影响**: 中等（char/boolean 字面量作为子界边界是 Pascal82 §6.4.3.2 标准用法）
 **风险**: 低（纯新增 case，不影响现有路径）
 
 | # | 问题 | 现象 | 状态 |
 |---|------|------|------|
-| 023 | `evaluateConstExpr` 不支持 `CharLiteral` 和 `BooleanLiteral` | `type T = 'A'..'Z'` 报 `Unsupported constant expression: CharLiteral`；`type T = false..true` 报 `Unsupported constant expression: BooleanLiteral` | **Open** |
+| 023 | `evaluateConstExpr` 不支持 `CharLiteral` 和 `BooleanLiteral` | `type T = 'A'..'Z'` 报 `Unsupported constant expression: CharLiteral`；`type T = false..true` 报 `Unsupported constant expression: BooleanLiteral` | **Fixed**（evaluateConstExpr 添加 CharLiteral/BooleanLiteral case；resolveType RangeType 根据边界字面量推断基类型；coerceToType 支持 boolean→subrange；formatValue 对 char/boolean 子界按基类型输出） |
 
 ---
 

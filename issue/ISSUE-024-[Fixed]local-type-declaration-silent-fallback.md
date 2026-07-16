@@ -81,10 +81,26 @@ case 'SimpleType': {
 Run: `npx jest tests/m3.6/q10-range.test.ts -t "local const bound overflow should error"`
 
 ## Fix
-（pending）
+采用方案 A（在 Scope 上增加 types 字段，沿 scope 链查找）：
+
+1. `src/interpreter/types.ts`：
+   - `Scope` 接口增加 `types: Map<string, TypeDeclarationNode> | null` 字段
+   - `createScope` 默认 `types: null`
+   - `resolveType` 'SimpleType' case：**先**沿 `state.currentScope` 链查找 `s.types`，找到则 `resolveType(localTypeDecl.typeDef, state)` 返回（不 registerType 到全局，避免污染）；**再**查 `findType(name)`（内置 + 全局缓存）；**最后**查 `state.declarations.types`（全局用户定义）
+   - `evaluateConstExpr` 'Identifier' case：从查 `state.globalScope.variables` 改为沿 `state.currentScope` 链查找 `s.variables`（支持局部 const 作为子界边界）
+2. `src/interpreter/frames.ts`：
+   - `createFunctionFrame`：在 `constDeclarations` 处理之后、`variableDeclarations` 处理之前，添加 `decl.block.typeDeclarations` 处理：如果非空，创建 `fnScope.types = new Map()` 并填充
+
+关键设计点：
+- 局部 type 查找优先于 `findType(name)` 全局缓存，避免前面测试注册的全局同名 type 污染（TYPE_TABLE 跨测试共享）
+- 局部 type 不调用 `registerType`，不污染全局 TYPE_TABLE
+- `evaluateConstExpr` 沿 scope 链查找 const，支持局部 const 作为子界边界（如 `procedure p; const n = 5; type T = 1..n;`）
 
 ## Verification
-（pending）
+- `npx jest tests/m3.6/q10-range.test.ts -t "local const bound overflow should error"`：通过
+- `npx jest tests/m3.6/q10-range.test.ts`：49/49 通过
+- `npx jest --no-coverage`：925 通过，1 失败（tangle ISSUE-003 已知问题，非回归）
+- 之前基线：876 通过 1 失败（tangle）；修复后：925 通过 1 失败（tangle，同一个），新增 49 测试全通过
 
 ## Status
-Open
+Fixed

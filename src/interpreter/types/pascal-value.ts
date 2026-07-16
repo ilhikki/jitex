@@ -905,8 +905,15 @@ export function coerceToType(value: PascalValue, targetType: PascalType): Pascal
     return { type: targetType, rawValue: getCharCode(value) }
   }
 
-  // 布尔到整数（Pascal 中 ord(false)=0, ord(true)=1）
-  if (value.type.kind === 'boolean' && targetType.kind === 'integer') {
+  // 布尔到整数/子界（Pascal 中 ord(false)=0, ord(true)=1）
+  if (value.type.kind === 'boolean' && (targetType.kind === 'integer' || targetType.kind === 'subrange')) {
+    if (targetType.kind === 'subrange') {
+      const sub = targetType as SubrangeType
+      const num = getNum(value)
+      if (!sub.checkRange(num)) {
+        throw new Error(`Value ${num} out of range ${sub.min}..${sub.max}`)
+      }
+    }
     return { type: targetType, rawValue: getNum(value) }
   }
 

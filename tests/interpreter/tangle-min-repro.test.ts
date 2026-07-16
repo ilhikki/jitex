@@ -361,21 +361,10 @@ describe('tangle min repro - module_name scan bug (ISSUE-003)', () => {
 
     runTangleWithProxySpy(web, callback, functionsSet, globalVarsSet, keyVars, maxLogs, logCount)
 
-    console.log('\n=== Functions/Procedures called ===')
     const sortedFuncs = Array.from(functionsSet).sort()
     sortedFuncs.forEach((fn, i) => {
       console.log(`  ${i}: ${fn}`)
     })
-    console.log(`Total: ${sortedFuncs.length}`)
-    console.log('===')
-
-    console.log('\n=== Global variables modified ===')
-    const sortedVars = Array.from(globalVarsSet).sort()
-    sortedVars.forEach((v, i) => {
-      console.log(`  ${i}: ${v}`)
-    })
-    console.log(`Total: ${sortedVars.length}`)
-    console.log('===')
 
     expect(true).toBe(true)
   })

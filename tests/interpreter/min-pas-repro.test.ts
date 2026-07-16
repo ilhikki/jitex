@@ -62,7 +62,6 @@ end.`
 
     runToCompletion(state)
 
-    console.log('output:', output)
     expect(output).toContain('OK')
   })
 
@@ -122,7 +121,6 @@ end.`
 
     runToCompletion(state)
 
-    console.log('output:', output)
     expect(output).toContain('OK')
   })
 
@@ -172,7 +170,6 @@ end.`
 
     runToCompletion(state)
 
-    console.log('output:', output)
     expect(output).toContain('OK')
   })
 
@@ -217,7 +214,6 @@ end.`
     populateSystemProcedures(state, true)
     populateSystemFunctions(state)
     runToCompletion(state)
-    console.log('output:', output)
     expect(output).toContain('OK')
   })
 
@@ -264,7 +260,6 @@ end.`
     populateSystemProcedures(state, true)
     populateSystemFunctions(state)
     runToCompletion(state)
-    console.log('output:', output)
     expect(output).toContain('OK')
   })
 
@@ -311,7 +306,6 @@ end.`
     populateSystemProcedures(state, true)
     populateSystemFunctions(state)
     runToCompletion(state)
-    console.log('output:', output)
     expect(output).toContain('OK')
   })
 
@@ -382,7 +376,6 @@ end.`
 
     runToCompletion(state)
 
-    console.log('output:', output)
     expect(output).toContain('OK')
   })
 })

@@ -160,6 +160,13 @@ export function createFunctionFrame(
             })
             fnScope.variableTypes.set(c.name.name.toUpperCase(), INTEGER_TYPE)
           })
+          // 注册局部 type 声明到 fnScope.types（Pascal82 §6.2.2.1: 局部 type 遮蔽全局）
+          if (decl.block.typeDeclarations.length > 0) {
+            fnScope.types = new Map()
+            decl.block.typeDeclarations.forEach((t) => {
+              fnScope.types!.set(t.name.name.toUpperCase(), t)
+            })
+          }
           // 初始化局部变量
           decl.block.variableDeclarations.forEach((v) => {
             initVariables(v, fnScope, state)

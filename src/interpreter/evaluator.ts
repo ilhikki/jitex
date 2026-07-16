@@ -45,6 +45,7 @@ import {
   REAL_TYPE,
   RecordType,
   SetType,
+  SubrangeType,
   unaryOp,
 } from './types/pascal-value'
 import type { PascalFile } from './io'
@@ -671,9 +672,19 @@ export function formatValue(value: PascalValue): string {
     }
     case 'boolean':
       return getBoolValue(value) ? 'TRUE' : 'FALSE'
+    case 'subrange': {
+      // Pascal82 §6.4.3.2: char/boolean 子界按基类型输出
+      const sub = value.type as SubrangeType
+      if (sub.baseType.kind === 'char') {
+        return String.fromCharCode(value.rawValue as number)
+      }
+      if (sub.baseType.kind === 'boolean') {
+        return value.rawValue ? 'TRUE' : 'FALSE'
+      }
+      return String(value.rawValue)
+    }
     case 'integer':
     case 'real':
-    case 'subrange':
       return String(value.rawValue)
     default:
       return String(value.rawValue)

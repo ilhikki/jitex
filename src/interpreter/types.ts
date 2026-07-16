@@ -2,6 +2,8 @@ import type {
   ArrayTypeNode,
   BinaryExpressionNode,
   BlockNode,
+  BooleanLiteralNode,
+  CharLiteralNode,
   ConstDeclarationNode,
   EnumerationTypeNode,
   ExpressionNode,
@@ -47,6 +49,8 @@ export * from './types/pascal-value'
 export interface Scope {
   variables: Map<string, PascalValue>
   variableTypes: Map<string, PascalType>
+  /** 局部 type 声明：类型名 -> TypeDeclarationNode（Pascal82 §6.2.2.1 局部 type 遮蔽全局） */
+  types: Map<string, TypeDeclarationNode> | null
   /** var 参数绑定：参数名 -> 调用方 scope 和变量名 */
   varBindings: Map<string, { scope: Scope; name: string }> | null
   /** WITH 语句绑定：字段名 -> 记录值引用（PascalValue，rawValue 是 PascalRecord） */
@@ -62,6 +66,7 @@ export function createScope(
   return {
     variables: new Map(),
     variableTypes: new Map(),
+    types: null,
     varBindings: null,
     withRecords: null,
     parent,
@@ -174,10 +179,22 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
   switch (kind) {
     case 'SimpleType': {
       const name = (typeNode as SimpleTypeNode).name.name.toUpperCase()
+
+      // Pascal82 §6.2.2.1: 局部 type 遮蔽全局 type — 先沿 scope 链查找局部 type 声明
+      let s: Scope | null = state.currentScope
+      while (s) {
+        if (s.types && s.types.has(name)) {
+          const localTypeDecl = s.types.get(name)!
+          return resolveType(localTypeDecl.typeDef, state)
+        }
+        s = s.parent
+      }
+
+      // 内置类型 + 全局缓存
       const builtin = findType(name)
       if (builtin) return builtin
 
-      // 用户定义的类型（如 ASCIICODE）
+      // 全局用户定义类型
       const typeDecl = state.declarations.types.get(name)
       if (typeDecl) {
         const resolved = resolveType(typeDecl.typeDef, state)
@@ -192,7 +209,14 @@ export function resolveType(typeNode: TypeNode | null, state: State): PascalType
       const sub = typeNode as RangeTypeNode
       const low = evaluateConstExpr(sub.start, state)
       const high = evaluateConstExpr(sub.end, state)
-      return new SubrangeType(`${low}..${high}`, INTEGER_TYPE, low, high)
+      // Pascal82 §6.4.3.2: 根据边界字面量类型推断子界基类型
+      let baseType: PascalType = INTEGER_TYPE
+      if (sub.start.kind === 'CharLiteral' || sub.end.kind === 'CharLiteral') {
+        baseType = findType('CHAR') || INTEGER_TYPE
+      } else if (sub.start.kind === 'BooleanLiteral' || sub.end.kind === 'BooleanLiteral') {
+        baseType = findType('BOOLEAN') || INTEGER_TYPE
+      }
+      return new SubrangeType(`${low}..${high}`, baseType, low, high)
     }
 
     case 'ArrayType': {
@@ -287,13 +311,24 @@ export function evaluateConstExpr(expr: ExpressionNode, state: State): number {
       return (expr as IntegerLiteralNode).value
     case 'RealLiteral':
       return (expr as any).value
+    case 'CharLiteral':
+      // Pascal82 §6.4.3.2: char 字面量作为子界边界，返回 ASCII 码
+      return (expr as CharLiteralNode).value.charCodeAt(0)
+    case 'BooleanLiteral':
+      // Pascal82 §6.4.3.2: boolean 字面量作为子界边界，ord(false)=0, ord(true)=1
+      return (expr as BooleanLiteralNode).value ? 1 : 0
 
     case 'Identifier': {
       const name = (expr as IdentifierNode).name.toUpperCase()
-      const value = state.globalScope.variables.get(name)
-      if (value) {
-        const raw = value.rawValue
-        return typeof raw === 'bigint' ? Number(raw) : (raw as number)
+      // Pascal82 §6.2.2.1: 局部 const 遮蔽全局 const — 沿 scope 链查找
+      let s: Scope | null = state.currentScope
+      while (s) {
+        if (s.variables.has(name)) {
+          const value = s.variables.get(name)!
+          const raw = value.rawValue
+          return typeof raw === 'bigint' ? Number(raw) : (raw as number)
+        }
+        s = s.parent
       }
       throw new Error(`Unknown constant: ${name}`)
     }
