@@ -54,25 +54,25 @@ export interface IdentifierNode extends AstNode {
 export interface IntegerLiteralNode extends AstNode {
   kind: 'IntegerLiteral'
   value: number
-  raw: Token
+  raw: string
 }
 
 export interface RealLiteralNode extends AstNode {
   kind: 'RealLiteral'
   value: number
-  raw: Token
+  raw: string
 }
 
 export interface StringLiteralNode extends AstNode {
   kind: 'StringLiteral'
   value: string
-  raw: Token
+  raw: string
 }
 
 export interface CharLiteralNode extends AstNode {
   kind: 'CharLiteral'
   value: string
-  raw: Token
+  raw: string
 }
 
 export interface BooleanLiteralNode extends AstNode {

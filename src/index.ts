@@ -7,8 +7,6 @@ export { parseStatement, parseCompoundStatement } from './parser/statements'
 export { parseType, parseVariableDeclaration } from './parser/types'
 export * from './parser/helpers'
 export { nodeToCode } from './ast/printer'
-export { SourceMap } from './ast/source-map'
-export type { NodeLineInfo } from './ast/source-map'
 
 import { lex } from './lexer/lexer'
 import { parseProgram } from './parser/declarations'

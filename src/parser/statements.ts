@@ -126,7 +126,7 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
     label: {
       kind: 'IntegerLiteral',
       value: labelValue,
-      raw: labelToken,
+      raw: labelToken.content,
     } as IntegerLiteralNode,
     statement: stmtResult.astNode,
   } as LabeledStatementNode)
@@ -482,7 +482,7 @@ function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> 
     label: {
       kind: 'IntegerLiteral',
       value: parseInt(token.content, 10),
-      raw: token,
+      raw: token.content,
     } as IntegerLiteralNode,
   } as GotoStatementNode)
 }

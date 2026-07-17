@@ -147,13 +147,13 @@ function printNode(node: AstNode, ctx: PrintContext): string {
     case 'Identifier':
       return (node as IdentifierNode).name
     case 'IntegerLiteral':
-      return (node as IntegerLiteralNode).raw.content
+      return (node as IntegerLiteralNode).raw
     case 'RealLiteral':
-      return (node as RealLiteralNode).raw.content
+      return (node as RealLiteralNode).raw
     case 'StringLiteral':
-      return quoteString((node as StringLiteralNode).raw.content)
+      return quoteString((node as StringLiteralNode).raw)
     case 'CharLiteral':
-      return quoteChar((node as CharLiteralNode).raw.content)
+      return quoteChar((node as CharLiteralNode).raw)
     case 'BooleanLiteral':
       return (node as BooleanLiteralNode).value ? 'TRUE' : 'FALSE'
     case 'BinaryExpression':
@@ -262,7 +262,7 @@ function printBlock(node: BlockNode, ctx: PrintContext): string {
   const parts: string[] = []
 
   if (node.labelDeclarations && node.labelDeclarations.labels.length > 0) {
-    const labels = node.labelDeclarations.labels.map((l) => l.raw.content).join(', ')
+    const labels = node.labelDeclarations.labels.map((l) => l.raw).join(', ')
     parts.push(`label\n  ${labels};`)
   }
 
@@ -388,12 +388,12 @@ function printCaseBranch(branch: CaseBranchNode, ctx: PrintContext): string {
 }
 
 function printGoto(node: GotoStatementNode): string {
-  return `goto ${node.label.raw.content}`
+  return `goto ${node.label.raw}`
 }
 
 function printLabeled(node: LabeledStatementNode, ctx: PrintContext): string {
   const stmt = printStatement(node.statement, ctx)
-  return `${node.label.raw.content}: ${stmt}`
+  return `${node.label.raw}: ${stmt}`
 }
 
 function printWith(node: WithStatementNode, ctx: PrintContext): string {
@@ -414,7 +414,7 @@ function printProcedureCall(node: ProcedureCallNode): string {
 // ============================================================================
 
 function printLabelDecl(node: { labels: IntegerLiteralNode[] }): string {
-  return node.labels.map((l) => l.raw.content).join(', ')
+  return node.labels.map((l) => l.raw).join(', ')
 }
 
 function printConstDecl(node: ConstDeclarationNode): string {
