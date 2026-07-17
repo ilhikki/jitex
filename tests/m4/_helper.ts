@@ -84,3 +84,64 @@ export async function runVMTests(tests: VMTest[]): Promise<{ passed: number; fai
 
   return { passed, failed, failures }
 }
+
+// ===========================================================================
+// 兼容层：将 m3.6 InterpreterTest 格式适配到 VM
+// ===========================================================================
+
+export interface InterpreterTestCompat {
+  name: string
+  code: string
+  purpose: string
+  features: string[]
+  expectedOutput?: string
+  expectedContains?: string
+  expectedNotContains?: string
+  expectedError?: boolean
+  input?: string[]
+}
+
+export async function runVMFromInterpreterTest(
+  t: InterpreterTestCompat
+): Promise<{ passed: boolean; message: string }> {
+  try {
+    const state = await runVMImpl(t.code, { input: t.input })
+    const output = getOutput(state)
+
+    if (t.expectedError === true) {
+      if (state.status !== 'error' && !state.error) {
+        return { passed: false, message: `Expected error but none occurred` }
+      }
+      return { passed: true, message: 'OK' }
+    }
+
+    if (state.status === 'error') {
+      return { passed: false, message: `Unexpected error: ${state.error?.message}` }
+    }
+
+    if (t.expectedOutput !== undefined) {
+      if (output !== t.expectedOutput) {
+        return { passed: false, message: `Expected output ${JSON.stringify(t.expectedOutput)}, got ${JSON.stringify(output)}` }
+      }
+    }
+
+    if (t.expectedContains !== undefined) {
+      if (!output.includes(t.expectedContains)) {
+        return { passed: false, message: `Expected output to contain ${JSON.stringify(t.expectedContains)}, got ${JSON.stringify(output)}` }
+      }
+    }
+
+    if (t.expectedNotContains !== undefined) {
+      if (output.includes(t.expectedNotContains)) {
+        return { passed: false, message: `Expected output to NOT contain ${JSON.stringify(t.expectedNotContains)}, got ${JSON.stringify(output)}` }
+      }
+    }
+
+    return { passed: true, message: 'OK' }
+  } catch (e: any) {
+    if (t.expectedError === true) {
+      return { passed: true, message: 'OK (error caught)' }
+    }
+    return { passed: false, message: `Exception: ${e.message}` }
+  }
+}
