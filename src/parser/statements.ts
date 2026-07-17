@@ -19,7 +19,7 @@ import {
   WhileStatementNode,
   WithStatementNode,
 } from '../ast/types'
-import { expectKeyword, expectType, fail, ok, parseList, peek } from './helpers'
+import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
 import { parseExpression, parseIdentifier, parsePrimary } from './expressions'
 
 // ============================================================================
@@ -69,15 +69,16 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
     case 'UNTIL':
     case 'EOF':
       // Empty statement
-      return ok(input.position, { kind: 'EmptyStatement' } as EmptyStatementNode)
+      return ok(input.position, withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end))
 
     default:
-      return ok(input.position, { kind: 'EmptyStatement' } as EmptyStatementNode)
+      return ok(input.position, withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end))
   }
 }
 
 // BEGIN statements END
 export function parseCompoundStatement(input: ParserInput): ParseResult<CompoundStatementNode> {
+  const startToken = peek(input)
   const beginResult = expectKeyword(input, 'BEGIN')
   if (!beginResult.success) return fail(beginResult.error, beginResult.position)
   let pos = beginResult.newPosition
@@ -105,11 +106,12 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
   if (!endResult.success) return fail(endResult.error, endResult.position)
   pos = endResult.newPosition
 
-  return ok(pos, { kind: 'CompoundStatement', statements } as CompoundStatementNode)
+  return ok(pos, withLoc({ kind: 'CompoundStatement', statements } as CompoundStatementNode, startToken.start, endResult.astNode.end))
 }
 
 function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   // label: statement
+  const startToken = peek(input)
   const labelToken = peek(input)
   const labelValue = parseInt(labelToken.content, 10)
   let pos = input.position + 1
@@ -121,7 +123,7 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
   if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
 
-  return ok(stmtResult.newPosition, {
+  return ok(stmtResult.newPosition, withLoc({
     kind: 'LabeledStatement',
     label: {
       kind: 'IntegerLiteral',
@@ -129,10 +131,11 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
       raw: labelToken.content,
     } as IntegerLiteralNode,
     statement: stmtResult.astNode,
-  } as LabeledStatementNode)
+  } as LabeledStatementNode, startToken.start, input.tokens[stmtResult.newPosition - 1].end))
 }
 
 function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
+  const startToken = peek(input)
   const token = peek(input)
 
   // Special handling for WRITE/WRITELN — they support format specifiers: expr:width:precision
@@ -157,29 +160,29 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
     if (!rightResult.success) return fail(rightResult.error, rightResult.position)
     pos = rightResult.newPosition
 
-    return ok(pos, {
+    return ok(pos, withLoc({
       kind: 'Assignment',
       left: exprResult.astNode,
       right: rightResult.astNode,
-    } as AssignmentNode)
+    } as AssignmentNode, startToken.start, input.tokens[pos - 1].end))
   }
 
   // If it's a function call without :=, it's a procedure call
   if (exprResult.astNode.kind === 'FunctionCall') {
-    return ok(pos, {
+    return ok(pos, withLoc({
       kind: 'ProcedureCall',
       name: (exprResult.astNode as any).name,
       arguments: (exprResult.astNode as any).arguments,
-    } as ProcedureCallNode)
+    } as ProcedureCallNode, startToken.start, input.tokens[pos - 1].end))
   }
 
   // If it's just an identifier, it's a procedure call with no args
   if (exprResult.astNode.kind === 'Identifier') {
-    return ok(pos, {
+    return ok(pos, withLoc({
       kind: 'ProcedureCall',
       name: exprResult.astNode as IdentifierNode,
       arguments: [],
-    } as ProcedureCallNode)
+    } as ProcedureCallNode, startToken.start, input.tokens[pos - 1].end))
   }
 
   return fail(
@@ -190,6 +193,7 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
 
 // Parse WRITE/WRITELN with format specifiers: WRITE([file,] expr[:width[:precision]] {, expr[:width[:precision]]})
 function parseWriteCall(input: ParserInput, name: string): ParseResult<StatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip WRITE/WRITELN
   const args: ExpressionNode[] = []
 
@@ -242,15 +246,16 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
     pos = closeResult.newPosition
   }
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'ProcedureCall',
     name: { kind: 'Identifier', name } as IdentifierNode,
     arguments: args,
-  } as ProcedureCallNode)
+  } as ProcedureCallNode, startToken.start, input.tokens[pos - 1].end))
 }
 
 // IF expression THEN statement [ELSE statement]
 function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip IF
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
@@ -274,16 +279,17 @@ function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
     pos = elseResult.newPosition
   }
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'IfStatement',
     condition: condResult.astNode,
     thenBranch: thenStmtResult.astNode,
     elseBranch,
-  } as IfStatementNode)
+  } as IfStatementNode, startToken.start, input.tokens[pos - 1].end))
 }
 
 // WHILE expression DO statement
 function parseWhileStatement(input: ParserInput): ParseResult<WhileStatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip WHILE
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
@@ -298,15 +304,16 @@ function parseWhileStatement(input: ParserInput): ParseResult<WhileStatementNode
   if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
   pos = bodyResult.newPosition
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'WhileStatement',
     condition: condResult.astNode,
     body: bodyResult.astNode,
-  } as WhileStatementNode)
+  } as WhileStatementNode, startToken.start, input.tokens[pos - 1].end))
 }
 
 // REPEAT statements UNTIL expression
 function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip REPEAT
   const statements: StatementNode[] = []
 
@@ -335,15 +342,16 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
   if (!condResult.success) return fail(condResult.error, condResult.position)
   pos = condResult.newPosition
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'RepeatStatement',
     statements,
     untilCondition: condResult.astNode,
-  } as RepeatStatementNode)
+  } as RepeatStatementNode, startToken.start, input.tokens[pos - 1].end))
 }
 
 // FOR identifier := expression (TO|DOWNTO) expression DO statement
 function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip FOR
 
   const varResult = parseIdentifier({ tokens: input.tokens, position: pos })
@@ -386,18 +394,19 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
   pos = bodyResult.newPosition
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'ForStatement',
     variable: varResult.astNode,
     initial: initResult.astNode,
     final: finalResult.astNode,
     direction,
     body: bodyResult.astNode,
-  } as ForStatementNode)
+  } as ForStatementNode, startToken.start, input.tokens[pos - 1].end))
 }
 
 // CASE expression OF case_branch {; case_branch} [; OTHERWISE statement] END
 function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip CASE
 
   const exprResult = parseExpression({ tokens: input.tokens, position: pos })
@@ -459,16 +468,17 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   if (!endResult.success) return fail(endResult.error, endResult.position)
   pos = endResult.newPosition
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'CaseStatement',
     expression: exprResult.astNode,
     branches,
     otherwise,
-  } as CaseStatementNode)
+  } as CaseStatementNode, startToken.start, endResult.astNode.end))
 }
 
 // GOTO label
 function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip GOTO
 
   const token = peek({ tokens: input.tokens, position: pos })
@@ -477,18 +487,19 @@ function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> 
   }
   pos++
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'GotoStatement',
     label: {
       kind: 'IntegerLiteral',
       value: parseInt(token.content, 10),
       raw: token.content,
     } as IntegerLiteralNode,
-  } as GotoStatementNode)
+  } as GotoStatementNode, startToken.start, token.end))
 }
 
 // WITH expression {, expression} DO statement
 function parseWithStatement(input: ParserInput): ParseResult<WithStatementNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip WITH
 
   const recordsResult = parseList({ tokens: input.tokens, position: pos }, parseExpression, 'COMMA')
@@ -503,9 +514,9 @@ function parseWithStatement(input: ParserInput): ParseResult<WithStatementNode> 
   if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
   pos = bodyResult.newPosition
 
-  return ok(pos, {
+  return ok(pos, withLoc({
     kind: 'WithStatement',
     records: recordsResult.astNode,
     body: bodyResult.astNode,
-  } as WithStatementNode)
+  } as WithStatementNode, startToken.start, input.tokens[pos - 1].end))
 }

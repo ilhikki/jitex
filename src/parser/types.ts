@@ -5,6 +5,7 @@ import {
   IdentifierNode,
   ParseResult,
   ParserInput,
+  Position,
   RangeTypeNode,
   RecordTypeNode,
   SetTypeNode,
@@ -12,7 +13,7 @@ import {
   TypeNode,
   VariableDeclarationNode,
 } from '../ast/types'
-import { expectKeyword, expectType, fail, ok, parseList, peek } from './helpers'
+import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
 import { parseExpression, parseIdentifier } from './expressions'
 
 // ============================================================================
@@ -63,53 +64,59 @@ export function parseType(input: ParserInput): ParseResult<TypeNode> {
 }
 
 function parseRangeOrSimpleType(input: ParserInput): ParseResult<TypeNode> {
-  // Parse first expression
+  const startPos = peek(input).start
+
   const startResult = parseExpression(input)
   if (!startResult.success) return startResult
 
   let pos = startResult.newPosition
 
-  // Check for .. (range)
   if (peek({ tokens: input.tokens, position: pos }).type === 'DOTDOT') {
     pos++
     const endResult = parseExpression({ tokens: input.tokens, position: pos })
     if (!endResult.success) return fail(endResult.error, endResult.position)
-    return ok(endResult.newPosition, {
-      kind: 'RangeType',
-      start: startResult.astNode,
-      end: endResult.astNode,
-    } as RangeTypeNode)
+    return ok(endResult.newPosition, withLoc(
+      {
+        kind: 'RangeType',
+        start: startResult.astNode,
+        end: endResult.astNode,
+      } as RangeTypeNode,
+      startPos,
+      input.tokens[endResult.newPosition - 1].end
+    ))
   }
 
-  // Just a simple type (identifier or constant)
   if (startResult.astNode.kind === 'Identifier') {
-    return ok(pos, {
-      kind: 'SimpleType',
-      name: startResult.astNode as IdentifierNode,
-    } as SimpleTypeNode)
+    return ok(pos, withLoc(
+      {
+        kind: 'SimpleType',
+        name: startResult.astNode as IdentifierNode,
+      } as SimpleTypeNode,
+      startPos,
+      input.tokens[pos - 1].end
+    ))
   }
 
-  // Constant range without dots? This shouldn't happen but handle gracefully
   return fail('Expected type definition', pos)
 }
 
 function parsePackedType(input: ParserInput): ParseResult<TypeNode> {
-  // PACKED ARRAY / PACKED FILE / PACKED SET / PACKED RECORD
+  const startPos = peek(input).start
   const afterPacked = { tokens: input.tokens, position: input.position + 1 }
   const token = peek(afterPacked)
 
   switch (token.type) {
     case 'ARRAY':
-      return parseArrayType(afterPacked, true)
+      return parseArrayType(afterPacked, true, startPos)
 
     case 'FILE':
-      return parseFileType(afterPacked, true)
+      return parseFileType(afterPacked, true, startPos)
 
     case 'SET':
-      return parseSetType(afterPacked)
+      return parseSetType(afterPacked, startPos)
 
     case 'RECORD':
-      return parseRecordType(afterPacked)
+      return parseRecordType(afterPacked, startPos)
 
     default:
       return fail(
@@ -120,7 +127,8 @@ function parsePackedType(input: ParserInput): ParseResult<TypeNode> {
 }
 
 // ARRAY [ indexType {, indexType} ] OF elementType
-function parseArrayType(input: ParserInput, isPacked: boolean = false): ParseResult<ArrayTypeNode> {
+function parseArrayType(input: ParserInput, isPacked: boolean = false, startPos?: Position): ParseResult<ArrayTypeNode> {
+  const start = startPos ?? peek(input).start
   let pos = input.position + 1 // skip ARRAY
 
   const openResult = expectType({ tokens: input.tokens, position: pos }, 'LBRACKET')
@@ -143,16 +151,21 @@ function parseArrayType(input: ParserInput, isPacked: boolean = false): ParseRes
   if (!elemResult.success) return fail(elemResult.error, elemResult.position)
   pos = elemResult.newPosition
 
-  return ok(pos, {
-    kind: 'ArrayType',
-    indexTypes: indexResult.astNode,
-    elementType: elemResult.astNode,
-    isPacked,
-  } as ArrayTypeNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'ArrayType',
+      indexTypes: indexResult.astNode,
+      elementType: elemResult.astNode,
+      isPacked,
+    } as ArrayTypeNode,
+    start,
+    input.tokens[pos - 1].end
+  ))
 }
 
 // RECORD field_list END
-function parseRecordType(input: ParserInput): ParseResult<RecordTypeNode> {
+function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<RecordTypeNode> {
+  const start = startPos ?? peek(input).start
   let pos = input.position + 1 // skip RECORD
   const fields: VariableDeclarationNode[] = []
 
@@ -162,7 +175,6 @@ function parseRecordType(input: ParserInput): ParseResult<RecordTypeNode> {
     fields.push(fieldResult.astNode)
     pos = fieldResult.newPosition
 
-    // Skip semicolons
     while (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
       pos++
     }
@@ -172,11 +184,16 @@ function parseRecordType(input: ParserInput): ParseResult<RecordTypeNode> {
   if (!endResult.success) return fail(endResult.error, endResult.position)
   pos = endResult.newPosition
 
-  return ok(pos, { kind: 'RecordType', fields } as RecordTypeNode)
+  return ok(pos, withLoc(
+    { kind: 'RecordType', fields } as RecordTypeNode,
+    start,
+    input.tokens[pos - 1].end
+  ))
 }
 
 // FILE OF type  |  FILE
-function parseFileType(input: ParserInput, isPacked: boolean = false): ParseResult<FileTypeNode> {
+function parseFileType(input: ParserInput, isPacked: boolean = false, startPos?: Position): ParseResult<FileTypeNode> {
+  const start = startPos ?? peek(input).start
   let pos = input.position + 1 // skip FILE
 
   let elementType: TypeNode | null = null
@@ -189,15 +206,20 @@ function parseFileType(input: ParserInput, isPacked: boolean = false): ParseResu
     elementType = elemResult.astNode
   }
 
-  return ok(pos, {
-    kind: 'FileType',
-    elementType,
-    isPacked,
-  } as FileTypeNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'FileType',
+      elementType,
+      isPacked,
+    } as FileTypeNode,
+    start,
+    input.tokens[pos - 1].end
+  ))
 }
 
 // SET OF type
-function parseSetType(input: ParserInput): ParseResult<SetTypeNode> {
+function parseSetType(input: ParserInput, startPos?: Position): ParseResult<SetTypeNode> {
+  const start = startPos ?? peek(input).start
   let pos = input.position + 1 // skip SET
 
   const ofResult = expectKeyword({ tokens: input.tokens, position: pos }, 'OF')
@@ -208,13 +230,18 @@ function parseSetType(input: ParserInput): ParseResult<SetTypeNode> {
   if (!baseResult.success) return fail(baseResult.error, baseResult.position)
   pos = baseResult.newPosition
 
-  return ok(pos, { kind: 'SetType', baseType: baseResult.astNode } as SetTypeNode)
+  return ok(pos, withLoc(
+    { kind: 'SetType', baseType: baseResult.astNode } as SetTypeNode,
+    start,
+    input.tokens[pos - 1].end
+  ))
 }
 
 // ( identifier {, identifier} )
 function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNode> {
   const openResult = expectType(input, 'LPAREN')
   if (!openResult.success) return fail(openResult.error, openResult.position)
+  const start = openResult.astNode.start
   let pos = openResult.newPosition
 
   const valuesResult = parseList({ tokens: input.tokens, position: pos }, parseIdentifier, 'COMMA')
@@ -225,10 +252,14 @@ function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNo
   if (!closeResult.success) return fail(closeResult.error, closeResult.position)
   pos = closeResult.newPosition
 
-  return ok(pos, {
-    kind: 'EnumerationType',
-    values: valuesResult.astNode,
-  } as EnumerationTypeNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'EnumerationType',
+      values: valuesResult.astNode,
+    } as EnumerationTypeNode,
+    start,
+    closeResult.astNode.end
+  ))
 }
 
 // ============================================================================
@@ -237,6 +268,8 @@ function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNo
 
 // identifier_list : type
 export function parseVariableDeclaration(input: ParserInput): ParseResult<VariableDeclarationNode> {
+  const startPos = peek(input).start
+
   const namesResult = parseList(input, parseIdentifier, 'COMMA')
   if (!namesResult.success) return fail(namesResult.error, namesResult.position)
   let pos = namesResult.newPosition
@@ -249,9 +282,13 @@ export function parseVariableDeclaration(input: ParserInput): ParseResult<Variab
   if (!typeResult.success) return fail(typeResult.error, typeResult.position)
   pos = typeResult.newPosition
 
-  return ok(pos, {
-    kind: 'VariableDeclaration',
-    names: namesResult.astNode,
-    type: typeResult.astNode,
-  } as VariableDeclarationNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'VariableDeclaration',
+      names: namesResult.astNode,
+      type: typeResult.astNode,
+    } as VariableDeclarationNode,
+    startPos,
+    input.tokens[pos - 1].end
+  ))
 }

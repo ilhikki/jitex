@@ -1,4 +1,4 @@
-import { Token, ParserInput, ParseResult, AstNode, Position } from '../ast/types'
+import { Token, ParserInput, ParseResult, AstNode, Position, SourceLocation } from '../ast/types'
 
 // ============================================================================
 // Parser helpers — pure functions operating on {tokens, position}
@@ -32,6 +32,25 @@ export function tokenContent(input: ParserInput): string {
 
 export function tokenPosition(input: ParserInput): Position {
   return peek(input).start
+}
+
+// 给 AST 节点添加源码位置
+export function withLoc<T extends AstNode>(
+  node: T,
+  start: Position,
+  end: Position
+): T & { loc: SourceLocation } {
+  return { ...node, loc: { start, end } }
+}
+
+// 从 Token 提取位置范围（单个 token 的 start/end）
+export function tokenLoc(token: Token): SourceLocation {
+  return { start: token.start, end: token.end }
+}
+
+// 从两个 token 位置构造范围（用于跨多个 token 的节点）
+export function rangeLoc(startToken: Token, endToken: Token): SourceLocation {
+  return { start: startToken.start, end: endToken.end }
 }
 
 // --- Success / Failure constructors ---

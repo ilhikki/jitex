@@ -26,6 +26,7 @@ import {
   expectType,
   expectKeyword,
   parseList,
+  withLoc,
 } from './helpers'
 import { parseIdentifier, parseExpression } from './expressions'
 import { parseType, parseVariableDeclaration } from './types'
@@ -37,6 +38,7 @@ import { parseStatement, parseCompoundStatement } from './statements'
 
 // LABEL label {, label} ;
 export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDeclarationNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip LABEL
   const labels: IntegerLiteralNode[] = []
 
@@ -60,7 +62,11 @@ export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDecl
   if (!semiResult.success) return fail(semiResult.error, semiResult.position)
   pos = semiResult.newPosition
 
-  return ok(pos, { kind: 'LabelDeclaration', labels } as LabelDeclarationNode)
+  return ok(pos, withLoc(
+    { kind: 'LabelDeclaration', labels } as LabelDeclarationNode,
+    startToken.start,
+    semiResult.astNode.end
+  ))
 }
 
 // CONST { identifier = expression ; }
@@ -73,6 +79,7 @@ export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDec
   const decls: ConstDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type === 'IDENTIFIER') {
+    const nameStartToken = peek({ tokens: input.tokens, position: pos })
     const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
     if (!nameResult.success) return fail(nameResult.error, nameResult.position)
     pos = nameResult.newPosition
@@ -90,11 +97,15 @@ export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDec
       pos++
     }
 
-    decls.push({
-      kind: 'ConstDeclaration',
-      name: nameResult.astNode,
-      value: valResult.astNode,
-    } as ConstDeclarationNode)
+    decls.push(withLoc(
+      {
+        kind: 'ConstDeclaration',
+        name: nameResult.astNode,
+        value: valResult.astNode,
+      } as ConstDeclarationNode,
+      nameStartToken.start,
+      input.tokens[pos - 1].end
+    ))
   }
 
   return ok(pos, decls)
@@ -110,6 +121,7 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
   const decls: TypeDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type === 'IDENTIFIER') {
+    const nameStartToken = peek({ tokens: input.tokens, position: pos })
     const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
     if (!nameResult.success) return fail(nameResult.error, nameResult.position)
     pos = nameResult.newPosition
@@ -126,11 +138,15 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
       pos++
     }
 
-    decls.push({
-      kind: 'TypeDeclaration',
-      name: nameResult.astNode,
-      typeDef: typeResult.astNode,
-    } as TypeDeclarationNode)
+    decls.push(withLoc(
+      {
+        kind: 'TypeDeclaration',
+        name: nameResult.astNode,
+        typeDef: typeResult.astNode,
+      } as TypeDeclarationNode,
+      nameStartToken.start,
+      input.tokens[pos - 1].end
+    ))
   }
 
   return ok(pos, decls)
@@ -175,6 +191,7 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
   const params: ParameterDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'RPAREN') {
+    const paramStartToken = peek({ tokens: input.tokens, position: pos })
     let isVar = false
     if (peek({ tokens: input.tokens, position: pos }).type === 'VAR') {
       isVar = true
@@ -193,12 +210,16 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
     if (!typeResult.success) return fail(typeResult.error, typeResult.position)
     pos = typeResult.newPosition
 
-    params.push({
-      kind: 'ParameterDeclaration',
-      names: namesResult.astNode,
-      type: typeResult.astNode,
-      isVar,
-    } as ParameterDeclarationNode)
+    params.push(withLoc(
+      {
+        kind: 'ParameterDeclaration',
+        names: namesResult.astNode,
+        type: typeResult.astNode,
+        isVar,
+      } as ParameterDeclarationNode,
+      paramStartToken.start,
+      input.tokens[pos - 1].end
+    ))
 
     if (peek({ tokens: input.tokens, position: pos }).type !== 'SEMICOLON') break
     pos++
@@ -214,6 +235,7 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
 export function parseProcedureDeclaration(
   input: ParserInput
 ): ParseResult<ProcedureDeclarationNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip PROCEDURE
 
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
@@ -234,13 +256,17 @@ export function parseProcedureDeclaration(
     const semiResult2 = expectType({ tokens: input.tokens, position: pos }, 'SEMICOLON')
     if (!semiResult2.success) return fail(semiResult2.error, semiResult2.position)
     pos = semiResult2.newPosition
-    return ok(pos, {
-      kind: 'ProcedureDeclaration',
-      name: nameResult.astNode,
-      parameters: paramsResult.astNode,
-      block: null,
-      isForward: true,
-    } as ProcedureDeclarationNode)
+    return ok(pos, withLoc(
+      {
+        kind: 'ProcedureDeclaration',
+        name: nameResult.astNode,
+        parameters: paramsResult.astNode,
+        block: null,
+        isForward: true,
+      } as ProcedureDeclarationNode,
+      startToken.start,
+      semiResult2.astNode.end
+    ))
   }
 
   // Parse block
@@ -253,16 +279,21 @@ export function parseProcedureDeclaration(
     pos++
   }
 
-  return ok(pos, {
-    kind: 'ProcedureDeclaration',
-    name: nameResult.astNode,
-    parameters: paramsResult.astNode,
-    block: blockResult.astNode,
-    isForward: false,
-  } as ProcedureDeclarationNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'ProcedureDeclaration',
+      name: nameResult.astNode,
+      parameters: paramsResult.astNode,
+      block: blockResult.astNode,
+      isForward: false,
+    } as ProcedureDeclarationNode,
+    startToken.start,
+    input.tokens[pos - 1].end
+  ))
 }
 
 export function parseFunctionDeclaration(input: ParserInput): ParseResult<FunctionDeclarationNode> {
+  const startToken = peek(input)
   let pos = input.position + 1 // skip FUNCTION
 
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
@@ -291,14 +322,18 @@ export function parseFunctionDeclaration(input: ParserInput): ParseResult<Functi
     const semiResult2 = expectType({ tokens: input.tokens, position: pos }, 'SEMICOLON')
     if (!semiResult2.success) return fail(semiResult2.error, semiResult2.position)
     pos = semiResult2.newPosition
-    return ok(pos, {
-      kind: 'FunctionDeclaration',
-      name: nameResult.astNode,
-      parameters: paramsResult.astNode,
-      returnType: returnTypeResult.astNode,
-      block: null,
-      isForward: true,
-    } as FunctionDeclarationNode)
+    return ok(pos, withLoc(
+      {
+        kind: 'FunctionDeclaration',
+        name: nameResult.astNode,
+        parameters: paramsResult.astNode,
+        returnType: returnTypeResult.astNode,
+        block: null,
+        isForward: true,
+      } as FunctionDeclarationNode,
+      startToken.start,
+      semiResult2.astNode.end
+    ))
   }
 
   // Parse block
@@ -310,14 +345,18 @@ export function parseFunctionDeclaration(input: ParserInput): ParseResult<Functi
     pos++
   }
 
-  return ok(pos, {
-    kind: 'FunctionDeclaration',
-    name: nameResult.astNode,
-    parameters: paramsResult.astNode,
-    returnType: returnTypeResult.astNode,
-    block: blockResult.astNode,
-    isForward: false,
-  } as FunctionDeclarationNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'FunctionDeclaration',
+      name: nameResult.astNode,
+      parameters: paramsResult.astNode,
+      returnType: returnTypeResult.astNode,
+      block: blockResult.astNode,
+      isForward: false,
+    } as FunctionDeclarationNode,
+    startToken.start,
+    input.tokens[pos - 1].end
+  ))
 }
 
 // ============================================================================
@@ -325,6 +364,7 @@ export function parseFunctionDeclaration(input: ParserInput): ParseResult<Functi
 // ============================================================================
 
 export function parseBlock(input: ParserInput): ParseResult<BlockNode> {
+  const startToken = peek(input)
   let pos = input.position
 
   // Label section
@@ -381,16 +421,20 @@ export function parseBlock(input: ParserInput): ParseResult<BlockNode> {
   const labelCheck = checkDuplicateLabels(compoundResult.astNode)
   if (!labelCheck.success) return fail(labelCheck.error, labelCheck.position)
 
-  return ok(pos, {
-    kind: 'Block',
-    labelDeclarations,
-    constDeclarations: constResult.astNode,
-    typeDeclarations: typeResult.astNode,
-    variableDeclarations: varResult.astNode,
-    procedureDeclarations: procDecls,
-    functionDeclarations: funcDecls,
-    compound: compoundResult.astNode,
-  } as BlockNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'Block',
+      labelDeclarations,
+      constDeclarations: constResult.astNode,
+      typeDeclarations: typeResult.astNode,
+      variableDeclarations: varResult.astNode,
+      procedureDeclarations: procDecls,
+      functionDeclarations: funcDecls,
+      compound: compoundResult.astNode,
+    } as BlockNode,
+    startToken.start,
+    input.tokens[pos - 1].end
+  ))
 }
 
 // Pascal82 要求同一 block 内不能重复声明 label。跨 block（不同 procedure/function）允许同名 label。
@@ -558,6 +602,7 @@ function validateGotos(
 
 // PROGRAM identifier ( identifier_list ) ; block .
 export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
+  const startToken = peek(input)
   let pos = input.position
 
   // Skip compiler directives and comments (already handled by lexer)
@@ -613,10 +658,14 @@ export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
     )
   }
 
-  return ok(pos, {
-    kind: 'Program',
-    name: nameResult.astNode,
-    parameters,
-    block: blockResult.astNode,
-  } as ProgramNode)
+  return ok(pos, withLoc(
+    {
+      kind: 'Program',
+      name: nameResult.astNode,
+      parameters,
+      block: blockResult.astNode,
+    } as ProgramNode,
+    startToken.start,
+    dotResult.astNode.end
+  ))
 }

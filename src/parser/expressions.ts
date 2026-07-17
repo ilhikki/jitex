@@ -15,7 +15,7 @@ import {
   StringLiteralNode,
   UnaryExpressionNode,
 } from '../ast/types'
-import { expectType, fail, ok, parseList, peek } from './helpers'
+import { expectType, fail, ok, parseList, peek, withLoc } from './helpers'
 
 // ============================================================================
 // Expression Parsers
@@ -30,7 +30,7 @@ export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode>
       input.position
     )
   }
-  return ok(input.position + 1, { kind: 'Identifier', name: token.content })
+  return ok(input.position + 1, withLoc({ kind: 'Identifier', name: token.content }, token.start, token.end))
 }
 
 // parsePrimary — the base factor
@@ -39,42 +39,42 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
 
   switch (token.type) {
     case 'INTEGER': {
-      return ok(input.position + 1, {
+      return ok(input.position + 1, withLoc({
         kind: 'IntegerLiteral',
         value: parseInt(token.content, 10),
         raw: token.content,
-      } as IntegerLiteralNode)
+      } as IntegerLiteralNode, token.start, token.end))
     }
 
     case 'HEX_NUMBER': {
-      return ok(input.position + 1, {
+      return ok(input.position + 1, withLoc({
         kind: 'IntegerLiteral',
         value: parseInt(token.content.substring(1), 16),
         raw: token.content,
-      } as IntegerLiteralNode)
+      } as IntegerLiteralNode, token.start, token.end))
     }
 
     case 'REAL': {
-      return ok(input.position + 1, {
+      return ok(input.position + 1, withLoc({
         kind: 'RealLiteral',
         value: parseFloat(token.content),
         raw: token.content,
-      } as RealLiteralNode)
+      } as RealLiteralNode, token.start, token.end))
     }
 
     case 'STRING': {
       if (token.content.length === 1) {
-        return ok(input.position + 1, {
+        return ok(input.position + 1, withLoc({
           kind: 'CharLiteral',
           value: token.content,
           raw: token.content,
-        } as CharLiteralNode)
+        } as CharLiteralNode, token.start, token.end))
       }
-      return ok(input.position + 1, {
+      return ok(input.position + 1, withLoc({
         kind: 'StringLiteral',
         value: token.content,
         raw: token.content,
-      } as StringLiteralNode)
+      } as StringLiteralNode, token.start, token.end))
     }
 
     case 'CHAR_CODE': {
@@ -86,23 +86,23 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       } else {
         value = parseInt(content.substring(1), 10)
       }
-      return ok(input.position + 1, {
+      return ok(input.position + 1, withLoc({
         kind: 'CharLiteral',
         value: String.fromCharCode(value),
         raw: token.content,
-      } as CharLiteralNode)
+      } as CharLiteralNode, token.start, token.end))
     }
 
     case 'IDENTIFIER':
       // Handle TRUE/FALSE/NIL as identifiers (predefined, not reserved)
       if (token.content.toUpperCase() === 'TRUE') {
-        return ok(input.position + 1, { kind: 'BooleanLiteral', value: true })
+        return ok(input.position + 1, withLoc({ kind: 'BooleanLiteral', value: true }, token.start, token.end))
       }
       if (token.content.toUpperCase() === 'FALSE') {
-        return ok(input.position + 1, { kind: 'BooleanLiteral', value: false })
+        return ok(input.position + 1, withLoc({ kind: 'BooleanLiteral', value: false }, token.start, token.end))
       }
       if (token.content.toUpperCase() === 'NIL') {
-        return ok(input.position + 1, { kind: 'Identifier', name: 'NIL' } as IdentifierNode)
+        return ok(input.position + 1, withLoc({ kind: 'Identifier', name: 'NIL' } as IdentifierNode, token.start, token.end))
       }
       // Could be: identifier, function call, array access, field access
       return parsePostfix(input)
@@ -110,6 +110,7 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
     case 'LPAREN': {
       // Could be parenthesized expression or set constructor
       const startPos = input.position
+      const startToken = token
       const afterParen = { tokens: input.tokens, position: startPos + 1 }
 
       // Check for set constructor: [ ... ]
@@ -126,12 +127,13 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       if (!closeResult.success) {
         return fail(closeResult.error, closeResult.position)
       }
+      const endToken = closeResult.astNode
       pos = closeResult.newPosition
 
-      return ok(pos, {
+      return ok(pos, withLoc({
         kind: 'ParenthesizedExpression',
         expression: exprResult.astNode,
-      } as ParenthesizedExpressionNode)
+      } as ParenthesizedExpressionNode, startToken.start, endToken.end))
     }
 
     case 'LBRACKET': {
@@ -189,26 +191,30 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
 
     case 'MINUS': {
       // Unary minus
+      const startToken = token
       const afterMinus = { tokens: input.tokens, position: input.position + 1 }
       const operandResult = parseFactor(afterMinus)
       if (!operandResult.success) return fail(operandResult.error, operandResult.position)
-      return ok(operandResult.newPosition, {
+      const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
+      return ok(operandResult.newPosition, withLoc({
         kind: 'UnaryExpression',
         operator: '-',
         operand: operandResult.astNode,
-      } as UnaryExpressionNode)
+      } as UnaryExpressionNode, startToken.start, endToken.end))
     }
 
     case 'PLUS': {
       // Unary plus (no-op but still parse)
+      const startToken = token
       const afterPlus = { tokens: input.tokens, position: input.position + 1 }
       const operandResult = parseFactor(afterPlus)
       if (!operandResult.success) return fail(operandResult.error, operandResult.position)
-      return ok(operandResult.newPosition, {
+      const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
+      return ok(operandResult.newPosition, withLoc({
         kind: 'UnaryExpression',
         operator: '+',
         operand: operandResult.astNode,
-      } as UnaryExpressionNode)
+      } as UnaryExpressionNode, startToken.start, endToken.end))
     }
 
     default:
@@ -221,6 +227,7 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
 
 function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode> {
   const startPos = input.position
+  const startToken = peek(input)
   // Skip [
   let pos = startPos + 1
   const elements: [ExpressionNode, ExpressionNode | null][] = []
@@ -249,18 +256,21 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
 
   const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RBRACKET')
   if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+  const endToken = closeResult.astNode
   pos = closeResult.newPosition
 
-  return ok(pos, { kind: 'SetConstructor', elements })
+  return ok(pos, withLoc({ kind: 'SetConstructor', elements }, startToken.start, endToken.end))
 }
 
 // parsePostfix — handles function calls, array access, field access
 export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
+  const startToken = peek(input)
   const idResult = parseIdentifier(input)
   if (!idResult.success) return fail(idResult.error, idResult.position)
 
   let pos = idResult.newPosition
   let expr: ExpressionNode = idResult.astNode
+  let endPos = peek({ tokens: input.tokens, position: pos - 1 }).end
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
@@ -281,8 +291,9 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       }
       const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RPAREN')
       if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+      endPos = closeResult.astNode.end
       pos = closeResult.newPosition
-      expr = { kind: 'FunctionCall', name: idResult.astNode, arguments: args } as FunctionCallNode
+      expr = withLoc({ kind: 'FunctionCall', name: idResult.astNode, arguments: args } as FunctionCallNode, startToken.start, endPos)
     } else if (token.type === 'LBRACKET') {
       // Array access
       pos++
@@ -297,23 +308,26 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       pos = listResult.newPosition
       const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RBRACKET')
       if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+      endPos = closeResult.astNode.end
       pos = closeResult.newPosition
-      expr = { kind: 'ArrayAccess', array: expr, indices } as ArrayAccessNode
+      expr = withLoc({ kind: 'ArrayAccess', array: expr, indices } as ArrayAccessNode, startToken.start, endPos)
     } else if (token.type === 'DOT') {
       // Field access
       pos++
       const fieldResult = parseIdentifier({ tokens: input.tokens, position: pos })
       if (!fieldResult.success) return fail(fieldResult.error, fieldResult.position)
+      endPos = peek({ tokens: input.tokens, position: fieldResult.newPosition - 1 }).end
       pos = fieldResult.newPosition
-      expr = { kind: 'FieldAccess', object: expr, field: fieldResult.astNode } as FieldAccessNode
+      expr = withLoc({ kind: 'FieldAccess', object: expr, field: fieldResult.astNode } as FieldAccessNode, startToken.start, endPos)
     } else if (token.type === 'CARET') {
       // Pointer dereference (treat as field access for simplicity)
       pos++
-      expr = {
+      endPos = token.end
+      expr = withLoc({
         kind: 'FieldAccess',
         object: expr,
         field: { kind: 'Identifier', name: '^' },
-      } as FieldAccessNode
+      } as FieldAccessNode, startToken.start, endPos)
     } else {
       break
     }
@@ -324,14 +338,16 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
 
 // parseNot — NOT factor
 function parseNot(input: ParserInput): ParseResult<ExpressionNode> {
+  const startToken = peek(input)
   const afterNot = { tokens: input.tokens, position: input.position + 1 }
   const operandResult = parseFactor(afterNot)
   if (!operandResult.success) return fail(operandResult.error, operandResult.position)
-  return ok(operandResult.newPosition, {
+  const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
+  return ok(operandResult.newPosition, withLoc({
     kind: 'UnaryExpression',
     operator: 'NOT',
     operand: operandResult.astNode,
-  } as UnaryExpressionNode)
+  } as UnaryExpressionNode, startToken.start, endToken.end))
 }
 
 // parseFactor — handles multiplication-level operators
@@ -341,11 +357,13 @@ export function parseFactor(input: ParserInput): ParseResult<ExpressionNode> {
 
 // parseTerm — term: factor { (* | / | DIV | MOD | AND) factor }
 export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
+  const startToken = peek(input)
   let result = parseFactor(input)
   if (!result.success) return result
 
   let pos = result.newPosition
   let left = result.astNode
+  let startPos = startToken.start
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
@@ -374,12 +392,13 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
     const rightResult = parseFactor({ tokens: input.tokens, position: pos + 1 })
     if (!rightResult.success) return fail(rightResult.error, rightResult.position)
 
-    left = {
+    const endToken = peek({ tokens: input.tokens, position: rightResult.newPosition - 1 })
+    left = withLoc({
       kind: 'BinaryExpression',
       left,
       operator,
       right: rightResult.astNode,
-    } as BinaryExpressionNode
+    } as BinaryExpressionNode, startPos, endToken.end)
     pos = rightResult.newPosition
   }
 
@@ -388,9 +407,11 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
 
 // parseSimpleExpression — [ (+|-|NOT) ] term { (+|-|OR) term }
 export function parseSimpleExpression(input: ParserInput): ParseResult<ExpressionNode> {
+  const startToken = peek(input)
   let pos = input.position
   let left: ExpressionNode
   let hasLeadingSign = false
+  let startPos = startToken.start
 
   const sign = peek({ tokens: input.tokens, position: pos })
   if (sign.type === 'PLUS' || sign.type === 'MINUS') {
@@ -398,11 +419,12 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
     const termResult = parseTerm({ tokens: input.tokens, position: pos })
     if (!termResult.success) return fail(termResult.error, termResult.position)
     pos = termResult.newPosition
-    left = {
+    const endToken = peek({ tokens: input.tokens, position: pos - 1 })
+    left = withLoc({
       kind: 'UnaryExpression',
       operator: sign.type === 'PLUS' ? '+' : '-',
       operand: termResult.astNode,
-    } as UnaryExpressionNode
+    } as UnaryExpressionNode, startPos, endToken.end)
     hasLeadingSign = true
   } else {
     const termResult = parseTerm({ tokens: input.tokens, position: pos })
@@ -432,12 +454,13 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
     const rightResult = parseTerm({ tokens: input.tokens, position: pos + 1 })
     if (!rightResult.success) return fail(rightResult.error, rightResult.position)
 
-    left = {
+    const endToken = peek({ tokens: input.tokens, position: rightResult.newPosition - 1 })
+    left = withLoc({
       kind: 'BinaryExpression',
       left,
       operator,
       right: rightResult.astNode,
-    } as BinaryExpressionNode
+    } as BinaryExpressionNode, startPos, endToken.end)
     pos = rightResult.newPosition
   }
 
@@ -446,11 +469,13 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
 
 // parseExpression — simple_expression [ (= | <> | < | <= | > | >= | IN) simple_expression ]
 export function parseExpression(input: ParserInput): ParseResult<ExpressionNode> {
+  const startToken = peek(input)
   const leftResult = parseSimpleExpression(input)
   if (!leftResult.success) return leftResult
 
   let pos = leftResult.newPosition
   let left = leftResult.astNode
+  let startPos = startToken.start
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
@@ -488,12 +513,13 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
     const rightResult = parseSimpleExpression({ tokens: input.tokens, position: pos + 1 })
     if (!rightResult.success) return fail(rightResult.error, rightResult.position)
 
-    left = {
+    const endToken = peek({ tokens: input.tokens, position: rightResult.newPosition - 1 })
+    left = withLoc({
       kind: operator === 'IN' ? 'InExpression' : 'BinaryExpression',
       left,
       operator,
       right: rightResult.astNode,
-    } as ExpressionNode
+    } as ExpressionNode, startPos, endToken.end)
     pos = rightResult.newPosition
   }
 

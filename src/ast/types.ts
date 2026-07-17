@@ -37,11 +37,21 @@ export type ParseResult<T = AstNode> =
   | { success: false; error: string; position: number }
 
 // ============================================================================
+// Source Location (用于 AST 节点的行号追溯)
+// ============================================================================
+
+export interface SourceLocation {
+  start: Position
+  end: Position
+}
+
+// ============================================================================
 // AST Node Definitions (records, not classes)
 // ============================================================================
 
 export interface AstNode {
   kind: string
+  loc?: SourceLocation
 }
 
 // --- Literals ---
