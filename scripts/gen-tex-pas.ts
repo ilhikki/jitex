@@ -3,9 +3,9 @@ import * as path from 'path'
 import { runVM } from '../src/vm'
 
 async function main() {
-  const webFile = path.join(__dirname, 'resources', 'tex.web')
-  const tanglePasFile = path.join(__dirname, 'resources', 'tangle-official.pas')
-  const outFile = path.join(__dirname, 'resources', 'tex.pas')
+  const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
+  const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
+  const outFile = path.join(__dirname, '..', 'tests', 'temp', 'tex.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
   const tanglePas = fs.readFileSync(tanglePasFile, 'utf-8')
 

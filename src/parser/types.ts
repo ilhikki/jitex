@@ -167,12 +167,26 @@ function parseArrayType(input: ParserInput, isPacked: boolean = false, startPos?
 }
 
 // RECORD field_list END
+// field_list = [ (fixed-part [; variant-part] | variant-part) [;] ]
 function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<RecordTypeNode> {
   const start = startPos ?? peek(input).start
-  let pos = input.position + 1 // skip RECORD
+  let pos = input.position + 1
   const fields: VariableDeclarationNode[] = []
+  let variant: RecordVariantPartNode | undefined
 
-  while (peek({ tokens: input.tokens, position: pos }).type !== 'END') {
+  while (true) {
+    const token = peek({ tokens: input.tokens, position: pos })
+    if (token.type === 'END') {
+      break
+    }
+    if (token.type === 'CASE') {
+      const variantResult = parseRecordVariantPart({ tokens: input.tokens, position: pos })
+      if (!variantResult.success) return fail(variantResult.error, variantResult.position)
+      variant = variantResult.astNode
+      pos = variantResult.newPosition
+      break
+    }
+
     const fieldResult = parseVariableDeclaration({ tokens: input.tokens, position: pos })
     if (!fieldResult.success) return fail(fieldResult.error, fieldResult.position)
     fields.push(fieldResult.astNode)
@@ -188,7 +202,121 @@ function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<R
   pos = endResult.newPosition
 
   return ok(pos, withLoc(
-    { kind: 'RecordType', fields } as RecordTypeNode,
+    { kind: 'RecordType', fields, variant } as RecordTypeNode,
+    start,
+    input.tokens[pos - 1].end
+  ))
+}
+
+// CASE [tag:] type OF variant {; variant}
+function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPartNode> {
+  const start = peek(input).start
+  let pos = input.position + 1
+
+  let tagName: IdentifierNode | undefined
+  const afterCaseToken = peek({ tokens: input.tokens, position: pos })
+  if (afterCaseToken.type === 'IDENTIFIER') {
+    const nextNextToken = peek({ tokens: input.tokens, position: pos + 1 })
+    if (nextNextToken.type === 'COLON') {
+      const idResult = parseIdentifier({ tokens: input.tokens, position: pos })
+      if (!idResult.success) return fail(idResult.error, idResult.position)
+      tagName = idResult.astNode
+      pos = idResult.newPosition
+
+      const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
+      if (!colonResult.success) return fail(colonResult.error, colonResult.position)
+      pos = colonResult.newPosition
+    }
+  }
+
+  const typeResult = parseType({ tokens: input.tokens, position: pos })
+  if (!typeResult.success) return fail(typeResult.error, typeResult.position)
+  pos = typeResult.newPosition
+
+  const ofResult = expectKeyword({ tokens: input.tokens, position: pos }, 'OF')
+  if (!ofResult.success) return fail(ofResult.error, ofResult.position)
+  pos = ofResult.newPosition
+
+  const variants: RecordVariantNode[] = []
+  while (true) {
+    const token = peek({ tokens: input.tokens, position: pos })
+    if (token.type === 'END') {
+      break
+    }
+    if (token.type === 'SEMICOLON') {
+      pos++
+      continue
+    }
+
+    const variantResult = parseRecordVariant({ tokens: input.tokens, position: pos })
+    if (!variantResult.success) return fail(variantResult.error, variantResult.position)
+    variants.push(variantResult.astNode)
+    pos = variantResult.newPosition
+
+    while (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
+      pos++
+    }
+  }
+
+  return ok(pos, withLoc(
+    { kind: 'RecordVariantPart', tagName, tagType: typeResult.astNode, variants },
+    start,
+    input.tokens[pos - 1].end
+  ))
+}
+
+// case-constant-list : ( field-list )
+function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> {
+  const start = peek(input).start
+  let pos = input.position
+
+  const caseLabelsResult = parseList({ tokens: input.tokens, position: pos }, parseExpression, 'COMMA')
+  if (!caseLabelsResult.success) return fail(caseLabelsResult.error, caseLabelsResult.position)
+  pos = caseLabelsResult.newPosition
+
+  const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
+  if (!colonResult.success) return fail(colonResult.error, colonResult.position)
+  pos = colonResult.newPosition
+
+  const openResult = expectType({ tokens: input.tokens, position: pos }, 'LPAREN')
+  if (!openResult.success) return fail(openResult.error, openResult.position)
+  pos = openResult.newPosition
+
+  const fields: VariableDeclarationNode[] = []
+  let variant: RecordVariantPartNode | undefined
+
+  while (true) {
+    const token = peek({ tokens: input.tokens, position: pos })
+    if (token.type === 'RPAREN') {
+      break
+    }
+    if (token.type === 'CASE') {
+      const variantResult = parseRecordVariantPart({ tokens: input.tokens, position: pos })
+      if (!variantResult.success) return fail(variantResult.error, variantResult.position)
+      variant = variantResult.astNode
+      pos = variantResult.newPosition
+      if (peek({ tokens: input.tokens, position: pos }).type === 'END') {
+        pos++
+      }
+      continue
+    }
+
+    const fieldResult = parseVariableDeclaration({ tokens: input.tokens, position: pos })
+    if (!fieldResult.success) return fail(fieldResult.error, fieldResult.position)
+    fields.push(fieldResult.astNode)
+    pos = fieldResult.newPosition
+
+    while (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
+      pos++
+    }
+  }
+
+  const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RPAREN')
+  if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+  pos = closeResult.newPosition
+
+  return ok(pos, withLoc(
+    { kind: 'RecordVariant', caseLabels: caseLabelsResult.astNode, fields, variant },
     start,
     input.tokens[pos - 1].end
   ))

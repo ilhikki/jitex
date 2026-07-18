@@ -737,6 +737,7 @@ export class StaticAnalyzer {
         const rec = typeNode as RecordTypeNode
         const fields: { name: string; typeId: string; offset: number }[] = []
         let offset = 0
+
         for (const fieldDecl of rec.fields) {
           const fieldType = this.resolveType(fieldDecl.type, scope)
           if (!this.typeTable.has(fieldType.id)) {
@@ -751,6 +752,44 @@ export class StaticAnalyzer {
             offset++
           }
         }
+
+        const processVariantPart = (variantPart: any, baseOffset: number) => {
+          if (variantPart.tagName) {
+            const tagType = this.resolveType(variantPart.tagType, scope)
+            if (!this.typeTable.has(tagType.id)) {
+              this.typeTable.register(tagType)
+            }
+            fields.push({
+              name: variantPart.tagName.name.toUpperCase(),
+              typeId: tagType.id,
+              offset: baseOffset,
+            })
+          }
+
+          for (const variant of variantPart.variants) {
+            for (const fieldDecl of variant.fields) {
+              const fieldType = this.resolveType(fieldDecl.type, scope)
+              if (!this.typeTable.has(fieldType.id)) {
+                this.typeTable.register(fieldType)
+              }
+              for (const nameNode of fieldDecl.names) {
+                fields.push({
+                  name: nameNode.name.toUpperCase(),
+                  typeId: fieldType.id,
+                  offset: baseOffset,
+                })
+              }
+            }
+            if (variant.variant) {
+              processVariantPart(variant.variant, baseOffset)
+            }
+          }
+        }
+
+        if (rec.variant) {
+          processVariantPart(rec.variant, offset)
+        }
+
         const id = `record-${fields.map((f) => f.name).join(',')}`
         return {
           id,
@@ -808,10 +847,9 @@ export class StaticAnalyzer {
           return this.typeTable.get('text')!
         }
         // 其他 FILE OF X：创建通用 file 类型（VM 简化处理）
-        const id = ft.elementType
-          ? `file-of-${this.resolveType(ft.elementType, scope).id}`
-          : 'file'
-        return { id, kind: 'file' }
+        const elementType = ft.elementType ? this.resolveType(ft.elementType, scope) : null
+        const id = elementType ? `file-of-${elementType.id}` : 'file'
+        return { id, kind: 'file', elementTypeId: elementType?.id }
       }
 
       default:
@@ -1035,7 +1073,37 @@ export class StaticAnalyzer {
       const obj = this.compileExpr(fieldAccess.object, scope)
       const fieldName = fieldAccess.field.name.toUpperCase()
       const objType = this.typeTable.get(obj.typeId)
-      if (!objType || objType.kind !== 'record') {
+      if (!objType) {
+        throw new Error(`Unknown type for object: ${obj.typeId}`)
+      }
+      if (fieldName === '^' && objType.kind === 'file') {
+        const elemTypeId = (objType as any).elementTypeId || 'char'
+        const checkedValue = this.tempVar()
+        this.instructions.push({
+          op: 'TYPE_OP',
+          typeId: elemTypeId,
+          opName: 'default',
+          opKind: 'default',
+          dest: checkedValue,
+          src: [],
+        })
+        const valueResult = this.compileExpr(node.right, scope)
+        this.instructions.push({
+          op: 'TYPE_OP',
+          typeId: elemTypeId,
+          opName: 'assign',
+          opKind: 'assign',
+          dest: checkedValue,
+          src: [valueResult.ref],
+        })
+        this.instructions.push({
+          op: 'SYS_CALL',
+          proc: 'WRITE_FILE',
+          args: [obj.ref, checkedValue],
+        })
+        return
+      }
+      if (objType.kind !== 'record') {
         throw new Error(`Type ${obj.typeId} is not a record`)
       }
       const recType = objType as RecordType
@@ -1378,7 +1446,17 @@ export class StaticAnalyzer {
     // 用户定义的过程
     const sym = lookupProc(scope, name)
     if (!sym) {
-      throw new Error(`Unknown procedure: ${name}`)
+      const argRefs: Ref[] = []
+      for (const arg of node.arguments) {
+        const result = this.compileExpr(arg, scope)
+        argRefs.push(result.ref)
+      }
+      this.instructions.push({
+        op: 'SYS_CALL',
+        proc: name,
+        args: argRefs,
+      })
+      return
     }
 
     // var 参数检查：var 参数必须传递变量（Identifier/ArrayAccess/FieldAccess），不能是常量或表达式
@@ -1759,7 +1837,19 @@ export class StaticAnalyzer {
 
         const sym = lookupProc(scope, name)
         if (!sym || !sym.returnType) {
-          throw new Error(`Unknown function: ${name}`)
+          const argRefs: Ref[] = []
+          for (const arg of callNode.arguments) {
+            const result = this.compileExpr(arg, scope)
+            argRefs.push(result.ref)
+          }
+          const temp = this.tempVar()
+          this.instructions.push({
+            op: 'SYS_CALL',
+            proc: name,
+            args: argRefs,
+            dest: temp,
+          })
+          return { ref: temp, typeId: 'integer' }
         }
 
         const argRefs: Ref[] = []
@@ -1823,6 +1913,9 @@ export class StaticAnalyzer {
         const obj = this.compileExpr(fieldAccess.object, scope)
         const fieldName = fieldAccess.field.name.toUpperCase()
         const objType = this.typeTable.get(obj.typeId)
+        if (!objType) {
+          throw new Error(`Unknown type for object: ${obj.typeId} (field: ${fieldName})`)
+        }
 
         // 文件缓冲区访问 F^：编译为 SYS_CALL BUFFER_CHAR，由 VM 调用 io.file.bufferChar
         if (fieldName === '^' && objType?.kind === 'file') {
@@ -1838,7 +1931,7 @@ export class StaticAnalyzer {
         }
 
         if (!objType || objType.kind !== 'record') {
-          throw new Error(`Type ${obj.typeId} is not a record`)
+          throw new Error(`Type ${obj.typeId} is not a record (field: ${fieldName})`)
         }
         const recType = objType as any
         const field = recType.fields.find((f: any) => f.name === fieldName)

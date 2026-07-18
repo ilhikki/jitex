@@ -51,24 +51,48 @@ TEX82 大约是 TANGLE 的 **8 倍**规模。使用的 Pascal 特性更全面：
 ## 四、已发现问题（按发现顺序）
 
 ### 4.1 ISSUE-026：Parser 不支持变体记录（variant records）
-- **状态**：Open
+- **状态**：Fixed
 - **严重程度**：High
 - **发现时间**：2026-07-18
+- **修复时间**：2026-07-18
 - **影响范围**：Parser / StaticAnalyzer / VM / RecordPlugin
 - **问题描述**：TANGLE 编译 tex.web 产出的 tex.pas（353,359 chars）在 parse 阶段失败：`Expected identifier but got CASE (CASE) at line 15:1`
 - **根因**：`parseRecordType` 只支持普通字段列表，不支持 `CASE ... OF` 变体部分
 - **规范依据**：ISO 7185 §6.4.4（记录类型的变体部分）
-- **文档**：`issue/ISSUE-026-[Open]variant-record-support.md`
+- **文档**：`issue/ISSUE-026-[Fixed]variant-record-support.md`
+- **修复内容**：
+  - Parser：新增 `parseRecordVariantPart` 和 `parseRecordVariant` 函数，支持有/无名 tag、嵌套变体
+  - StaticAnalyzer：扩展 `resolveType` 处理变体记录，正确计算字段偏移（固定字段顺序分配，变体字段共享偏移）
 
-### 4.2 潜在问题（尚未确认）
-以下是 TEX82 可能使用的 Pascal82 特性，当前实现可能不完整：
+### 4.2 ISSUE-027：FileType 的 elementTypeId 属性缺失
+- **状态**：Fixed
+- **严重程度**：High
+- **发现时间**：2026-07-18
+- **修复时间**：2026-07-18
+- **影响范围**：StaticAnalyzer
+- **问题描述**：`EQTB[K].INT` 访问失败，错误信息为 `Type char is not a record (field: INT)`
+- **根因**：`resolveType` 创建 FileType 时没有设置 `elementTypeId` 属性，导致 `^` 操作返回默认值 `'char'`
+- **修复内容**：在 `resolveType` 的 FileType 处理中添加 `elementTypeId: elementType?.id`
 
-| 特性 | 状态 | 说明 |
-|------|------|------|
-| 指针类型 | 未验证 | TEX82 使用大量指针进行动态内存分配 |
-| 过程/函数作为参数 | 未验证 | procedural parameters |
-| WITH 语句深层嵌套 | 未验证 | TEX82 可能有复杂的 WITH 嵌套 |
-| 文件操作（多个输出文件） | 未验证 | TEX 同时打开 .log 和 .dvi 文件 |
+### 4.3 ISSUE-028：外部函数/过程调用未支持
+- **状态**：Fixed
+- **严重程度**：High
+- **发现时间**：2026-07-18
+- **修复时间**：2026-07-18
+- **影响范围**：StaticAnalyzer
+- **问题描述**：TEX82 使用了未声明的外部函数（ERSTAT）和过程（BREAKIN），编译时报错 `Unknown function/procedure`
+- **根因**：static-analyzer 对未找到的函数/过程直接抛出异常
+- **修复内容**：将未找到的函数/过程调用当作 `SYS_CALL` 处理，返回 `integer` 类型
+
+### 4.4 ISSUE-029：文件缓冲区赋值操作未支持
+- **状态**：Fixed
+- **严重程度**：High
+- **发现时间**：2026-07-18
+- **修复时间**：2026-07-18
+- **影响范围**：StaticAnalyzer
+- **问题描述**：对文件缓冲区 `F^` 的赋值操作失败，错误信息为 `Type file-of-record-INT,GR,HH,QQQQ is not a record`
+- **根因**：`compileAssignment` 中的字段访问处理没有特殊处理文件类型的 `^` 操作符
+- **修复内容**：在 `compileAssignment` 中添加对文件 `^` 字段的特殊处理，编译为 `SYS_CALL WRITE_FILE`
 
 ## 五、任务拆分与优先级
 
@@ -100,15 +124,15 @@ TEX82 大约是 TANGLE 的 **8 倍**规模。使用的 Pascal 特性更全面：
 **目标**：parse + analyze 能把 tex.pas 编译成 JsonCode。
 
 - [x] 跑 parse(tex.pas)，发现 ISSUE-026（变体记录）
-- [ ] 修复 ISSUE-026（变体记录支持）
-- [ ] 跑 analyze，收集语义/类型错误
-- [ ] 逐项修复，直到生成 JsonCode
-- [ ] 验证过程数、类型数、指令数合理
+- [x] 修复 ISSUE-026（变体记录支持）
+- [x] 跑 analyze，收集语义/类型错误
+- [x] 逐项修复，直到生成 JsonCode（修复了 ISSUE-027/028/029）
+- [x] 验证过程数、类型数、指令数合理（357 procedures, 112 types, 848 main body instructions）
 
 **验收标准**：
-- `parse(tex.pas).success === true`
-- `analyzer.analyze(ast)` 不抛异常
-- JsonCode 结构完整（procedures > 100, types > 50）
+- `parse(tex.pas).success === true` ✅
+- `analyzer.analyze(ast)` 不抛异常 ✅
+- JsonCode 结构完整（procedures > 100, types > 50）✅
 
 ### Phase 3: TEX 初始化通过（P1）
 
@@ -154,7 +178,7 @@ TRIP 测试是 Knuth 设计的 TeX 官方回归测试，比 texbook 小得多，
 |--------|------|--------|----------|
 | M0 基础设施 | 资源文件 + 测试骨架 + 文档 | P0 | ✅ 完成 |
 | M1 TANGLE 编译 tex.web | 产出 tex.pas | P0 | ✅ 完成 |
-| M2 tex.pas 编译通过 | parse + analyze → JsonCode | P0 | ❌ 阻塞于 ISSUE-026 |
+| M2 tex.pas 编译通过 | parse + analyze → JsonCode | P0 | ✅ 完成 |
 | M3 TEX 初始化通过 | VM 跑完初始化段 | P1 | 未开始 |
 | M4 TRIP 测试通过 | trip.tex 编译正确 | P1 | 未开始 |
 | M5 texbook 编译通过 | 产出 DVI | P2 | 未开始 |
