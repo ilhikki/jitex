@@ -15,10 +15,21 @@ export interface VMTest {
   expectedError?: string
   input?: string[]
   plugins?: TypePlugin[]
+  // 内存文件存储
+  files?: Map<string, Uint8Array>
+  // 全局文件变量名 → URL
+  programFileUrls?: Record<string, string>
+  // 文件内容包含检查（runVM 完成后检查 files.get(url) 是否包含 substring）
+  expectedFileContains?: { url: string; contains: string }[]
 }
 
 export async function runVM(test: VMTest): Promise<VMState> {
-  return await runVMImpl(test.code, { input: test.input, plugins: test.plugins })
+  return await runVMImpl(test.code, {
+    input: test.input,
+    plugins: test.plugins,
+    files: test.files,
+    programFileUrls: test.programFileUrls,
+  })
 }
 
 export function getOutput(state: VMState): string {
@@ -60,6 +71,16 @@ export async function runVMTest(test: VMTest): Promise<{ passed: boolean; messag
     if (test.expectedNotContains !== undefined) {
       if (output.includes(test.expectedNotContains)) {
         return { passed: false, message: `Expected output to NOT contain "${test.expectedNotContains}", got "${JSON.stringify(output)}"`, state }
+      }
+    }
+
+    if (test.expectedFileContains && test.files) {
+      for (const exp of test.expectedFileContains) {
+        const bytes = test.files.get(exp.url)
+        const text = bytes ? new TextDecoder().decode(bytes) : ''
+        if (!text.includes(exp.contains)) {
+          return { passed: false, message: `Expected file ${exp.url} to contain "${exp.contains}", got "${text}"`, state }
+        }
       }
     }
 

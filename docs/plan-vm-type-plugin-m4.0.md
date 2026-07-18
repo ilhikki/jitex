@@ -1,4 +1,8 @@
-# Pascal VM 实现规划（TypePlugin 模型）
+# Pascal VM 实现规划（TypePlugin 模型）— M4.0 归档
+
+> **阶段**：M4.0 — VM + TypePlugin 模型实现
+> **状态**：✅ 已完成（归档）
+> **后续阶段**：M4.1 — Pascal82 规范一致性测试与修复（见 [plan-m4.1-pascal82-conformance.md](./plan-m4.1-pascal82-conformance.md)）
 
 ## 一、总览
 

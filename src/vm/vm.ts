@@ -17,6 +17,7 @@ import type {
 import {
   createTypeTable,
 } from '../types'
+import type { PascalIO, PascalFile } from './file-model'
 import {
   VMState,
   StackFrame,
@@ -52,6 +53,8 @@ type ExecFunc = (state: VMState, runtime: RuntimeCtx, ctx: VMContext) => Promise
 interface VMContext {
   procMap: Map<string, CompiledProc>
   plugins: TypePlugin[]
+  // 全局文件变量名（大写）→ URL；DECLARE file 变量时自动 ASSIGN
+  programFileUrls?: Record<string, string>
 }
 
 // ============================================================================
@@ -62,6 +65,9 @@ export interface VMOptions {
   input?: string[]
   typePlugins?: TypePlugin[]
   sysCalls?: Map<string, SysCallHandler>
+  io?: PascalIO
+  // 全局文件变量名（大写）→ 文件 URL；VM 启动时自动 ASSIGN
+  programFileUrls?: Record<string, string>
 }
 
 export async function execute(
@@ -84,11 +90,11 @@ export async function execute(
   }
 
   const sysCalls = options.sysCalls || new Map<string, SysCallHandler>()
-  const runtime: RuntimeCtx = { typeTable, sysCalls }
+  const runtime: RuntimeCtx = { typeTable, sysCalls, io: options.io }
 
   // 编译所有过程
   const procMap = new Map<string, CompiledProc>()
-  const ctx: VMContext = { procMap, plugins }
+  const ctx: VMContext = { procMap, plugins, programFileUrls: options.programFileUrls }
   for (const proc of jsonCode.procedures) {
     procMap.set(proc.name.toUpperCase(), compileProc(proc, plugins, runtime, ctx))
   }
@@ -125,6 +131,10 @@ export async function execute(
     topFrame(state).locals[local.name.toUpperCase()] = getDefault(typeDef, plugins, runtime)
   }
 
+  // 注意：programFileUrls 的 ASSIGN 不在此处处理
+  // 因为 VAR 声明的 DECLARE 指令会在 MAIN body 执行时重新创建 PascalValue，覆盖 locals
+  // 所以 programFileUrls 在 DECLARE 指令内部处理（见 compileInstruction DECLARE case）
+
   // 主执行循环
   try {
     await runLoop(state, runtime, ctx)
@@ -150,7 +160,7 @@ async function runLoop(
   runtime: RuntimeCtx,
   ctx: VMContext
 ): Promise<void> {
-  const maxSteps = 1000000
+  const maxSteps = 100000000
   let steps = 0
 
   while (state.status === 'running' && state.callStack.length > 0) {
@@ -237,13 +247,22 @@ function compileInstruction(
   switch (inst.op) {
     case 'DECLARE': {
       const { typeId, scope, name } = inst
-      return (state) => {
+      return async (state, _runtime, ctx) => {
         const typeDef = runtime.typeTable.get(typeId)
         const value = getDefault(typeDef, plugins, runtime)
         if (scope === 'global') {
           state.globals[name.toUpperCase()] = value
         } else {
           topFrame(state).locals[name.toUpperCase()] = value
+        }
+        // file 类型变量 DECLARE 后自动 ASSIGN（programFileUrls）
+        // TANGLE 等 Knuth 风格程序依靠 PROGRAM 头隐式 ASSIGN 文件参数
+        if (typeDef?.kind === 'file' && ctx.programFileUrls && runtime.io) {
+          const upper = name.toUpperCase()
+          const url = ctx.programFileUrls[upper]
+          if (url && typeof value.raw === 'object' && 'url' in (value.raw as any)) {
+            await runtime.io.file.assign(value.raw as PascalFile, url)
+          }
         }
         state.pc++
       }

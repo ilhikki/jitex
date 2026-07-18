@@ -1,4 +1,4 @@
-// File TypePlugin（简化版：text 类型支持）
+// File TypePlugin（句柄模式：file 变量的 raw 是 PascalFile 句柄）
 
 import type {
   FileType,
@@ -12,6 +12,7 @@ import type {
   CodeGenContext,
   RuntimeCtx,
 } from './index'
+import { createEmptyFile } from '../vm/file-model'
 
 export const TEXT_TYPE: FileType = {
   id: 'text',
@@ -41,8 +42,8 @@ export function createFilePlugin(typeTable: TypeTable): TypePlugin {
           }]
         },
         invoke: (typeId: string, ctx: RuntimeCtx): PascalValue => {
-          // text 类型默认值：空字符串缓冲区
-          return { typeId, raw: { lines: [] as string[], pos: 0 } }
+          // file 变量默认值：空 PascalFile 句柄
+          return { typeId, raw: createEmptyFile() }
         },
       },
 

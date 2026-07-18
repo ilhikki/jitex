@@ -710,6 +710,17 @@ export class StaticAnalyzer {
             const sub = idxType as any
             return { low: sub.min, high: sub.max, indexTypeId: idxType.id }
           }
+          // ordinal 类型作为索引：覆盖完整取值范围（Pascal82 §6.4.3.1）
+          if (idxType.id === 'char') {
+            return { low: 0, high: 255, indexTypeId: 'char' }
+          }
+          if (idxType.id === 'boolean') {
+            return { low: 0, high: 1, indexTypeId: 'boolean' }
+          }
+          if (idxType.kind === 'enum') {
+            const enumDef = idxType as any
+            return { low: 0, high: enumDef.values.length - 1, indexTypeId: idxType.id }
+          }
           return { low: 0, high: 0, indexTypeId: idxType.id }
         })
         const id = `array-${dimensions.map((d) => `${d.low}..${d.high}`).join(',')}-of-${elementType.id}`
@@ -1322,7 +1333,7 @@ export class StaticAnalyzer {
     const name = node.name.name.toUpperCase()
 
     // 检查是否是系统调用
-    const sysCallNames = ['WRITE', 'WRITELN', 'READ', 'READLN', 'REWRITE', 'RESET', 'CLOSE', 'PUT', 'GET', 'BREAK', 'PAGE']
+    const sysCallNames = ['WRITE', 'WRITELN', 'READ', 'READLN', 'REWRITE', 'RESET', 'CLOSE', 'PUT', 'GET', 'BREAK', 'PAGE', 'ASSIGN']
     if (sysCallNames.includes(name)) {
       const argRefs: Ref[] = []
       const argFormats: { width?: Ref; precision?: Ref }[] = []
@@ -1813,16 +1824,15 @@ export class StaticAnalyzer {
         const fieldName = fieldAccess.field.name.toUpperCase()
         const objType = this.typeTable.get(obj.typeId)
 
-        // 文件缓冲区访问 F^：返回文件元素类型的占位值
+        // 文件缓冲区访问 F^：编译为 SYS_CALL BUFFER_CHAR，由 VM 调用 io.file.bufferChar
         if (fieldName === '^' && objType?.kind === 'file') {
           const elemTypeId = (objType as any).elementTypeId || 'char'
           const temp = this.tempVar()
-          // 简化：返回默认 char 值（VM 不支持真实文件 IO）
           this.instructions.push({
-            op: 'LITERAL',
+            op: 'SYS_CALL',
+            proc: 'BUFFER_CHAR',
+            args: [obj.ref],
             dest: temp,
-            typeId: elemTypeId,
-            value: ' ',
           })
           return { ref: temp, typeId: elemTypeId }
         }

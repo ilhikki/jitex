@@ -60,9 +60,12 @@ export function createCodeGenContext(typeTable: TypeTable): CodeGenContext {
 // RuntimeCtx: 运行时上下文
 // ============================================================================
 
+import type { PascalIO } from '../vm/file-model'
+
 export interface RuntimeCtx {
   typeTable: TypeTable
   sysCalls: Map<string, SysCallHandler>
+  io?: PascalIO
 }
 
 export interface SysCallArg {

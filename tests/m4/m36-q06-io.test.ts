@@ -142,7 +142,7 @@ end.`,
     features: ['writeln', 'file-operation', 'text-file'],
   },
   {
-    name: 'close file (non-standard extension, expect friendly error)',
+    name: 'close file (Knuth extension, supported as no-op without io)',
     code: `program test;
 var f: text;
 begin
@@ -150,9 +150,8 @@ begin
   writeln(f, 'test');
   close(f);
 end.`,
-    purpose: 'close is not Pascal82 standard; must report friendly error when extensions disabled',
-    features: ['close', 'file-operation', 'text-file', 'unsupported'],
-    expectedError: true,
+    purpose: 'close is a Knuth extension (used by TANGLE); without io it is a no-op',
+    features: ['close', 'file-operation', 'text-file', 'knuth-extension'],
   },
   {
     name: 'ord function',

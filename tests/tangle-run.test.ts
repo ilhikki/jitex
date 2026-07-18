@@ -6,7 +6,9 @@ import { runVM } from '../src/vm'
 
 describe('Tangle Official - VM run', () => {
   const pasFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle-official.pas')
+  const webFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle.web')
   const source = fs.readFileSync(pasFile, 'utf-8')
+  const webSource = fs.readFileSync(webFile, 'utf-8')
 
   test('parse succeeds', () => {
     const result = parse(source)
@@ -28,7 +30,6 @@ describe('Tangle Official - VM run', () => {
     }).not.toThrow()
     if (!jsonCode) return
 
-    // 基本结构检查
     expect(jsonCode.version).toBe('1.0.0')
     expect(jsonCode.entry).toBe('MAIN')
     expect(jsonCode.procedures.length).toBeGreaterThan(10)
@@ -40,29 +41,41 @@ describe('Tangle Official - VM run', () => {
     console.log('  main body instructions:', jsonCode.procedures[jsonCode.procedures.length - 1].body.length)
   })
 
-  test('run VM (expect early termination or error, not crash)', async () => {
+  test('run VM with web file input', async () => {
     const result = parse(source)
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    // TANGLE 需要 WEBFILE/CHANGEFILE 输入，VM 没有真实文件 IO
-    // 预期：VM 会因为缺少输入或文件操作而终止，但不应抛出未捕获异常
-    let state: any
-    try {
-      state = await runVM(source, { input: [] })
-    } catch (e: any) {
-      // 编译期错误直接抛出是可以接受的（记录下来）
-      console.log('VM threw (compile-time):', e.message)
-      return
-    }
+    const files = new Map<string, Uint8Array>()
+    files.set('WEBFILE', new Uint8Array(Buffer.from(webSource, 'utf-8')))
+    files.set('CHANGEFILE', new Uint8Array())
+    files.set('PASCALFILE', new Uint8Array())
+    files.set('POOL', new Uint8Array())
+
+    const state = await runVM(source, {
+      input: [],
+      files,
+      programFileUrls: {
+        'WEBFILE': 'WEBFILE',
+        'CHANGEFILE': 'CHANGEFILE',
+        'PASCALFILE': 'PASCALFILE',
+        'POOL': 'POOL',
+      },
+    })
 
     console.log('VM final status:', state.status)
     if (state.error) {
       console.log('VM error:', state.error.message)
+      console.log('VM stack trace:', state.error.stackTrace)
     }
-    console.log('VM output (first 500 chars):', state.outputBuffer.join('').slice(0, 500))
 
-    // 程序应该终止（terminated/error），不应该卡死
+    const output = state.outputBuffer.join('')
+    console.log('VM output (first 1000 chars):', output.slice(0, 1000))
+
+    for (const [name, content] of files.entries()) {
+      console.log(`File ${name} (${content.length} chars):`, Buffer.from(content).toString('utf-8').slice(0, 500))
+    }
+
     expect(['terminated', 'error']).toContain(state.status)
-  }, 30000)
+  }, 60000)
 })

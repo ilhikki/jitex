@@ -68,6 +68,23 @@ export const realPlugin: TypePlugin = {
           return makeRealValue(-(operand.raw as number))
         },
       },
+      POS: {
+        can: (operandType: string) => operandType === 'real' ? 'real' : null,
+        toCode: (dest: Ref, operand: Ref, ctx: CodeGenContext): JsonInstruction[] => {
+          return [{
+            op: 'TYPE_OP',
+            typeId: 'real',
+            opName: 'POS',
+            opKind: 'unary',
+            dest,
+            src: [operand],
+            sourcePos: ctx.sourcePos,
+          }]
+        },
+        invoke: (operand: PascalValue) => {
+          return makeRealValue(operand.raw as number)
+        },
+      },
     },
 
     binary: {

@@ -103,6 +103,23 @@ export const integerPlugin: TypePlugin = {
           return makeIntegerValue(-(operand.raw as number))
         },
       },
+      POS: {
+        can: (operandType: string) => operandType === 'integer' ? 'integer' : null,
+        toCode: (dest: Ref, operand: Ref, ctx: CodeGenContext): JsonInstruction[] => {
+          return [{
+            op: 'TYPE_OP',
+            typeId: 'integer',
+            opName: 'POS',
+            opKind: 'unary',
+            dest,
+            src: [operand],
+            sourcePos: ctx.sourcePos,
+          }]
+        },
+        invoke: (operand: PascalValue) => {
+          return makeIntegerValue(operand.raw as number)
+        },
+      },
     },
 
     binary: {

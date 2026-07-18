@@ -1,7 +1,12 @@
-// IO 插件：WRITE/WRITELN/READ/READLN
+// IO 插件：WRITE/WRITELN/READ/READLN/RESET/REWRITE/GET/PUT/CLOSE/ASSIGN/BUFFER_CHAR/EOF/EOLN
+//
+// 路由规则：
+// - 第一参数是 file 类型 → 调用 runtime.io.file 的对应方法
+// - 否则 → 走 outputBuffer/inputQueue（控制台兼容模式）
 
 import type { PascalValue, Ref, SubrangeType } from '../vm/jsoncode'
 import type { SysCallHandler, RuntimeCtx, TypeTable } from '../types'
+import type { PascalFile } from '../vm/file-model'
 import type { VMState } from '../vm/state'
 import { setValue } from './state'
 
@@ -87,15 +92,61 @@ function formatReal(n: number): string {
 }
 
 // ============================================================================
+// 工具：从 SysCallArg 提取 PascalFile 句柄
+// ============================================================================
+
+function asFileValue(arg: any, typeTable: TypeTable | null): PascalFile | null {
+  const value = arg?.value || arg
+  if (!value || !value.typeId) return null
+  if (value.typeId === 'text') return value.raw as PascalFile
+  if (typeTable) {
+    const td = typeTable.get(value.typeId)
+    if (td?.kind === 'file') return value.raw as PascalFile
+  }
+  return null
+}
+
+function isFileArg(arg: any, typeTable: TypeTable | null): boolean {
+  return asFileValue(arg, typeTable) !== null
+}
+
+// ============================================================================
 // WRITE: 输出不换行
 // ============================================================================
 
-export const writeHandler: SysCallHandler = (args, state, runtime) => {
+export const writeHandler: SysCallHandler = async (args, state, runtime) => {
   const vmState = state as VMState
   const typeTable = runtime?.typeTable || null
-  // 跳过第一个参数如果是 text/file 类型（文件参数）
-  const startIdx = (args.length > 0 && isFileArg(args[0], typeTable)) ? 1 : 0
-  for (let i = startIdx; i < args.length; i++) {
+  const io = runtime?.io
+
+  // 第一参数是文件
+  if (args.length > 0 && isFileArg(args[0], typeTable)) {
+    const startIdx = 1
+    // 有 io：写到对应文件
+    if (io) {
+      const file = asFileValue(args[0], typeTable)!
+      for (let i = startIdx; i < args.length; i++) {
+        const arg = args[i] as any
+        const value = arg.value || arg
+        const width = arg.width as number | undefined
+        const precision = arg.precision as number | undefined
+        await io.file.write(file, formatValueWithTable(value, typeTable, width, precision))
+      }
+      return
+    }
+    // 无 io：退化为控制台输出（跳过文件参数）
+    for (let i = startIdx; i < args.length; i++) {
+      const arg = args[i] as any
+      const value = arg.value || arg
+      const width = arg.width as number | undefined
+      const precision = arg.precision as number | undefined
+      vmState.outputBuffer.push(formatValueWithTable(value, typeTable, width, precision))
+    }
+    return
+  }
+
+  // 控制台模式：输出到 outputBuffer
+  for (let i = 0; i < args.length; i++) {
     const arg = args[i] as any
     const value = arg.value || arg
     const width = arg.width as number | undefined
@@ -108,12 +159,41 @@ export const writeHandler: SysCallHandler = (args, state, runtime) => {
 // WRITELN: 输出并换行
 // ============================================================================
 
-export const writelnHandler: SysCallHandler = (args, state, runtime) => {
+export const writelnHandler: SysCallHandler = async (args, state, runtime) => {
   const vmState = state as VMState
   const typeTable = runtime?.typeTable || null
-  // 跳过第一个参数如果是 text/file 类型（文件参数）
-  const startIdx = (args.length > 0 && isFileArg(args[0], typeTable)) ? 1 : 0
-  for (let i = startIdx; i < args.length; i++) {
+  const io = runtime?.io
+
+  // 第一参数是文件
+  if (args.length > 0 && isFileArg(args[0], typeTable)) {
+    const startIdx = 1
+    // 有 io：写到对应文件
+    if (io) {
+      const file = asFileValue(args[0], typeTable)!
+      for (let i = startIdx; i < args.length; i++) {
+        const arg = args[i] as any
+        const value = arg.value || arg
+        const width = arg.width as number | undefined
+        const precision = arg.precision as number | undefined
+        await io.file.write(file, formatValueWithTable(value, typeTable, width, precision))
+      }
+      await io.file.writeln(file)
+      return
+    }
+    // 无 io：退化为控制台输出
+    for (let i = startIdx; i < args.length; i++) {
+      const arg = args[i] as any
+      const value = arg.value || arg
+      const width = arg.width as number | undefined
+      const precision = arg.precision as number | undefined
+      vmState.outputBuffer.push(formatValueWithTable(value, typeTable, width, precision))
+    }
+    vmState.outputBuffer.push('\n')
+    return
+  }
+
+  // 控制台模式
+  for (let i = 0; i < args.length; i++) {
     const arg = args[i] as any
     const value = arg.value || arg
     const width = arg.width as number | undefined
@@ -123,60 +203,56 @@ export const writelnHandler: SysCallHandler = (args, state, runtime) => {
   vmState.outputBuffer.push('\n')
 }
 
-// 判断参数是否是文件类型（text/file）
-function isFileArg(arg: any, typeTable: TypeTable | null): boolean {
-  const value = arg?.value || arg
-  if (!value || !value.typeId) return false
-  if (value.typeId === 'text') return true
-  if (typeTable) {
-    const td = typeTable.get(value.typeId)
-    return td?.kind === 'file'
-  }
-  return false
-}
-
 // ============================================================================
 // READ: 读取输入
 // ============================================================================
 
-export const readHandler: SysCallHandler = async (args, state) => {
+export const readHandler: SysCallHandler = async (args, state, runtime) => {
   const vmState = state as VMState
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+
+  // 第一参数是文件：从文件读
+  let fileMode: PascalFile | null = null
+  let argStart = 0
+  if (args.length > 0 && isFileArg(args[0], typeTable)) {
+    fileMode = asFileValue(args[0], typeTable)!
+    argStart = 1
+  }
+
   let values: string[] = []
-  let varValue: string
-  
-  for (const arg of args) {
-    if (values.length === 0) {
-      const input = vmState.inputQueue.shift()
-      if (input === undefined) {
-        // 输入为空时使用默认值 0
-        values = ['0']
-      } else {
-        values = input.split(/\s+/).filter(v => v.length > 0)
-        if (values.length === 0) {
-          values = ['0']
-        }
+  for (let i = argStart; i < args.length; i++) {
+    const arg = args[i] as any
+    const argValue = arg.value || arg
+    const argRef = arg.ref
+
+    let varValue: string
+    if (fileMode) {
+      if (!io) throw new Error('READ from file requires runtime.io')
+      // 从文件读一个 token：先跳过空白，读到下一个空白
+      let ch = await io.file.bufferChar(fileMode)
+      while (ch === 32 || ch === 10 || ch === 13 || ch === 9) {
+        await io.file.get(fileMode)
+        ch = await io.file.bufferChar(fileMode)
       }
-    }
-    
-    const valueStr = values.shift()
-    if (valueStr === undefined) {
-      // 当行中值不够时，尝试读下一行或用默认值
-      const nextInput = vmState.inputQueue.shift()
-      if (nextInput !== undefined) {
-        values = nextInput.split(/\s+/).filter(v => v.length > 0)
-        const nextVal = values.shift()
-        if (nextVal === undefined) continue
-        // 有值，继续处理
-        varValue = nextVal
-      } else {
-        varValue = '0'
+      let s = ''
+      while (ch !== 32 && ch !== 10 && ch !== 13 && ch !== 9 && ch !== 0) {
+        s += String.fromCharCode(ch)
+        await io.file.get(fileMode)
+        ch = await io.file.bufferChar(fileMode)
       }
+      varValue = s
     } else {
-      varValue = valueStr
+      // 控制台模式
+      if (values.length === 0) {
+        const input = vmState.inputQueue.shift()
+        values = input === undefined ? ['0'] : input.split(/\s+/).filter(v => v.length > 0)
+        if (values.length === 0) values = ['0']
+      }
+      const v = values.shift()
+      varValue = v === undefined ? '0' : v
     }
-    
-    const argValue = (arg as any).value || arg
-    const argRef = (arg as any).ref
+
     let newValue: PascalValue
     if (argValue.typeId === 'integer') {
       newValue = { typeId: 'integer', raw: parseInt(varValue, 10) }
@@ -195,18 +271,33 @@ export const readHandler: SysCallHandler = async (args, state) => {
   }
 }
 
-export const readlnHandler: SysCallHandler = async (args, state) => {
-  await readHandler(args, state)
+export const readlnHandler: SysCallHandler = async (args, state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+
+  // 第一参数是文件
+  if (args.length > 0 && isFileArg(args[0], typeTable)) {
+    const file = asFileValue(args[0], typeTable)!
+    if (!io) throw new Error('READLN from file requires runtime.io')
+    // 先按 READ 处理后续变量参数
+    if (args.length > 1) {
+      await readHandler(args, state, runtime)
+    }
+    await io.file.readln(file)
+    return
+  }
+
+  // 控制台模式
+  await readHandler(args, state, runtime)
 }
 
 // ============================================================================
-// 内置函数
+// 内置函数：ORD/CHR/ABS/SQR/PRED/SUCC/ODD
 // ============================================================================
 
 const ordHandler: SysCallHandler = (args) => {
   const value = (args[0] as any).value || args[0]
   const raw = value.raw
-  // char → charCode, boolean → 0/1, integer → itself, enum → index
   if (typeof raw === 'string') return { typeId: 'integer', raw: raw.charCodeAt(0) }
   if (typeof raw === 'boolean') return { typeId: 'integer', raw: raw ? 1 : 0 }
   return { typeId: 'integer', raw: raw as number }
@@ -255,31 +346,99 @@ const oddHandler: SysCallHandler = (args) => {
 }
 
 // ============================================================================
-// 文件操作：REWRITE/RESET/CLOSE（简化为 no-op）
+// 文件操作：RESET/REWRITE/CLOSE/GET/PUT/ASSIGN
 // ============================================================================
 
-const rewriteHandler: SysCallHandler = (args) => {
-  // rewrite(f): 创建新文件，简化为 no-op
-  // 不做任何事，writeln(f, ...) 仍输出到 stdout
+const resetHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return // 无 io：退化为 no-op（向后兼容）
+  if (args.length === 0) throw new Error('RESET requires a file argument')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('RESET: argument is not a file')
+  await io.file.reset(file)
 }
 
-const resetHandler: SysCallHandler = (args) => {
-  // reset(f): 打开文件读，简化为 no-op
+const rewriteHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return // 无 io：退化为 no-op
+  if (args.length === 0) throw new Error('REWRITE requires a file argument')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('REWRITE: argument is not a file')
+  await io.file.rewrite(file)
 }
 
-const closeHandler: SysCallHandler = (args) => {
-  // close(f): 关闭文件
-  // Pascal82 标准不含 close，抛出友好错误
-  throw new Error('close is not a Pascal82 standard function; use a Pascal82-compliant alternative')
+const closeHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return // 无 io：退化为 no-op
+  if (args.length === 0) throw new Error('CLOSE requires a file argument')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('CLOSE: argument is not a file')
+  await io.file.close(file)
 }
 
-const breakHandler: SysCallHandler = (args) => {
-  // break(f): flush 输出缓冲区，简化为 no-op
+const getHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return // 无 io：退化为 no-op
+  if (args.length === 0) throw new Error('GET requires a file argument')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('GET: argument is not a file')
+  await io.file.get(file)
 }
 
-const pageHandler: SysCallHandler = (args, state) => {
-  // page(f): 输出换页符
+const putHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return // 无 io：退化为 no-op
+  if (args.length === 0) throw new Error('PUT requires a file argument')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('PUT: argument is not a file')
+  await io.file.put(file)
+}
+
+const assignHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return // 无 io：退化为 no-op
+  if (args.length < 2) throw new Error('ASSIGN requires (file, name) arguments')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('ASSIGN: first argument is not a file')
+  const nameValue = (args[1] as any).value || args[1]
+  const name = String(nameValue.raw)
+  await io.file.assign(file, name)
+}
+
+// BUFFER_CHAR: 返回文件缓冲区当前字符（F^ 表达式编译为此 syscall）
+const bufferCharHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return { typeId: 'char', raw: ' ' } // 无 io：返回空格
+  if (args.length === 0) throw new Error('buffer char requires a file argument')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('buffer char: argument is not a file')
+  const code = await io.file.bufferChar(file)
+  return { typeId: 'char', raw: String.fromCharCode(code) }
+}
+
+const breakHandler: SysCallHandler = async (_args, _state, runtime) => {
+  // BREAK(f): flush 输出缓冲区，简化为 no-op（未来可调用 io.file.flush）
+}
+
+const pageHandler: SysCallHandler = async (args, state, runtime) => {
   const vmState = state as VMState
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  // PAGE(f) 或 PAGE
+  if (args.length > 0 && isFileArg(args[0], typeTable)) {
+    const file = asFileValue(args[0], typeTable)!
+    if (io) {
+      await io.file.write(file, '\f')
+      return
+    }
+  }
   vmState.outputBuffer.push('\f')
 }
 
@@ -287,20 +446,35 @@ const pageHandler: SysCallHandler = (args, state) => {
 // EOF/EOLN: 文件/输入结束检测
 // ============================================================================
 
-const eofHandler: SysCallHandler = (args, state) => {
-  // eof 或 eof(f): 简化为返回 true（输入已耗尽）
+const eofHandler: SysCallHandler = async (args, state, runtime) => {
   const vmState = state as VMState
-  if (args.length === 0) {
-    return { typeId: 'boolean', raw: vmState.inputQueue.length === 0 }
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+
+  // 带 file 参数
+  if (args.length > 0 && isFileArg(args[0], typeTable)) {
+    const file = asFileValue(args[0], typeTable)!
+    if (!io) return { typeId: 'boolean', raw: true } // 无 io：空文件
+    const v = await io.file.eof(file)
+    return { typeId: 'boolean', raw: v }
   }
-  // 带 file 参数：简化为 true（空文件）
-  return { typeId: 'boolean', raw: true }
+
+  // 无参数：检查 inputQueue
+  return { typeId: 'boolean', raw: vmState.inputQueue.length === 0 }
 }
 
-const eolnHandler: SysCallHandler = (args, state) => {
-  // eoln 或 eoln(f): 行结束检测
-  // 简化：readln 后 eoln 为 true
+const eolnHandler: SysCallHandler = async (args, state, runtime) => {
   const vmState = state as VMState
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+
+  if (args.length > 0 && isFileArg(args[0], typeTable)) {
+    const file = asFileValue(args[0], typeTable)!
+    if (!io) return { typeId: 'boolean', raw: true } // 无 io：行尾
+    const v = await io.file.eoln(file)
+    return { typeId: 'boolean', raw: v }
+  }
+
   return { typeId: 'boolean', raw: vmState.inputQueue.length === 0 }
 }
 
@@ -328,6 +502,10 @@ export function createDefaultSysCalls(): Map<string, SysCallHandler> {
   map.set('REWRITE', rewriteHandler)
   map.set('RESET', resetHandler)
   map.set('CLOSE', closeHandler)
+  map.set('GET', getHandler)
+  map.set('PUT', putHandler)
+  map.set('ASSIGN', assignHandler)
+  map.set('BUFFER_CHAR', bufferCharHandler)
   map.set('BREAK', breakHandler)
   map.set('PAGE', pageHandler)
   return map

@@ -1,0 +1,195 @@
+// 测试 VM 内存文件模型（异步）
+// 代码风格模仿 TANGLE.WEB 输出的 Pascal：紧凑、大写、TEXTFILE = PACKED FILE OF CHAR
+// 这些用例覆盖 RESET/REWRITE/GET/PUT/EOF/EOLN/READ/READLN/WRITE/WRITELN/F^/ASSIGN
+
+import { describe, it, expect } from '@jest/globals'
+import { runVMTest, type VMTest } from './_helper'
+
+function text(s: string): Uint8Array {
+  return new TextEncoder().encode(s)
+}
+
+describe('M4 VM - File Model (async)', () => {
+  const tests: VMTest[] = [
+    // ==========================================================================
+    // REWRITE + WRITE/WRITELN：写入到内存文件
+    // ==========================================================================
+
+    {
+      name: 'REWRITE + WRITELN 写入单行',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;BEGIN ASSIGN(F,'OUT.TXT');REWRITE(F);WRITELN(F,'HELLO');CLOSE(F);END.`,
+      purpose: 'ASSIGN + REWRITE + WRITELN + CLOSE 写入到内存文件',
+      features: ['assign', 'rewrite', 'writeln', 'close'],
+      files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
+      expectedFileContains: [{ url: 'OUT.TXT', contains: 'HELLO' }],
+    },
+
+    {
+      name: 'REWRITE + WRITE 多个参数',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;BEGIN ASSIGN(F,'OUT.TXT');REWRITE(F);WRITE(F,'N=',42);WRITELN(F);CLOSE(F);END.`,
+      purpose: 'WRITE 多参数写入文件，最后 WRITELN 换行',
+      features: ['write', 'writeln', 'multiple-args'],
+      files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
+      expectedFileContains: [{ url: 'OUT.TXT', contains: 'N=42' }],
+    },
+
+    {
+      name: 'WRITELN with width 写入文件',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;BEGIN ASSIGN(F,'OUT.TXT');REWRITE(F);WRITELN(F,'l.',5:1,')');CLOSE(F);END.`,
+      purpose: 'TANGLE 风格：WRITELN(TERMOUT, "l.", LINE:1, ")") 写入文件',
+      features: ['writeln', 'width-format'],
+      files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
+      expectedFileContains: [{ url: 'OUT.TXT', contains: 'l.5)' }],
+    },
+
+    // ==========================================================================
+    // RESET + EOF：从内存文件读
+    // ==========================================================================
+
+    {
+      name: 'RESET 空文件 EOF 立即为真',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;BEGIN ASSIGN(F,'EMPTY.TXT');RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('NOT EMPTY');END.`,
+      purpose: '空文件 RESET 后 EOF 立即为真',
+      features: ['reset', 'eof', 'empty-file'],
+      files: new Map<string, Uint8Array>([['EMPTY.TXT', new Uint8Array(0)]]),
+      expectedContains: 'EMPTY',
+    },
+
+    {
+      name: 'RESET 非空文件 EOF 为假',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('HAS DATA');END.`,
+      purpose: '非空文件 RESET 后 EOF 为假',
+      features: ['reset', 'eof'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('hello')]]),
+      expectedContains: 'HAS DATA',
+    },
+
+    // ==========================================================================
+    // F^ + GET：逐字符读取（Knuth INPUTLN 风格）
+    // ==========================================================================
+
+    {
+      name: 'F^ 读首字符 + GET 推进',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;CH:CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);CH:=F^;WRITE(CH);GET(F);CH:=F^;WRITE(CH);WRITELN;END.`,
+      purpose: 'F^ 读缓冲区字符，GET 推进 offset（tangle INPUTLN 风格）',
+      features: ['buffer-char', 'get', 'char-by-char'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('AB')]]),
+      expectedContains: 'AB',
+    },
+
+    {
+      name: 'INPUTLN 风格逐字符循环',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;CH:CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);WHILE NOT EOLN(F)DO BEGIN CH:=F^;WRITE(CH);GET(F);END;WRITELN;END.`,
+      purpose: 'Knuth INPUTLN 风格：WHILE NOT EOLN(F) DO BEGIN CH:=F^;WRITE(CH);GET(F) END',
+      features: ['buffer-char', 'get', 'eoln', 'while-loop'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('HELLO\n')]]),
+      expectedContains: 'HELLO',
+    },
+
+    // ==========================================================================
+    // EOLN：行结束检测
+    // ==========================================================================
+
+    {
+      name: 'EOLN 在行尾返回真',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITELN('AT EOLN');END.`,
+      purpose: 'GET 推进到行尾时 EOLN 返回真',
+      features: ['eoln', 'get'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('AB\n')]]),
+      expectedContains: 'AT EOLN',
+    },
+
+    {
+      name: 'READLN 跳过当前行',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;CH:CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);READLN(F);CH:=F^;WRITE(CH);WRITELN;END.`,
+      purpose: 'READLN(F) 跳过当前行，下一行首字符可读',
+      features: ['readln', 'buffer-char'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('LINE1\nLINE2\n')]]),
+      expectedContains: 'L',
+    },
+
+    // ==========================================================================
+    // READ/READLN 整数：从文件读数值
+    // ==========================================================================
+
+    {
+      name: 'READ 从文件读整数',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;N:INTEGER;BEGIN ASSIGN(F,'IN.TXT');RESET(F);READ(F,N);WRITELN('N=',N);END.`,
+      purpose: 'READ(F, N) 从文件读整数',
+      features: ['read', 'integer', 'from-file'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('42')]]),
+      expectedContains: 'N=42',
+    },
+
+    {
+      name: 'READ 多个整数',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;A,B:INTEGER;BEGIN ASSIGN(F,'IN.TXT');RESET(F);READ(F,A,B);WRITELN('A=',A,' B=',B);END.`,
+      purpose: 'READ(F, A, B) 连续读多个整数',
+      features: ['read', 'multiple-integers'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('10 20')]]),
+      expectedContains: 'A=10 B=20',
+    },
+
+    // ==========================================================================
+    // 文件复制：经典 Pascal IO 用例
+    // ==========================================================================
+
+    {
+      name: '文件复制：INFILE → OUTFILE',
+      code: `PROGRAM COPYFILE(INFILE,OUTFILE);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN WHILE NOT EOLN(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;WRITELN(OUTFILE);READLN(INFILE);END;CLOSE(OUTFILE);END.`,
+      purpose: 'TANGLE 风格：通过 PROGRAM 头声明文件参数，逐字符复制',
+      features: ['program-params', 'reset', 'rewrite', 'eof', 'eoln', 'buffer-char', 'get', 'readln', 'close'],
+      files: new Map<string, Uint8Array>([
+        ['INFILE', text('LINE1\nLINE2\n')],
+        ['OUTFILE', new Uint8Array(0)],
+      ]),
+      programFileUrls: { INFILE: 'INFILE', OUTFILE: 'OUTFILE' },
+      expectedFileContains: [{ url: 'OUTFILE', contains: 'LINE1' }],
+    },
+
+    // ==========================================================================
+    // ASSIGN 显式调用
+    // ==========================================================================
+
+    {
+      name: 'ASSIGN + RESET + READ',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;N:INTEGER;BEGIN ASSIGN(F,'DATA.TXT');RESET(F);READ(F,N);WRITELN(N*2);END.`,
+      purpose: 'ASSIGN 显式绑定文件名，再 RESET + READ',
+      features: ['assign', 'reset', 'read'],
+      files: new Map<string, Uint8Array>([['DATA.TXT', text('21')]]),
+      expectedContains: '42',
+    },
+
+    // ==========================================================================
+    // PUT：写入缓冲区（简化为 no-op，但仍要能正确执行不报错）
+    // ==========================================================================
+
+    {
+      name: 'PUT 调用不报错',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;BEGIN ASSIGN(F,'OUT.TXT');REWRITE(F);PUT(F);WRITELN(F,'AFTER PUT');CLOSE(F);END.`,
+      purpose: 'PUT 在简化实现中是 no-op，但要能正确执行',
+      features: ['put'],
+      files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
+      expectedFileContains: [{ url: 'OUT.TXT', contains: 'AFTER PUT' }],
+    },
+  ]
+
+  for (const t of tests) {
+    it(t.name, async () => {
+      const result = await runVMTest(t)
+      if (!result.passed) {
+        console.error(`  [${t.name}] FAIL: ${result.message}`)
+        if (result.state?.error) {
+          console.error(`  [${t.name}] error:`, result.state.error.message)
+          console.error(`  [${t.name}] stack:`, result.state.error.stackTrace)
+        }
+        if (t.files) {
+          for (const [url, bytes] of t.files) {
+            console.error(`  [${t.name}] file ${url}: ${JSON.stringify(new TextDecoder().decode(bytes))}`)
+          }
+        }
+      }
+      expect(result.passed).toBe(true)
+    })
+  }
+})
