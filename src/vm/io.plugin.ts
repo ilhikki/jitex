@@ -229,6 +229,16 @@ const closeHandler: SysCallHandler = (args) => {
   throw new Error('close is not a Pascal82 standard function; use a Pascal82-compliant alternative')
 }
 
+const breakHandler: SysCallHandler = (args) => {
+  // break(f): flush 输出缓冲区，简化为 no-op
+}
+
+const pageHandler: SysCallHandler = (args, state) => {
+  // page(f): 输出换页符
+  const vmState = state as VMState
+  vmState.outputBuffer.push('\f')
+}
+
 // ============================================================================
 // EOF/EOLN: 文件/输入结束检测
 // ============================================================================
@@ -274,5 +284,7 @@ export function createDefaultSysCalls(): Map<string, SysCallHandler> {
   map.set('REWRITE', rewriteHandler)
   map.set('RESET', resetHandler)
   map.set('CLOSE', closeHandler)
+  map.set('BREAK', breakHandler)
+  map.set('PAGE', pageHandler)
   return map
 }

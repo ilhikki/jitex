@@ -421,9 +421,15 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   let otherwise: StatementNode | null = null
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'END') {
-    // Check for OTHERWISE
-    if (peek({ tokens: input.tokens, position: pos }).type === 'OTHERWISE') {
+    // Check for OTHERWISE / OTHERS (UCSD Pascal 别名)
+    // 两种语法：`OTHERWISE statement` 或 `OTHERS: statement`
+    const peekTok = peek({ tokens: input.tokens, position: pos })
+    if (peekTok.type === 'OTHERWISE' || (peekTok.type === 'IDENTIFIER' && peekTok.content.toUpperCase() === 'OTHERS')) {
       pos++
+      // 可选冒号（OTHERS: statement 风格）
+      if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
+        pos++
+      }
       const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
       if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
       otherwise = stmtResult.astNode

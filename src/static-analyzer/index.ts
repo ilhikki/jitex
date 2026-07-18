@@ -789,8 +789,22 @@ export class StaticAnalyzer {
         }
       }
 
+      case 'FileType': {
+        const ft = typeNode as any
+        // FILE OF CHAR（packed 或非 packed）等价于 text
+        if (ft.elementType && ft.elementType.kind === 'SimpleType'
+          && (ft.elementType as any).name.name.toUpperCase() === 'CHAR') {
+          return this.typeTable.get('text')!
+        }
+        // 其他 FILE OF X：创建通用 file 类型（VM 简化处理）
+        const id = ft.elementType
+          ? `file-of-${this.resolveType(ft.elementType, scope).id}`
+          : 'file'
+        return { id, kind: 'file' }
+      }
+
       default:
-        throw new Error(`Unsupported type kind: ${typeNode.kind}`)
+        throw new Error(`Unsupported type kind: ${(typeNode as any).kind}`)
     }
   }
 
@@ -1308,7 +1322,7 @@ export class StaticAnalyzer {
     const name = node.name.name.toUpperCase()
 
     // 检查是否是系统调用
-    const sysCallNames = ['WRITE', 'WRITELN', 'READ', 'READLN', 'REWRITE', 'RESET', 'CLOSE', 'PUT', 'GET']
+    const sysCallNames = ['WRITE', 'WRITELN', 'READ', 'READLN', 'REWRITE', 'RESET', 'CLOSE', 'PUT', 'GET', 'BREAK', 'PAGE']
     if (sysCallNames.includes(name)) {
       const argRefs: Ref[] = []
       for (const arg of node.arguments) {
@@ -1771,6 +1785,21 @@ export class StaticAnalyzer {
         const obj = this.compileExpr(fieldAccess.object, scope)
         const fieldName = fieldAccess.field.name.toUpperCase()
         const objType = this.typeTable.get(obj.typeId)
+
+        // 文件缓冲区访问 F^：返回文件元素类型的占位值
+        if (fieldName === '^' && objType?.kind === 'file') {
+          const elemTypeId = (objType as any).elementTypeId || 'char'
+          const temp = this.tempVar()
+          // 简化：返回默认 char 值（VM 不支持真实文件 IO）
+          this.instructions.push({
+            op: 'LITERAL',
+            dest: temp,
+            typeId: elemTypeId,
+            value: ' ',
+          })
+          return { ref: temp, typeId: elemTypeId }
+        }
+
         if (!objType || objType.kind !== 'record') {
           throw new Error(`Type ${obj.typeId} is not a record`)
         }
