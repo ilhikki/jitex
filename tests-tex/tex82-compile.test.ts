@@ -5,8 +5,8 @@ import { StaticAnalyzer } from '../src/static-analyzer'
 import { runVM } from '../src/vm'
 
 describe('TEX82 - compile and analyze tex.pas', () => {
-  const webFile = path.join(__dirname, 'resources', 'tex.web')
-  const tanglePasFile = path.join(__dirname, 'resources', 'tangle-official.pas')
+  const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
+  const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
   const tanglePas = fs.readFileSync(tanglePasFile, 'utf-8')
 

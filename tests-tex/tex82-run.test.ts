@@ -6,8 +6,8 @@ import { runVM } from '../src/vm'
 import { stringPlugin } from '../src/types'
 
 describe('TEX82 - run tex.pas on VM', () => {
-  const webFile = path.join(__dirname, 'resources', 'tex.web')
-  const tanglePasFile = path.join(__dirname, 'resources', 'tangle-official.pas')
+  const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
+  const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
   const tanglePas = fs.readFileSync(tanglePasFile, 'utf-8')
 

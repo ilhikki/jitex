@@ -187,7 +187,8 @@ TEX82 大约是 TANGLE 的 **8 倍**规模。使用的 Pascal 特性更全面：
 
 TRIP 测试是 Knuth 设计的 TeX 官方回归测试，比 texbook 小得多，适合作为中间里程碑。
 
-- [ ] 用 TEX 编译 trip.tex
+- [x] 资源已就位：trip.tex, trip.typ 在 `tests/resources/`
+- [ ] 用 TEX 编译 trip.tex，收集初始化后的运行时错误
 - [ ] 对比 trip.typ（预期输出）
 - [ ] 修复发现的问题
 
@@ -215,7 +216,7 @@ TRIP 测试是 Knuth 设计的 TeX 官方回归测试，比 texbook 小得多，
 | M1 TANGLE 编译 tex.web | 产出 tex.pas | P0 | ✅ 完成 |
 | M2 tex.pas 编译通过 | parse + analyze → JsonCode | P0 | ✅ 完成 |
 | M3 TEX 初始化通过 | VM 跑完初始化段 | P1 | ✅ 完成 |
-| M4 TRIP 测试通过 | trip.tex 编译正确 | P1 | 未开始 |
+| M4 TRIP 测试通过 | trip.tex 编译正确 | P1 | 进行中 |
 | M5 texbook 编译通过 | 产出 DVI | P2 | 未开始 |
 
 ## 七、工作流程
@@ -251,27 +252,34 @@ TRIP 测试是 Knuth 设计的 TeX 官方回归测试，比 texbook 小得多，
 tests/resources/
 ├── tangle-official.pas         # 已有：TANGLE 官方 Pascal
 ├── tangle.web                  # 已有：TANGLE WEB 源
-├── tex.web                     # 新增：TEX WEB 源（从 knuth/tex82/ 复制）
-├── texbook.tex                 # 新增：TeXbook 源文件
-├── trip.tex                    # 新增：TRIP 测试输入
-├── trip.typ                    # 新增：TRIP 测试预期输出
-└── tex.pas                     # 后续产出：TANGLE 编译 tex.web 的结果
+├── tex.web                     # TEX WEB 源（从 knuth/tex82/ 复制）
+├── texbook.tex                 # TeXbook 源文件
+├── trip.tex                    # TRIP 测试输入
+└── trip.typ                    # TRIP 测试预期输出
 
 tests/temp/                     # 测试临时文件目录（可提交）
 └── *.txt / *.pas / *.json      # 中间产物、调试输出等
 
-tests/
-├── tangle-run.test.ts          # 已有：TANGLE 端到端测试
-├── tangle-bootstrap.test.ts    # 已有：TANGLE 自举测试
-├── tex82-tangle.test.ts        # 新增：TANGLE 编译 tex.web 的测试
-└── tex82-compile.test.ts       # 新增：tex.pas 的 parse + analyze 测试
+tests/                          # 标准测试（快速）
+├── lexer/ parser/ m3.5/ m4/    # 单元/模块测试
+└── resources/                  # 测试资源（tex 和 tangle 共用）
+
+tests-tex/                      # TEX82 端到端测试（耗时长，独立目录）
+├── tangle-run.test.ts          # TANGLE 端到端测试
+├── tangle-bootstrap.test.ts    # TANGLE 自举测试
+├── tangle-verify.test.ts       # TANGLE 验证测试
+├── tangle.test.ts              # TANGLE 基础测试
+├── tex82-tangle.test.ts        # TANGLE 编译 tex.web 的测试
+├── tex82-compile.test.ts       # tex.pas 的 parse + analyze 测试
+├── tex82-run.test.ts           # TEX82 在 VM 上初始化运行测试
+└── tex82-trip.test.ts          # TRIP 回归测试
 
 knuth/
 ├── web/                        # 已有：TANGLE 相关源文件
 └── tex82/                      # 已有：TEX82 原始文件（只读参考，不直接用于测试）
 
 issue/
-└── ISSUE-XXX-*.md              # M4.2 期间新增的 bug 记录
+└── ISSUE-XXX-*.md              # bug 记录
 ```
 
 ## 九、参考资源
@@ -283,3 +291,20 @@ issue/
 - **TeXbook**：`knuth/tex82/texbook.tex`
 - **issue 格式参考**：`issue/ISSUE-025-[Fixed]array-char-index.md`
 - **测试风格参考**：`tests/m4/q11-knuth-pascal.test.ts`、`tests/m4/q12-file-model.test.ts`
+
+## 十、Issue 跟踪
+
+| Issue | 描述 | 分类 | 状态 |
+|-------|------|------|------|
+| ISSUE-026 | 变体记录支持 | 标准 | Fixed |
+| ISSUE-027~032 | TEX82 初始化系列 | 混合 | Fixed |
+| ISSUE-033 | RESET/REWRITE 多参数形式（带文件名） | 非标扩展（插件） | Open |
+| ISSUE-034 | READ 对 char 类型错误跳过空白 | 标准行为（核心） | Open |
+
+### M4 阻塞问题
+
+TRIP 测试当前卡在 POOL 文件读取，由 ISSUE-033 + ISSUE-034 共同导致：
+1. ISSUE-033：`RESET(POOLFILE, NAMEOFFILE, '/O')` 的文件名参数被忽略，POOL 文件未关联
+2. ISSUE-034：`READ(POOLFILE, M, N)`（char）跳过空白，读到错误内容
+
+修复顺序：先 ISSUE-034（标准核心），再 ISSUE-033（非标插件）。
