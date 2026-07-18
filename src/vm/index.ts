@@ -33,6 +33,8 @@ export interface VMRunOptions {
   io?: PascalIO
   // 全局文件变量名（大写）→ URL；VM 启动时自动 ASSIGN（TANGLE 等 Knuth 风格程序用）
   programFileUrls?: Record<string, string>
+  // 最大执行步数，默认 1 亿；大程序（如 TEX82）可设更大
+  maxSteps?: number
 }
 
 function parseSource(source: string): ProgramNode {
@@ -79,6 +81,7 @@ export async function runVM(source: string, options: VMRunOptions = {}): Promise
     sysCalls,
     io,
     programFileUrls: options.programFileUrls,
+    maxSteps: options.maxSteps,
   })
 
   return state

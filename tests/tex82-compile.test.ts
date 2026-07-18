@@ -28,6 +28,7 @@ describe('TEX82 - compile and analyze tex.pas', () => {
         'PASCALFILE': 'PASCALFILE',
         'POOL': 'POOL',
       },
+      maxSteps: 2000000000,
     })
     return Buffer.from(files.get('PASCALFILE')!).toString('utf-8')
   }

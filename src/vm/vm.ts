@@ -68,6 +68,8 @@ export interface VMOptions {
   io?: PascalIO
   // 全局文件变量名（大写）→ 文件 URL；VM 启动时自动 ASSIGN
   programFileUrls?: Record<string, string>
+  // 最大执行步数，默认 1 亿；大程序（如 TEX82）可设更大
+  maxSteps?: number
 }
 
 export async function execute(
@@ -137,7 +139,7 @@ export async function execute(
 
   // 主执行循环
   try {
-    await runLoop(state, runtime, ctx)
+    await runLoop(state, runtime, ctx, options.maxSteps || 100000000)
     state.status = 'terminated'
   } catch (e: any) {
     state.status = 'error'
@@ -158,9 +160,9 @@ export async function execute(
 async function runLoop(
   state: VMState,
   runtime: RuntimeCtx,
-  ctx: VMContext
+  ctx: VMContext,
+  maxSteps: number
 ): Promise<void> {
-  const maxSteps = 100000000
   let steps = 0
 
   while (state.status === 'running' && state.callStack.length > 0) {

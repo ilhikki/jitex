@@ -8,10 +8,13 @@ import {
   Position,
   RangeTypeNode,
   RecordTypeNode,
+  RecordVariantPartNode,
+  RecordVariantNode,
   SetTypeNode,
   SimpleTypeNode,
   TypeNode,
   VariableDeclarationNode,
+  ExpressionNode,
 } from '../ast/types'
 import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
 import { parseExpression, parseIdentifier } from './expressions'

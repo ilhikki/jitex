@@ -191,6 +191,21 @@ export interface ArrayTypeNode extends AstNode {
 export interface RecordTypeNode extends AstNode {
   kind: 'RecordType'
   fields: VariableDeclarationNode[]
+  variant?: RecordVariantPartNode
+}
+
+export interface RecordVariantPartNode extends AstNode {
+  kind: 'RecordVariantPart'
+  tagName?: IdentifierNode
+  tagType: TypeNode
+  variants: RecordVariantNode[]
+}
+
+export interface RecordVariantNode extends AstNode {
+  kind: 'RecordVariant'
+  caseLabels: ExpressionNode[]
+  fields: VariableDeclarationNode[]
+  variant?: RecordVariantPartNode
 }
 
 export interface FileTypeNode extends AstNode {
