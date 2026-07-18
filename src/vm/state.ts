@@ -16,6 +16,7 @@ export interface VMState {
   inputQueue: string[]
   error: VMError | null
   status: 'running' | 'paused' | 'terminated' | 'error'
+  stepsExecuted: number
 }
 
 export interface StackFrame {
@@ -65,6 +66,7 @@ export function createVMState(): VMState {
     inputQueue: [],
     error: null,
     status: 'running',
+    stepsExecuted: 0,
   }
 }
 

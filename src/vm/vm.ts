@@ -163,12 +163,8 @@ async function runLoop(
   ctx: VMContext,
   maxSteps: number
 ): Promise<void> {
-  let steps = 0
-
   while (state.status === 'running' && state.callStack.length > 0) {
-    if (steps++ > maxSteps) {
-      // 达到步数上限：不抛异常，安静终止（与解释器行为一致）
-      // 这样 output 仍然可用，测试可以检查 expectedContains
+    if (state.stepsExecuted++ >= maxSteps) {
       state.status = 'terminated'
       state.error = {
         message: 'VM: step limit exceeded (possible infinite loop)',
@@ -201,7 +197,10 @@ async function runLoop(
     }
 
     const fn = proc.body[state.pc]
-    await fn(state, runtime, ctx)
+    const result = fn(state, runtime, ctx)
+    if (result && typeof result.then === 'function') {
+      await result
+    }
   }
 }
 
@@ -249,22 +248,32 @@ function compileInstruction(
   switch (inst.op) {
     case 'DECLARE': {
       const { typeId, scope, name } = inst
-      return async (state, _runtime, ctx) => {
-        const typeDef = runtime.typeTable.get(typeId)
+      const typeDef = runtime.typeTable.get(typeId)
+      const isFile = typeDef?.kind === 'file'
+      if (isFile) {
+        return async (state, _runtime, ctx) => {
+          const value = getDefault(typeDef, plugins, runtime)
+          if (scope === 'global') {
+            state.globals[name.toUpperCase()] = value
+          } else {
+            topFrame(state).locals[name.toUpperCase()] = value
+          }
+          if (ctx.programFileUrls && runtime.io) {
+            const upper = name.toUpperCase()
+            const url = ctx.programFileUrls[upper]
+            if (url && typeof value.raw === 'object' && 'url' in (value.raw as any)) {
+              await runtime.io.file.assign(value.raw as PascalFile, url)
+            }
+          }
+          state.pc++
+        }
+      }
+      return (state) => {
         const value = getDefault(typeDef, plugins, runtime)
         if (scope === 'global') {
           state.globals[name.toUpperCase()] = value
         } else {
           topFrame(state).locals[name.toUpperCase()] = value
-        }
-        // file 类型变量 DECLARE 后自动 ASSIGN（programFileUrls）
-        // TANGLE 等 Knuth 风格程序依靠 PROGRAM 头隐式 ASSIGN 文件参数
-        if (typeDef?.kind === 'file' && ctx.programFileUrls && runtime.io) {
-          const upper = name.toUpperCase()
-          const url = ctx.programFileUrls[upper]
-          if (url && typeof value.raw === 'object' && 'url' in (value.raw as any)) {
-            await runtime.io.file.assign(value.raw as PascalFile, url)
-          }
         }
         state.pc++
       }
@@ -343,7 +352,7 @@ function compileInstruction(
       const procName = inst.proc.toUpperCase()
       const argRefs = inst.args
       const dest = inst.dest
-      return async (state, runtime, ctx) => {
+      return (state, runtime, ctx) => {
         const proc = ctx.procMap.get(procName)
         if (!proc) {
           throw new Error(`VM: unknown procedure ${procName}`)
@@ -354,26 +363,22 @@ function compileInstruction(
         const returnProc = state.currentProc
         const staticLink = state.callStack.length > 0 ? state.callStack.length - 1 : undefined
         const frame = createStackFrame(proc.name, returnAddress, returnProc, staticLink, proc.level)
-        frame.returnDest = dest  // 记录返回值存储位置
+        frame.returnDest = dest
 
-        // 初始化局部变量
         for (const local of proc.locals) {
           const typeDef = runtime.typeTable.get(local.typeId)
           frame.locals[local.name.toUpperCase()] = getDefault(typeDef, plugins, runtime)
         }
 
-        // 绑定参数
         proc.params.forEach((param, i) => {
           const argValue = argValues[i]
           if (param.isVar) {
-            // var 参数：先 resolve varBinding 链，避免循环引用
             frame.varBindings[param.name.toUpperCase()] = resolveVarBinding(state, argRefs[i])
           } else {
             frame.locals[param.name.toUpperCase()] = argValue
           }
         })
 
-        // 分配临时槽位
         for (let i = 0; i < proc.maxTemps; i++) {
           frame.temps.push({ typeId: 'unknown', raw: undefined })
         }
@@ -381,7 +386,6 @@ function compileInstruction(
         state.callStack.push(frame)
         state.currentProc = proc.name
         state.pc = 0
-        // 主循环会自动执行新过程
       }
     }
 
@@ -435,50 +439,86 @@ function compileInstruction(
 
     case 'TYPE_OP': {
       const { typeId, opName, opKind, dest, src: srcRefs, extra } = inst
-      return (state, runtime) => {
-        const op = findOp(plugins, opKind, opName, typeId, runtime.typeTable)
-        if (!op) {
-          throw new Error(`VM: unknown op ${opKind}.${opName} for type ${typeId}`)
+      const op = findOp(plugins, opKind, opName, typeId, runtime.typeTable)
+      if (!op) {
+        throw new Error(`VM: unknown op ${opKind}.${opName} for type ${typeId}`)
+      }
+      const invoke = (op as any).invoke
+
+      if (opKind === 'compare') {
+        const opStr = (extra as any)?.op || opName
+        return (state, runtime) => {
+          const left = getValue(state, srcRefs[0])
+          const right = getValue(state, srcRefs[1])
+          setValue(state, dest, invoke(left, right, opStr, runtime))
+          state.pc++
         }
-        const args = srcRefs.map((r) => getValue(state, r))
-        const invoke = (op as any).invoke
-        let result: PascalValue
-        if (opKind === 'compare') {
-          const opStr = (extra as any)?.op || opName
-          result = invoke(args[0], args[1], opStr, runtime)
-        } else if (opKind === 'assign') {
-          // assign invoke(dest, src, runtime) — 需要 dest 当前值和 src 新值
+      }
+      if (opKind === 'assign') {
+        return (state, runtime) => {
           const destValue = getValue(state, dest)
-          result = invoke(destValue, args[0], runtime)
-        } else if (opKind === 'copy') {
-          // copy invoke(value, runtime) — 只需要 src 值
-          result = invoke(args[0], runtime)
-        } else if (opKind === 'default') {
-          result = invoke(typeId, runtime)
-        } else if (opKind === 'control') {
-          const bool = invoke(args[0], runtime)
-          result = { typeId: 'boolean', raw: bool }
-        } else if (opKind === 'index') {
-          const arrayValue = args[0]
-          const indices = args.slice(1)
-          result = invoke(arrayValue, ...indices)
-        } else if (opKind === 'setIndex') {
+          const srcValue = getValue(state, srcRefs[0])
+          setValue(state, dest, invoke(destValue, srcValue, runtime))
+          state.pc++
+        }
+      }
+      if (opKind === 'copy') {
+        return (state, runtime) => {
+          setValue(state, dest, invoke(getValue(state, srcRefs[0]), runtime))
+          state.pc++
+        }
+      }
+      if (opKind === 'default') {
+        return (state, runtime) => {
+          setValue(state, dest, invoke(typeId, runtime))
+          state.pc++
+        }
+      }
+      if (opKind === 'control') {
+        return (state, runtime) => {
+          const bool = invoke(getValue(state, srcRefs[0]), runtime)
+          setValue(state, dest, { typeId: 'boolean', raw: bool })
+          state.pc++
+        }
+      }
+      if (opKind === 'index') {
+        return (state) => {
+          const arrayValue = getValue(state, srcRefs[0])
+          const indices = srcRefs.slice(1).map((r) => getValue(state, r))
+          setValue(state, dest, invoke(arrayValue, ...indices))
+          state.pc++
+        }
+      }
+      if (opKind === 'setIndex') {
+        return (state) => {
           const arrayValue = getValue(state, dest)
+          const args = srcRefs.map((r) => getValue(state, r))
           const indices = args.slice(0, args.length - 1)
           const value = args[args.length - 1]
-          result = invoke(arrayValue, ...indices, value)
-        } else if (opKind === 'field') {
-          const fieldName = (extra as any)?.field
-          result = invoke(args[0], fieldName, runtime)
-        } else if (opKind === 'setField') {
-          const recordValue = getValue(state, dest)
-          const fieldName = (extra as any)?.field
-          const value = args[0]
-          result = invoke(recordValue, value, fieldName, runtime)
-        } else {
-          result = invoke(...args, runtime)
+          setValue(state, dest, invoke(arrayValue, ...indices, value))
+          state.pc++
         }
-        setValue(state, dest, result)
+      }
+      if (opKind === 'field') {
+        const fieldName = (extra as any)?.field
+        return (state, runtime) => {
+          setValue(state, dest, invoke(getValue(state, srcRefs[0]), fieldName, runtime))
+          state.pc++
+        }
+      }
+      if (opKind === 'setField') {
+        const fieldName = (extra as any)?.field
+        return (state, runtime) => {
+          const recordValue = getValue(state, dest)
+          const value = getValue(state, srcRefs[0])
+          setValue(state, dest, invoke(recordValue, value, fieldName, runtime))
+          state.pc++
+        }
+      }
+      // unary / binary / call 等通用情况
+      return (state, runtime) => {
+        const args = srcRefs.map((r) => getValue(state, r))
+        setValue(state, dest, invoke(...args, runtime))
         state.pc++
       }
     }
