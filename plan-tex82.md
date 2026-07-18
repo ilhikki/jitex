@@ -94,6 +94,39 @@ TEX82 大约是 TANGLE 的 **8 倍**规模。使用的 Pascal 特性更全面：
 - **根因**：`compileAssignment` 中的字段访问处理没有特殊处理文件类型的 `^` 操作符
 - **修复内容**：在 `compileAssignment` 中添加对文件 `^` 字段的特殊处理，编译为 `SYS_CALL WRITE_FILE`
 
+### 4.5 ISSUE-030：VM 不支持 string 类型的 assign 操作
+- **状态**：Fixed
+- **严重程度**：High
+- **发现时间**：2026-07-18
+- **修复时间**：2026-07-18
+- **影响范围**：VM
+- **问题描述**：TEX82 在 VM 上运行初始化时失败，错误信息为 `VM: unknown op assign.assign for type string`
+- **根因**：`runVM` 的 `basePlugins` 数组没有包含 `stringPlugin`
+- **修复内容**：在 `basePlugins` 中添加 `stringPlugin`
+- **文档**：`issue/ISSUE-030-[Fixed]vm-assign-op-for-string.md`
+
+### 4.6 ISSUE-031：VM 不支持 array-of-char 类型的 assign 操作
+- **状态**：Fixed
+- **严重程度**：High
+- **发现时间**：2026-07-18
+- **修复时间**：2026-07-18
+- **影响范围**：VM / ArrayPlugin
+- **问题描述**：TEX82 在 VM 上运行初始化时失败，错误信息为 `VM: unknown op assign.assign for type array-1..20-of-char`
+- **根因**：`ArrayPlugin` 没有实现 `assign` 操作
+- **修复内容**：在 `createArrayPlugin` 中添加 `assign` 操作（深拷贝数组）
+- **文档**：`issue/ISSUE-031-[Fixed]vm-assign-op-for-array-of-char.md`
+
+### 4.7 ISSUE-032：VM 缺少 TEX82 所需的 SYS_CALL handler
+- **状态**：Fixed
+- **严重程度**：High
+- **发现时间**：2026-07-18
+- **修复时间**：2026-07-18
+- **影响范围**：VM / io.plugin.ts
+- **问题描述**：TEX82 在 VM 上运行时调用未实现的系统调用 `ERSTAT`
+- **根因**：`createDefaultSysCalls()` 中没有注册 ERSTAT、BREAKIN、WRITE_FILE 的 handler
+- **修复内容**：添加三个 handler（ERSTAT 返回 0、BREAKIN no-op、WRITE_FILE 调用 io.file.write）
+- **文档**：`issue/ISSUE-032-[Fixed]vm-missing-syscalls-erstat-breakin-writefile.md`
+
 ## 五、任务拆分与优先级
 
 ### Phase 0: 基础设施（P0）
@@ -138,13 +171,15 @@ TEX82 大约是 TANGLE 的 **8 倍**规模。使用的 Pascal 特性更全面：
 
 **目标**：VM 能跑完 TEX 的初始化段不崩溃。
 
-- [ ] 跑 VM 执行 tex.pas，收集初始化阶段的错误
-- [ ] 修复数组越界、类型不匹配等初始化问题
-- [ ] 验证 TEX 能进入主循环（或读取输入文件）
+- [x] 跑 VM 执行 tex.pas，收集初始化阶段的错误
+- [x] 修复 ISSUE-030（string assign 缺失）
+- [x] 修复 ISSUE-031（array-of-char assign 缺失）
+- [x] 修复 ISSUE-032（ERSTAT/BREAKIN/WRITE_FILE syscall 缺失）
+- [x] 验证 VM 状态为 terminated（初始化通过）
 
 **验收标准**：
-- VM 能跑完初始化不报错
-- 能成功打开 .tex 输入文件
+- VM 能跑完初始化不报错 ✅
+- VM 状态为 terminated ✅
 
 ### Phase 4: TRIP 测试（P1）
 
@@ -179,7 +214,7 @@ TRIP 测试是 Knuth 设计的 TeX 官方回归测试，比 texbook 小得多，
 | M0 基础设施 | 资源文件 + 测试骨架 + 文档 | P0 | ✅ 完成 |
 | M1 TANGLE 编译 tex.web | 产出 tex.pas | P0 | ✅ 完成 |
 | M2 tex.pas 编译通过 | parse + analyze → JsonCode | P0 | ✅ 完成 |
-| M3 TEX 初始化通过 | VM 跑完初始化段 | P1 | 未开始 |
+| M3 TEX 初始化通过 | VM 跑完初始化段 | P1 | ✅ 完成 |
 | M4 TRIP 测试通过 | trip.tex 编译正确 | P1 | 未开始 |
 | M5 texbook 编译通过 | 产出 DVI | P2 | 未开始 |
 

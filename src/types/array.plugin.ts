@@ -230,6 +230,34 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
           return { typeId: value.typeId, raw: deepCopy(value.raw) }
         },
       },
+
+      assign: {
+        can: (fromType: string, toType: string) => {
+          const fromDef = typeTable.get(fromType)
+          const toDef = typeTable.get(toType)
+          return fromDef?.kind === 'array' && toDef?.kind === 'array'
+        },
+        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
+          return [{
+            op: 'TYPE_OP',
+            typeId: ctx.typeId || 'array',
+            opName: 'assign',
+            opKind: 'assign',
+            dest,
+            src: [src],
+            sourcePos: ctx.sourcePos,
+          }]
+        },
+        invoke: (dest: PascalValue, src: PascalValue) => {
+          const deepCopy = (obj: unknown): unknown => {
+            if (Array.isArray(obj)) {
+              return obj.map(deepCopy)
+            }
+            return obj
+          }
+          return { typeId: src.typeId, raw: deepCopy(src.raw) }
+        },
+      },
     },
   }
 }

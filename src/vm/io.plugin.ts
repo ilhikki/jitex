@@ -427,6 +427,31 @@ const breakHandler: SysCallHandler = async (_args, _state, runtime) => {
   // BREAK(f): flush 输出缓冲区，简化为 no-op（未来可调用 io.file.flush）
 }
 
+// BREAKIN: TEX82 调试用交互断点，no-op
+const breakinHandler: SysCallHandler = async (_args, _state, _runtime) => {
+  // no-op
+}
+
+// ERSTAT: TEX82 文件错误状态（类似 errno），简化为总是返回 0（成功）
+const erstatHandler: SysCallHandler = async (_args, _state, _runtime) => {
+  return { typeId: 'integer', raw: 0 }
+}
+
+// WRITE_FILE: 写入文件缓冲区（F^ := value 编译为此调用）
+const writeFileHandler: SysCallHandler = async (args, _state, runtime) => {
+  const typeTable = runtime?.typeTable || null
+  const io = runtime?.io
+  if (!io) return // 无 io：退化为 no-op
+  if (args.length < 2) throw new Error('WRITE_FILE requires (file, value) arguments')
+  const file = asFileValue(args[0], typeTable)
+  if (!file) throw new Error('WRITE_FILE: first argument is not a file')
+  // 简化处理：通过 write 写入（实际应该更新缓冲区变量）
+  const valueArg = args[1] as any
+  const value = valueArg.value || valueArg
+  const text = typeof value.raw === 'string' ? value.raw : String.fromCharCode(value.raw)
+  await io.file.write(file, text)
+}
+
 const pageHandler: SysCallHandler = async (args, state, runtime) => {
   const vmState = state as VMState
   const typeTable = runtime?.typeTable || null
@@ -507,6 +532,9 @@ export function createDefaultSysCalls(): Map<string, SysCallHandler> {
   map.set('ASSIGN', assignHandler)
   map.set('BUFFER_CHAR', bufferCharHandler)
   map.set('BREAK', breakHandler)
+  map.set('BREAKIN', breakinHandler)
+  map.set('ERSTAT', erstatHandler)
+  map.set('WRITE_FILE', writeFileHandler)
   map.set('PAGE', pageHandler)
   return map
 }
