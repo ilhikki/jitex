@@ -229,19 +229,26 @@ export const readHandler: SysCallHandler = async (args, state, runtime) => {
     let varValue: string
     if (fileMode) {
       if (!io) throw new Error('READ from file requires runtime.io')
-      // 从文件读一个 token：先跳过空白，读到下一个空白
-      let ch = await io.file.bufferChar(fileMode)
-      while (ch === 32 || ch === 10 || ch === 13 || ch === 9) {
+      // ISO 7185 §14.4.4: char 类型读取当前字符（含空白），不跳过
+      if (argValue.typeId === 'char') {
+        const ch = await io.file.bufferChar(fileMode)
+        varValue = String.fromCharCode(ch)
         await io.file.get(fileMode)
-        ch = await io.file.bufferChar(fileMode)
+      } else {
+        // integer/real/string：跳过空白读 token
+        let ch = await io.file.bufferChar(fileMode)
+        while (ch === 32 || ch === 10 || ch === 13 || ch === 9) {
+          await io.file.get(fileMode)
+          ch = await io.file.bufferChar(fileMode)
+        }
+        let s = ''
+        while (ch !== 32 && ch !== 10 && ch !== 13 && ch !== 9 && ch !== 0) {
+          s += String.fromCharCode(ch)
+          await io.file.get(fileMode)
+          ch = await io.file.bufferChar(fileMode)
+        }
+        varValue = s
       }
-      let s = ''
-      while (ch !== 32 && ch !== 10 && ch !== 13 && ch !== 9 && ch !== 0) {
-        s += String.fromCharCode(ch)
-        await io.file.get(fileMode)
-        ch = await io.file.bufferChar(fileMode)
-      }
-      varValue = s
     } else {
       // 控制台模式
       if (values.length === 0) {

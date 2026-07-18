@@ -172,6 +172,38 @@ describe('M4 VM - File Model (async)', () => {
       files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
       expectedFileContains: [{ url: 'OUT.TXT', contains: 'AFTER PUT' }],
     },
+
+    // ==========================================================================
+    // ISSUE-034 复现：READ 对 char 类型不应跳过空白（ISO 7185 §14.4.4）
+    // 标准：READ(F, c) 当 c 是 char 时，读取当前字符（含空格），不跳过空白
+    // ==============================================================================
+
+    {
+      name: 'ISSUE-034: READ char 读取首个字符（非空白）',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;C:CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);READ(F,C);WRITELN(C);END.`,
+      purpose: 'READ(F, C) 读 char：文件首字符为 A，应读到 A',
+      features: ['read', 'char', 'issue-034'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('AB')]]),
+      expectedContains: 'A',
+    },
+
+    {
+      name: 'ISSUE-034: READ char 不跳过空格（标准行为）',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;C:CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);READ(F,C);WRITELN(ORD(C));END.`,
+      purpose: 'READ(F, C) 读 char：文件首字符为空格(ASCII 32)，标准要求读到空格而非跳过',
+      features: ['read', 'char', 'whitespace', 'issue-034'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text(' A')]]),
+      expectedContains: '32',
+    },
+
+    {
+      name: 'ISSUE-034: 连续 READ char 逐字读取',
+      code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;A,B,C:CHAR;BEGIN ASSIGN(F,'IN.TXT');RESET(F);READ(F,A,B,C);WRITELN(A,B,C);END.`,
+      purpose: 'READ(F, A, B, C) 读三个 char：应逐字读取 "A B"（含中间空格）',
+      features: ['read', 'char', 'multiple', 'issue-034'],
+      files: new Map<string, Uint8Array>([['IN.TXT', text('A B')]]),
+      expectedContains: 'A B',
+    },
   ]
 
   for (const t of tests) {

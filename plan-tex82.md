@@ -298,8 +298,8 @@ issue/
 |-------|------|------|------|
 | ISSUE-026 | 变体记录支持 | 标准 | Fixed |
 | ISSUE-027~032 | TEX82 初始化系列 | 混合 | Fixed |
-| ISSUE-033 | RESET/REWRITE 多参数形式（带文件名） | 非标扩展（插件） | Open |
-| ISSUE-034 | READ 对 char 类型错误跳过空白 | 标准行为（核心） | Open |
+| ISSUE-033 | RESET/REWRITE 多参数形式（带文件名） | 非标扩展（插件） | Fixed |
+| ISSUE-034 | READ 对 char 类型错误跳过空白 | 标准行为（核心） | Fixed |
 
 ### M4 阻塞问题
 

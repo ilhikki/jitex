@@ -2,7 +2,7 @@
 
 import { runVM as runVMImpl } from '../../src/vm'
 import type { VMState } from '../../src/vm/state'
-import type { TypePlugin } from '../../src/types'
+import type { TypePlugin, SysCallHandler } from '../../src/types'
 
 export interface VMTest {
   name: string
@@ -21,6 +21,8 @@ export interface VMTest {
   programFileUrls?: Record<string, string>
   // 文件内容包含检查（runVM 完成后检查 files.get(url) 是否包含 substring）
   expectedFileContains?: { url: string; contains: string }[]
+  // 自定义系统调用（非标扩展用）
+  sysCalls?: Map<string, SysCallHandler>
 }
 
 export async function runVM(test: VMTest): Promise<VMState> {
@@ -29,6 +31,7 @@ export async function runVM(test: VMTest): Promise<VMState> {
     plugins: test.plugins,
     files: test.files,
     programFileUrls: test.programFileUrls,
+    sysCalls: test.sysCalls,
   })
 }
 
