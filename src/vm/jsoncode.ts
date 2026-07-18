@@ -162,6 +162,9 @@ export interface SysCallInst {
   proc: string
   args: Ref[]
   dest?: Ref
+  // WRITE/WRITELN 参数的格式说明（width/precision），按 args 索引对齐
+  // 仅对 WRITE/WRITELN 有意义；其他 syscall 忽略
+  argFormats?: { width?: Ref; precision?: Ref }[]
   sourcePos?: SourcePos
 }
 

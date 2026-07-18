@@ -1325,14 +1325,41 @@ export class StaticAnalyzer {
     const sysCallNames = ['WRITE', 'WRITELN', 'READ', 'READLN', 'REWRITE', 'RESET', 'CLOSE', 'PUT', 'GET', 'BREAK', 'PAGE']
     if (sysCallNames.includes(name)) {
       const argRefs: Ref[] = []
+      const argFormats: { width?: Ref; precision?: Ref }[] = []
+
       for (const arg of node.arguments) {
-        const result = this.compileExpr(arg, scope)
-        argRefs.push(result.ref)
+        // WRITE/WRITELN 支持 value:width:precision 格式
+        if ((name === 'WRITE' || name === 'WRITELN') && arg.kind === 'BinaryExpression'
+          && (arg as BinaryExpressionNode).operator === ':') {
+          const fmtNode = arg as BinaryExpressionNode
+          // 外层是 (value:width):precision，内层是 value:width
+          if (fmtNode.left.kind === 'BinaryExpression'
+            && (fmtNode.left as BinaryExpressionNode).operator === ':') {
+            const inner = fmtNode.left as BinaryExpressionNode
+            const valueResult = this.compileExpr(inner.left, scope)
+            const widthResult = this.compileExpr(inner.right, scope)
+            const precResult = this.compileExpr(fmtNode.right, scope)
+            argRefs.push(valueResult.ref)
+            argFormats.push({ width: widthResult.ref, precision: precResult.ref })
+          } else {
+            // value:width
+            const valueResult = this.compileExpr(fmtNode.left, scope)
+            const widthResult = this.compileExpr(fmtNode.right, scope)
+            argRefs.push(valueResult.ref)
+            argFormats.push({ width: widthResult.ref })
+          }
+        } else {
+          const result = this.compileExpr(arg, scope)
+          argRefs.push(result.ref)
+          argFormats.push({})
+        }
       }
+
       this.instructions.push({
         op: 'SYS_CALL',
         proc: name,
         args: argRefs,
+        argFormats,
       })
       return
     }

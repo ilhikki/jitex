@@ -5,21 +5,37 @@ import type { SysCallHandler, RuntimeCtx, TypeTable } from '../types'
 import type { VMState } from '../vm/state'
 import { setValue } from './state'
 
-function formatValueWithTable(value: PascalValue, typeTable: TypeTable | null): string {
+function formatValueWithTable(
+  value: PascalValue,
+  typeTable: TypeTable | null,
+  width?: number,
+  precision?: number
+): string {
   const raw = value.raw
+  let s: string
   if (typeTable) {
     const td = typeTable.get(value.typeId)
     if (td && td.kind === 'subrange') {
       const st = td as SubrangeType
       if (st.baseTypeId === 'char') {
-        return String.fromCharCode(raw as number)
+        s = String.fromCharCode(raw as number)
+      } else if (st.baseTypeId === 'boolean') {
+        s = raw ? 'TRUE' : 'FALSE'
+      } else {
+        s = String(raw)
       }
-      if (st.baseTypeId === 'boolean') {
-        return raw ? 'TRUE' : 'FALSE'
-      }
-      return String(raw)
+    } else {
+      s = formatRaw(value)
     }
+  } else {
+    s = formatRaw(value)
   }
+  // 应用宽度/精度
+  return applyFormat(s, value, width, precision)
+}
+
+function formatRaw(value: PascalValue): string {
+  const raw = value.raw
   switch (value.typeId) {
     case 'integer':
       return String(raw as number)
@@ -36,8 +52,30 @@ function formatValueWithTable(value: PascalValue, typeTable: TypeTable | null): 
   }
 }
 
+// Pascal 宽度/精度格式化
+function applyFormat(
+  s: string,
+  value: PascalValue,
+  width?: number,
+  precision?: number
+): string {
+  // real 类型带 precision 时重新格式化
+  if (value.typeId === 'real' && precision !== undefined) {
+    const n = value.raw as number
+    s = n.toFixed(precision)
+  }
+
+  if (width === undefined) return s
+
+  // 宽度小于内容长度时不截断，只左填充空格
+  if (s.length >= width) return s
+
+  // Pascal 默认右对齐（数字、字符）；字符串也右对齐
+  return ' '.repeat(width - s.length) + s
+}
+
 export function formatValue(value: PascalValue): string {
-  return formatValueWithTable(value, null)
+  return formatValueWithTable(value, null, undefined, undefined)
 }
 
 function formatReal(n: number): string {
@@ -58,8 +96,11 @@ export const writeHandler: SysCallHandler = (args, state, runtime) => {
   // 跳过第一个参数如果是 text/file 类型（文件参数）
   const startIdx = (args.length > 0 && isFileArg(args[0], typeTable)) ? 1 : 0
   for (let i = startIdx; i < args.length; i++) {
-    const value = (args[i] as any).value || args[i]
-    vmState.outputBuffer.push(formatValueWithTable(value, typeTable))
+    const arg = args[i] as any
+    const value = arg.value || arg
+    const width = arg.width as number | undefined
+    const precision = arg.precision as number | undefined
+    vmState.outputBuffer.push(formatValueWithTable(value, typeTable, width, precision))
   }
 }
 
@@ -73,8 +114,11 @@ export const writelnHandler: SysCallHandler = (args, state, runtime) => {
   // 跳过第一个参数如果是 text/file 类型（文件参数）
   const startIdx = (args.length > 0 && isFileArg(args[0], typeTable)) ? 1 : 0
   for (let i = startIdx; i < args.length; i++) {
-    const value = (args[i] as any).value || args[i]
-    vmState.outputBuffer.push(formatValueWithTable(value, typeTable))
+    const arg = args[i] as any
+    const value = arg.value || arg
+    const width = arg.width as number | undefined
+    const precision = arg.precision as number | undefined
+    vmState.outputBuffer.push(formatValueWithTable(value, typeTable, width, precision))
   }
   vmState.outputBuffer.push('\n')
 }

@@ -68,6 +68,9 @@ export interface RuntimeCtx {
 export interface SysCallArg {
   ref?: import('../vm/jsoncode').Ref
   value: PascalValue
+  // WRITE/WRITELN 参数的格式说明
+  width?: number
+  precision?: number
 }
 
 export type SysCallHandler = (

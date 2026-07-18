@@ -388,13 +388,22 @@ function compileInstruction(
     case 'SYS_CALL': {
       const procName = inst.proc.toUpperCase()
       const argRefs = inst.args
+      const argFormats = inst.argFormats
       const dest = inst.dest
       return async (state, runtime) => {
         const handler = runtime.sysCalls.get(procName)
         if (!handler) {
           throw new Error(`VM: unknown system call ${procName}`)
         }
-        const args = argRefs.map((r) => ({ ref: r, value: getValue(state, r) }))
+        const args = argRefs.map((r, i) => {
+          const fmt = argFormats?.[i]
+          return {
+            ref: r,
+            value: getValue(state, r),
+            width: fmt?.width !== undefined ? Number(getValue(state, fmt.width).raw) : undefined,
+            precision: fmt?.precision !== undefined ? Number(getValue(state, fmt.precision).raw) : undefined,
+          }
+        })
         const result = await handler(args, state, runtime)
         if (dest && result !== undefined && result !== null) {
           setValue(state, dest, result as PascalValue)
