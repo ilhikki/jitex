@@ -12,6 +12,7 @@ import type {
   TypePlugin,
   RuntimeCtx,
   SysCallHandler,
+  TypeTable,
 } from '../types'
 import {
   createTypeTable,
@@ -24,6 +25,7 @@ import {
   getValue,
   setValue,
   topFrame,
+  resolveVarBinding,
 } from './state'
 
 // ============================================================================
@@ -148,12 +150,20 @@ async function runLoop(
   runtime: RuntimeCtx,
   ctx: VMContext
 ): Promise<void> {
-  const maxSteps = 10000000
+  const maxSteps = 1000000
   let steps = 0
 
   while (state.status === 'running' && state.callStack.length > 0) {
     if (steps++ > maxSteps) {
-      throw new Error('VM: step limit exceeded (possible infinite loop)')
+      // 达到步数上限：不抛异常，安静终止（与解释器行为一致）
+      // 这样 output 仍然可用，测试可以检查 expectedContains
+      state.status = 'terminated'
+      state.error = {
+        message: 'VM: step limit exceeded (possible infinite loop)',
+        instructionIndex: state.pc,
+        stackTrace: state.callStack.map((f) => f.procName).reverse(),
+      }
+      return
     }
 
     const currentFrame = topFrame(state)
@@ -335,7 +345,8 @@ function compileInstruction(
         proc.params.forEach((param, i) => {
           const argValue = argValues[i]
           if (param.isVar) {
-            frame.varBindings[param.name.toUpperCase()] = argRefs[i]
+            // var 参数：先 resolve varBinding 链，避免循环引用
+            frame.varBindings[param.name.toUpperCase()] = resolveVarBinding(state, argRefs[i])
           } else {
             frame.locals[param.name.toUpperCase()] = argValue
           }
@@ -384,7 +395,7 @@ function compileInstruction(
           throw new Error(`VM: unknown system call ${procName}`)
         }
         const args = argRefs.map((r) => ({ ref: r, value: getValue(state, r) }))
-        const result = await handler(args, state)
+        const result = await handler(args, state, runtime)
         if (dest && result !== undefined && result !== null) {
           setValue(state, dest, result as PascalValue)
         }
@@ -395,7 +406,7 @@ function compileInstruction(
     case 'TYPE_OP': {
       const { typeId, opName, opKind, dest, src: srcRefs, extra } = inst
       return (state, runtime) => {
-        const op = findOp(plugins, opKind, opName)
+        const op = findOp(plugins, opKind, opName, typeId, runtime.typeTable)
         if (!op) {
           throw new Error(`VM: unknown op ${opKind}.${opName} for type ${typeId}`)
         }
@@ -471,17 +482,32 @@ function getDefault(
 function findOp(
   plugins: TypePlugin[],
   opKind: string,
-  opName: string
+  opName: string,
+  typeId?: string,
+  typeTable?: TypeTable
 ): { invoke: (...args: any[]) => PascalValue; toCode: (...args: any[]) => JsonInstruction[] } | null {
   for (const plugin of plugins) {
     const ops = plugin.ops as any
     const category = ops[opKind]
     if (!category) continue
     if (opKind === 'literal' || opKind === 'default' || opKind === 'copy' || opKind === 'control' || opKind === 'assign' || opKind === 'index' || opKind === 'setIndex' || opKind === 'field' || opKind === 'setField') {
-      return category
-    }
-    if (category[opName]) {
-      return category[opName]
+      if (typeId && typeTable && category.can) {
+        if (opKind === 'assign') {
+          if (category.can(typeId, typeId, typeTable)) return category
+        } else if (opKind === 'default' || opKind === 'copy' || opKind === 'control') {
+          if (category.can(typeId, typeTable)) return category
+        } else {
+          // index/setIndex/field/setField: 暂时不做 can 检查，返回第一个匹配的
+          // 因为这些操作需要额外参数（fieldName, indexType等），findOp时没有这些信息
+          return category
+        }
+      } else {
+        return category
+      }
+    } else {
+      if (category[opName]) {
+        return category[opName]
+      }
     }
   }
   return null

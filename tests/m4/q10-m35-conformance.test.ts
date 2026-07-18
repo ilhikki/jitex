@@ -1,4 +1,5 @@
 import { VMTest, runVMTest } from './_helper'
+import { stringPlugin } from '../../src/types/string.plugin'
 
 const tests: VMTest[] = [
   // ==========================================================================
@@ -90,18 +91,21 @@ end.`,
     code: `program test;\nvar\n  s: string;\nbegin\n  s := '';\nend.`,
     purpose: '验证空字符串字面量',
     features: ['string-literal', 'empty-string'],
+    plugins: [stringPlugin],
   },
   {
     name: '单字符字符串',
     code: `program test;\nvar\n  s: string;\nbegin\n  s := 'a';\nend.`,
     purpose: '验证单字符字符串',
     features: ['string-literal', 'single-char'],
+    plugins: [stringPlugin],
   },
   {
     name: '转义引号（双写单引号）',
     code: `program test;\nvar\n  s: string;\nbegin\n  s := 'it''s';\nend.`,
     purpose: '验证 Pascal 中通过双写单引号转义引号',
     features: ['string-literal', 'escaped-quote'],
+    plugins: [stringPlugin],
   },
 
   // ------------------------------
@@ -306,14 +310,14 @@ end.`,
 ]
 
 describe('M4 VM - M3.5 Conformance Tests', () => {
-  test.each(tests)('$name', async ({ name, code, purpose, features, expectedError }) => {
-    const result = await runVMTest({ name, code, purpose, features, expectedError })
+  test.each(tests)('$name', async (t) => {
+    const result = await runVMTest(t)
     if (!result.passed) {
-      if (expectedError && result.message.includes(expectedError)) {
-        console.log(`Skipping (expected): ${name}`)
+      if (t.expectedError && result.message.includes(t.expectedError)) {
+        console.log(`Skipping (expected): ${t.name}`)
         return
       }
-      console.error(`Test failed: ${name}`)
+      console.error(`Test failed: ${t.name}`)
       console.error(`Message: ${result.message}`)
     }
     expect(result.passed).toBe(true)

@@ -72,7 +72,8 @@ export interface SysCallArg {
 
 export type SysCallHandler = (
   args: (PascalValue | SysCallArg)[],
-  state: unknown
+  state: unknown,
+  runtime?: RuntimeCtx
 ) => Promise<PascalValue | void> | PascalValue | void
 
 // ============================================================================

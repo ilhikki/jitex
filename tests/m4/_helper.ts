@@ -2,6 +2,7 @@
 
 import { runVM as runVMImpl } from '../../src/vm'
 import type { VMState } from '../../src/vm/state'
+import type { TypePlugin } from '../../src/types'
 
 export interface VMTest {
   name: string
@@ -13,10 +14,11 @@ export interface VMTest {
   expectedNotContains?: string
   expectedError?: string
   input?: string[]
+  plugins?: TypePlugin[]
 }
 
 export async function runVM(test: VMTest): Promise<VMState> {
-  return await runVMImpl(test.code, { input: test.input })
+  return await runVMImpl(test.code, { input: test.input, plugins: test.plugins })
 }
 
 export function getOutput(state: VMState): string {

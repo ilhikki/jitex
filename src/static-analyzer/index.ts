@@ -32,12 +32,17 @@ import type {
   FieldAccessNode,
   GotoStatementNode,
   LabeledStatementNode,
+  CaseStatementNode,
+  WithStatementNode,
+  SetConstructorNode,
+  InExpressionNode,
   TypeNode,
   SimpleTypeNode,
   RangeTypeNode,
   ArrayTypeNode,
   RecordTypeNode,
   EnumerationTypeNode,
+  SetTypeNode,
   ParameterDeclarationNode,
 } from '../ast/types'
 import type {
@@ -50,13 +55,15 @@ import type {
   Ref,
   SourcePos,
   ArrayType,
+  RecordType,
 } from '../vm/jsoncode'
 import type { TypePlugin, TypeTable, CodeGenContext } from '../types'
 import { createTypeTable, createCodeGenContext } from '../types'
 import { INTEGER_TYPE } from '../types/integer.plugin'
 import { BOOLEAN_TYPE as BOOL_TYPE } from '../types/boolean.plugin'
-import { STRING_TYPE } from '../types/string.plugin'
 import { CHAR_TYPE } from '../types/char.plugin'
+import { REAL_TYPE } from '../types/real.plugin'
+import { TEXT_TYPE } from '../types/file.plugin'
 
 // ============================================================================
 // 符号表
@@ -68,6 +75,7 @@ interface VarSymbol {
   ref: Ref
   isVar?: boolean
   declaredLevel: number // 变量声明时的作用域层级
+  constValue?: number // 编译时常量值（仅常量有）
 }
 
 interface ProcSymbol {
@@ -83,6 +91,7 @@ interface Scope {
   procs: Map<string, ProcSymbol>
   parent: Scope | null
   level: number // 0=全局, 1=main, 2=嵌套在main中, ...
+  withRecords?: { ref: Ref; typeId: string }[] // with 语句中的 record 列表
 }
 
 interface ProcInfo {
@@ -146,6 +155,29 @@ function lookupProc(scope: Scope, name: string): ProcSymbol | null {
   return null
 }
 
+// 查找 with 语句中的字段：返回 record 的 ref/typeId 和字段名
+function lookupWithField(scope: Scope, name: string, typeTable: any): { recordRef: Ref; recordTypeId: string; fieldName: string; fieldTypeId: string } | null {
+  const upper = name.toUpperCase()
+  let s: Scope | null = scope
+  while (s) {
+    if (s.kind === 'with' && s.withRecords) {
+      // 从后往前查（后面的 with record 优先级更高）
+      for (let i = s.withRecords.length - 1; i >= 0; i--) {
+        const wr = s.withRecords[i]
+        const td = typeTable.get(wr.typeId)
+        if (td && td.kind === 'record') {
+          const field = td.fields.find((f: any) => f.name === upper)
+          if (field) {
+            return { recordRef: wr.ref, recordTypeId: wr.typeId, fieldName: upper, fieldTypeId: field.typeId }
+          }
+        }
+      }
+    }
+    s = s.parent
+  }
+  return null
+}
+
 // ============================================================================
 // Analyzer
 // ============================================================================
@@ -162,8 +194,9 @@ export class StaticAnalyzer {
     this.typeTable = createTypeTable()
     this.typeTable.register(INTEGER_TYPE)
     this.typeTable.register(BOOL_TYPE)
-    this.typeTable.register(STRING_TYPE)
     this.typeTable.register(CHAR_TYPE)
+    this.typeTable.register(REAL_TYPE)
+    this.typeTable.register(TEXT_TYPE)
     for (const plugin of plugins) {
       for (const t of plugin.types) {
         if (!this.typeTable.has(t.id)) {
@@ -274,18 +307,27 @@ export class StaticAnalyzer {
       if (node.block) {
         for (const c of node.block.constDeclarations) {
           const constName = c.name.name.toUpperCase()
+          let constValue: number | undefined
+          try {
+            constValue = this.evaluateConstExpr(c.value, localScope)
+          } catch (e) {
+            // 非常量表达式，忽略
+          }
           localScope.vars.set(constName, {
             name: constName,
             typeId: 'integer',
             ref: { kind: 'local', name: constName },
             declaredLevel: level,
+            constValue,
           })
         }
         for (const t of node.block.typeDeclarations) {
           this.processTypeDecl(t, localScope)
         }
         for (const v of node.block.variableDeclarations) {
-          this.processVarDecl(v, localScope)
+          // 只注册变量信息到 scope，不生成 DECLARE 指令（由 compileProcedures 生成）
+          // 也不做重复声明检查（由 compileProcedures 检查）
+          this.registerVarDecl(v, localScope)
         }
 
         for (const nestedProc of node.block.procedureDeclarations) {
@@ -443,12 +485,20 @@ export class StaticAnalyzer {
     const name = c.name.name.toUpperCase()
     // 编译常量值
     const result = this.compileExpr(c.value, scope)
+    // 尝试计算编译时常量值
+    let constValue: number | undefined
+    try {
+      constValue = this.evaluateConstExpr(c.value, scope)
+    } catch (e) {
+      // 非常量表达式，忽略
+    }
     // 常量作为全局变量（在 main 中）
     scope.vars.set(name, {
       name,
       typeId: result.typeId,
       ref: { kind: scope.kind === 'global' ? 'global' : 'local', name },
       declaredLevel: scope.level,
+      constValue,
     })
     // 生成 DECLARE + 赋值
     this.instructions.push({
@@ -506,6 +556,24 @@ export class StaticAnalyzer {
     }
   }
 
+  // 只注册变量信息到 scope，不生成 DECLARE 指令（用于 collectProcedures 阶段）
+  // 包含重复声明检查（参数与局部变量同名）
+  private registerVarDecl(v: VariableDeclarationNode, scope: Scope): void {
+    const typeDef = this.resolveType(v.type, scope)
+    if (!this.typeTable.has(typeDef.id)) {
+      this.typeTable.register(typeDef)
+    }
+    for (const nameNode of v.names) {
+      const name = nameNode.name.toUpperCase()
+      // 局部作用域中检查重复声明（参数与局部变量同名）
+      if (scope.kind === 'local' && scope.vars.has(name)) {
+        throw new Error(`Duplicate declaration: ${name} is already declared as a parameter or local variable`)
+      }
+      const ref: Ref = scope.kind === 'global' ? { kind: 'global', name } : { kind: 'local', name }
+      scope.vars.set(name, { name, typeId: typeDef.id, ref, declaredLevel: scope.level })
+    }
+  }
+
   private registerProcedure(p: ProcedureDeclarationNode, scope: Scope): void {
     const name = p.name.name.toUpperCase()
     const params = this.compileParams(p.parameters, scope)
@@ -559,6 +627,25 @@ export class StaticAnalyzer {
     return null
   }
 
+  private getBuiltinFunction(name: string): { returnType: string } | null {
+    switch (name) {
+      case 'ORD':
+      case 'ABS':
+      case 'SQR':
+      case 'PRED':
+      case 'SUCC':
+        return { returnType: 'integer' }
+      case 'CHR':
+        return { returnType: 'char' }
+      case 'ODD':
+      case 'EOF':
+      case 'EOLN':
+        return { returnType: 'boolean' }
+      default:
+        return null
+    }
+  }
+
   // ===========================================================================
   // 类型解析
   // ===========================================================================
@@ -583,11 +670,22 @@ export class StaticAnalyzer {
         const range = typeNode as RangeTypeNode
         const min = this.evaluateConstExpr(range.start, scope)
         const max = this.evaluateConstExpr(range.end, scope)
-        const id = `subrange-${min}-${max}-of-integer`
+        let baseTypeId = 'integer'
+        if (range.start.kind === 'CharLiteral') {
+          baseTypeId = 'char'
+        } else if (range.start.kind === 'BooleanLiteral') {
+          baseTypeId = 'boolean'
+        } else if (range.start.kind === 'Identifier') {
+          const name = (range.start as IdentifierNode).name.toUpperCase()
+          const sym = lookupVar(scope, name, scope)
+          if (sym?.typeId === 'char') baseTypeId = 'char'
+          else if (sym?.typeId === 'boolean') baseTypeId = 'boolean'
+        }
+        const id = `subrange-${min}-${max}-of-${baseTypeId}`
         return {
           id,
           kind: 'subrange',
-          baseTypeId: 'integer',
+          baseTypeId,
           min,
           max,
         }
@@ -661,6 +759,36 @@ export class StaticAnalyzer {
         }
       }
 
+      case 'SetType': {
+        const setNode = typeNode as SetTypeNode
+        const baseType = this.resolveType(setNode.baseType, scope)
+        let minOrd = 0
+        let maxOrd = 255
+        if (baseType.kind === 'subrange') {
+          const sub = baseType as any
+          minOrd = sub.min
+          maxOrd = sub.max
+        } else if (baseType.kind === 'char') {
+          minOrd = 0
+          maxOrd = 255
+        } else if (baseType.kind === 'boolean') {
+          minOrd = 0
+          maxOrd = 1
+        } else if (baseType.kind === 'enum') {
+          const et = baseType as any
+          minOrd = 0
+          maxOrd = et.values.length - 1
+        }
+        const id = `set-of-${baseType.id}-${minOrd}-${maxOrd}`
+        return {
+          id,
+          kind: 'set',
+          baseTypeId: baseType.id,
+          minOrd,
+          maxOrd,
+        }
+      }
+
       default:
         throw new Error(`Unsupported type kind: ${typeNode.kind}`)
     }
@@ -679,16 +807,12 @@ export class StaticAnalyzer {
       case 'BooleanLiteral':
         return (expr as BooleanLiteralNode).value ? 1 : 0
       case 'CharLiteral':
-        return (expr as any).charCodeAt(0)
+        return (expr as CharLiteralNode).value.charCodeAt(0)
       case 'Identifier': {
         const name = (expr as IdentifierNode).name.toUpperCase()
         const sym = lookupVar(scope, name, scope)
-        if (sym) {
-          // 需要获取常量值
-          // 这里简化：假设常量值已存储在变量中
-          // 实际上，常量在编译时应该求值
-          // 暂时返回 0，后续改进
-          return 0
+        if (sym && sym.constValue !== undefined) {
+          return sym.constValue
         }
         throw new Error(`Unknown constant: ${name}`)
       }
@@ -769,8 +893,14 @@ export class StaticAnalyzer {
       case 'GotoStatement':
         this.compileGoto(stmt as GotoStatementNode, scope)
         break
+      case 'CaseStatement':
+        this.compileCase(stmt as CaseStatementNode, scope)
+        break
+      case 'WithStatement':
+        this.compileWith(stmt as WithStatementNode, scope)
+        break
       default:
-        throw new Error(`Unsupported statement: ${stmt.kind}`)
+        throw new Error(`Unsupported statement: ${(stmt as any).kind}`)
     }
   }
 
@@ -780,6 +910,38 @@ export class StaticAnalyzer {
 
     if (leftNode.kind === 'Identifier') {
       const name = (leftNode as IdentifierNode).name.toUpperCase()
+      // with 语句中的字段优先于普通变量
+      const withField = lookupWithField(scope, name, this.typeTable)
+      if (withField) {
+        // 先对右边值做 assign 类型检查
+        const checkedValue = this.tempVar()
+        this.instructions.push({
+          op: 'TYPE_OP',
+          typeId: withField.fieldTypeId,
+          opName: 'default',
+          opKind: 'default',
+          dest: checkedValue,
+          src: [],
+        })
+        this.instructions.push({
+          op: 'TYPE_OP',
+          typeId: withField.fieldTypeId,
+          opName: 'assign',
+          opKind: 'assign',
+          dest: checkedValue,
+          src: [rightResult.ref],
+        })
+        this.instructions.push({
+          op: 'TYPE_OP',
+          typeId: withField.recordTypeId,
+          opName: 'setField',
+          opKind: 'setField',
+          dest: withField.recordRef,
+          src: [checkedValue],
+          extra: { field: withField.fieldName },
+        })
+        return
+      }
       const sym = lookupVar(scope, name)
       if (!sym) {
         throw new Error(`Unknown variable: ${name}`)
@@ -804,13 +966,44 @@ export class StaticAnalyzer {
         const idxResult = this.compileExpr(idxExpr, scope)
         indexRefs.push(idxResult.ref)
       }
+      // 计算元素类型
+      let elemType = (arrType as ArrayType).elementTypeId
+      let remaining = arrAccess.indices.length - 1
+      while (remaining > 0) {
+        const et = this.typeTable.get(elemType)
+        if (et && et.kind === 'array') {
+          elemType = (et as ArrayType).elementTypeId
+          remaining--
+        } else {
+          break
+        }
+      }
+      // 先对右边值做 assign 类型检查（如子界边界检查）
+      const checkedValue = this.tempVar()
+      // 先初始化临时变量，使其有正确的 typeId
+      this.instructions.push({
+        op: 'TYPE_OP',
+        typeId: elemType,
+        opName: 'default',
+        opKind: 'default',
+        dest: checkedValue,
+        src: [],
+      })
+      this.instructions.push({
+        op: 'TYPE_OP',
+        typeId: elemType,
+        opName: 'assign',
+        opKind: 'assign',
+        dest: checkedValue,
+        src: [rightResult.ref],
+      })
       this.instructions.push({
         op: 'TYPE_OP',
         typeId: arr.typeId,
         opName: 'SET_INDEX',
         opKind: 'setIndex',
         dest: arr.ref,
-        src: [...indexRefs, rightResult.ref],
+        src: [...indexRefs, checkedValue],
       })
     } else if (leftNode.kind === 'FieldAccess') {
       const fieldAccess = leftNode as FieldAccessNode
@@ -820,13 +1013,35 @@ export class StaticAnalyzer {
       if (!objType || objType.kind !== 'record') {
         throw new Error(`Type ${obj.typeId} is not a record`)
       }
+      const recType = objType as RecordType
+      const field = recType.fields.find((f) => f.name === fieldName)
+      const fieldTypeId = field ? field.typeId : 'integer'
+      // 先对右边值做 assign 类型检查（如子界边界检查）
+      const checkedValue = this.tempVar()
+      // 先初始化临时变量，使其有正确的 typeId
+      this.instructions.push({
+        op: 'TYPE_OP',
+        typeId: fieldTypeId,
+        opName: 'default',
+        opKind: 'default',
+        dest: checkedValue,
+        src: [],
+      })
+      this.instructions.push({
+        op: 'TYPE_OP',
+        typeId: fieldTypeId,
+        opName: 'assign',
+        opKind: 'assign',
+        dest: checkedValue,
+        src: [rightResult.ref],
+      })
       this.instructions.push({
         op: 'TYPE_OP',
         typeId: obj.typeId,
         opName: 'setField',
         opKind: 'setField',
         dest: obj.ref,
-        src: [rightResult.ref],
+        src: [checkedValue],
         extra: { field: fieldName },
       })
     } else {
@@ -927,6 +1142,32 @@ export class StaticAnalyzer {
     // 循环体
     this.compileStmt(node.body, scope)
 
+    // 检查是否到达终值，如果到达则退出（避免越界）
+    const atEndResult = this.tempVar()
+    this.instructions.push({
+      op: 'TYPE_OP',
+      typeId: sym.typeId,
+      opName: 'EQ',
+      opKind: 'compare',
+      dest: atEndResult,
+      src: [sym.ref, endResult.ref],
+      extra: { op: '=' },
+    })
+    const notAtEndResult = this.tempVar()
+    this.instructions.push({
+      op: 'TYPE_OP',
+      typeId: 'boolean',
+      opName: 'NOT',
+      opKind: 'unary',
+      dest: notAtEndResult,
+      src: [atEndResult],
+    })
+    this.instructions.push({
+      op: 'JMP_IF_FALSE',
+      cond: notAtEndResult,
+      target: endLabel,
+    })
+
     // 递增/递减循环变量
     const oneTemp = this.tempVar()
     this.instructions.push({
@@ -955,6 +1196,84 @@ export class StaticAnalyzer {
 
     this.instructions.push({ op: 'JMP', target: startLabel })
     this.instructions.push({ op: 'LABEL', label: endLabel })
+  }
+
+  private compileCase(node: CaseStatementNode, scope: Scope): void {
+    const endLabel = this.tempLabel('case_end')
+    const exprResult = this.compileExpr(node.expression, scope)
+    const otherwiseLabel = node.otherwise ? this.tempLabel('case_otherwise') : endLabel
+
+    for (let i = 0; i < node.branches.length; i++) {
+      const branch = node.branches[i]
+      const branchLabel = this.tempLabel(`case_branch_${i}`)
+      const nextBranchLabel = i < node.branches.length - 1
+        ? this.tempLabel(`case_next_${i}`)
+        : otherwiseLabel
+
+      for (let j = 0; j < branch.labels.length; j++) {
+        const labelExpr = branch.labels[j]
+        const labelResult = this.compileExpr(labelExpr, scope)
+        const cmpResult = this.tempVar()
+        const nextCheckLabel = j < branch.labels.length - 1
+          ? this.tempLabel(`case_lblcheck_${i}_${j + 1}`)
+          : nextBranchLabel
+
+        this.instructions.push({
+          op: 'TYPE_OP',
+          typeId: exprResult.typeId,
+          opName: 'EQ',
+          opKind: 'compare',
+          dest: cmpResult,
+          src: [exprResult.ref, labelResult.ref],
+          extra: { op: '=' },
+        })
+        // 不相等 → 下一个检查
+        this.instructions.push({
+          op: 'JMP_IF_FALSE',
+          cond: cmpResult,
+          target: nextCheckLabel,
+        })
+        // 相等 → 分支体
+        this.instructions.push({ op: 'JMP', target: branchLabel })
+
+        if (j < branch.labels.length - 1) {
+          this.instructions.push({ op: 'LABEL', label: nextCheckLabel })
+        }
+      }
+
+      // 分支体
+      this.instructions.push({ op: 'LABEL', label: branchLabel })
+      this.compileStmt(branch.statement, scope)
+      this.instructions.push({ op: 'JMP', target: endLabel })
+
+      // 下一个分支入口
+      if (i < node.branches.length - 1) {
+        this.instructions.push({ op: 'LABEL', label: nextBranchLabel })
+      }
+    }
+
+    if (node.otherwise) {
+      this.instructions.push({ op: 'LABEL', label: otherwiseLabel })
+      this.compileStmt(node.otherwise, scope)
+    }
+
+    this.instructions.push({ op: 'LABEL', label: endLabel })
+  }
+
+  private compileWith(node: WithStatementNode, scope: Scope): void {
+    // 编译所有 record 表达式
+    const recordInfos: { ref: Ref; typeId: string }[] = []
+    for (const recordExpr of node.records) {
+      const result = this.compileExpr(recordExpr, scope)
+      recordInfos.push({ ref: result.ref, typeId: result.typeId })
+    }
+
+    // 创建 with 作用域
+    const withScope = createScope('with', scope)
+    withScope.withRecords = recordInfos
+
+    // 编译 body
+    this.compileStmt(node.body, withScope)
   }
 
   private compileRepeat(node: RepeatStatementNode, scope: Scope): void {
@@ -989,7 +1308,7 @@ export class StaticAnalyzer {
     const name = node.name.name.toUpperCase()
 
     // 检查是否是系统调用
-    const sysCallNames = ['WRITE', 'WRITELN', 'READ', 'READLN']
+    const sysCallNames = ['WRITE', 'WRITELN', 'READ', 'READLN', 'REWRITE', 'RESET', 'CLOSE', 'PUT', 'GET']
     if (sysCallNames.includes(name)) {
       const argRefs: Ref[] = []
       for (const arg of node.arguments) {
@@ -1009,6 +1328,16 @@ export class StaticAnalyzer {
     if (!sym) {
       throw new Error(`Unknown procedure: ${name}`)
     }
+
+    // var 参数检查：var 参数必须传递变量（Identifier/ArrayAccess/FieldAccess），不能是常量或表达式
+    sym.params.forEach((param, i) => {
+      if (param.isVar && i < node.arguments.length) {
+        const arg = node.arguments[i]
+        if (arg.kind !== 'Identifier' && arg.kind !== 'ArrayAccess' && arg.kind !== 'FieldAccess') {
+          throw new Error(`var parameter ${param.name} requires a variable, not a constant or expression`)
+        }
+      }
+    })
 
     const argRefs: Ref[] = []
     for (const arg of node.arguments) {
@@ -1086,6 +1415,18 @@ export class StaticAnalyzer {
 
       case 'Identifier': {
         const name = (node as IdentifierNode).name.toUpperCase()
+        // 先检查是否是内置系统函数（无参数调用，如 eof、eoln）
+        const builtinFunc = this.getBuiltinFunction(name)
+        if (builtinFunc) {
+          const temp = this.tempVar()
+          this.instructions.push({
+            op: 'SYS_CALL',
+            proc: name,
+            args: [],
+            dest: temp,
+          })
+          return { ref: temp, typeId: builtinFunc.returnType }
+        }
         const procSym = lookupProc(scope, name)
         if (procSym && procSym.returnType) {
           const temp = this.tempVar()
@@ -1108,6 +1449,21 @@ export class StaticAnalyzer {
           })
           return { ref: temp, typeId: enumVal.typeId }
         }
+        // with 语句中的字段优先于普通变量
+        const withField = lookupWithField(scope, name, this.typeTable)
+        if (withField) {
+          const temp = this.tempVar()
+          this.instructions.push({
+            op: 'TYPE_OP',
+            typeId: withField.recordTypeId,
+            opName: 'field',
+            opKind: 'field',
+            dest: temp,
+            src: [withField.recordRef],
+            extra: { field: withField.fieldName },
+          })
+          return { ref: temp, typeId: withField.fieldTypeId }
+        }
         const sym = lookupVar(scope, name, scope)
         if (!sym) {
           throw new Error(`Unknown variable: ${name}`)
@@ -1117,9 +1473,103 @@ export class StaticAnalyzer {
 
       case 'BinaryExpression': {
         const bin = node as BinaryExpressionNode
+        const op = bin.operator.toUpperCase()
+
+        // 逻辑短路求值：AND / OR
+        if (op === 'AND' || op === 'OR') {
+          const result = this.tempVar()
+          const endLabel = this.tempLabel('logic_end')
+          const left = this.compileExpr(bin.left, scope)
+
+          if (op === 'AND') {
+            // A and B: 如果 A 为 false，结果为 false（短路）
+            // 先把 A 的值赋给 result
+            this.instructions.push({
+              op: 'TYPE_OP',
+              typeId: 'boolean',
+              opName: 'assign',
+              opKind: 'assign',
+              dest: result,
+              src: [left.ref],
+            })
+            // 如果 A 为 true，需要计算 B
+            this.instructions.push({
+              op: 'JMP_IF_FALSE',
+              cond: result,
+              target: endLabel,
+            })
+            // 计算 B
+            const right = this.compileExpr(bin.right, scope)
+            this.instructions.push({
+              op: 'TYPE_OP',
+              typeId: 'boolean',
+              opName: 'assign',
+              opKind: 'assign',
+              dest: result,
+              src: [right.ref],
+            })
+          } else {
+            // A or B: 如果 A 为 true，结果为 true（短路）
+            this.instructions.push({
+              op: 'TYPE_OP',
+              typeId: 'boolean',
+              opName: 'assign',
+              opKind: 'assign',
+              dest: result,
+              src: [left.ref],
+            })
+            // 如果 A 为 false，需要计算 B
+            // JMP_IF_FALSE 当条件为 true 时不跳转，所以我们需要反过来
+            // 如果 A 为 true 就跳到 end（保持 result = true）
+            // 用 NOT + JMP_IF_FALSE 实现 JMP_IF_TRUE
+            const notTemp = this.tempVar()
+            this.instructions.push({
+              op: 'TYPE_OP',
+              typeId: 'boolean',
+              opName: 'NOT',
+              opKind: 'unary',
+              dest: notTemp,
+              src: [result],
+            })
+            this.instructions.push({
+              op: 'JMP_IF_FALSE',
+              cond: notTemp,
+              target: endLabel,
+            })
+            // 计算 B
+            const right = this.compileExpr(bin.right, scope)
+            this.instructions.push({
+              op: 'TYPE_OP',
+              typeId: 'boolean',
+              opName: 'assign',
+              opKind: 'assign',
+              dest: result,
+              src: [right.ref],
+            })
+          }
+
+          this.instructions.push({ op: 'LABEL', label: endLabel })
+          return { ref: result, typeId: 'boolean' }
+        }
+
         const left = this.compileExpr(bin.left, scope)
         const right = this.compileExpr(bin.right, scope)
-        const op = bin.operator.toUpperCase()
+
+        // 集合运算符：当左侧是 set 类型时，+/*/- 映射到 UNION/INTERSECT/DIFF
+        const leftTypeDef = this.typeTable.get(left.typeId)
+        if (leftTypeDef?.kind === 'set' && (op === '+' || op === '*' || op === '-')) {
+          const setOpName = op === '+' ? 'UNION' : op === '*' ? 'INTERSECT' : 'DIFF'
+          const temp = this.tempVar()
+          this.instructions.push({
+            op: 'TYPE_OP',
+            typeId: left.typeId,
+            opName: setOpName,
+            opKind: 'binary',
+            dest: temp,
+            src: [left.ref, right.ref],
+          })
+          return { ref: temp, typeId: left.typeId }
+        }
 
         // 查找比较运算符
         const compareOps = ['=', '<>', '<', '<=', '>', '>=']
@@ -1151,6 +1601,70 @@ export class StaticAnalyzer {
         return { ref: temp, typeId: left.typeId }
       }
 
+      case 'InExpression': {
+        // 集合成员运算：left in right
+        const inNode = node as InExpressionNode
+        const left = this.compileExpr(inNode.left, scope)
+        const right = this.compileExpr(inNode.right, scope)
+        const temp = this.tempVar()
+        this.instructions.push({
+          op: 'TYPE_OP',
+          typeId: right.typeId,
+          opName: 'IN',
+          opKind: 'compare',
+          dest: temp,
+          src: [left.ref, right.ref],
+          extra: { op: 'IN' },
+        })
+        return { ref: temp, typeId: 'boolean' }
+      }
+
+      case 'SetConstructor': {
+        // 集合构造 [1, 2, 3] 或 ['A', 'B'] 或 [1..5]
+        const setCtor = node as SetConstructorNode
+        // 推导集合的 base type
+        let baseTypeId = 'integer'
+        if (setCtor.elements.length > 0) {
+          const firstExpr = setCtor.elements[0][0]
+          if (firstExpr.kind === 'CharLiteral') baseTypeId = 'char'
+          else if (firstExpr.kind === 'BooleanLiteral') baseTypeId = 'boolean'
+          else if (firstExpr.kind === 'IntegerLiteral') baseTypeId = 'integer'
+        }
+        // 集合 typeId：使用一个通用的 set 类型 id
+        const setId = `set-of-${baseTypeId}-0-255`
+        // 如果该类型未注册，注册之
+        if (!this.typeTable.has(setId)) {
+          this.typeTable.register({
+            id: setId,
+            kind: 'set',
+            baseTypeId,
+            minOrd: 0,
+            maxOrd: 255,
+          })
+        }
+        // 编译时计算所有元素的 ord 值
+        const elements: number[] = []
+        for (const [startExpr, endExpr] of setCtor.elements) {
+          const startVal = this.evaluateConstExpr(startExpr, scope)
+          if (endExpr) {
+            const endVal = this.evaluateConstExpr(endExpr, scope)
+            for (let v = startVal; v <= endVal; v++) elements.push(v)
+          } else {
+            elements.push(startVal)
+          }
+        }
+        // 用 LITERAL 指令把元素数组写入 resultTemp
+        // set plugin 的所有操作通过 normalizeSet 兼容 number[] 输入
+        const resultTemp = this.tempVar()
+        this.instructions.push({
+          op: 'LITERAL',
+          dest: resultTemp,
+          typeId: setId,
+          value: elements,
+        })
+        return { ref: resultTemp, typeId: setId }
+      }
+
       case 'UnaryExpression': {
         const unary = node as UnaryExpressionNode
         const operand = this.compileExpr(unary.operand, scope)
@@ -1172,6 +1686,25 @@ export class StaticAnalyzer {
         // 函数调用
         const callNode = node as FunctionCallNode
         const name = callNode.name.name.toUpperCase()
+
+        // 先检查是否是内置系统函数
+        const builtinFunc = this.getBuiltinFunction(name)
+        if (builtinFunc) {
+          const argRefs: Ref[] = []
+          for (const arg of callNode.arguments) {
+            const result = this.compileExpr(arg, scope)
+            argRefs.push(result.ref)
+          }
+          const temp = this.tempVar()
+          this.instructions.push({
+            op: 'SYS_CALL',
+            proc: name,
+            args: argRefs,
+            dest: temp,
+          })
+          return { ref: temp, typeId: builtinFunc.returnType }
+        }
+
         const sym = lookupProc(scope, name)
         if (!sym || !sym.returnType) {
           throw new Error(`Unknown function: ${name}`)
@@ -1219,7 +1752,18 @@ export class StaticAnalyzer {
           dest: temp,
           src: [arr.ref, ...indexRefs],
         })
-        return { ref: temp, typeId: (arrType as ArrayType).elementTypeId }
+        let elemType = (arrType as ArrayType).elementTypeId
+        let remaining = arrAccess.indices.length - 1
+        while (remaining > 0) {
+          const et = this.typeTable.get(elemType)
+          if (et && et.kind === 'array') {
+            elemType = (et as ArrayType).elementTypeId
+            remaining--
+          } else {
+            break
+          }
+        }
+        return { ref: temp, typeId: elemType }
       }
 
       case 'FieldAccess': {
@@ -1249,7 +1793,7 @@ export class StaticAnalyzer {
       }
 
       default:
-        throw new Error(`Unsupported expression: ${node.kind}`)
+        throw new Error(`Unsupported expression: ${(node as any).kind}`)
     }
   }
 

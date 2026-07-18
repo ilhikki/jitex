@@ -45,6 +45,22 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
         invoke: (arrayValue: PascalValue, ...indexValues: PascalValue[]) => {
           const arr = arrayValue.raw as unknown[]
           const indices = indexValues.map((iv) => iv.raw as number)
+          // 边界检查
+          let currentTypeId = arrayValue.typeId
+          for (let i = 0; i < indices.length; i++) {
+            const td = typeTable.get(currentTypeId)
+            if (td && td.kind === 'array') {
+              const at = td as ArrayType
+              const dim = at.dimensions[0]
+              const idx = indices[i]
+              if (idx < dim.low || idx > dim.high) {
+                throw new Error(`Array index ${idx} out of range ${dim.low}..${dim.high}`)
+              }
+              currentTypeId = at.elementTypeId
+            } else {
+              break
+            }
+          }
           let result: unknown = arr
           for (const idx of indices) {
             if (Array.isArray(result)) {
@@ -53,10 +69,26 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
               throw new Error('Array access: not an array')
             }
           }
-          if (result === undefined) {
-            return { typeId: 'integer', raw: 0 }
+          let elemTypeId = 'integer'
+          let remaining = indices.length
+          currentTypeId = arrayValue.typeId
+          while (remaining > 0) {
+            const td = typeTable.get(currentTypeId)
+            if (td && td.kind === 'array') {
+              elemTypeId = (td as ArrayType).elementTypeId
+              currentTypeId = elemTypeId
+              remaining--
+            } else {
+              break
+            }
           }
-          return { typeId: 'integer', raw: result as number }
+          if (result === undefined) {
+            const td = typeTable.get(elemTypeId)
+            if (td && td.kind === 'record') return { typeId: elemTypeId, raw: {} }
+            if (td && td.kind === 'array') return { typeId: elemTypeId, raw: [] }
+            return { typeId: elemTypeId, raw: 0 }
+          }
+          return { typeId: elemTypeId, raw: result }
         },
       },
 
@@ -83,6 +115,23 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
           const arr = arrayValue.raw as unknown[]
           const value = args[args.length - 1]
           const indices = args.slice(0, args.length - 1).map((iv) => iv.raw as number)
+          
+          // 边界检查
+          let currentTypeId = arrayValue.typeId
+          for (let i = 0; i < indices.length; i++) {
+            const td = typeTable.get(currentTypeId)
+            if (td && td.kind === 'array') {
+              const at = td as ArrayType
+              const dim = at.dimensions[0]
+              const idx = indices[i]
+              if (idx < dim.low || idx > dim.high) {
+                throw new Error(`Array index ${idx} out of range ${dim.low}..${dim.high}`)
+              }
+              currentTypeId = at.elementTypeId
+            } else {
+              break
+            }
+          }
           
           let target: unknown[] = arr
           for (let i = 0; i < indices.length - 1; i++) {
@@ -121,18 +170,37 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
             throw new Error(`Type ${typeId} is not an array`)
           }
           const arrType = typeDef as ArrayType
-          const createArray = (dimensions: typeof arrType.dimensions, dimIndex: number): unknown => {
-            if (dimIndex >= dimensions.length) {
-              return 0
+          const buildDefault = (tid: string): unknown => {
+            const td = ctx.typeTable.get(tid)
+            if (!td) return 0
+            if (td.kind === 'record') {
+              const rt = td as any
+              const obj: Record<string, unknown> = {}
+              for (const f of rt.fields) {
+                obj[f.name] = buildDefault(f.typeId)
+              }
+              return obj
             }
-            const dim = dimensions[dimIndex]
-            const result: unknown[] = []
-            for (let i = dim.low; i <= dim.high; i++) {
-              result[i] = createArray(dimensions, dimIndex + 1)
+            if (td.kind === 'array') {
+              const at = td as ArrayType
+              const dim = at.dimensions[0]
+              const result: unknown[] = []
+              for (let i = dim.low; i <= dim.high; i++) {
+                result[i] = buildDefault(at.elementTypeId)
+              }
+              return result
             }
-            return result
+            if (td.kind === 'string') return ''
+            if (td.kind === 'char') return '\x00'
+            if (td.kind === 'boolean') return false
+            return 0
           }
-          return { typeId, raw: createArray(arrType.dimensions, 0) }
+          const dim = arrType.dimensions[0]
+          const result: unknown[] = []
+          for (let i = dim.low; i <= dim.high; i++) {
+            result[i] = buildDefault(arrType.elementTypeId)
+          }
+          return { typeId, raw: result }
         },
       },
 

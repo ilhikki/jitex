@@ -1,78 +1,43 @@
-// Integer TypePlugin
+// Real TypePlugin
 
 import type {
-  IntegerType,
+  RealType,
   PascalValue,
   Ref,
   JsonInstruction,
 } from '../vm/jsoncode'
 import type {
   TypePlugin,
-  TypeTable,
   CodeGenContext,
-  RuntimeCtx,
 } from './index'
 
-// ============================================================================
-// 类型定义
-// ============================================================================
-
-export const INTEGER_TYPE: IntegerType = {
-  id: 'integer',
-  kind: 'integer',
-  size: 32,
-  signed: true,
+export const REAL_TYPE: RealType = {
+  id: 'real',
+  kind: 'real',
+  size: 64,
 }
 
-// 将 number 截断为 32 位有符号整数（模拟 Pascal integer 溢出）
-function toInt32(n: number): number {
-  return n | 0
+export function makeRealValue(n: number): PascalValue {
+  return { typeId: 'real', raw: n }
 }
 
-export function makeIntegerValue(n: number): PascalValue {
-  return { typeId: 'integer', raw: toInt32(n) }
-}
-
-// ============================================================================
-// 插件实现
-// ============================================================================
-
-export const integerPlugin: TypePlugin = {
-  name: 'integer',
+export const realPlugin: TypePlugin = {
+  name: 'real',
   version: '1.0.0',
-  types: [INTEGER_TYPE],
+  types: [REAL_TYPE],
   ops: {
-    literal: {
-      can: (node: any) => {
-        if (node?.kind === 'IntegerLiteral') return 'integer'
-        return null
-      },
-      toCode: (dest: Ref, node: any, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'LITERAL',
-          dest,
-          typeId: 'integer',
-          value: node.value,
-          sourcePos: ctx.sourcePos,
-        }]
-      },
-      invoke: (value: unknown) => {
-        return makeIntegerValue(typeof value === 'number' ? value : Number(value))
-      },
-    },
-
     assign: {
       can: (fromType: string, toType: string) => {
-        // integer → integer
-        if (fromType === 'integer' && toType === 'integer') return true
-        // integer → subrange (范围检查由 subrange 插件处理，这里先允许)
-        if (fromType === 'integer' && toType !== 'real') return true
+        // real → real
+        if (fromType === 'real' && toType === 'real') return true
+        // integer → real（隐式转换）
+        if (fromType === 'integer' && toType === 'real') return true
         return false
       },
       toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
         return [{
           op: 'TYPE_OP',
-          typeId: 'integer',
+          typeId: 'real',
           opName: 'assign',
           opKind: 'assign',
           dest,
@@ -81,17 +46,17 @@ export const integerPlugin: TypePlugin = {
         }]
       },
       invoke: (dest: PascalValue, src: PascalValue) => {
-        return makeIntegerValue(src.raw as number)
+        return makeRealValue(Number(src.raw))
       },
     },
 
     unary: {
       NEG: {
-        can: (operandType: string) => operandType === 'integer' ? 'integer' : null,
+        can: (operandType: string) => operandType === 'real' ? 'real' : null,
         toCode: (dest: Ref, operand: Ref, ctx: CodeGenContext): JsonInstruction[] => {
           return [{
             op: 'TYPE_OP',
-            typeId: 'integer',
+            typeId: 'real',
             opName: 'NEG',
             opKind: 'unary',
             dest,
@@ -100,7 +65,7 @@ export const integerPlugin: TypePlugin = {
           }]
         },
         invoke: (operand: PascalValue) => {
-          return makeIntegerValue(-(operand.raw as number))
+          return makeRealValue(-(operand.raw as number))
         },
       },
     },
@@ -108,13 +73,14 @@ export const integerPlugin: TypePlugin = {
     binary: {
       ADD: {
         can: (leftType: string, rightType: string) => {
-          if (leftType === 'integer' && rightType === 'integer') return 'integer'
+          if ((leftType === 'real' || leftType === 'integer') &&
+              (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
         },
         toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
           return [{
             op: 'TYPE_OP',
-            typeId: 'integer',
+            typeId: 'real',
             opName: 'ADD',
             opKind: 'binary',
             dest,
@@ -123,18 +89,19 @@ export const integerPlugin: TypePlugin = {
           }]
         },
         invoke: (left: PascalValue, right: PascalValue) => {
-          return makeIntegerValue((left.raw as number) + (right.raw as number))
+          return makeRealValue(Number(left.raw) + Number(right.raw))
         },
       },
       SUB: {
         can: (leftType: string, rightType: string) => {
-          if (leftType === 'integer' && rightType === 'integer') return 'integer'
+          if ((leftType === 'real' || leftType === 'integer') &&
+              (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
         },
         toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
           return [{
             op: 'TYPE_OP',
-            typeId: 'integer',
+            typeId: 'real',
             opName: 'SUB',
             opKind: 'binary',
             dest,
@@ -143,18 +110,19 @@ export const integerPlugin: TypePlugin = {
           }]
         },
         invoke: (left: PascalValue, right: PascalValue) => {
-          return makeIntegerValue((left.raw as number) - (right.raw as number))
+          return makeRealValue(Number(left.raw) - Number(right.raw))
         },
       },
       MUL: {
         can: (leftType: string, rightType: string) => {
-          if (leftType === 'integer' && rightType === 'integer') return 'integer'
+          if ((leftType === 'real' || leftType === 'integer') &&
+              (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
         },
         toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
           return [{
             op: 'TYPE_OP',
-            typeId: 'integer',
+            typeId: 'real',
             opName: 'MUL',
             opKind: 'binary',
             dest,
@@ -163,18 +131,19 @@ export const integerPlugin: TypePlugin = {
           }]
         },
         invoke: (left: PascalValue, right: PascalValue) => {
-          return makeIntegerValue((left.raw as number) * (right.raw as number))
+          return makeRealValue(Number(left.raw) * Number(right.raw))
         },
       },
       DIV: {
         can: (leftType: string, rightType: string) => {
-          if (leftType === 'integer' && rightType === 'integer') return 'integer'
+          if ((leftType === 'real' || leftType === 'integer') &&
+              (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
         },
         toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
           return [{
             op: 'TYPE_OP',
-            typeId: 'integer',
+            typeId: 'real',
             opName: 'DIV',
             opKind: 'binary',
             dest,
@@ -183,31 +152,9 @@ export const integerPlugin: TypePlugin = {
           }]
         },
         invoke: (left: PascalValue, right: PascalValue) => {
-          const r = right.raw as number
+          const r = Number(right.raw)
           if (r === 0) throw new Error('Division by zero')
-          return makeIntegerValue(Math.trunc((left.raw as number) / r))
-        },
-      },
-      MOD: {
-        can: (leftType: string, rightType: string) => {
-          if (leftType === 'integer' && rightType === 'integer') return 'integer'
-          return null
-        },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'integer',
-            opName: 'MOD',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
-        invoke: (left: PascalValue, right: PascalValue) => {
-          const r = right.raw as number
-          if (r === 0) throw new Error('Division by zero')
-          return makeIntegerValue((left.raw as number) - Math.trunc((left.raw as number) / r) * r)
+          return makeRealValue(Number(left.raw) / r)
         },
       },
     },
@@ -215,13 +162,14 @@ export const integerPlugin: TypePlugin = {
     compare: {
       EQ: {
         can: (leftType: string, rightType: string) => {
-          if (leftType === 'integer' && rightType === 'integer') return 'boolean'
+          if ((leftType === 'real' || leftType === 'integer') &&
+              (rightType === 'real' || rightType === 'integer')) return 'boolean'
           return null
         },
         toCode: (dest: Ref, left: Ref, right: Ref, op: string, ctx: CodeGenContext): JsonInstruction[] => {
           return [{
             op: 'TYPE_OP',
-            typeId: 'integer',
+            typeId: 'real',
             opName: 'EQ',
             opKind: 'compare',
             dest,
@@ -231,8 +179,8 @@ export const integerPlugin: TypePlugin = {
           }]
         },
         invoke: (left: PascalValue, right: PascalValue, op: string) => {
-          const l = left.raw as number
-          const r = right.raw as number
+          const l = Number(left.raw)
+          const r = Number(right.raw)
           let result = false
           switch (op) {
             case '=': result = l === r; break
@@ -247,31 +195,12 @@ export const integerPlugin: TypePlugin = {
       },
     },
 
-    control: {
-      can: (typeId: string) => typeId === 'integer',
-      toCode: (cond: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        // integer 作为控制条件：非 0 为 true
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'integer',
-          opName: 'control',
-          opKind: 'control',
-          dest: cond,
-          src: [],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
-      invoke: (value: PascalValue) => {
-        return (value.raw as number) !== 0
-      },
-    },
-
     default: {
-      can: (typeId: string) => typeId === 'integer',
+      can: (typeId: string) => typeId === 'real',
       toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
         return [{
           op: 'TYPE_OP',
-          typeId: 'integer',
+          typeId: 'real',
           opName: 'default',
           opKind: 'default',
           dest,
@@ -280,16 +209,16 @@ export const integerPlugin: TypePlugin = {
         }]
       },
       invoke: () => {
-        return makeIntegerValue(0)
+        return makeRealValue(0)
       },
     },
 
     copy: {
-      can: (typeId: string) => typeId === 'integer',
+      can: (typeId: string) => typeId === 'real',
       toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
         return [{
           op: 'TYPE_OP',
-          typeId: 'integer',
+          typeId: 'real',
           opName: 'copy',
           opKind: 'copy',
           dest,
@@ -298,7 +227,7 @@ export const integerPlugin: TypePlugin = {
         }]
       },
       invoke: (value: PascalValue) => {
-        return makeIntegerValue(value.raw as number)
+        return makeRealValue(Number(value.raw))
       },
     },
   },

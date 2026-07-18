@@ -127,6 +127,21 @@ export function getValue(state: VMState, ref: Ref): PascalValue {
   }
 }
 
+// 解析 var 参数绑定：返回最终的目标 ref（避免 varBinding 链形成循环）
+// 当 var 参数被传递给另一层 var 参数时，需要先 resolve 到最终目标
+export function resolveVarBinding(state: VMState, ref: Ref): Ref {
+  if (ref.kind === 'local') {
+    const upLevel = (ref as any).upLevel || 0
+    const frame = resolveFrame(state, upLevel)
+    const binding = frame.varBindings[ref.name]
+    if (binding) {
+      // 递归解析，直到找到非 varBinding 的 ref
+      return resolveVarBinding(state, binding)
+    }
+  }
+  return ref
+}
+
 export function setValue(state: VMState, ref: Ref, value: PascalValue): void {
   switch (ref.kind) {
     case 'global':
