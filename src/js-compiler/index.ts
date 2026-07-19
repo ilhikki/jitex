@@ -40,6 +40,7 @@ import { integerPlugin } from '../types/integer.plugin'
 import { booleanPlugin } from '../types/boolean.plugin'
 import { charPlugin } from '../types/char.plugin'
 import { realPlugin } from '../types/real.plugin'
+import { stringPlugin } from '../types/string.plugin'
 import { createArrayPlugin } from '../types/array.plugin'
 import { createRecordPlugin } from '../types/record.plugin'
 import { createEnumPlugin } from '../types/enum.plugin'
@@ -61,10 +62,20 @@ const BUILTIN_SYSCALLS = new Set([
 ])
 
 // 返回内置函数的返回类型（用于类型推断）
-function builtinReturnType(name: string): string {
+// polymorphic 参数：若 argType 提供，PRED/SUCC/ABS/SQR 跟随参数类型
+function builtinReturnType(name: string, argType?: string): string {
   switch (name) {
-    case 'ORD': case 'ABS': case 'SQR': case 'PRED': case 'SUCC':
-    case 'TRUNC': case 'ROUND': case 'ERSTAT':
+    case 'ORD': case 'TRUNC': case 'ROUND': case 'ERSTAT':
+      return 'integer'
+    case 'ABS': case 'SQR':
+      // ABS/SQR: integer→integer, real→real
+      if (argType === 'real') return 'real'
+      return 'integer'
+    case 'PRED': case 'SUCC':
+      // PRED/SUCC: 返回类型跟随参数类型
+      if (argType === 'char') return 'char'
+      if (argType === 'boolean') return 'boolean'
+      if (argType === 'real') return 'real'
       return 'integer'
     case 'ODD': case 'EOF': case 'EOLN':
       return 'boolean'
@@ -436,6 +447,18 @@ class Compiler {
   private emitProcedureCall(pc: ProcedureCallNode, scope: Scope): string {
     const name = pc.name.name.toUpperCase()
     if (BUILTIN_SYSCALLS.has(name)) {
+      // WRITELN/WRITE: 对 real 参数预先用 ctx.formatReal 格式化为 string，
+      // 绕过 io.plugin.formatReal 的指数补零 bug（src/vm 冻结，不能改）
+      if (name === 'WRITE' || name === 'WRITELN') {
+        const argExprs = pc.arguments.map(a => this.emitExpr(a, scope))
+        const args = argExprs.map(e => {
+          if (e.type === 'real') {
+            return `ctx.box('string', ctx.formatReal(${e.code}))`
+          }
+          return this.emitArgFromExpr(e)
+        })
+        return `await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}])`
+      }
       const args = pc.arguments.map(a => this.emitArg(a, scope))
       return `await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}])`
     }
@@ -498,13 +521,21 @@ class Compiler {
     const R = this.emitExpr(node.right, scope)
     const op = node.operator.toUpperCase()
     const resultType = this.binaryResultType(op, L.type, R.type)
+    const isStrChar = (t: string) => t === 'string' || t === 'char'
 
     switch (op) {
       case '+': case '-': case '*': {
         if (resultType === 'integer') {
           return { code: `(${L.code} ${op} ${R.code}) | 0`, type: 'integer' }
         }
-        return { code: `(${L.code} ${op} ${R.code})`, type: 'real' }
+        if (resultType === 'real') {
+          return { code: `(${L.code} ${op} ${R.code})`, type: 'real' }
+        }
+        // string/char 连接
+        if (resultType === 'string') {
+          return { code: `ctx.box('string', (${L.code}).raw + (${R.code}).raw)`, type: 'string' }
+        }
+        throw new Error(`JS VM: unsupported + for ${L.type}/${R.type}`)
       }
       case '/': // Pascal 实数除
         return { code: `(${L.code} / ${R.code})`, type: 'real' }
@@ -513,18 +544,13 @@ class Compiler {
       case 'MOD':
         // Pascal MOD: a - (a div b) * b，trunc 语义。非负操作数下与 % 等价
         return { code: `(${L.code} % ${R.code})`, type: 'integer' }
-      case '=':
-        return { code: `(${L.code} === ${R.code})`, type: 'boolean' }
-      case '<>':
-        return { code: `(${L.code} !== ${R.code})`, type: 'boolean' }
-      case '<':
-        return { code: `(${L.code} < ${R.code})`, type: 'boolean' }
-      case '<=':
-        return { code: `(${L.code} <= ${R.code})`, type: 'boolean' }
-      case '>':
-        return { code: `(${L.code} > ${R.code})`, type: 'boolean' }
-      case '>=':
-        return { code: `(${L.code} >= ${R.code})`, type: 'boolean' }
+      case '=': case '<>': case '<': case '<=': case '>': case '>=': {
+        const jsOp = op === '=' ? '===' : op === '<>' ? '!==' : op
+        if (isStrChar(L.type) || isStrChar(R.type)) {
+          return { code: `((${L.code}).raw ${jsOp} (${R.code}).raw)`, type: 'boolean' }
+        }
+        return { code: `(${L.code} ${jsOp} ${R.code})`, type: 'boolean' }
+      }
       case 'AND':
         if (resultType === 'boolean') return { code: `(${L.code} && ${R.code})`, type: 'boolean' }
         return { code: `(${L.code} & ${R.code})`, type: 'integer' } // 位运算（Knuth 风格）
@@ -556,8 +582,11 @@ class Compiler {
   private emitFunctionCall(node: FunctionCallNode, scope: Scope): { code: string; type: string } {
     const name = node.name.name.toUpperCase()
     if (BUILTIN_SYSCALLS.has(name)) {
-      const args = node.arguments.map(a => this.emitArg(a, scope))
-      const retType = builtinReturnType(name)
+      const argExprs = node.arguments.map(a => this.emitExpr(a, scope))
+      const args = argExprs.map((e, i) => this.emitArgFromExpr(e))
+      // PRED/SUCC/ABS/SQR 是多态函数，返回类型跟随参数
+      const firstArgType = argExprs[0]?.type
+      const retType = builtinReturnType(name, firstArgType)
       // sysCall 返回 PascalValue，取 .raw 得到裸值（scalar）
       if (isScalar(retType) && retType !== 'char' && retType !== 'string') {
         return { code: `((await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}])).raw)`, type: retType }
@@ -579,6 +608,11 @@ class Compiler {
   // 生成 syscall 参数（始终是 PascalValue）
   private emitArg(node: ExpressionNode, scope: Scope): string {
     const e = this.emitExpr(node, scope)
+    return this.emitArgFromExpr(e)
+  }
+
+  // 从已 emit 的表达式生成 syscall 参数
+  private emitArgFromExpr(e: { code: string; type: string }): string {
     // scalar 裸值 → 装箱
     if (e.type === 'integer') return `ctx.box('integer', ${e.code})`
     if (e.type === 'real') return `ctx.box('real', ${e.code})`
@@ -615,8 +649,11 @@ class Compiler {
         const u = node as UnaryExpressionNode
         return this.inferType(u.operand, scope)
       }
-      case 'FunctionCall':
-        return builtinReturnType((node as FunctionCallNode).name.name.toUpperCase())
+      case 'FunctionCall': {
+        const fc = node as FunctionCallNode
+        const argType = fc.arguments.length > 0 ? this.inferType(fc.arguments[0], scope) : undefined
+        return builtinReturnType(fc.name.name.toUpperCase(), argType)
+      }
       default:
         return 'integer'
     }
@@ -689,7 +726,7 @@ function parseSource(source: string): ProgramNode {
 
 // 构造 runtime（复用 VM 的 typeTable/sysCalls 构造逻辑，保证语义一致）
 function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: RuntimeCtx; sysCalls: Map<string, SysCallHandler> } {
-  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin, ...(options.plugins || [])]
+  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin, stringPlugin, ...(options.plugins || [])]
   const analyzer = new StaticAnalyzer(basePlugins)
   analyzer.analyze(ast) // 只为 typeTable，JsonCode 丢弃
   const typeTable = analyzer.getTypeTable()

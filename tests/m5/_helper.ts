@@ -1,6 +1,8 @@
-// m4 VM 测试辅助函数
+// m5 测试辅助函数
+// 默认走 JS 编译器（M5）；显式指定 engine='vm' 时回退到 M4 解释器
 
 import { runVM as runVMImpl } from '../../src/vm'
+import { runJS as runJSImpl } from '../../src/js-compiler'
 import type { VMState } from '../../src/vm/state'
 import type { TypePlugin, SysCallHandler } from '../../src/types'
 
@@ -23,15 +25,20 @@ export interface VMTest {
   expectedFileContains?: { url: string; contains: string }[]
   // 自定义系统调用（非标扩展用）
   sysCalls?: Map<string, SysCallHandler>
-  // 执行引擎：'vm'（默认，M4 解释器）| 'js'（M5 JS 编译器）
+  // 执行引擎：'js'（默认，M5 JS 编译器）| 'vm'（M4 解释器，回退用）
   engine?: 'vm' | 'js'
 }
 
 export async function runVM(test: VMTest): Promise<VMState> {
-  const engine = test.engine || 'vm'
+  const engine = test.engine || 'js'
   if (engine === 'js') {
-    // M5: JS 编译器执行路径（Phase 1 实现）
-    throw new Error('JS engine not implemented yet (M5 Phase 1)')
+    // M5: JS 编译器执行路径
+    return await runJSImpl(test.code, {
+      input: test.input,
+      plugins: test.plugins,
+      sysCalls: test.sysCalls,
+      maxSteps: 1e9,
+    })
   }
   return await runVMImpl(test.code, {
     input: test.input,

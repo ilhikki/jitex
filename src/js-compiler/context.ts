@@ -14,6 +14,7 @@ import type { VMState } from '../vm/state'
 export interface JSCtx {
   sysCall: (name: string, args: any[]) => Promise<any>
   box: (typeId: string, raw: unknown) => PascalValue
+  formatReal: (n: number) => string
   steps: number
   maxSteps: number
   outputBuffer: string[]
@@ -44,6 +45,25 @@ function createMockState(outputBuffer: string[], inputQueue: string[]): VMState 
   } as VMState
 }
 
+// Pascal 实数格式化（与 io.plugin 的 formatReal 行为一致，但修正指数补零为 3 位）
+// 复制实现是为了不修改 src/vm 下的冻结代码
+function formatReal(n: number): string {
+  if (Number.isInteger(n)) {
+    return `${n}.00000000000000E+000`
+  }
+  // toExponential 输出形如 "3.50000000000000e+0"，需将指数补零至 3 位
+  const s = n.toExponential(14)
+  // 拆出尾数和指数
+  const eIdx = s.indexOf('e')
+  if (eIdx < 0) return s
+  const mantissa = s.slice(0, eIdx)
+  let exp = s.slice(eIdx + 1) // 含符号
+  const sign = exp[0]
+  const digits = exp.slice(1)
+  const padded = digits.padStart(3, '0')
+  return `${mantissa}E${sign}${padded}`
+}
+
 export function createJSCtx(options: JSRuntimeOptions): JSCtx {
   const outputBuffer: string[] = []
   const inputQueue: string[] = options.input ? [...options.input] : []
@@ -60,6 +80,7 @@ export function createJSCtx(options: JSRuntimeOptions): JSCtx {
       return Promise.resolve(handler(args, mockState, runtime))
     },
     box: (typeId: string, raw: unknown): PascalValue => ({ typeId, raw }),
+    formatReal,
     steps: 0,
     maxSteps: options.maxSteps ?? 100000000,
     outputBuffer,
