@@ -14,6 +14,7 @@ import type { VMState } from '../vm/state'
 export interface JSCtx {
   sysCall: (name: string, args: any[]) => Promise<any>
   box: (typeId: string, raw: unknown) => PascalValue
+  defaultOf: (typeId: string) => PascalValue
   formatReal: (n: number) => string
   steps: number
   maxSteps: number
@@ -64,12 +65,59 @@ function formatReal(n: number): string {
   return `${mantissa}E${sign}${padded}`
 }
 
+// 递归构造类型默认值（与 plugin.default.invoke 语义一致）
+function buildDefaultValue(typeId: string, typeTable: any): unknown {
+  const td = typeTable.get(typeId) as any
+  if (!td) return 0
+  switch (td.kind) {
+    case 'integer': return 0
+    case 'real': return 0.0
+    case 'boolean': return false
+    case 'char': return '\x00'
+    case 'string': return ''
+    case 'text': return null
+    case 'subrange': return 0
+    case 'enum': return 0
+    case 'array': {
+      // 多维数组：StaticAnalyzer 把 array[1..2,1..3] of integer 压成
+      // dimensions=[d0,d1]+elementTypeId=integer；需递归构造嵌套数组
+      // 对 array[1..2] of array[1..3] of integer（dimensions=[d0]+elementTypeId=array-...）
+      // 也能正确处理：dimIdx 越界时走 buildDefaultValue(elementTypeId) 递归
+      const dims = td.dimensions
+      const elemTypeId = td.elementTypeId
+      const build = (dimIdx: number): unknown => {
+        if (dimIdx >= dims.length) {
+          return buildDefaultValue(elemTypeId, typeTable)
+        }
+        const dim = dims[dimIdx]
+        const arr: unknown[] = []
+        for (let i = dim.low; i <= dim.high; i++) {
+          arr[i] = build(dimIdx + 1)
+        }
+        return arr
+      }
+      return build(0)
+    }
+    case 'record': {
+      const obj: Record<string, unknown> = {}
+      for (const f of td.fields) {
+        obj[f.name] = buildDefaultValue(f.typeId, typeTable)
+      }
+      return obj
+    }
+    case 'set': return new Set<number>()
+    case 'file': return null
+    default: return 0
+  }
+}
+
 export function createJSCtx(options: JSRuntimeOptions): JSCtx {
   const outputBuffer: string[] = []
   const inputQueue: string[] = options.input ? [...options.input] : []
   const mockState = createMockState(outputBuffer, inputQueue)
   const runtime = options.runtime
   const sysCalls = options.sysCalls
+  const typeTable = runtime.typeTable
 
   return {
     sysCall: (name: string, args: any[]) => {
@@ -80,6 +128,9 @@ export function createJSCtx(options: JSRuntimeOptions): JSCtx {
       return Promise.resolve(handler(args, mockState, runtime))
     },
     box: (typeId: string, raw: unknown): PascalValue => ({ typeId, raw }),
+    defaultOf: (typeId: string): PascalValue => {
+      return { typeId, raw: buildDefaultValue(typeId, typeTable) }
+    },
     formatReal,
     steps: 0,
     maxSteps: options.maxSteps ?? 100000000,
