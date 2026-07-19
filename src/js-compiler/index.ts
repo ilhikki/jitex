@@ -28,6 +28,7 @@ import type {
   BinaryExpressionNode,
   UnaryExpressionNode,
   IdentifierNode,
+  IntegerLiteralNode,
   CompoundStatementNode,
   AssignmentNode,
   IfStatementNode,
@@ -40,6 +41,7 @@ import type {
   FieldAccessNode,
   SetConstructorNode,
   InExpressionNode,
+  GotoStatementNode,
   ProcedureCallNode,
   FunctionCallNode,
   ConstDeclarationNode,
@@ -128,6 +130,7 @@ interface WithRecordInfo {
 
 class Scope {
   vars = new Map<string, VarInfo>()
+  procs = new Map<string, ProcInfo>()  // 该作用域可见的过程（嵌套过程注册到父 scope）
   withRecords: WithRecordInfo[] | null = null
   parent: Scope | null
   constructor(parent: Scope | null = null) {
@@ -138,6 +141,12 @@ class Scope {
     const v = this.vars.get(key)
     if (v) return v
     return this.parent ? this.parent.lookup(name) : null
+  }
+  lookupProc(name: string): ProcInfo | null {
+    const key = name.toUpperCase()
+    const p = this.procs.get(key)
+    if (p) return p
+    return this.parent ? this.parent.lookupProc(name) : null
   }
   // 沿父链收集所有 with-record（内层、后面的优先）
   allWithRecords(): WithRecordInfo[] {
@@ -166,10 +175,15 @@ class Scope {
 
 interface ProcInfo {
   jsName: string
+  name: string // 原始 Pascal 名（大写）
   isFunction: boolean
   returnType: string
   params: { name: string; typeId: string; isVar: boolean }[]
   block: BlockNode | null
+  parent: ProcInfo | null // 父过程（嵌套用）
+  children: ProcInfo[]    // 直接嵌套的子过程
+  isForward: boolean      // FORWARD 声明（无 block）
+  forwardDef?: ProcInfo   // FORWARD 实际定义（第二次声明时指向 actual）
 }
 
 // ============================================================================
@@ -187,6 +201,9 @@ class Compiler {
   enumConstants = new Map<string, number>()
   // const integer 名 -> 值（用于类型边界求值）
   constInts = new Map<string, number>()
+  // goto 状态机支持：当前过程体的 label -> case 编号映射（null 表示无 goto 上下文）
+  labelCases: Map<string, number> | null = null
+  labelSwitchName: string | null = null  // goto break 用的 JS label 名
 
   constructor(typeTable: TypeTable) {
     this.typeTable = typeTable
@@ -204,7 +221,8 @@ class Compiler {
     // 2. 生成过程函数体
     const procDefs: string[] = []
     for (const [name, info] of this.procs) {
-      if (info.block) {
+      // 跳过 forward 声明且无实际定义的（罕见，正常 forwardDef 已设置）
+      if (info.block || info.forwardDef) {
         procDefs.push(this.emitProc(info))
       }
     }
@@ -212,8 +230,8 @@ class Compiler {
     // 3. 生成全局变量声明
     const globalDecls = this.emitGlobalDecls(program.block)
 
-    // 4. 生成 main 体
-    const mainBody = this.emitCompound(program.block.compound, this.globalScope, 2)
+    // 4. 生成 main 体（用 emitBody 以支持 main 程序的 goto 标号状态机）
+    const mainBody = this.emitBody(program.block, this.globalScope, 2)
 
     // 5. 组装
     const parts: string[] = []
@@ -450,28 +468,85 @@ class Compiler {
   }
 
   private collectProcs(procs: ProcedureDeclarationNode[], funcs: FunctionDeclarationNode[]) {
+    this.collectProcsRecursive(procs, funcs, null, '')
+  }
+
+  // 递归收集过程（含嵌套）。parentJsName 用于生成唯一 jsName（如 p_outer__inner）
+  private collectProcsRecursive(
+    procs: ProcedureDeclarationNode[],
+    funcs: FunctionDeclarationNode[],
+    parent: ProcInfo | null,
+    parentJsName: string,
+  ) {
+    const makeJsName = (base: string) => parentJsName
+      ? `${parentJsName}__${base.toLowerCase()}`
+      : `p_${base.toLowerCase()}`
+    // 在父作用域（parent.children 或 this.procs）中查找同名 forward
+    const findForward = (name: string): ProcInfo | undefined => {
+      if (parent) return parent.children.find(c => c.name === name && c.isForward)
+      return this.procs.get(name)
+    }
+    // 递归收集嵌套
+    const recurseNested = (info: ProcInfo, block: BlockNode) => {
+      this.collectProcsRecursive(
+        block.procedureDeclarations,
+        block.functionDeclarations,
+        info,
+        info.jsName,
+      )
+    }
     for (const p of procs) {
-      const key = p.name.name.toUpperCase()
+      const name = p.name.name.toUpperCase()
       const params = this.collectParams(p.parameters)
-      this.procs.set(key, {
-        jsName: 'p_' + p.name.name.toLowerCase(),
+      const info: ProcInfo = {
+        jsName: makeJsName(p.name.name),
+        name,
         isFunction: false,
         returnType: 'void',
         params,
         block: p.block,
-      })
+        parent,
+        children: [],
+        isForward: p.isForward,
+      }
+      if (!p.isForward) {
+        const existing = findForward(name)
+        if (existing && existing.isForward) {
+          existing.forwardDef = info
+          if (p.block) recurseNested(info, p.block)
+          continue
+        }
+      }
+      if (parent) parent.children.push(info)
+      else this.procs.set(name, info)
+      if (p.block) recurseNested(info, p.block)
     }
     for (const f of funcs) {
-      const key = f.name.name.toUpperCase()
+      const name = f.name.name.toUpperCase()
       const params = this.collectParams(f.parameters)
       const retType = this.scalarBase(this.resolveTypeId(f.returnType))
-      this.procs.set(key, {
-        jsName: 'p_' + f.name.name.toLowerCase(),
+      const info: ProcInfo = {
+        jsName: makeJsName(f.name.name),
+        name,
         isFunction: true,
         returnType: retType,
         params,
         block: f.block,
-      })
+        parent,
+        children: [],
+        isForward: f.isForward,
+      }
+      if (!f.isForward) {
+        const existing = findForward(name)
+        if (existing && existing.isForward) {
+          existing.forwardDef = info
+          if (f.block) recurseNested(info, f.block)
+          continue
+        }
+      }
+      if (parent) parent.children.push(info)
+      else this.procs.set(name, info)
+      if (f.block) recurseNested(info, f.block)
     }
   }
 
@@ -523,27 +598,54 @@ class Compiler {
 
   // ---- 过程生成 ----
 
-  private emitProc(info: ProcInfo): string {
-    if (!info.block) return '' // forward 声明
-    const scope = new Scope(this.globalScope)
+  private emitProc(info: ProcInfo, parentScope: Scope = this.globalScope): string {
+    // FORWARD 声明：跳过（实际定义通过 forwardDef 引用）
+    if (info.isForward && !info.forwardDef) return ''
+    // 实际定义：用 forwardDef 指向的 info（含 block）
+    const actual = info.forwardDef || info
+    const block = actual.block
+    if (!block) return ''
+    // 嵌套过程的 scope 继承父过程 scope（JS 闭包能访问外层局部变量）
+    const scope = new Scope(parentScope)
+    // 注册嵌套过程到 scope.procs（供过程体调用解析）
+    for (const child of actual.children) {
+      scope.procs.set(child.name, child)
+    }
     const paramDecls: string[] = []
-    for (const p of info.params) {
+    for (const p of actual.params) {
       scope.declare(p.name, p.typeId, p.isVar)
-      // value 参数直接作为 JS 参数；var 参数 Phase 4 处理
       paramDecls.push(p.name)
     }
     const localDecls: string[] = []
     // 函数返回值：Pascal 通过给函数名赋值返回，映射到 __ret 变量
     let hasRet = false
-    if (info.isFunction) {
+    if (actual.isFunction) {
       hasRet = true
-      scope.vars.set(info.jsName.slice(2).toUpperCase(), {
-        jsName: '__ret', typeId: info.returnType, isVar: false,
+      scope.vars.set(actual.name, {
+        jsName: '__ret', typeId: actual.returnType, isVar: false,
       })
-      localDecls.push(`let __ret = ${this.defaultInit(info.returnType, info.returnType)}`)
+      localDecls.push(`let __ret = ${this.defaultInit(actual.returnType, actual.returnType)}`)
+    }
+    // 局部类型声明：注册到 aliasMap（暂用 save/restore 模拟作用域）
+    const savedAliases: [string, string | undefined][] = []
+    const savedConstInts: [string, number | undefined][] = []
+    for (const t of block.typeDeclarations) {
+      const key = t.name.name.toUpperCase()
+      savedAliases.push([key, this.aliasMap.get(key)])
+      const typeId = this.resolveTypeId(t.typeDef)
+      this.aliasMap.set(key, typeId)
+    }
+    // 局部 const integer（type 边界可能引用）
+    for (const c of block.constDeclarations) {
+      const v = this.tryEvalConstInt(c.value)
+      if (v !== undefined) {
+        const key = c.name.name.toUpperCase()
+        savedConstInts.push([key, this.constInts.get(key)])
+        this.constInts.set(key, v)
+      }
     }
     // 局部变量
-    for (const decl of info.block.variableDeclarations) {
+    for (const decl of block.variableDeclarations) {
       const t = this.resolveTypeId(decl.type)
       const st = this.scalarBase(t)
       const init = this.defaultInit(t, st)
@@ -552,12 +654,34 @@ class Compiler {
         localDecls.push(`let ${n.name} = ${init}`)
       }
     }
-    // 嵌套过程（Phase 4 才支持嵌套；这里只处理无嵌套）
-    const body = this.emitCompound(info.block.compound, scope, 2)
+    // 局部常量
+    for (const c of block.constDeclarations) {
+      const { code, type } = this.emitExpr(c.value, scope)
+      const inferType = this.inferType(c.value, scope)
+      localDecls.push(`const ${c.name.name} = ${this.coerce(code, type, inferType)}`)
+      scope.declare(c.name.name, inferType)
+    }
+    // 嵌套过程的 JS 函数定义（放在父过程函数体内，闭包捕获父局部变量）
+    const nestedDefs = actual.children
+      .filter(c => !c.isForward || c.forwardDef)
+      .map(c => this.emitProc(c, scope))
+      .filter(s => s.length > 0)
+    // 函数体
+    const body = this.emitBody(block, scope, 2)
+    // 恢复 aliasMap / constInts
+    for (const [k, v] of savedAliases) {
+      if (v === undefined) this.aliasMap.delete(k)
+      else this.aliasMap.set(k, v)
+    }
+    for (const [k, v] of savedConstInts) {
+      if (v === undefined) this.constInts.delete(k)
+      else this.constInts.set(k, v)
+    }
     const params = ['ctx', ...paramDecls].join(', ')
     const lines: string[] = []
-    lines.push(`async function ${info.jsName}(${params}) {`)
+    lines.push(`async function ${actual.jsName}(${params}) {`)
     if (localDecls.length) lines.push('  ' + localDecls.join('\n  '))
+    if (nestedDefs.length) lines.push(nestedDefs.map(d => '  ' + d.replace(/\n/g, '\n  ')).join('\n\n'))
     lines.push(body)
     if (hasRet) lines.push('  return __ret')
     lines.push('}')
@@ -565,6 +689,66 @@ class Compiler {
   }
 
   // ---- 语句生成 ----
+
+  // 过程/主程序体生成：检测 label 声明，有 label 则用状态机包装
+  private emitBody(block: BlockNode, scope: Scope, indent: number): string {
+    if (block.labelDeclarations && block.labelDeclarations.labels.length > 0) {
+      return this.emitLabeledBody(block.compound, scope, indent, block.labelDeclarations.labels)
+    }
+    return this.emitCompound(block.compound, scope, indent)
+  }
+
+  // goto 状态机：把 compound 切分成段，每段一个 case
+  // goto → 设置 __pc + break 跳出 switch
+  private emitLabeledBody(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[]): string {
+    const pad = ' '.repeat(indent)
+    // label 名（数字字符串）→ case 编号（1..N）
+    const labelCases = new Map<string, number>()
+    labels.forEach((l, i) => labelCases.set(String((l as any).value), i + 1))
+    // 切分 compound.statements：按顶层 LabeledStatement 切段
+    const segments: { caseNum: number; stmts: StatementNode[] }[] = []
+    let curCase = 0
+    let curStmts: StatementNode[] = []
+    for (const s of compound.statements) {
+      if (s.kind === 'LabeledStatement') {
+        segments.push({ caseNum: curCase, stmts: curStmts })
+        const lblName = String(((s as LabeledStatementNode).label as any).value)
+        curCase = labelCases.get(lblName) || 0
+        curStmts = [(s as LabeledStatementNode).statement]
+      } else {
+        curStmts.push(s)
+      }
+    }
+    segments.push({ caseNum: curCase, stmts: curStmts })
+    // 生成 while + switch
+    const switchLabel = '__goto_switch'
+    const lines: string[] = []
+    lines.push(`${pad}let __pc = 0`)
+    lines.push(`${pad}${switchLabel}: while (true) {`)
+    lines.push(`${pad}  switch (__pc) {`)
+    const savedLabelCases = this.labelCases
+    const savedSwitchName = this.labelSwitchName
+    this.labelCases = labelCases
+    this.labelSwitchName = switchLabel
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i]
+      lines.push(`${pad}  case ${seg.caseNum}:`)
+      for (const s of seg.stmts) {
+        const code = this.emitStmt(s, scope, indent + 4)
+        if (code) lines.push(code)
+      }
+      const nextCase = i + 1 < segments.length ? segments[i + 1].caseNum : -1
+      lines.push(`${pad}    __pc = ${nextCase}`)
+      lines.push(`${pad}    break`)
+    }
+    lines.push(`${pad}  default:`)
+    lines.push(`${pad}    break ${switchLabel}`)
+    lines.push(`${pad}  }`)
+    lines.push(`${pad}}`)
+    this.labelCases = savedLabelCases
+    this.labelSwitchName = savedSwitchName
+    return lines.join('\n')
+  }
 
   private emitCompound(node: CompoundStatementNode, scope: Scope, indent: number): string {
     const pad = ' '.repeat(indent)
@@ -652,10 +836,26 @@ class Compiler {
         return pad + this.emitProcedureCall(pc, scope)
       }
 
-      case 'GotoStatement':
-        throw new Error('JS VM: goto not supported yet')
+      case 'GotoStatement': {
+        const gs = node as GotoStatementNode
+        const lblName = String((gs.label as any).value)
+        if (this.labelCases) {
+          const caseNum = this.labelCases.get(lblName)
+          if (caseNum === undefined) {
+            throw new Error(`JS VM: goto ${lblName} - label not found`)
+          }
+          // break 跳出 switch；while 重新进入 switch 到目标 case
+          // 注：goto 在嵌套 while/for 内时需用 labeled break（暂不支持）
+          return `${pad}__pc = ${caseNum}; break`
+        }
+        // 跨过程 goto：当前过程无 label 上下文。运行时若执行到此处再报错，
+        // 这样未调用的过程不会被编译期拒绝（符合 Pascal 编译器惯例）
+        return `${pad}throw new Error('JS VM: goto ${lblName} - no label context in this scope')`
+      }
 
       case 'LabeledStatement': {
+        // 在 emitLabeledBody 中由切分逻辑处理；直接 emit 内部 stmt
+        // （fallback：未在状态机上下文中遇到 labeled statement，可能是嵌套块内）
         const ls = node as LabeledStatementNode
         return this.emitStmt(ls.statement, scope, indent)
       }
@@ -753,6 +953,10 @@ class Compiler {
       if (!vi) throw new Error(`JS VM: undefined variable ${id.name}`)
       const rhs = this.emitExpr(a.right, scope)
       const code = this.coerce(rhs.code, rhs.type, vi.typeId)
+      // var 参数（scalar）：赋值到 .v
+      if (vi.isVar && this.isScalarBare(vi.typeId)) {
+        return `${vi.jsName}.v = ${code}`
+      }
       return `${vi.jsName} = ${code}`
     }
     if (a.left.kind === 'ArrayAccess') {
@@ -831,15 +1035,55 @@ class Compiler {
       const args = pc.arguments.map(a => this.emitArg(a, scope))
       return `await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}])`
     }
-    // 用户过程
-    const info = this.procs.get(name)
+    // 用户过程（按作用域查找：嵌套过程 → 外层 → 全局）
+    const info = scope.lookupProc(name) || this.procs.get(name)
     if (!info) throw new Error(`JS VM: unknown procedure ${pc.name.name}`)
+    // 检查是否有 scalar var 参数（需要 box + 写回）
+    const varBoxes: { argIdx: number; argJsName: string; boxName: string }[] = []
     const args = pc.arguments.map((a, i) => {
-      const pType = info.params[i]?.typeId || 'integer'
+      const paramInfo = info.params[i]
+      const pType = paramInfo?.typeId || 'integer'
       const e = this.emitExpr(a, scope)
+      if (paramInfo?.isVar) {
+        // var 参数：传引用
+        // 链式 var：实参是 var 参数（scalar），直接传容器对象
+        if (a.kind === 'Identifier') {
+          const argVi = scope.lookup((a as IdentifierNode).name)
+          if (argVi?.isVar && this.isScalarBare(argVi.typeId)) {
+            return argVi.jsName
+          }
+          // 普通 scalar 变量：用 box 包装，调用后写回
+          if (this.isScalarBare(pType) && argVi) {
+            const boxName = `__box_${varBoxes.length}`
+            varBoxes.push({ argIdx: i, argJsName: argVi.jsName, boxName })
+            return boxName
+          }
+        }
+        if (this.isScalarBare(pType)) {
+          // scalar 表达式（非常量标识符）：box + 写回丢弃（无左值）
+          return `{v: ${this.coerce(e.code, e.type, pType)}}`
+        }
+        // 复杂类型：直接传 PascalValue 引用（已经是对象）
+        return e.code
+      }
+      // value 参数：传值（scalar 裸值 / 复杂类型 PascalValue）
       return this.coerce(e.code, e.type, pType)
     })
-    return `await ${info.jsName}(ctx, ${args.join(', ')})`
+    // 无 scalar var 参数：直接调用
+    if (varBoxes.length === 0) {
+      return `await ${info.jsName}(ctx, ${args.join(', ')})`
+    }
+    // 有 scalar var 参数：包装 box + 调用 + 写回
+    const lines: string[] = ['{']
+    for (const b of varBoxes) {
+      lines.push(`  const ${b.boxName} = {v: ${b.argJsName}}`)
+    }
+    lines.push(`  await ${info.jsName}(ctx, ${args.join(', ')})`)
+    for (const b of varBoxes) {
+      lines.push(`  ${b.argJsName} = ${b.boxName}.v`)
+    }
+    lines.push('}')
+    return lines.join('\n')
   }
 
   // READ/READLN 内联生成
@@ -922,7 +1166,19 @@ class Compiler {
         }
         // 3. 普通变量
         const vi = scope.lookup(name)
-        if (!vi) throw new Error(`JS VM: undefined variable ${name}`)
+        if (!vi) {
+          // 无参函数省略括号：识别为函数调用
+          const procInfo = scope.lookupProc(name) || this.procs.get(name.toUpperCase())
+          if (procInfo && procInfo.isFunction && procInfo.params.length === 0) {
+            const actual = procInfo.forwardDef || procInfo
+            return { code: `(await ${actual.jsName}(ctx))`, type: actual.returnType }
+          }
+          throw new Error(`JS VM: undefined variable ${name}`)
+        }
+        // var 参数（scalar）：访问 .v
+        if (vi.isVar && this.isScalarBare(vi.typeId)) {
+          return { code: `${vi.jsName}.v`, type: vi.typeId }
+        }
         return { code: vi.jsName, type: vi.typeId }
       }
       case 'ParenthesizedExpression': {
@@ -1015,10 +1271,10 @@ class Compiler {
     switch (op) {
       case '+': case '-': case '*': {
         if (resultType === 'integer') {
-          return { code: `(${L.code} ${op} ${R.code}) | 0`, type: 'integer' }
+          return { code: `((${L.code}) ${op} (${R.code})) | 0`, type: 'integer' }
         }
         if (resultType === 'real') {
-          return { code: `(${L.code} ${op} ${R.code})`, type: 'real' }
+          return { code: `((${L.code}) ${op} (${R.code}))`, type: 'real' }
         }
         // string/char 连接
         if (resultType === 'string') {
@@ -1027,25 +1283,25 @@ class Compiler {
         throw new Error(`JS VM: unsupported + for ${L.type}/${R.type}`)
       }
       case '/': // Pascal 实数除
-        return { code: `(${L.code} / ${R.code})`, type: 'real' }
+        return { code: `((${L.code}) / (${R.code}))`, type: 'real' }
       case 'DIV':
-        return { code: `Math.trunc(${L.code} / ${R.code}) | 0`, type: 'integer' }
+        return { code: `(Math.trunc((${L.code}) / (${R.code}))) | 0`, type: 'integer' }
       case 'MOD':
         // Pascal MOD: a - (a div b) * b，trunc 语义。非负操作数下与 % 等价
-        return { code: `(${L.code} % ${R.code})`, type: 'integer' }
+        return { code: `((${L.code}) % (${R.code}))`, type: 'integer' }
       case '=': case '<>': case '<': case '<=': case '>': case '>=': {
         const jsOp = op === '=' ? '===' : op === '<>' ? '!==' : op
         if (isStrChar(L.type) || isStrChar(R.type)) {
           return { code: `((${L.code}).raw ${jsOp} (${R.code}).raw)`, type: 'boolean' }
         }
-        return { code: `(${L.code} ${jsOp} ${R.code})`, type: 'boolean' }
+        return { code: `((${L.code}) ${jsOp} (${R.code}))`, type: 'boolean' }
       }
       case 'AND':
-        if (resultType === 'boolean') return { code: `(${L.code} && ${R.code})`, type: 'boolean' }
-        return { code: `(${L.code} & ${R.code})`, type: 'integer' } // 位运算（Knuth 风格）
+        if (resultType === 'boolean') return { code: `((${L.code}) && (${R.code}))`, type: 'boolean' }
+        return { code: `((${L.code}) & (${R.code}))`, type: 'integer' } // 位运算（Knuth 风格）
       case 'OR':
-        if (resultType === 'boolean') return { code: `(${L.code} || ${R.code})`, type: 'boolean' }
-        return { code: `(${L.code} | ${R.code})`, type: 'integer' }
+        if (resultType === 'boolean') return { code: `((${L.code}) || (${R.code}))`, type: 'boolean' }
+        return { code: `((${L.code}) | (${R.code}))`, type: 'integer' }
       default:
         throw new Error(`JS VM: unsupported binary operator ${op}`)
     }
@@ -1056,13 +1312,13 @@ class Compiler {
     const op = node.operator.toUpperCase()
     switch (op) {
       case '-':
-        if (operand.type === 'integer') return { code: `(-${operand.code}) | 0`, type: 'integer' }
-        return { code: `(-${operand.code})`, type: 'real' }
+        if (operand.type === 'integer') return { code: `(-(${operand.code})) | 0`, type: 'integer' }
+        return { code: `(-(${operand.code}))`, type: 'real' }
       case '+':
         return operand
       case 'NOT':
-        if (operand.type === 'boolean') return { code: `(!${operand.code})`, type: 'boolean' }
-        return { code: `(~${operand.code})`, type: 'integer' }
+        if (operand.type === 'boolean') return { code: `(!(${operand.code}))`, type: 'boolean' }
+        return { code: `(~(${operand.code}))`, type: 'integer' }
       default:
         throw new Error(`JS VM: unsupported unary operator ${op}`)
     }
@@ -1082,8 +1338,8 @@ class Compiler {
       }
       return { code: `(await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}]))`, type: retType }
     }
-    // 用户函数
-    const info = this.procs.get(name)
+    // 用户函数（按作用域查找：嵌套函数 → 外层 → 全局）
+    const info = scope.lookupProc(name) || this.procs.get(name)
     if (!info || !info.isFunction) throw new Error(`JS VM: unknown function ${node.name.name}`)
     const args = node.arguments.map((a, i) => {
       const pType = info.params[i]?.typeId || 'integer'
