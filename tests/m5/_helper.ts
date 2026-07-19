@@ -23,9 +23,16 @@ export interface VMTest {
   expectedFileContains?: { url: string; contains: string }[]
   // 自定义系统调用（非标扩展用）
   sysCalls?: Map<string, SysCallHandler>
+  // 执行引擎：'vm'（默认，M4 解释器）| 'js'（M5 JS 编译器）
+  engine?: 'vm' | 'js'
 }
 
 export async function runVM(test: VMTest): Promise<VMState> {
+  const engine = test.engine || 'vm'
+  if (engine === 'js') {
+    // M5: JS 编译器执行路径（Phase 1 实现）
+    throw new Error('JS engine not implemented yet (M5 Phase 1)')
+  }
   return await runVMImpl(test.code, {
     input: test.input,
     plugins: test.plugins,

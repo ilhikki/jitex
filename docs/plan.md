@@ -191,12 +191,24 @@ function run(state, mode):
 - readln 输入读取问题（INTERPRETER-BUGS.md #6）
 - eof/eoln 检测失败（INTERPRETER-BUGS.md #7）
 
-### M4 — 非 debugger 模式和优化 ❌
+### M4 — VM + TypePlugin + Pascal82 一致性 + TEX82 ✅
 
-- ❌ 实现 RUN 模式（跳过断点检查，减少帧操作开销）
-- ❌ 实现 STEP_OVER 模式
-- ❌ 直接执行模式（不走 step-by-step）
-- ❌ 性能优化
+- ✅ M4.0：VM + TypePlugin 模型（JsonCode 中间码 + 解释执行）
+- ✅ M4.1：Pascal82 规范一致性（TANGLE 端到端 + 自举验证通过）
+- ✅ M4.2：TEX82 移植与验证（tex.pas 编译通过、初始化通过、TRIP 测试启动）
+- ✅ 性能优化：同步指令跳过 await + TYPE_OP 预绑定（89万→264万步/秒，~2.9x）
+
+> **M4 代码冻结**：`src/` 下所有代码作为基线冻结，M5 不修改，仅作为 fallback 保留。
+> 详见 [M5 高性能执行计划](./plan-m5-high-performance.md)
+
+### M5 — 高性能执行 🚧
+
+- 🚯 **代码冻结**：Lexer / Parser / AST / StaticAnalyzer / VM / TypePlugin 全部冻结
+- 🎯 **目标**：在不改变语义的前提下，实现高性能执行引擎
+- 📌 **当前方案**：编译为 JS（从 AST 直接编译到 JS 代码字符串，`new Function()` 执行）
+- 📌 **不排除其他可能**：如栈式 VM、WASM 等，视评估结果而定
+- 🔄 **测试复用**：将 `tests/m4` 重命名为 `tests/m5`，复用全部测试用例验证新引擎
+- 📄 详见 [M5 高性能执行计划](./plan-m5-high-performance.md)
 
 ## 项目结构
 
