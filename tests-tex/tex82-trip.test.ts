@@ -4,6 +4,9 @@ import { parse } from '../src/index'
 import { StaticAnalyzer } from '../src/static-analyzer'
 import { runVM } from '../src/vm'
 import { stringPlugin } from '../src/types'
+import { createExtendedSysCalls } from '../src/vm/extended-io.plugin'
+
+const extendedSysCalls = createExtendedSysCalls()
 
 describe('TEX82 - TRIP test', () => {
   const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
@@ -28,12 +31,12 @@ describe('TEX82 - TRIP test', () => {
       input: [],
       files,
       programFileUrls: {
-        'WEBFILE': 'WEBFILE',
-        'CHANGEFILE': 'CHANGEFILE',
-        'PASCALFILE': 'PASCALFILE',
-        'POOL': 'POOL',
+        WEBFILE: 'WEBFILE',
+        CHANGEFILE: 'CHANGEFILE',
+        PASCALFILE: 'PASCALFILE',
+        POOL: 'POOL',
       },
-      maxSteps: 2000000000,
+      maxSteps: Number.MAX_VALUE,
     })
     return {
       pas: Buffer.from(files.get('PASCALFILE')!).toString('utf-8'),
@@ -64,7 +67,10 @@ describe('TEX82 - TRIP test', () => {
     // - trip.tfm：TFM 字体文件
     const files = new Map<string, Uint8Array>()
     files.set('TTY:', new Uint8Array(Buffer.from('trip.tex\n', 'utf-8')))
-    files.set('TeXformats:TEX.POOL                     ', new Uint8Array(Buffer.from(texPool, 'utf-8')))
+    files.set(
+      'TeXformats:TEX.POOL                     ',
+      new Uint8Array(Buffer.from(texPool, 'utf-8'))
+    )
     files.set('trip.tex', new Uint8Array(Buffer.from(tripTex, 'utf-8')))
     files.set('trip.log', new Uint8Array())
     files.set('trip.dvi', new Uint8Array())
@@ -74,7 +80,8 @@ describe('TEX82 - TRIP test', () => {
       input: [],
       files,
       plugins: [stringPlugin],
-      maxSteps: 100000000,
+      sysCalls: extendedSysCalls,
+      maxSteps: Number.MAX_VALUE,
     })
 
     console.log('VM status:', state.status)
@@ -98,5 +105,5 @@ describe('TEX82 - TRIP test', () => {
     console.log('trip.dvi size:', dviContent.length, 'bytes')
 
     expect(['terminated', 'error']).toContain(state.status)
-  }, 600000)
+  })
 })
