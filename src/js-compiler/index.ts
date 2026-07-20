@@ -68,12 +68,44 @@ import type { VMState } from '../vm/state'
 
 // 内置系统调用名（大写）。ProcedureCall/FunctionCall 命中此集合 → 走 sysCall
 const BUILTIN_SYSCALLS = new Set([
-  'WRITE', 'WRITELN', 'READ', 'READLN', 'PAGE',
-  'ORD', 'CHR', 'ABS', 'SQR', 'PRED', 'SUCC', 'ODD',
-  'EOF', 'EOLN', 'RESET', 'REWRITE', 'CLOSE', 'GET', 'PUT',
-  'ASSIGN', 'BUFFER_CHAR', 'BREAK', 'BREAKIN', 'ERSTAT', 'WRITE_FILE',
-  'TRUNC', 'ROUND', 'SIN', 'COS', 'EXP', 'LN', 'SQRT', 'ARCTAN',
-  'NEW', 'DISPOSE', 'PACK', 'UNPACK', 'RANDOM',
+  'WRITE',
+  'WRITELN',
+  'READ',
+  'READLN',
+  'PAGE',
+  'ORD',
+  'CHR',
+  'ABS',
+  'SQR',
+  'PRED',
+  'SUCC',
+  'ODD',
+  'EOF',
+  'EOLN',
+  'RESET',
+  'REWRITE',
+  'CLOSE',
+  'GET',
+  'PUT',
+  'ASSIGN',
+  'BUFFER_CHAR',
+  'BREAK',
+  'BREAKIN',
+  'ERSTAT',
+  'WRITE_FILE',
+  'TRUNC',
+  'ROUND',
+  'SIN',
+  'COS',
+  'EXP',
+  'LN',
+  'SQRT',
+  'ARCTAN',
+  'NEW',
+  'DISPOSE',
+  'PACK',
+  'UNPACK',
+  'RANDOM',
 ])
 
 // 明确无参的内置函数（允许省略括号调用）
@@ -83,23 +115,35 @@ const BUILTIN_NO_ARG = new Set(['EOF', 'EOLN', 'RANDOM'])
 // polymorphic 参数：若 argType 提供，PRED/SUCC/ABS/SQR 跟随参数类型
 function builtinReturnType(name: string, argType?: string): string {
   switch (name) {
-    case 'ORD': case 'TRUNC': case 'ROUND': case 'ERSTAT':
+    case 'ORD':
+    case 'TRUNC':
+    case 'ROUND':
+    case 'ERSTAT':
       return 'integer'
-    case 'ABS': case 'SQR':
+    case 'ABS':
+    case 'SQR':
       // ABS/SQR: integer→integer, real→real
       if (argType === 'real') return 'real'
       return 'integer'
-    case 'PRED': case 'SUCC':
+    case 'PRED':
+    case 'SUCC':
       // PRED/SUCC: 返回类型跟随参数类型
       if (argType === 'char') return 'char'
       if (argType === 'boolean') return 'boolean'
       if (argType === 'real') return 'real'
       return 'integer'
-    case 'ODD': case 'EOF': case 'EOLN':
+    case 'ODD':
+    case 'EOF':
+    case 'EOLN':
       return 'boolean'
     case 'CHR':
       return 'char'
-    case 'SIN': case 'COS': case 'EXP': case 'LN': case 'SQRT': case 'ARCTAN':
+    case 'SIN':
+    case 'COS':
+    case 'EXP':
+    case 'LN':
+    case 'SQRT':
+    case 'ARCTAN':
       return 'real'
     case 'RANDOM':
       return 'real'
@@ -124,8 +168,8 @@ function isScalar(typeId: string): boolean {
 
 interface VarInfo {
   jsName: string
-  typeId: string       // 运行时类型（scalarBase 缩并后）
-  origTypeId: string   // 原始类型（用于 subrange 边界检查/默认值）
+  typeId: string // 运行时类型（scalarBase 缩并后）
+  origTypeId: string // 原始类型（用于 subrange 边界检查/默认值）
   isVar: boolean // var 参数（Phase 4 处理引用语义）
 }
 
@@ -136,7 +180,7 @@ interface WithRecordInfo {
 
 class Scope {
   vars = new Map<string, VarInfo>()
-  procs = new Map<string, ProcInfo>()  // 该作用域可见的过程（嵌套过程注册到父 scope）
+  procs = new Map<string, ProcInfo>() // 该作用域可见的过程（嵌套过程注册到父 scope）
   withRecords: WithRecordInfo[] | null = null
   parent: Scope | null
   constructor(parent: Scope | null = null) {
@@ -187,9 +231,9 @@ interface ProcInfo {
   params: { name: string; typeId: string; isVar: boolean }[]
   block: BlockNode | null
   parent: ProcInfo | null // 父过程（嵌套用）
-  children: ProcInfo[]    // 直接嵌套的子过程
-  isForward: boolean      // FORWARD 声明（无 block）
-  forwardDef?: ProcInfo   // FORWARD 实际定义（第二次声明时指向 actual）
+  children: ProcInfo[] // 直接嵌套的子过程
+  isForward: boolean // FORWARD 声明（无 block）
+  forwardDef?: ProcInfo // FORWARD 实际定义（第二次声明时指向 actual）
 }
 
 // ============================================================================
@@ -209,10 +253,10 @@ class Compiler {
   constInts = new Map<string, number>()
   // goto 状态机支持：当前过程体的 label -> case 编号映射（null 表示无 goto 上下文）
   labelCases: Map<string, number> | null = null
-  labelSwitchName: string | null = null  // goto break 用的 JS label 名
+  labelSwitchName: string | null = null // goto break 用的 JS label 名
   // goto 优化模式：'continue' = 策略 B（后向循环），'break' = 策略 C（跳出循环），null = 正常
-  gotoMode: 'continue' | 'break' | null = null
-  gotoLabel: string | null = null  // 策略 B/C 的 JS label 名
+  gotoMode: 'continue' | 'break' | 'exception' | null = null
+  gotoLabel: string | null = null // 策略 B/C 的 JS label 名
   // 非标扩展配置
   allowUndeclaredLabels: boolean
   // WITH 临时变量计数器（避免嵌套 WITH 变量名冲突）
@@ -253,7 +297,9 @@ class Compiler {
       for (const [varName, url] of Object.entries(programFileUrls)) {
         // F 已在 globalDecls 中初始化为 PascalValue（file 句柄）
         // ASSIGN(F, 'url') → ctx.sysCall("ASSIGN", [F, ctx.box('string', url)])
-        assignLines.push(`  await ctx.sysCall("ASSIGN", [${varName}, ctx.box('string', ${JSON.stringify(url)})])`)
+        assignLines.push(
+          `  await ctx.sysCall("ASSIGN", [${varName}, ctx.box('string', ${JSON.stringify(url)})])`
+        )
       }
     }
 
@@ -317,11 +363,16 @@ class Compiler {
         const l = this.evalConstInt(b.left)
         const r = this.evalConstInt(b.right)
         switch (b.operator.toUpperCase()) {
-          case '+': return l + r
-          case '-': return l - r
-          case '*': return l * r
-          case 'DIV': return Math.trunc(l / r)
-          case 'MOD': return l - Math.trunc(l / r) * r
+          case '+':
+            return l + r
+          case '-':
+            return l - r
+          case '*':
+            return l * r
+          case 'DIV':
+            return Math.trunc(l / r)
+          case 'MOD':
+            return l - Math.trunc(l / r) * r
         }
       }
       case 'ParenthesizedExpression':
@@ -336,12 +387,18 @@ class Compiler {
       case 'SimpleType': {
         const n = (node as SimpleTypeNode).name.name.toUpperCase()
         switch (n) {
-          case 'INTEGER': return 'integer'
-          case 'REAL': return 'real'
-          case 'BOOLEAN': return 'boolean'
-          case 'CHAR': return 'char'
-          case 'STRING': return 'string'
-          case 'TEXT': return 'text'
+          case 'INTEGER':
+            return 'integer'
+          case 'REAL':
+            return 'real'
+          case 'BOOLEAN':
+            return 'boolean'
+          case 'CHAR':
+            return 'char'
+          case 'STRING':
+            return 'string'
+          case 'TEXT':
+            return 'text'
           default: {
             const tid = this.aliasMap.get(n)
             if (tid) return tid
@@ -371,7 +428,7 @@ class Compiler {
       case 'ArrayType': {
         const a = node as ArrayTypeNode
         const elemTypeId = this.resolveTypeId(a.elementType)
-        const dims = a.indexTypes.map(idx => {
+        const dims = a.indexTypes.map((idx) => {
           if (idx.kind === 'RangeType') {
             const r = idx as RangeTypeNode
             const low = this.evalConstInt(r.start)
@@ -400,7 +457,7 @@ class Compiler {
       }
       case 'EnumerationType': {
         const e = node as EnumerationTypeNode
-        const vals = e.values.map(v => v.name.toUpperCase())
+        const vals = e.values.map((v) => v.name.toUpperCase())
         // 注册 enum 常量
         vals.forEach((v, i) => this.enumConstants.set(v, i))
         return `enum-${vals.join(',')}`
@@ -408,23 +465,31 @@ class Compiler {
       case 'SetType': {
         const s = node as SetTypeNode
         const baseTypeId = this.resolveTypeId(s.baseType)
-        let minOrd = 0, maxOrd = 255
+        let minOrd = 0,
+          maxOrd = 255
         const baseDef = this.typeTable.get(baseTypeId) as any
         if (baseDef?.kind === 'subrange') {
-          minOrd = baseDef.min; maxOrd = baseDef.max
+          minOrd = baseDef.min
+          maxOrd = baseDef.max
         } else if (baseDef?.kind === 'char') {
-          minOrd = 0; maxOrd = 255
+          minOrd = 0
+          maxOrd = 255
         } else if (baseDef?.kind === 'boolean') {
-          minOrd = 0; maxOrd = 1
+          minOrd = 0
+          maxOrd = 1
         } else if (baseDef?.kind === 'enum') {
-          minOrd = 0; maxOrd = baseDef.values.length - 1
+          minOrd = 0
+          maxOrd = baseDef.values.length - 1
         }
         return `set-of-${baseTypeId}-${minOrd}-${maxOrd}`
       }
       case 'FileType': {
         const f = node as FileTypeNode
-        if (f.elementType && f.elementType.kind === 'SimpleType'
-          && (f.elementType as SimpleTypeNode).name.name.toUpperCase() === 'CHAR') {
+        if (
+          f.elementType &&
+          f.elementType.kind === 'SimpleType' &&
+          (f.elementType as SimpleTypeNode).name.name.toUpperCase() === 'CHAR'
+        ) {
           return 'text'
         }
         const elemTypeId = f.elementType ? this.resolveTypeId(f.elementType) : 'integer'
@@ -437,8 +502,14 @@ class Compiler {
 
   // 类型种类判断
   private typeKind(typeId: string): string {
-    if (typeId === 'integer' || typeId === 'real' || typeId === 'boolean'
-      || typeId === 'char' || typeId === 'string' || typeId === 'text') {
+    if (
+      typeId === 'integer' ||
+      typeId === 'real' ||
+      typeId === 'boolean' ||
+      typeId === 'char' ||
+      typeId === 'string' ||
+      typeId === 'text'
+    ) {
       return typeId
     }
     if (typeId === 'set' || typeId.startsWith('set-of-')) return 'set'
@@ -583,14 +654,13 @@ class Compiler {
     procs: ProcedureDeclarationNode[],
     funcs: FunctionDeclarationNode[],
     parent: ProcInfo | null,
-    parentJsName: string,
+    parentJsName: string
   ) {
-    const makeJsName = (base: string) => parentJsName
-      ? `${parentJsName}__${base.toLowerCase()}`
-      : `p_${base.toLowerCase()}`
+    const makeJsName = (base: string) =>
+      parentJsName ? `${parentJsName}__${base.toLowerCase()}` : `p_${base.toLowerCase()}`
     // 在父作用域（parent.children 或 this.procs）中查找同名 forward
     const findForward = (name: string): ProcInfo | undefined => {
-      if (parent) return parent.children.find(c => c.name === name && c.isForward)
+      if (parent) return parent.children.find((c) => c.name === name && c.isForward)
       return this.procs.get(name)
     }
     // 递归收集嵌套
@@ -599,7 +669,7 @@ class Compiler {
         block.procedureDeclarations,
         block.functionDeclarations,
         info,
-        info.jsName,
+        info.jsName
       )
     }
     for (const p of procs) {
@@ -657,7 +727,9 @@ class Compiler {
     }
   }
 
-  private collectParams(params: ParameterDeclarationNode[]): { name: string; typeId: string; isVar: boolean }[] {
+  private collectParams(
+    params: ParameterDeclarationNode[]
+  ): { name: string; typeId: string; isVar: boolean }[] {
     const result: { name: string; typeId: string; isVar: boolean }[] = []
     for (const p of params) {
       const t = this.resolveTypeId(p.type)
@@ -676,7 +748,9 @@ class Compiler {
     // 常量
     for (const c of block.constDeclarations) {
       const { code, type } = this.emitExpr(c.value, this.globalScope)
-      lines.push(`const ${c.name.name} = ${this.coerce(code, type, this.inferType(c.value, this.globalScope))}`)
+      lines.push(
+        `const ${c.name.name} = ${this.coerce(code, type, this.inferType(c.value, this.globalScope))}`
+      )
     }
     // 全局变量
     for (const decl of block.variableDeclarations) {
@@ -702,11 +776,16 @@ class Compiler {
       }
     }
     switch (st) {
-      case 'integer': return '0'
-      case 'real': return '0.0'
-      case 'boolean': return 'false'
-      case 'char': return "ctx.box('char', '\\u0000')"
-      case 'string': return "ctx.box('string', '')"
+      case 'integer':
+        return '0'
+      case 'real':
+        return '0.0'
+      case 'boolean':
+        return 'false'
+      case 'char':
+        return "ctx.box('char', '\\u0000')"
+      case 'string':
+        return "ctx.box('string', '')"
     }
     // array/record/set/file/text：调用 ctx.defaultOf(原始 typeId)
     return `ctx.defaultOf(${JSON.stringify(t)})`
@@ -738,7 +817,10 @@ class Compiler {
     if (actual.isFunction) {
       hasRet = true
       scope.vars.set(actual.name, {
-        jsName: '__ret', typeId: actual.returnType, origTypeId: actual.returnType, isVar: false,
+        jsName: '__ret',
+        typeId: actual.returnType,
+        origTypeId: actual.returnType,
+        isVar: false,
       })
       localDecls.push(`let __ret = ${this.defaultInit(actual.returnType, actual.returnType)}`)
     }
@@ -779,9 +861,9 @@ class Compiler {
     }
     // 嵌套过程的 JS 函数定义（放在父过程函数体内，闭包捕获父局部变量）
     const nestedDefs = actual.children
-      .filter(c => !c.isForward || c.forwardDef)
-      .map(c => this.emitProc(c, scope))
-      .filter(s => s.length > 0)
+      .filter((c) => !c.isForward || c.forwardDef)
+      .map((c) => this.emitProc(c, scope))
+      .filter((s) => s.length > 0)
     // 函数体
     const body = this.emitBody(block, scope, 2)
     // 恢复 aliasMap / constInts
@@ -797,7 +879,8 @@ class Compiler {
     const lines: string[] = []
     lines.push(`async function ${actual.jsName}(${params}) {`)
     if (localDecls.length) lines.push('  ' + localDecls.join('\n  '))
-    if (nestedDefs.length) lines.push(nestedDefs.map(d => '  ' + d.replace(/\n/g, '\n  ')).join('\n\n'))
+    if (nestedDefs.length)
+      lines.push(nestedDefs.map((d) => '  ' + d.replace(/\n/g, '\n  ')).join('\n\n'))
     lines.push(body)
     if (hasRet) lines.push('  return __ret')
     lines.push('}')
@@ -821,26 +904,35 @@ class Compiler {
   // 策略 B：单 label 后向循环 → while(true) + labeled continue
   // 策略 C：单 label 前向跨循环 → labeled block + labeled break
   // 策略 D：状态机（兜底）
-  private selectStrategy(analysis: LabelAnalysis): 'B' | 'C' | 'D' {
+  // 策略 E：lambda 复用（label 在嵌套 while 内）
+  private selectStrategy(analysis: LabelAnalysis): 'B' | 'C' | 'D' | 'E' {
     if (analysis.labels.size !== 1) return 'D'
-    
+
     const labelEntry = [...analysis.labels.entries()][0]
     const labelInfo = labelEntry[1]
-    
+
+    if (!labelInfo.isTopLevel) {
+      return 'D'
+    }
+
     const hasBackward = labelInfo.hasGotoBefore
     const hasForward = labelInfo.hasGotoAfter
-    
+
     if (hasBackward && !hasForward) {
       return 'B'
     }
-    
+
     if (hasForward && !hasBackward) {
       if (!labelInfo.inLoop) {
         return 'C'
       }
+      // 检测是否在嵌套的 while 内
+      if (labelInfo.inLoop && analysis.gotos.some((g) => g.crossesLoop && g.loopDepth > 1)) {
+        return 'E'
+      }
       return 'D'
     }
-    
+
     return 'D'
   }
 
@@ -850,7 +942,7 @@ class Compiler {
     let allLabels = declaredLabels
     if (this.allowUndeclaredLabels) {
       const inferred = this.collectLabelsFromCompound(block.compound)
-      const declaredSet = new Set(declaredLabels.map(l => l.value))
+      const declaredSet = new Set(declaredLabels.map((l) => l.value))
       for (const l of inferred) {
         if (!declaredSet.has(l.value)) {
           allLabels = [...allLabels, l]
@@ -864,15 +956,26 @@ class Compiler {
     const analysis = analyzeLabels(block.compound, allLabels)
     const strategy = this.selectStrategy(analysis)
     switch (strategy) {
-      case 'B': return this.emitStrategyB(block.compound, scope, indent, allLabels, analysis)
-      case 'C': return this.emitStrategyC(block.compound, scope, indent, allLabels, analysis)
-      case 'D': return this.emitStrategyD(block.compound, scope, indent, allLabels, analysis)
+      case 'B':
+        return this.emitStrategyB(block.compound, scope, indent, allLabels, analysis)
+      case 'C':
+        return this.emitStrategyC(block.compound, scope, indent, allLabels, analysis)
+      case 'D':
+        return this.emitStrategyD(block.compound, scope, indent, allLabels, analysis)
+      case 'E':
+        return this.emitStrategyE(block.compound, scope, indent, allLabels, analysis)
     }
   }
 
   // 策略 B：单 label 后向跳转循环
   // 用 while(true) + labeled continue 实现，支持任意嵌套深度的 goto
-  private emitStrategyB(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[], analysis: LabelAnalysis): string {
+  private emitStrategyB(
+    compound: CompoundStatementNode,
+    scope: Scope,
+    indent: number,
+    labels: IntegerLiteralNode[],
+    analysis: LabelAnalysis
+  ): string {
     const pad = ' '.repeat(indent)
     const labelName = [...analysis.labels.keys()][0]
     const labelInfo = analysis.labels.get(labelName)!
@@ -882,8 +985,11 @@ class Compiler {
     let foundLabel = false
 
     for (const s of compound.statements) {
-      if (!foundLabel && s.kind === 'LabeledStatement' &&
-          String(((s as LabeledStatementNode).label as any).value) === labelName) {
+      if (
+        !foundLabel &&
+        s.kind === 'LabeledStatement' &&
+        String(((s as LabeledStatementNode).label as any).value) === labelName
+      ) {
         foundLabel = true
         fromLabel.push((s as LabeledStatementNode).statement)
       } else if (foundLabel) {
@@ -898,27 +1004,40 @@ class Compiler {
     this.gotoMode = 'continue'
     this.gotoLabel = '__goto_loop'
 
-    const bodyLines = fromLabel.map(s => this.emitStmt(s, scope, indent + 2)).filter(x => x.length > 0)
+    const bodyLines = fromLabel
+      .map((s) => this.emitStmt(s, scope, indent + 2))
+      .filter((x) => x.length > 0)
 
     this.gotoMode = savedGotoMode
     this.gotoLabel = savedGotoLabel
 
     const lines: string[] = []
     lines.push(`${pad}__goto_loop: while (true) {`)
-    lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+    lines.push(
+      `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
+    )
     for (const line of bodyLines) {
       lines.push(line)
     }
     lines.push(`${pad}  break`)
     lines.push(`${pad}}`)
 
-    const beforeCode = beforeLabel.map(s => this.emitStmt(s, scope, indent)).filter(x => x.length > 0).join('\n')
+    const beforeCode = beforeLabel
+      .map((s) => this.emitStmt(s, scope, indent))
+      .filter((x) => x.length > 0)
+      .join('\n')
     return beforeCode + (beforeCode ? '\n' : '') + lines.join('\n')
   }
 
   // 策略 C：单 label 前向跨循环跳转（跳出循环）
   // 用 labeled block + labeled break 实现，支持任意嵌套深度
-  private emitStrategyC(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[], analysis: LabelAnalysis): string {
+  private emitStrategyC(
+    compound: CompoundStatementNode,
+    scope: Scope,
+    indent: number,
+    labels: IntegerLiteralNode[],
+    analysis: LabelAnalysis
+  ): string {
     const pad = ' '.repeat(indent)
     const labelName = [...analysis.labels.keys()][0]
     const labelInfo = analysis.labels.get(labelName)!
@@ -929,8 +1048,11 @@ class Compiler {
     const afterLabel: StatementNode[] = []
 
     for (const s of compound.statements) {
-      if (!foundLabel && s.kind === 'LabeledStatement' &&
-          String(((s as LabeledStatementNode).label as any).value) === labelName) {
+      if (
+        !foundLabel &&
+        s.kind === 'LabeledStatement' &&
+        String(((s as LabeledStatementNode).label as any).value) === labelName
+      ) {
         foundLabel = true
         labelStmt = (s as LabeledStatementNode).statement
       } else if (foundLabel) {
@@ -945,7 +1067,9 @@ class Compiler {
     this.gotoMode = 'break'
     this.gotoLabel = '__goto_block'
 
-    const beforeLabelCode = beforeLabel.map(s => this.emitStmt(s, scope, indent + 2)).filter(x => x.length > 0)
+    const beforeLabelCode = beforeLabel
+      .map((s) => this.emitStmt(s, scope, indent + 2))
+      .filter((x) => x.length > 0)
 
     this.gotoMode = savedGotoMode
     this.gotoLabel = savedGotoLabel
@@ -967,60 +1091,174 @@ class Compiler {
     return lines.join('\n')
   }
 
-  // 策略 D：完整状态机（复杂场景）
-  // 修正版：确保 labeled break 能跳出所有嵌套结构
-  private emitStrategyD(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[], analysis: LabelAnalysis): string {
+  // 策略 D：完整状态机（兜底方案）
+  // 哲学：不要触发兜底。简单、正确、暴力。
+  // 实现：while + switch，每个 label 都有独立的 case
+  //  - case 0：从函数开始执行
+  //  - case N (label N-1)：从该 label 所在语句开始执行到函数末尾
+  // 任何 goto 抛出 __goto 异常，被 catch 捕获后切换 __pc
+  //
+  // 嵌套 label 的处理：
+  //  - 在 case N 入口，__skipTo = lblName
+  //  - 循环结构（while/repeat/for）每轮检查：若 __skipTo 已被"吸收"（变为 null），则正常执行
+  //  - LabeledStatement 遇到匹配的 __skipTo 时清除标记（表示已到达）return lines.join('\n')
+
+  // 策略 E：lambda 复用（label 在嵌套 while 内）
+  // 将包含 label 的 while 块包装成 lambda 函数，确保正确跳出
+  private emitStrategyE(
+    compound: CompoundStatementNode,
+    scope: Scope,
+    indent: number,
+    labels: IntegerLiteralNode[],
+    analysis: LabelAnalysis
+  ): string {
+    const pad = ' '.repeat(indent)
+    const labelName = [...analysis.labels.keys()][0]
+    const labelInfo = analysis.labels.get(labelName)!
+
+    // 找到包含 label 的 while 块
+    let whileBlock: CompoundStatementNode | null = null
+    let whileStartIndex = -1
+
+    // 查找包含 label 的 while 语句
+    for (let i = 0; i < compound.statements.length; i++) {
+      const stmt = compound.statements[i]
+      if (stmt.kind === 'WhileStatement') {
+        const whileStmt = stmt as any
+        // 检查 while 块内是否有 label
+        for (let j = 0; j < whileStmt.body.statements.length; j++) {
+          const innerStmt = whileStmt.body.statements[j]
+          if (
+            innerStmt.kind === 'LabeledStatement' &&
+            String((innerStmt as LabeledStatementNode).label as any) === labelName
+          ) {
+            whileBlock = whileStmt.body
+            whileStartIndex = i
+            break
+          }
+        }
+      }
+      if (whileBlock) break
+    }
+
+    if (!whileBlock) {
+      // 如果找不到 while 块，回退到策略 D
+      return this.emitStrategyD(compound, scope, indent, labels, analysis)
+    }
+
+    const lines: string[] = []
+
+    // 生成 while 块的 lambda 函数
+    const whileLambdaName = `__while_with_label_${labelName}`
+    const whileLambda = `function ${whileLambdaName}(ctx) {\n`
+
+    // 生成 while 块的代码
+    const whileLines: string[] = []
+    for (const stmt of whileBlock.statements) {
+      const code = this.emitStmt(stmt, scope, 2)
+      if (code) whileLines.push(code)
+    }
+
+    // 包装 while 块
+    whileLines.unshift('  let __skipTo = null')
+    whileLines.unshift('  __goto_switch: while (true) {')
+    whileLines.push('  }')
+
+    // 生成完整的 lambda 函数
+    lines.push(whileLambda)
+    lines.push(whileLines.join('\n'))
+    lines.push('}')
+
+    // 生成主程序的代码
+    const mainLines: string[] = []
+
+    // 生成 while 块之前的代码
+    for (let i = 0; i < whileStartIndex; i++) {
+      const code = this.emitStmt(compound.statements[i], scope, indent)
+      if (code) mainLines.push(code)
+    }
+
+    // 生成调用 lambda 函数的代码
+    mainLines.push(`${pad}${whileLambdaName}(ctx)`)
+
+    // 生成 while 块之后的代码
+    for (let i = whileStartIndex + 1; i < compound.statements.length; i++) {
+      const code = this.emitStmt(compound.statements[i], scope, indent)
+      if (code) mainLines.push(code)
+    }
+
+    lines.push(mainLines.join('\n'))
+    return lines.join('\n\n')
+  }
+
+  private emitStrategyD(
+    compound: CompoundStatementNode,
+    scope: Scope,
+    indent: number,
+    labels: IntegerLiteralNode[],
+    analysis: LabelAnalysis
+  ): string {
     const pad = ' '.repeat(indent)
     const labelCases = new Map<string, number>()
     labels.forEach((l, i) => labelCases.set(String((l as any).value), i + 1))
 
-    const segments: { caseNum: number; stmts: StatementNode[] }[] = []
-    let curCase = 0
-    let curStmts: StatementNode[] = []
-    for (const s of compound.statements) {
-      if (s.kind === 'LabeledStatement') {
-        segments.push({ caseNum: curCase, stmts: curStmts })
-        const lblName = String(((s as LabeledStatementNode).label as any).value)
-        curCase = labelCases.get(lblName) || 0
-        curStmts = [(s as LabeledStatementNode).statement]
-      } else {
-        curStmts.push(s)
-      }
-    }
-    segments.push({ caseNum: curCase, stmts: curStmts })
-
     const lines: string[] = []
     lines.push(`${pad}let __pc = 0`)
-    lines.push(`${pad}while (true) {`)
-    lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
-    lines.push(`${pad}  if (__pc === -1) break`)
+    lines.push(`${pad}let __skipTo = null`)
+    lines.push(`${pad}__goto_switch: while (true) {`)
+    lines.push(
+      `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
+    )
+    lines.push(`${pad}  if (__pc === -1) break __goto_switch`)
+    lines.push(`${pad}  __skipTo = null`)
     lines.push(`${pad}  try {`)
-    lines.push(`${pad}    __goto_switch: switch (__pc) {`)
+    lines.push(`${pad}    switch (__pc) {`)
 
     const savedLabelCases = this.labelCases
     const savedSwitchName = this.labelSwitchName
+    const savedGotoMode = this.gotoMode
+    const savedGotoLabel = this.gotoLabel
     this.labelCases = labelCases
     this.labelSwitchName = '__goto_switch'
+    this.gotoMode = 'exception'
 
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i]
-      lines.push(`${pad}    case ${seg.caseNum}:`)
-      for (const s of seg.stmts) {
-        const code = this.emitStmt(s, scope, indent + 6)
+    // 工具函数：从某个 startIndex 开始生成代码
+    // 遇到 LabeledStatement（除最后一个）时停止，因为该 label 会从自己的 case 入口开始
+    // 但这里我们用另一种方式：重新执行整个 compound，用 __skipTo 跳到目标
+    const emitFull = () => {
+      for (const s of compound.statements) {
+        const code = this.emitStmt(s, scope, indent + 8)
         if (code) lines.push(code)
       }
-      const nextCase = i + 1 < segments.length ? segments[i + 1].caseNum : -1
-      lines.push(`${pad}      __pc = ${nextCase}`)
-      lines.push(`${pad}      break __goto_switch`)
     }
-    lines.push(`${pad}    default:`)
-    lines.push(`${pad}      __pc = -1`)
-    lines.push(`${pad}      break __goto_switch`)
+
+    // case 0: 从函数开始执行
+    lines.push(`${pad}      case 0:`)
+    emitFull()
+    lines.push(`${pad}        __pc = -1; break __goto_switch`)
+
+    // case N: 设置 __skipTo 后重新执行
+    for (const [lblName, caseNum] of labelCases) {
+      lines.push(`${pad}      case ${caseNum}:`)
+      lines.push(`${pad}        __skipTo = ${JSON.stringify(lblName)}`)
+      emitFull()
+      lines.push(`${pad}        __pc = -1; break __goto_switch`)
+    }
+
+    lines.push(`${pad}      default:`)
+    lines.push(`${pad}        __pc = -1; break __goto_switch`)
     lines.push(`${pad}    }`)
     lines.push(`${pad}  } catch (__goto_ex) {`)
     lines.push(`${pad}    if (__goto_ex && __goto_ex.__goto !== undefined) {`)
     lines.push(`${pad}      const __target = __goto_ex.__goto`)
-    lines.push(`${pad}      const __caseNum = ${JSON.stringify([...labelCases.entries()].reduce((o, [k, v]) => { (o as any)[k] = v; return o }, {}))}[__target]`)
+    lines.push(
+      `${pad}      const __caseNum = ${JSON.stringify(
+        [...labelCases.entries()].reduce((o, [k, v]) => {
+          ;(o as any)[k] = v
+          return o
+        }, {})
+      )}[__target]`
+    )
     lines.push(`${pad}      if (__caseNum !== undefined) {`)
     lines.push(`${pad}        __pc = __caseNum; continue`)
     lines.push(`${pad}      }`)
@@ -1032,12 +1270,16 @@ class Compiler {
 
     this.labelCases = savedLabelCases
     this.labelSwitchName = savedSwitchName
+    this.gotoMode = savedGotoMode
+    this.gotoLabel = savedGotoLabel
     return lines.join('\n')
   }
 
   private emitCompound(node: CompoundStatementNode, scope: Scope, indent: number): string {
     const pad = ' '.repeat(indent)
-    const lines = node.statements.map(s => this.emitStmt(s, scope, indent)).filter(x => x.length > 0)
+    const lines = node.statements
+      .map((s) => this.emitStmt(s, scope, indent))
+      .filter((x) => x.length > 0)
     return lines.join('\n')
   }
 
@@ -1072,9 +1314,15 @@ class Compiler {
         const w = node as WhileStatementNode
         const cond = this.emitExpr(w.condition, scope)
         const body = this.emitStmt(w.body, scope, indent + 2)
+        // 在状态机模式下，如果 __skipTo 还没被吸收，跳过 body 继续循环
+        const skipCheck =
+          this.gotoMode === 'exception'
+            ? `${pad}  if (__skipTo !== null) { if (${this.toBool(cond.code, cond.type)}) continue; else break; }\n`
+            : ''
         return [
           `${pad}while (${this.toBool(cond.code, cond.type)}) {`,
           `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
+          skipCheck,
           body,
           `${pad}}`,
         ].join('\n')
@@ -1082,12 +1330,19 @@ class Compiler {
 
       case 'RepeatStatement': {
         const r = node as RepeatStatementNode
-        const bodyStmts = r.statements.map(s => this.emitStmt(s, scope, indent + 2)).filter(x => x.length > 0)
+        const bodyStmts = r.statements
+          .map((s) => this.emitStmt(s, scope, indent + 2))
+          .filter((x) => x.length > 0)
         const cond = this.emitExpr(r.untilCondition, scope)
+        const skipCheck =
+          this.gotoMode === 'exception'
+            ? `${pad}  if (__skipTo !== null) { if (!(${this.toBool(cond.code, cond.type)})) continue; }\n`
+            : ''
         return [
           `${pad}do {`,
           `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
           ...bodyStmts,
+          skipCheck,
           `${pad}} while (!(${this.toBool(cond.code, cond.type)}));`,
         ].join('\n')
       }
@@ -1100,16 +1355,26 @@ class Compiler {
         const final = this.emitExpr(f.final, scope)
         const body = this.emitStmt(f.body, scope, indent + 2)
         if (f.direction === 'TO') {
+          const skipCheck =
+            this.gotoMode === 'exception'
+              ? `${pad}  if (__skipTo !== null) { if (${vName} <= ${this.toInt(final.code, final.type)}) continue; else break; }\n`
+              : ''
           return [
             `${pad}for (${vName} = ${this.toInt(init.code, init.type)}; ${vName} <= ${this.toInt(final.code, final.type)}; ${vName} = (${vName} + 1) | 0) {`,
             `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
+            skipCheck,
             body,
             `${pad}}`,
           ].join('\n')
         } else {
+          const skipCheck =
+            this.gotoMode === 'exception'
+              ? `${pad}  if (__skipTo !== null) { if (${vName} >= ${this.toInt(final.code, final.type)}) continue; else break; }\n`
+              : ''
           return [
             `${pad}for (${vName} = ${this.toInt(init.code, init.type)}; ${vName} >= ${this.toInt(final.code, final.type)}; ${vName} = (${vName} - 1) | 0) {`,
             `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
+            skipCheck,
             body,
             `${pad}}`,
           ].join('\n')
@@ -1130,24 +1395,29 @@ class Compiler {
         if (this.gotoMode === 'break') {
           return `${pad}break ${this.gotoLabel}`
         }
+        if (this.gotoMode === 'exception') {
+          return `${pad}throw Object.assign(new Error('goto'), { __goto: ${JSON.stringify(lblName)} })`
+        }
         if (this.labelCases) {
           const caseNum = this.labelCases.get(lblName)
           if (caseNum === undefined) {
             throw new Error(`JS VM: goto ${lblName} - label not found`)
           }
-          // labeled break 跳出外层 switch（避免被内层 while/for 拦截）
           const breakLabel = this.labelSwitchName ? ` ${this.labelSwitchName}` : ''
           return `${pad}__pc = ${caseNum}; break${breakLabel}`
         }
-        // 跨过程 goto：标准 Pascal 不允许，直接报错
         return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in current scope')`
       }
 
       case 'LabeledStatement': {
-        // 在 emitLabeledBody 中由切分逻辑处理；直接 emit 内部 stmt
-        // （fallback：未在状态机上下文中遇到 labeled statement，可能是嵌套块内）
         const ls = node as LabeledStatementNode
-        return this.emitStmt(ls.statement, scope, indent)
+        const lblName = String((ls.label as any).value)
+        const innerCode = this.emitStmt(ls.statement, scope, indent)
+        if (this.gotoMode === 'exception' && this.labelCases?.has(lblName)) {
+          // 状态机模式：遇到匹配的 __skipTo 时清除标记
+          return `${pad}if (__skipTo === ${JSON.stringify(lblName)}) { __skipTo = null; }\n${innerCode}`
+        }
+        return innerCode
       }
 
       case 'CaseStatement': {
@@ -1317,7 +1587,10 @@ class Compiler {
   }
 
   // 查找 WITH 字段
-  private findWithField(name: string, scope: Scope): { recordJsName: string; fieldTypeId: string } | null {
+  private findWithField(
+    name: string,
+    scope: Scope
+  ): { recordJsName: string; fieldTypeId: string } | null {
     const upper = name.toUpperCase()
     for (const wr of scope.allWithRecords()) {
       const fieldTypeId = this.recordFieldType(wr.typeId, upper)
@@ -1334,7 +1607,7 @@ class Compiler {
       // WRITELN/WRITE: 对 real 参数预先用 ctx.formatReal 格式化为 string，
       // 绕过 io.plugin.formatReal 的指数补零 bug（src/vm 冻结，不能改）
       if (name === 'WRITE' || name === 'WRITELN') {
-        const args = pc.arguments.map(a => {
+        const args = pc.arguments.map((a) => {
           // 处理格式化参数 value:width 或 value:width:precision
           // parser 把 : 包装成 BinaryExpression { op: ':' }
           if (a.kind === 'BinaryExpression' && (a as any).operator === ':') {
@@ -1374,7 +1647,7 @@ class Compiler {
       if (name === 'READ' || name === 'READLN') {
         return this.emitRead(pc, scope, name === 'READLN')
       }
-      const args = pc.arguments.map(a => this.emitArg(a, scope))
+      const args = pc.arguments.map((a) => this.emitArg(a, scope))
       return `await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}])`
     }
     // 用户过程（按作用域查找：嵌套过程 → 外层 → 全局）
@@ -1448,7 +1721,9 @@ class Compiler {
           const st = vi.typeId
           if (st === 'char') {
             // char: 读当前字符（不跳过空白），然后 get 推进
-            lines.push(`  ${vi.jsName}.raw = String.fromCharCode(await ctx.io.file.bufferChar(__f))`)
+            lines.push(
+              `  ${vi.jsName}.raw = String.fromCharCode(await ctx.io.file.bufferChar(__f))`
+            )
             lines.push(`  await ctx.io.file.get(__f)`)
           } else {
             // integer/real/string: 跳过空白，读 token
@@ -1459,7 +1734,9 @@ class Compiler {
             lines.push('      __ch = await ctx.io.file.bufferChar(__f)')
             lines.push('    }')
             lines.push('    let __s = ""')
-            lines.push('    while (__ch !== 32 && __ch !== 10 && __ch !== 13 && __ch !== 9 && __ch !== 0) {')
+            lines.push(
+              '    while (__ch !== 32 && __ch !== 10 && __ch !== 13 && __ch !== 9 && __ch !== 0) {'
+            )
             lines.push('      __s += String.fromCharCode(__ch)')
             lines.push('      await ctx.io.file.get(__f)')
             lines.push('      __ch = await ctx.io.file.bufferChar(__f)')
@@ -1497,7 +1774,9 @@ class Compiler {
       } else if (st === 'real') {
         lines.push(`  ${vi.jsName} = (__i < __toks.length) ? parseFloat(__toks[__i++]) : 0`)
       } else if (st === 'char') {
-        lines.push(`  ${vi.jsName}.raw = (__i < __toks.length) ? __toks[__i++].charAt(0) : '\\u0000'`)
+        lines.push(
+          `  ${vi.jsName}.raw = (__i < __toks.length) ? __toks[__i++].charAt(0) : '\\u0000'`
+        )
       } else if (st === 'string') {
         lines.push(`  ${vi.jsName}.raw = (__i < __toks.length) ? __toks[__i++] : ''`)
       }
@@ -1544,7 +1823,10 @@ class Compiler {
             return { code: rawCode, type: st }
           }
           // char/string/array/record：包装为 PascalValue
-          return { code: `ctx.box(${JSON.stringify(withField.fieldTypeId)}, ${rawCode})`, type: withField.fieldTypeId }
+          return {
+            code: `ctx.box(${JSON.stringify(withField.fieldTypeId)}, ${rawCode})`,
+            type: withField.fieldTypeId,
+          }
         }
         // 3. 普通变量
         const vi = scope.lookup(name)
@@ -1560,7 +1842,10 @@ class Compiler {
           if (BUILTIN_NO_ARG.has(upperName)) {
             const retType = builtinReturnType(upperName)
             if (isScalar(retType) && retType !== 'char' && retType !== 'string') {
-              return { code: `((await ctx.sysCall(${JSON.stringify(upperName)}, [])).raw)`, type: retType }
+              return {
+                code: `((await ctx.sysCall(${JSON.stringify(upperName)}, [])).raw)`,
+                type: retType,
+              }
             }
             return { code: `(await ctx.sysCall(${JSON.stringify(upperName)}, []))`, type: retType }
           }
@@ -1649,14 +1934,19 @@ class Compiler {
   }
 
   // 集合构造：[1, 2, 3] 或 [1..5]
-  private emitSetConstructor(node: SetConstructorNode, scope: Scope): { code: string; type: string } {
+  private emitSetConstructor(
+    node: SetConstructorNode,
+    scope: Scope
+  ): { code: string; type: string } {
     const elems: string[] = []
     for (const [start, end] of node.elements) {
       const s = this.emitExpr(start, scope)
       if (end) {
         const e = this.emitExpr(end, scope)
         // range: 从 s 到 e 的所有值
-        elems.push(`...Array.from({length: (${e.code}) - (${s.code}) + 1}, (_, i) => i + (${s.code}))`)
+        elems.push(
+          `...Array.from({length: (${e.code}) - (${s.code}) + 1}, (_, i) => i + (${s.code}))`
+        )
       } else {
         elems.push(this.toInt(s.code, s.type))
       }
@@ -1680,7 +1970,9 @@ class Compiler {
     const isStrChar = (t: string) => t === 'string' || t === 'char'
 
     switch (op) {
-      case '+': case '-': case '*': {
+      case '+':
+      case '-':
+      case '*': {
         if (this.typeKind(resultType) === 'set') {
           if (op === '+') {
             return {
@@ -1715,10 +2007,21 @@ class Compiler {
       case '/': // Pascal 实数除
         return { code: `((${L.code}) / (${R.code}))`, type: 'real' }
       case 'DIV':
-        return { code: `(() => { const __d = ${R.code}; if (__d === 0) throw new Error('JS VM: division by zero'); return (Math.trunc((${L.code}) / __d)) | 0 })()`, type: 'integer' }
+        return {
+          code: `(() => { const __d = ${R.code}; if (__d === 0) throw new Error('JS VM: division by zero'); return (Math.trunc((${L.code}) / __d)) | 0 })()`,
+          type: 'integer',
+        }
       case 'MOD':
-        return { code: `(() => { const __m = ${R.code}; if (__m === 0) throw new Error('JS VM: division by zero'); const __l = ${L.code}; return (__l - Math.trunc(__l / __m) * __m) | 0 })()`, type: 'integer' }
-      case '=': case '<>': case '<': case '<=': case '>': case '>=': {
+        return {
+          code: `(() => { const __m = ${R.code}; if (__m === 0) throw new Error('JS VM: division by zero'); const __l = ${L.code}; return (__l - Math.trunc(__l / __m) * __m) | 0 })()`,
+          type: 'integer',
+        }
+      case '=':
+      case '<>':
+      case '<':
+      case '<=':
+      case '>':
+      case '>=': {
         const jsOp = op === '=' ? '===' : op === '<>' ? '!==' : op
         if (isStrChar(L.type) || isStrChar(R.type)) {
           return { code: `((${L.code}).raw ${jsOp} (${R.code}).raw)`, type: 'boolean' }
@@ -1726,10 +2029,12 @@ class Compiler {
         return { code: `((${L.code}) ${jsOp} (${R.code}))`, type: 'boolean' }
       }
       case 'AND':
-        if (resultType === 'boolean') return { code: `((${L.code}) && (${R.code}))`, type: 'boolean' }
+        if (resultType === 'boolean')
+          return { code: `((${L.code}) && (${R.code}))`, type: 'boolean' }
         return { code: `((${L.code}) & (${R.code}))`, type: 'integer' } // 位运算（Knuth 风格）
       case 'OR':
-        if (resultType === 'boolean') return { code: `((${L.code}) || (${R.code}))`, type: 'boolean' }
+        if (resultType === 'boolean')
+          return { code: `((${L.code}) || (${R.code}))`, type: 'boolean' }
         return { code: `((${L.code}) | (${R.code}))`, type: 'integer' }
       default:
         throw new Error(`JS VM: unsupported binary operator ${op}`)
@@ -1756,16 +2061,22 @@ class Compiler {
   private emitFunctionCall(node: FunctionCallNode, scope: Scope): { code: string; type: string } {
     const name = node.name.name.toUpperCase()
     if (BUILTIN_SYSCALLS.has(name)) {
-      const argExprs = node.arguments.map(a => this.emitExpr(a, scope))
+      const argExprs = node.arguments.map((a) => this.emitExpr(a, scope))
       const args = argExprs.map((e, i) => this.emitArgFromExpr(e))
       // PRED/SUCC/ABS/SQR 是多态函数，返回类型跟随参数
       const firstArgType = argExprs[0]?.type
       const retType = builtinReturnType(name, firstArgType)
       // sysCall 返回 PascalValue，取 .raw 得到裸值（scalar）
       if (isScalar(retType) && retType !== 'char' && retType !== 'string') {
-        return { code: `((await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}])).raw)`, type: retType }
+        return {
+          code: `((await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}])).raw)`,
+          type: retType,
+        }
       }
-      return { code: `(await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}]))`, type: retType }
+      return {
+        code: `(await ctx.sysCall(${JSON.stringify(name)}, [${args.join(', ')}]))`,
+        type: retType,
+      }
     }
     // 用户函数（按作用域查找：嵌套函数 → 外层 → 全局）
     const info = scope.lookupProc(name) || this.procs.get(name)
@@ -1799,14 +2110,18 @@ class Compiler {
 
   private inferType(node: ExpressionNode, scope: Scope): string {
     switch (node.kind) {
-      case 'IntegerLiteral': return 'integer'
-      case 'RealLiteral': return 'real'
-      case 'BooleanLiteral': return 'boolean'
+      case 'IntegerLiteral':
+        return 'integer'
+      case 'RealLiteral':
+        return 'real'
+      case 'BooleanLiteral':
+        return 'boolean'
       case 'StringLiteral': {
         const s = (node as any).value as string
         return s.length === 1 ? 'char' : 'string'
       }
-      case 'CharLiteral': return 'char'
+      case 'CharLiteral':
+        return 'char'
       case 'Identifier': {
         const vi = scope.lookup((node as IdentifierNode).name)
         return vi ? vi.typeId : 'integer'
@@ -1838,19 +2153,29 @@ class Compiler {
       if (op === '+' || op === '-' || op === '*') return lt
     }
     switch (op) {
-      case '+': case '-': case '*':
+      case '+':
+      case '-':
+      case '*':
         if (lt === 'real' || rt === 'real') return 'real'
         if (lt === 'string' || rt === 'string') return 'string'
         return 'integer'
       case '/':
         return 'real'
-      case 'DIV': case 'MOD': case 'AND': case 'OR':
+      case 'DIV':
+      case 'MOD':
+      case 'AND':
+      case 'OR':
         if (op === 'AND' || op === 'OR') {
           if (lt === 'boolean' && rt === 'boolean') return 'boolean'
           return 'integer'
         }
         return 'integer'
-      case '=': case '<>': case '<': case '<=': case '>': case '>=':
+      case '=':
+      case '<>':
+      case '<':
+      case '<=':
+      case '>':
+      case '>=':
         return 'boolean'
       default:
         return 'integer'
@@ -1921,8 +2246,17 @@ function parseSource(source: string): ProgramNode {
 }
 
 // 构造 runtime（复用 VM 的 typeTable/sysCalls 构造逻辑，保证语义一致）
-function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: RuntimeCtx; sysCalls: Map<string, SysCallHandler> } {
-  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin, ...(options.plugins || [])]
+function buildRuntime(
+  ast: ProgramNode,
+  options: JSRunOptions
+): { runtime: RuntimeCtx; sysCalls: Map<string, SysCallHandler> } {
+  const basePlugins: TypePlugin[] = [
+    integerPlugin,
+    booleanPlugin,
+    charPlugin,
+    realPlugin,
+    ...(options.plugins || []),
+  ]
   const analyzer = new StaticAnalyzer(basePlugins)
   analyzer.analyze(ast) // 只为 typeTable，JsonCode 丢弃
   const typeTable = analyzer.getTypeTable()
@@ -1932,7 +2266,15 @@ function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: Runti
   const subrangePlugin = createSubrangePlugin(typeTable)
   const setPlugin = createSetPlugin(typeTable)
   const filePlugin = createFilePlugin(typeTable)
-  const allPlugins = [...basePlugins, arrayPlugin, recordPlugin, enumPlugin, subrangePlugin, setPlugin, filePlugin]
+  const allPlugins = [
+    ...basePlugins,
+    arrayPlugin,
+    recordPlugin,
+    enumPlugin,
+    subrangePlugin,
+    setPlugin,
+    filePlugin,
+  ]
   const sysCalls = options.sysCalls || createExtendedSysCalls()
   // 构造 PascalIO（与 runVM 一致）：files 优先，否则用默认 console-only IO
   let io: PascalIO | undefined
@@ -1952,7 +2294,9 @@ function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: Runti
   return { runtime, sysCalls }
 }
 
-const AsyncFunction = Object.getPrototypeOf(async function () { /* */ }).constructor
+const AsyncFunction = Object.getPrototypeOf(async function () {
+  /* */
+}).constructor
 
 export async function runJS(source: string, options: JSRunOptions = {}): Promise<VMState> {
   try {
@@ -1992,7 +2336,11 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
     } catch (e: any) {
       const state = ctxToVMState(ctx, 'error')
       // 与 VM 一致：state.error 是 VMError 对象（_helper 用 state.error?.message 访问）
-      state.error = { message: e?.message || String(e), instructionIndex: -1, stackTrace: [] } as any
+      state.error = {
+        message: e?.message || String(e),
+        instructionIndex: -1,
+        stackTrace: [],
+      } as any
       return state
     }
   } catch (e: any) {
