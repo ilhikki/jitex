@@ -9,7 +9,7 @@ function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)
 }
 
-describe('M4 VM - File Model (async)', () => {
+describe('M5 JS - File Model (async)', () => {
   const tests: VMTest[] = [
     // ==========================================================================
     // REWRITE + WRITE/WRITELN：写入到内存文件

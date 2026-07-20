@@ -737,7 +737,7 @@ end.`,
   },
 ]
 
-describe('M4 VM (from M3.6): Control Flow', () => {
+describe('M5 JS (from M3.6): Control Flow', () => {
   tests.forEach((t) => {
     test(t.name, async () => {
       const result = await runVMFromInterpreterTest(t)

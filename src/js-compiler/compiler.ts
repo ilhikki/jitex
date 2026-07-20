@@ -1062,7 +1062,7 @@ export class Compiler {
     const name = pc.name.name.toUpperCase()
     if (BUILTIN_SYSCALLS.has(name)) {
       // WRITELN/WRITE: 对 real 参数预先用 ctx.formatReal 格式化为 string，
-      // 绕过 io.plugin.formatReal 的指数补零 bug（src/vm 冻结，不能改）
+      // Pascal 实数格式化（指数补零为 3 位）
       if (name === 'WRITE' || name === 'WRITELN') {
         const args = pc.arguments.map((a) => {
           // 处理格式化参数 value:width 或 value:width:precision
@@ -1375,7 +1375,7 @@ export class Compiler {
     // F^：文件缓冲区访问（F 是 file 类型，F^ 是当前缓冲区字符/元素）
     if (fieldName === '^') {
       if (obj.type === 'text' || obj.type === 'file-of-char') {
-        // 无 io（无 files）时返回空格（与 VM bufferCharHandler 无 io 行为一致）
+        // 无 io（无 files）时返回空格
         return {
           code: `ctx.box('char', ctx.io ? String.fromCharCode(await ctx.io.file.bufferChar(${obj.code}.raw)) : ' ')`,
           type: 'char',

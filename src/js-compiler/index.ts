@@ -9,7 +9,7 @@
 
 import { parse } from '../index'
 import type { ProgramNode } from '../ast/types'
-import { createJSCtx, ctxToVMState } from './context'
+import { createJSCtx, ctxToRunState } from './context'
 import { buildTypeTable } from './type-table-builder'
 import { integerPlugin } from './types/integer.plugin'
 import { booleanPlugin } from './types/boolean.plugin'
@@ -24,8 +24,8 @@ import { createFilePlugin, TEXT_TYPE } from './types/file.plugin'
 import { createExtendedSysCalls } from './syscalls'
 import { createDefaultIO, createRecordFileOps, type PascalIO } from './file-model'
 import type { RuntimeCtx, SysCallHandler, TypePlugin, TypeDef } from './types'
-import type { VMState } from './vm-state'
-import { Compiler } from './complier'
+import type { RunState } from './run-state'
+import { Compiler } from './compiler'
 
 // ============================================================================
 // 公开 API
@@ -44,8 +44,8 @@ export interface JSRunOptions {
   input?: string[]
   plugins?: TypePlugin[]
   sysCalls?: Map<string, SysCallHandler>
-  // 内存文件存储：用户提供 Map<url, Uint8Array>，VM 会自动构造 PascalIO
-  // 程序执行后 Map 会更新以反映写入结果（与 VMRunOptions 一致）
+  // 内存文件存储：用户提供 Map<url, Uint8Array>，runJS 会自动构造 PascalIO
+  // 程序执行后 Map 会更新以反映写入结果
   files?: Map<string, Uint8Array>
   // 全局文件变量名（大写）→ URL；程序启动时自动 ASSIGN（TANGLE 等 Knuth 风格程序用）
   programFileUrls?: Record<string, string>
@@ -120,7 +120,7 @@ const AsyncFunction = Object.getPrototypeOf(async function () {
   /* */
 }).constructor
 
-export async function runJS(source: string, options: JSRunOptions = {}): Promise<VMState> {
+export async function runJS(source: string, options: JSRunOptions = {}): Promise<RunState> {
   try {
     const ast = parseSource(source)
     const { runtime, sysCalls } = buildRuntime(ast, options)
@@ -154,27 +154,24 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
     const fn = new AsyncFunction('ctx', body)
     try {
       await fn(ctx)
-      return ctxToVMState(ctx, 'terminated')
+      return ctxToRunState(ctx, 'terminated')
     } catch (e: any) {
-      const state = ctxToVMState(ctx, 'error')
-      // 与 VM 一致：state.error 是 VMError 对象（_helper 用 state.error?.message 访问）
+      const state = ctxToRunState(ctx, 'error')
       state.error = {
         message: e?.message || String(e),
-        instructionIndex: -1,
         stackTrace: [],
-      } as any
+      }
       return state
     }
   } catch (e: any) {
-    // parse / compile 阶段异常也包装为 error 状态（与 VM 行为一致）
+    // parse / compile 阶段异常也包装为 error 状态
     return {
       status: 'error',
       outputBuffer: [],
-      globals: new Map(),
-      callStack: [],
+      inputQueue: [],
       steps: 0,
-      error: { message: e?.message || String(e), instructionIndex: -1, stackTrace: [] },
-    } as any
+      error: { message: e?.message || String(e), stackTrace: [] },
+    }
   }
 }
 

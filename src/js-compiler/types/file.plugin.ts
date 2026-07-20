@@ -3,11 +3,8 @@
 import type {
   FileType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
   TypeTable,
-  CodeGenContext,
   RuntimeCtx,
 } from './types'
 import { createEmptyFile } from '../file-model'
@@ -28,17 +25,6 @@ export function createFilePlugin(typeTable: TypeTable): TypePlugin {
           const td = tt.get(typeId)
           return td?.kind === 'file'
         },
-        toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId,
-            opName: 'default',
-            opKind: 'default',
-            dest,
-            src: [],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (typeId: string, ctx: RuntimeCtx): PascalValue => {
           // file 变量默认值：空 PascalFile 句柄
           return { typeId, raw: createEmptyFile() }
@@ -50,17 +36,6 @@ export function createFilePlugin(typeTable: TypeTable): TypePlugin {
           const td = tt.get(typeId)
           return td?.kind === 'file'
         },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'text',
-            opName: 'copy',
-            opKind: 'copy',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (value: PascalValue): PascalValue => {
           return { typeId: value.typeId, raw: value.raw }
         },
@@ -71,17 +46,6 @@ export function createFilePlugin(typeTable: TypeTable): TypePlugin {
           const toDef = tt.get(toType)
           const fromDef = tt.get(fromType)
           return toDef?.kind === 'file' && fromDef?.kind === 'file'
-        },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'text',
-            opName: 'assign',
-            opKind: 'assign',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (dest: PascalValue, src: PascalValue): PascalValue => {
           return { typeId: dest.typeId, raw: src.raw }

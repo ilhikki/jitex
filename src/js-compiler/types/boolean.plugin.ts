@@ -3,11 +3,7 @@
 import type {
   BooleanType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
-  CodeGenContext,
-  RuntimeCtx,
 } from './types'
 
 // ============================================================================
@@ -37,15 +33,6 @@ export const booleanPlugin: TypePlugin = {
         if (node?.kind === 'BooleanLiteral') return 'boolean'
         return null
       },
-      toCode: (dest: Ref, node: any, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'LITERAL',
-          dest,
-          typeId: 'boolean',
-          value: node.value,
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: (value: unknown) => {
         return makeBooleanValue(Boolean(value))
       },
@@ -56,17 +43,6 @@ export const booleanPlugin: TypePlugin = {
         if (fromType === 'boolean' && toType === 'boolean') return true
         return false
       },
-      toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'boolean',
-          opName: 'assign',
-          opKind: 'assign',
-          dest,
-          src: [src],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: (dest: PascalValue, src: PascalValue) => {
         return makeBooleanValue(src.raw as boolean)
       },
@@ -75,17 +51,6 @@ export const booleanPlugin: TypePlugin = {
     unary: {
       NOT: {
         can: (operandType: string) => operandType === 'boolean' ? 'boolean' : null,
-        toCode: (dest: Ref, operand: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'boolean',
-            opName: 'NOT',
-            opKind: 'unary',
-            dest,
-            src: [operand],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (operand: PascalValue) => {
           return makeBooleanValue(!(operand.raw as boolean))
         },
@@ -98,17 +63,6 @@ export const booleanPlugin: TypePlugin = {
           if (leftType === 'boolean' && rightType === 'boolean') return 'boolean'
           return null
         },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'boolean',
-            opName: 'AND',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (left: PascalValue, right: PascalValue) => {
           return makeBooleanValue((left.raw as boolean) && (right.raw as boolean))
         },
@@ -117,17 +71,6 @@ export const booleanPlugin: TypePlugin = {
         can: (leftType: string, rightType: string) => {
           if (leftType === 'boolean' && rightType === 'boolean') return 'boolean'
           return null
-        },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'boolean',
-            opName: 'OR',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (left: PascalValue, right: PascalValue) => {
           return makeBooleanValue((left.raw as boolean) || (right.raw as boolean))
@@ -140,18 +83,6 @@ export const booleanPlugin: TypePlugin = {
         can: (leftType: string, rightType: string) => {
           if (leftType === 'boolean' && rightType === 'boolean') return 'boolean'
           return null
-        },
-        toCode: (dest: Ref, left: Ref, right: Ref, op: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'boolean',
-            opName: 'EQ',
-            opKind: 'compare',
-            dest,
-            src: [left, right],
-            extra: { op },
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (left: PascalValue, right: PascalValue, op: string) => {
           const l = left.raw as boolean
@@ -172,10 +103,6 @@ export const booleanPlugin: TypePlugin = {
 
     control: {
       can: (typeId: string) => typeId === 'boolean',
-      toCode: (cond: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        // boolean 直接作为控制条件，无需转换
-        return []
-      },
       invoke: (value: PascalValue) => {
         return value.raw as boolean
       },
@@ -183,17 +110,6 @@ export const booleanPlugin: TypePlugin = {
 
     default: {
       can: (typeId: string) => typeId === 'boolean',
-      toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'boolean',
-          opName: 'default',
-          opKind: 'default',
-          dest,
-          src: [],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: () => {
         return makeBooleanValue(false)
       },
@@ -201,17 +117,6 @@ export const booleanPlugin: TypePlugin = {
 
     copy: {
       can: (typeId: string) => typeId === 'boolean',
-      toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'boolean',
-          opName: 'copy',
-          opKind: 'copy',
-          dest,
-          src: [src],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: (value: PascalValue) => {
         return makeBooleanValue(value.raw as boolean)
       },

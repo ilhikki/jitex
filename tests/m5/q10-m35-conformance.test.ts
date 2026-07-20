@@ -309,7 +309,7 @@ end.`,
   },
 ]
 
-describe('M4 VM - M3.5 Conformance Tests', () => {
+describe('M5 JS - M3.5 Conformance Tests', () => {
   test.each(tests)('$name', async (t) => {
     const result = await runVMTest(t)
     if (!result.passed) {

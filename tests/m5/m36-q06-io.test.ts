@@ -412,7 +412,7 @@ end.`,
   },
 ]
 
-describe('M4 VM (from M3.6): IO and Standard Library', () => {
+describe('M5 JS (from M3.6): IO and Standard Library', () => {
   tests.forEach((t) => {
     test(t.name, async () => {
       const result = await runVMFromInterpreterTest(t)

@@ -237,7 +237,7 @@ console.log(compileToJS(code));
 | Phase 2 char/real/string | ✅ 完成 | 全部通过 |
 | Phase 3 array/record/set/file/WITH | ✅ 完成 | 全部通过 |
 | Phase 4 嵌套过程/var参数/goto | ✅ 完成 | 全部通过 |
-| **Phase 5 项目重构** | 🚧 **进行中** | **移除 VM/static-analyzer，JS 编译器独立** |
+| **Phase 5 项目重构** | 🚧 **进行中** | **5.5.1：VM 残留清理、命名修正、死代码删除（-864 行）** |
 | Phase 6 性能优化/bug 修复 | ⏳ 未开始 | 等待重构完成 |
 | Phase 7 跑 TEX82 | ⏳ 未开始 | 等待优化完成 |
 

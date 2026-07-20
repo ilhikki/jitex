@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals'
 import { runVMTest, type VMTest } from './_helper'
 
-describe('M4 VM Goto', () => {
+describe('M5 JS Goto', () => {
   const tests: VMTest[] = [
     {
       name: 'goto in procedure',

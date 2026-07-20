@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals'
 import { runVMTest, type VMTest } from './_helper'
 
-describe('M4 VM Array and Record', () => {
+describe('M5 JS Array and Record', () => {
   const tests: VMTest[] = [
     {
       name: 'array type usage',

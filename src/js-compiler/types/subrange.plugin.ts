@@ -1,11 +1,8 @@
 import type {
   SubrangeType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
   TypeTable,
-  CodeGenContext,
   RuntimeCtx,
 } from './types'
 
@@ -19,17 +16,6 @@ export function createSubrangePlugin(typeTable: TypeTable): TypePlugin {
         can: (typeId: string, tt: TypeTable) => {
           const td = tt.get(typeId)
           return td?.kind === 'subrange'
-        },
-        toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId,
-            opName: 'default',
-            opKind: 'default',
-            dest,
-            src: [],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (typeId: string, runtime: RuntimeCtx): PascalValue => {
           const td = runtime.typeTable.get(typeId)
@@ -45,17 +31,6 @@ export function createSubrangePlugin(typeTable: TypeTable): TypePlugin {
         can: (typeId: string, tt: TypeTable) => {
           const td = tt.get(typeId)
           return td?.kind === 'subrange'
-        },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'subrange',
-            opName: 'copy',
-            opKind: 'copy',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (value: PascalValue): PascalValue => {
           return { typeId: value.typeId, raw: value.raw }
@@ -74,17 +49,6 @@ export function createSubrangePlugin(typeTable: TypeTable): TypePlugin {
             return true
           }
           return false
-        },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'subrange',
-            opName: 'assign',
-            opKind: 'assign',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (dest: PascalValue, src: PascalValue, runtime: RuntimeCtx): PascalValue => {
           const destType = runtime.typeTable.get(dest.typeId)
@@ -111,17 +75,6 @@ export function createSubrangePlugin(typeTable: TypeTable): TypePlugin {
         can: (typeId: string, tt: TypeTable) => {
           const td = tt.get(typeId)
           return td?.kind === 'subrange'
-        },
-        toCode: (cond: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'subrange',
-            opName: 'control',
-            opKind: 'control',
-            dest: cond,
-            src: [cond],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (value: PascalValue): boolean => {
           return !!value.raw

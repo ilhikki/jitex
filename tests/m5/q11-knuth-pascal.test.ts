@@ -5,7 +5,7 @@
 import { describe, it, expect } from '@jest/globals'
 import { runVMTest, type VMTest } from './_helper'
 
-describe('M4 VM - Knuth Pascal Style', () => {
+describe('M5 JS - Knuth Pascal Style', () => {
   const tests: VMTest[] = [
     // ==========================================================================
     // FILE OF CHAR 类型（Knuth 用 TEXTFILE = PACKED FILE OF CHAR）

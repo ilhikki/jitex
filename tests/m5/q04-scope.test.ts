@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals'
 import { runVMTest, type VMTest } from './_helper'
 
-describe('M4 VM Scope', () => {
+describe('M5 JS Scope', () => {
   const tests: VMTest[] = [
     {
       name: 'global var used in main',

@@ -1,15 +1,11 @@
 // m5 测试辅助函数
-// 默认走 JS 编译器（M5）；显式指定 engine='vm' 时回退到 M4 解释器
+// 走 JS 编译器（M5）
 
-import { runJS as runJSImpl } from '../../src/js-compiler'
-import type { VMState } from '../../src/js-compiler/vm-state'
+import { runJS } from '../../src/js-compiler'
+import type { RunState } from '../../src/js-compiler/run-state'
 import type { TypePlugin, SysCallHandler } from '../../src/js-compiler/types'
 
-async function runVMImpl(code: string, options?: any): Promise<VMState> {
-  return await runJSImpl(code, options)
-}
-
-export interface VMTest {
+export interface JSTest {
   name: string
   code: string
   purpose: string
@@ -24,60 +20,44 @@ export interface VMTest {
   files?: Map<string, Uint8Array>
   // 全局文件变量名 → URL
   programFileUrls?: Record<string, string>
-  // 文件内容包含检查（runVM 完成后检查 files.get(url) 是否包含 substring）
+  // 文件内容包含检查（runJS 完成后检查 files.get(url) 是否包含 substring）
   expectedFileContains?: { url: string; contains: string }[]
   // 自定义系统调用（非标扩展用）
   sysCalls?: Map<string, SysCallHandler>
-  // 执行引擎：'js'（默认，M5 JS 编译器）| 'vm'（M4 解释器，回退用）
-  engine?: 'vm' | 'js'
   // 非标扩展：允许无 LABEL 声明的 goto（Berkeley/DEC Pascal 扩展）
   allowUndeclaredLabels?: boolean
   // 调试：失败时打印编译后的 JS 代码
   debugEmitJS?: boolean
 }
 
-export async function runVM(test: VMTest): Promise<VMState> {
-  const engine = test.engine || 'js'
-  if (engine === 'js') {
-    // M5: JS 编译器执行路径
-    const state = await runJSImpl(test.code, {
-      input: test.input,
-      plugins: test.plugins,
-      sysCalls: test.sysCalls,
-      files: test.files,
-      programFileUrls: test.programFileUrls,
-      maxSteps: 1e9,
-      allowUndeclaredLabels: test.allowUndeclaredLabels,
-      debug: test.debugEmitJS ? { emitJS: true } : undefined,
-    })
-    return state
-  }
-  return await runVMImpl(test.code, {
+export async function runTest(test: JSTest): Promise<RunState> {
+  return await runJS(test.code, {
     input: test.input,
     plugins: test.plugins,
+    sysCalls: test.sysCalls,
     files: test.files,
     programFileUrls: test.programFileUrls,
-    sysCalls: test.sysCalls,
+    maxSteps: 1e9,
+    allowUndeclaredLabels: test.allowUndeclaredLabels,
+    debug: test.debugEmitJS ? { emitJS: true } : undefined,
   })
 }
 
-export function getOutput(state: VMState): string {
+export function getOutput(state: RunState): string {
   return state.outputBuffer.join('')
 }
 
-export async function runVMTest(test: VMTest): Promise<{ passed: boolean; message: string; state: VMState }> {
+export async function runJSTest(test: JSTest): Promise<{ passed: boolean; message: string; state: RunState }> {
   try {
-    const state = await runVM(test)
+    const state = await runTest(test)
     const output = getOutput(state)
 
     if (test.expectedError !== undefined) {
       if (state.status !== 'error' && !state.error) {
-
         return { passed: false, message: `Expected error "${test.expectedError}", but no error occurred`, state }
       }
       const actualError = state.error?.message || ''
       if (test.expectedError.length > 0 && !actualError.includes(test.expectedError)) {
-
         return { passed: false, message: `Expected error containing "${test.expectedError}", got "${actualError}"`, state }
       }
       return { passed: true, message: 'OK', state }
@@ -94,21 +74,18 @@ export async function runVMTest(test: VMTest): Promise<{ passed: boolean; messag
 
     if (test.expectedOutput !== undefined) {
       if (output !== test.expectedOutput) {
-
         return { passed: false, message: `Expected output "${JSON.stringify(test.expectedOutput)}", got "${JSON.stringify(output)}"`, state }
       }
     }
 
     if (test.expectedContains !== undefined) {
       if (!output.includes(test.expectedContains)) {
-
         return { passed: false, message: `Expected output to contain "${test.expectedContains}", got "${JSON.stringify(output)}"`, state }
       }
     }
 
     if (test.expectedNotContains !== undefined) {
       if (output.includes(test.expectedNotContains)) {
-
         return { passed: false, message: `Expected output to NOT contain "${test.expectedNotContains}", got "${JSON.stringify(output)}"`, state }
       }
     }
@@ -134,13 +111,13 @@ export async function runVMTest(test: VMTest): Promise<{ passed: boolean; messag
   }
 }
 
-export async function runVMTests(tests: VMTest[]): Promise<{ passed: number; failed: number; failures: string[] }> {
+export async function runJSTests(tests: JSTest[]): Promise<{ passed: number; failed: number; failures: string[] }> {
   let passed = 0
   let failed = 0
   const failures: string[] = []
 
   for (const test of tests) {
-    const result = await runVMTest(test)
+    const result = await runJSTest(test)
     if (result.passed) {
       passed++
     } else {
@@ -153,7 +130,16 @@ export async function runVMTests(tests: VMTest[]): Promise<{ passed: number; fai
 }
 
 // ===========================================================================
-// 兼容层：将 m3.6 InterpreterTest 格式适配到 VM
+// 向后兼容别名（测试文件中的 runVM/runVMTest/VMTest 调用过渡期保留）
+// ===========================================================================
+
+export type VMTest = JSTest
+export const runVM = runTest
+export const runVMTest = runJSTest
+export const runVMTests = runJSTests
+
+// ===========================================================================
+// 兼容层：将 m3.6 InterpreterTest 格式适配
 // ===========================================================================
 
 export interface InterpreterTestCompat {
@@ -173,12 +159,10 @@ export interface InterpreterTestCompat {
 export async function runVMFromInterpreterTest(
   t: InterpreterTestCompat
 ): Promise<{ passed: boolean; message: string }> {
-  // 兼容层也默认走 JS 编译器（M5）
-  const result = await runVMTest({
+  const result = await runJSTest({
     ...t,
-    engine: 'js',
     expectedError: t.expectedError === true ? '' : undefined,
     allowUndeclaredLabels: t.allowUndeclaredLabels,
-  } as VMTest)
+  } as JSTest)
   return { passed: result.passed, message: result.message }
 }

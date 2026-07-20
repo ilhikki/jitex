@@ -1,10 +1,9 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { parse } from '../src/index'
-import { StaticAnalyzer } from '../src/static-analyzer'
 import { runJS } from '../src/js-compiler'
-import { stringPlugin } from '../src/types'
-import { createExtendedSysCalls } from '../src/vm/extended-io.plugin'
+import { stringPlugin } from '../src/js-compiler/types'
+import { createExtendedSysCalls } from '../src/js-compiler/syscalls'
 
 const extendedSysCalls = createExtendedSysCalls()
 

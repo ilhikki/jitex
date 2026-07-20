@@ -3,7 +3,7 @@
 import { describe, it, expect } from '@jest/globals'
 import { runVMTest, type VMTest } from './_helper'
 
-describe('M4 VM Basic', () => {
+describe('M5 JS Basic', () => {
   const tests: VMTest[] = [
     {
       name: 'integer literal output',

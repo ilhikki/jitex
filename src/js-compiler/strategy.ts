@@ -18,7 +18,7 @@ import type {
   ForStatementNode,
 } from '../ast/types'
 import { Scope } from './item'
-import type { Compiler } from './complier'
+import type { Compiler } from './compiler'
 
 // 判断是否为透明块（不生成独立状态机，标签可穿透）
 // 透明块：CompoundStatement、CaseStatement、WithStatement

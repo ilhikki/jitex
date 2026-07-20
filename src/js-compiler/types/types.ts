@@ -27,36 +27,6 @@ export type Ref =
   | { kind: 'local'; name: string; upLevel?: number }
   | { kind: 'temp'; index: number }
 
-export interface JsonInstruction {
-  op: string
-  dest?: Ref
-  src?: Ref[]
-  typeId?: string
-  value?: unknown
-  proc?: string
-  target?: string
-  label?: string
-  opName?: string
-  opKind?: string
-  extra?: Record<string, unknown>
-  sourcePos?: SourcePos
-  argFormats?: { width?: Ref; precision?: Ref }[]
-}
-
-export interface CodeGenContext {
-  typeTable: TypeTable
-  tempCount: number
-  sourcePos?: SourcePos
-  typeId?: string
-}
-
-export function createCodeGenContext(typeTable: TypeTable): CodeGenContext {
-  return {
-    typeTable,
-    tempCount: 0,
-  }
-}
-
 export interface TypeBase {
   id: string
   kind: string
@@ -196,73 +166,61 @@ export interface TypeOps {
 
 export interface LiteralOp {
   can: (node: unknown, typeTable: TypeTable) => string | null
-  toCode: (dest: Ref, node: unknown, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (value: unknown, typeId: string, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface AssignOp {
   can: (fromType: string, toType: string, typeTable: TypeTable) => boolean
-  toCode: (dest: Ref, src: Ref, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (dest: PascalValue, src: PascalValue, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface UnaryOp {
   can: (operandType: string, typeTable: TypeTable) => string | null
-  toCode: (dest: Ref, operand: Ref, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (operand: PascalValue, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface BinaryOp {
   can: (leftType: string, rightType: string, typeTable: TypeTable) => string | null
-  toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (left: PascalValue, right: PascalValue, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface CompareOp {
   can: (leftType: string, rightType: string, typeTable: TypeTable) => string | null
-  toCode: (dest: Ref, left: Ref, right: Ref, op: string, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (left: PascalValue, right: PascalValue, op: string, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface IndexOp {
   can: (arrayType: string, indexType: string, typeTable: TypeTable) => string | null
-  toCode: (dest: Ref, src: Ref[], ctx: CodeGenContext) => JsonInstruction[]
   invoke: (array: PascalValue, ...indexValues: PascalValue[]) => PascalValue
 }
 
 export interface SetIndexOp {
   can: (arrayType: string, indexType: string, valueType: string, typeTable: TypeTable) => boolean
-  toCode: (dest: Ref, src: Ref[], ctx: CodeGenContext) => JsonInstruction[]
   invoke: (array: PascalValue, ...args: PascalValue[]) => PascalValue
 }
 
 export interface FieldOp {
   can: (recordType: string, fieldName: string, typeTable: TypeTable) => string | null
-  toCode: (dest: Ref, record: Ref, fieldName: string, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (record: PascalValue, fieldName: string, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface SetFieldOp {
   can: (recordType: string, fieldName: string, valueType: string, typeTable: TypeTable) => boolean
-  toCode: (dest: Ref, value: Ref, fieldName: string, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (record: PascalValue, value: PascalValue, fieldName: string, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface ControlOp {
   can: (typeId: string, typeTable: TypeTable) => boolean
-  toCode: (cond: Ref, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (value: PascalValue, runtime: RuntimeCtx) => boolean
 }
 
 export interface DefaultOp {
   can: (typeId: string, typeTable: TypeTable) => boolean
-  toCode: (dest: Ref, typeId: string, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (typeId: string, runtime: RuntimeCtx) => PascalValue
 }
 
 export interface CopyOp {
   can: (typeId: string, typeTable: TypeTable) => boolean
-  toCode: (dest: Ref, src: Ref, ctx: CodeGenContext) => JsonInstruction[]
   invoke: (value: PascalValue, runtime: RuntimeCtx) => PascalValue
 }
 

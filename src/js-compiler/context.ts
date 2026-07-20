@@ -2,13 +2,13 @@
 //
 // 生成的 JS 代码签名：async function(ctx) { ... }
 // ctx 提供：
-//   - sysCall(name, args): 调用 VM 的 sysCall handler（WRITELN/READ/ORD...）
+//   - sysCall(name, args): 调用 sysCall handler（WRITELN/READ/ORD...）
 //   - box(typeId, raw): 裸值 → PascalValue（跨边界时装箱）
 //   - steps / maxSteps: 步数限制
-//   - outputBuffer / inputQueue: IO 缓冲（与 VM 状态结构兼容）
+//   - outputBuffer / inputQueue: IO 缓冲
 
 import type { PascalValue, RuntimeCtx, SysCallHandler } from './types'
-import type { VMState } from './vm-state'
+import type { RunState } from './run-state'
 import { createEmptyFile, type PascalIO } from './file-model'
 
 export interface JSCtx {
@@ -32,26 +32,19 @@ export interface JSRuntimeOptions {
   maxSteps?: number
 }
 
-// 构造一个最小 VMState 兼容对象，供 sysCall handler 使用
+// 构造一个最小 RunState 兼容对象，供 sysCall handler 使用
 // handler 主要访问 outputBuffer / inputQueue / status
-function createMockState(outputBuffer: string[], inputQueue: string[]): VMState {
+function createMockState(outputBuffer: string[], inputQueue: string[]): RunState {
   return {
-    pc: 0,
-    currentProc: 'main',
-    callStack: [],
-    globals: {},
-    returnValue: null,
     outputBuffer,
     inputQueue,
     error: null,
     status: 'running',
     steps: 0,
-    stepsExecuted: 0,
-  } as unknown as VMState
+  }
 }
 
-// Pascal 实数格式化（与 io.plugin 的 formatReal 行为一致，但修正指数补零为 3 位）
-// 复制实现是为了不修改 src/vm 下的冻结代码
+// Pascal 实数格式化（指数补零为 3 位）
 function formatReal(n: number): string {
   if (Number.isInteger(n)) {
     return `${n}.00000000000000E+000`
@@ -83,7 +76,7 @@ function buildDefaultValue(typeId: string, typeTable: any): unknown {
     case 'subrange': return 0
     case 'enum': return 0
     case 'array': {
-      // 多维数组：StaticAnalyzer 把 array[1..2,1..3] of integer 压成
+      // 多维数组：type-table-builder 把 array[1..2,1..3] of integer 压成
       // dimensions=[d0,d1]+elementTypeId=integer；需递归构造嵌套数组
       // 对 array[1..2] of array[1..3] of integer（dimensions=[d0]+elementTypeId=array-...）
       // 也能正确处理：dimIdx 越界时走 buildDefaultValue(elementTypeId) 递归
@@ -150,19 +143,13 @@ export function createJSCtx(options: JSRuntimeOptions): JSCtx {
   }
 }
 
-// 从 JSCtx 构造一个 VMState 兼容的返回值（供 _helper.ts 的 getOutput/runVMTest 使用）
-export function ctxToVMState(ctx: JSCtx, status: 'running' | 'terminated' | 'error' = 'terminated'): VMState {
+// 从 JSCtx 构造一个 RunState 返回值（供 _helper.ts 使用）
+export function ctxToRunState(ctx: JSCtx, status: 'running' | 'terminated' | 'error' = 'terminated'): RunState {
   return {
-    pc: 0,
-    currentProc: 'main',
-    callStack: [],
-    globals: {},
-    returnValue: null,
     outputBuffer: ctx.outputBuffer,
     inputQueue: ctx.inputQueue,
     error: null,
     status,
     steps: ctx.steps,
-    stepsExecuted: ctx.steps,
-  } as unknown as VMState
+  }
 }

@@ -1,14 +1,9 @@
 // Set TypePlugin
 
 import type {
-  SetType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
   TypeTable,
-  CodeGenContext,
-  RuntimeCtx,
 } from './types'
 
 function makeSetValue(elements: number[]): PascalValue {
@@ -34,17 +29,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
           const td = tt.get(typeId)
           return td?.kind === 'set'
         },
-        toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId,
-            opName: 'default',
-            opKind: 'default',
-            dest,
-            src: [],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (typeId: string): PascalValue => {
           return { typeId, raw: new Set<number>() }
         },
@@ -54,17 +38,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
         can: (typeId: string, tt: TypeTable) => {
           const td = tt.get(typeId)
           return td?.kind === 'set'
-        },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'set',
-            opName: 'copy',
-            opKind: 'copy',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (value: PascalValue): PascalValue => {
           const oldSet = normalizeSet(value.raw)
@@ -78,17 +51,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
           const fromDef = tt.get(fromType)
           return toDef?.kind === 'set' && fromDef?.kind === 'set'
         },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'set',
-            opName: 'assign',
-            opKind: 'assign',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (dest: PascalValue, src: PascalValue): PascalValue => {
           const srcSet = normalizeSet(src.raw)
           return { typeId: dest.typeId, raw: new Set(srcSet) }
@@ -100,9 +62,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
         can: (node: any, tt: TypeTable) => {
           // 集合构造表达式在静态分析器中处理，这里不处理
           return null
-        },
-        toCode: (dest: Ref, node: any, ctx: CodeGenContext): JsonInstruction[] => {
-          return []
         },
         invoke: (value: unknown, typeId: string): PascalValue => {
           return { typeId, raw: new Set(value as number[]) }
@@ -116,17 +75,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
             const rd = tt.get(rightType)
             if (ld?.kind === 'set' && rd?.kind === 'set') return leftType
             return null
-          },
-          toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-            return [{
-              op: 'TYPE_OP',
-              typeId: ctx.typeId || 'set',
-              opName: 'UNION',
-              opKind: 'binary',
-              dest,
-              src: [left, right],
-              sourcePos: ctx.sourcePos,
-            }]
           },
           invoke: (left: PascalValue, right: PascalValue): PascalValue => {
             const ls = normalizeSet(left.raw)
@@ -142,17 +90,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
             const rd = tt.get(rightType)
             if (ld?.kind === 'set' && rd?.kind === 'set') return leftType
             return null
-          },
-          toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-            return [{
-              op: 'TYPE_OP',
-              typeId: ctx.typeId || 'set',
-              opName: 'INTERSECT',
-              opKind: 'binary',
-              dest,
-              src: [left, right],
-              sourcePos: ctx.sourcePos,
-            }]
           },
           invoke: (left: PascalValue, right: PascalValue): PascalValue => {
             const ls = normalizeSet(left.raw)
@@ -170,17 +107,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
             const rd = tt.get(rightType)
             if (ld?.kind === 'set' && rd?.kind === 'set') return leftType
             return null
-          },
-          toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-            return [{
-              op: 'TYPE_OP',
-              typeId: ctx.typeId || 'set',
-              opName: 'DIFF',
-              opKind: 'binary',
-              dest,
-              src: [left, right],
-              sourcePos: ctx.sourcePos,
-            }]
           },
           invoke: (left: PascalValue, right: PascalValue): PascalValue => {
             const ls = normalizeSet(left.raw)
@@ -201,18 +127,6 @@ export function createSetPlugin(typeTable: TypeTable): TypePlugin {
             const rd = tt.get(rightType)
             if (rd?.kind === 'set') return 'boolean'
             return null
-          },
-          toCode: (dest: Ref, left: Ref, right: Ref, op: string, ctx: CodeGenContext): JsonInstruction[] => {
-            return [{
-              op: 'TYPE_OP',
-              typeId: ctx.typeId || 'set',
-              opName: 'IN',
-              opKind: 'compare',
-              dest,
-              src: [left, right],
-              extra: { op },
-              sourcePos: ctx.sourcePos,
-            }]
           },
           invoke: (left: PascalValue, right: PascalValue, op: string): PascalValue => {
             const set = normalizeSet(right.raw)

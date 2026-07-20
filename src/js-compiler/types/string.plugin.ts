@@ -1,11 +1,7 @@
 import type {
   StringType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
-  CodeGenContext,
-  RuntimeCtx,
 } from './types'
 
 export const STRING_TYPE: StringType = {
@@ -27,15 +23,6 @@ export const stringPlugin: TypePlugin = {
         if (node?.kind === 'StringLiteral') return 'string'
         return null
       },
-      toCode: (dest: Ref, node: any, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'LITERAL',
-          dest,
-          typeId: 'string',
-          value: node.value,
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: (value: unknown) => {
         return makeStringValue(String(value))
       },
@@ -45,17 +32,6 @@ export const stringPlugin: TypePlugin = {
       can: (fromType: string, toType: string) => {
         if (fromType === 'string' && toType === 'string') return true
         return false
-      },
-      toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'string',
-          opName: 'assign',
-          opKind: 'assign',
-          dest,
-          src: [src],
-          sourcePos: ctx.sourcePos,
-        }]
       },
       invoke: (dest: PascalValue, src: PascalValue) => {
         return makeStringValue(src.raw as string)
@@ -67,18 +43,6 @@ export const stringPlugin: TypePlugin = {
         can: (leftType: string, rightType: string) => {
           if (leftType === 'string' && rightType === 'string') return 'boolean'
           return null
-        },
-        toCode: (dest: Ref, left: Ref, right: Ref, op: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'string',
-            opName: 'EQ',
-            opKind: 'compare',
-            dest,
-            src: [left, right],
-            extra: { op },
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (left: PascalValue, right: PascalValue, op: string) => {
           const l = left.raw as string
@@ -103,17 +67,6 @@ export const stringPlugin: TypePlugin = {
           if (leftType === 'string' && rightType === 'string') return 'string'
           return null
         },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'string',
-            opName: 'CONCAT',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (left: PascalValue, right: PascalValue) => {
           return makeStringValue((left.raw as string) + (right.raw as string))
         },
@@ -122,17 +75,6 @@ export const stringPlugin: TypePlugin = {
 
     default: {
       can: (typeId: string) => typeId === 'string',
-      toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'string',
-          opName: 'default',
-          opKind: 'default',
-          dest,
-          src: [],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: () => {
         return makeStringValue('')
       },
@@ -140,17 +82,6 @@ export const stringPlugin: TypePlugin = {
 
     copy: {
       can: (typeId: string) => typeId === 'string',
-      toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'string',
-          opName: 'copy',
-          opKind: 'copy',
-          dest,
-          src: [src],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: (value: PascalValue) => {
         return makeStringValue(value.raw as string)
       },

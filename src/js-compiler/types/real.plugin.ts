@@ -3,10 +3,7 @@
 import type {
   RealType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
-  CodeGenContext,
 } from './types'
 
 export const REAL_TYPE: RealType = {
@@ -32,17 +29,6 @@ export const realPlugin: TypePlugin = {
         if (fromType === 'integer' && toType === 'real') return true
         return false
       },
-      toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'real',
-          opName: 'assign',
-          opKind: 'assign',
-          dest,
-          src: [src],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: (dest: PascalValue, src: PascalValue) => {
         return makeRealValue(Number(src.raw))
       },
@@ -51,34 +37,12 @@ export const realPlugin: TypePlugin = {
     unary: {
       NEG: {
         can: (operandType: string) => operandType === 'real' ? 'real' : null,
-        toCode: (dest: Ref, operand: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'real',
-            opName: 'NEG',
-            opKind: 'unary',
-            dest,
-            src: [operand],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (operand: PascalValue) => {
           return makeRealValue(-(operand.raw as number))
         },
       },
       POS: {
         can: (operandType: string) => operandType === 'real' ? 'real' : null,
-        toCode: (dest: Ref, operand: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'real',
-            opName: 'POS',
-            opKind: 'unary',
-            dest,
-            src: [operand],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (operand: PascalValue) => {
           return makeRealValue(operand.raw as number)
         },
@@ -92,17 +56,6 @@ export const realPlugin: TypePlugin = {
               (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
         },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'real',
-            opName: 'ADD',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (left: PascalValue, right: PascalValue) => {
           return makeRealValue(Number(left.raw) + Number(right.raw))
         },
@@ -112,17 +65,6 @@ export const realPlugin: TypePlugin = {
           if ((leftType === 'real' || leftType === 'integer') &&
               (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
-        },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'real',
-            opName: 'SUB',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (left: PascalValue, right: PascalValue) => {
           return makeRealValue(Number(left.raw) - Number(right.raw))
@@ -134,17 +76,6 @@ export const realPlugin: TypePlugin = {
               (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
         },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'real',
-            opName: 'MUL',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (left: PascalValue, right: PascalValue) => {
           return makeRealValue(Number(left.raw) * Number(right.raw))
         },
@@ -154,17 +85,6 @@ export const realPlugin: TypePlugin = {
           if ((leftType === 'real' || leftType === 'integer') &&
               (rightType === 'real' || rightType === 'integer')) return 'real'
           return null
-        },
-        toCode: (dest: Ref, left: Ref, right: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'real',
-            opName: 'DIV',
-            opKind: 'binary',
-            dest,
-            src: [left, right],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (left: PascalValue, right: PascalValue) => {
           const r = Number(right.raw)
@@ -180,18 +100,6 @@ export const realPlugin: TypePlugin = {
           if ((leftType === 'real' || leftType === 'integer') &&
               (rightType === 'real' || rightType === 'integer')) return 'boolean'
           return null
-        },
-        toCode: (dest: Ref, left: Ref, right: Ref, op: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: 'real',
-            opName: 'EQ',
-            opKind: 'compare',
-            dest,
-            src: [left, right],
-            extra: { op },
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (left: PascalValue, right: PascalValue, op: string) => {
           const l = Number(left.raw)
@@ -212,17 +120,6 @@ export const realPlugin: TypePlugin = {
 
     default: {
       can: (typeId: string) => typeId === 'real',
-      toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'real',
-          opName: 'default',
-          opKind: 'default',
-          dest,
-          src: [],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: () => {
         return makeRealValue(0)
       },
@@ -230,17 +127,6 @@ export const realPlugin: TypePlugin = {
 
     copy: {
       can: (typeId: string) => typeId === 'real',
-      toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-        return [{
-          op: 'TYPE_OP',
-          typeId: 'real',
-          opName: 'copy',
-          opKind: 'copy',
-          dest,
-          src: [src],
-          sourcePos: ctx.sourcePos,
-        }]
-      },
       invoke: (value: PascalValue) => {
         return makeRealValue(Number(value.raw))
       },

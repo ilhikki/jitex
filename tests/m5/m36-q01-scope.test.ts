@@ -675,7 +675,7 @@ end.`,
   },
 ]
 
-describe('M4 VM (from M3.6): Scope', () => {
+describe('M5 JS (from M3.6): Scope', () => {
   tests.forEach((t) => {
     test(t.name, async () => {
       const result = await runVMFromInterpreterTest(t)

@@ -1,11 +1,8 @@
 import type {
   RecordType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
   TypeTable,
-  CodeGenContext,
   RuntimeCtx,
 } from './types'
 
@@ -28,18 +25,6 @@ export function createRecordPlugin(typeTable: TypeTable): TypePlugin {
             if (field) return field.typeId
           }
           return null
-        },
-        toCode: (dest: Ref, record: Ref, fieldName: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'record',
-            opName: 'field',
-            opKind: 'field',
-            dest,
-            src: [record],
-            extra: { field: fieldName },
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (record: PascalValue, fieldName: string, runtime: RuntimeCtx): PascalValue => {
           const rec = record.raw as Record<string, unknown>
@@ -66,18 +51,6 @@ export function createRecordPlugin(typeTable: TypeTable): TypePlugin {
           }
           return false
         },
-        toCode: (dest: Ref, value: Ref, fieldName: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'record',
-            opName: 'setField',
-            opKind: 'setField',
-            dest,
-            src: [value],
-            extra: { field: fieldName },
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (record: PascalValue, value: PascalValue, fieldName: string): PascalValue => {
           const rec = record.raw as Record<string, unknown>
           rec[fieldName.toUpperCase()] = value.raw
@@ -89,17 +62,6 @@ export function createRecordPlugin(typeTable: TypeTable): TypePlugin {
         can: (typeId: string, tt: TypeTable) => {
           const typeDef = tt.get(typeId)
           return typeDef?.kind === 'record'
-        },
-        toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId,
-            opName: 'default',
-            opKind: 'default',
-            dest,
-            src: [],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (typeId: string, runtime: RuntimeCtx): PascalValue => {
           const buildDefault = (tid: string): unknown => {
@@ -145,17 +107,6 @@ export function createRecordPlugin(typeTable: TypeTable): TypePlugin {
           const typeDef = tt.get(typeId)
           return typeDef?.kind === 'record'
         },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'record',
-            opName: 'copy',
-            opKind: 'copy',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (value: PascalValue): PascalValue => {
           const rec = value.raw as Record<string, unknown>
           return { typeId: value.typeId, raw: { ...rec } }
@@ -167,17 +118,6 @@ export function createRecordPlugin(typeTable: TypeTable): TypePlugin {
           const fromDef = tt.get(fromType)
           const toDef = tt.get(toType)
           return fromDef?.kind === 'record' && toDef?.kind === 'record' && fromType === toType
-        },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'record',
-            opName: 'assign',
-            opKind: 'assign',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (dest: PascalValue, src: PascalValue): PascalValue => {
           const srcRec = src.raw as Record<string, unknown>

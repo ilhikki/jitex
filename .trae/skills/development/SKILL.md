@@ -1,6 +1,6 @@
 ---
 name: "development"
-description: "Guides development of pascal-ts interpreter: AST, lexer, parser (frozen) and PDI interpreter. Invoke when implementing frames, state, scope, or writing interpreter tests."
+description: "Guides development of pascal-ts: AST, lexer, parser (frozen) and JS compiler. Invoke when implementing compiler logic, type plugins, syscalls, or writing tests."
 ---
 
 # Development
@@ -9,10 +9,11 @@ This skill guides development of the pascal-ts project.
 
 ## When to Use
 
-- Implementing interpreter frames (Frame types, step logic)
-- Working on State, Scope, or DeclarationTable
-- Writing interpreter unit tests
-- Adding new statement types to the interpreter
+- Implementing JS compiler logic (expression/statement/declaration compilation)
+- Working on TypePlugin system (runtime invoke methods)
+- Adding new syscalls or file IO features
+- Writing or fixing tests in `tests/m5/`
+- Working on goto compilation strategies
 
 ## Architecture
 
@@ -22,72 +23,56 @@ Pure function: `{ string, offset, offsetToPosition } => Token[]`
 ### Layer 2: Parser (Frozen)
 Pure functions: `{ tokens, position } => ParseResult`
 
-### Layer 3: Interpreter (PDI — current focus)
+### Layer 3: JS Compiler (current focus)
 
 #### Execution Model
 ```
-run(state: State, mode: RunMode): void
-```
-- `state` is the single runtime state, `run` mutates it in place
-- Each `run` call advances one control step
-- Loop `run` until `state.status === 'terminated'`
-
-#### State
-```typescript
-interface State {
-  stack: Frame[]           // execution stack
-  globalScope: Scope       // program-level scope
-  currentScope: Scope      // active scope
-  program: ProgramNode     // parsed AST
-  declarations: DeclarationTable
-  status: 'running' | 'terminated'
-  returnValue: Value | null
-}
+parse(source) → AST → Compiler.compile(ast) → JS code string → new AsyncFunction('ctx', body) → run(ctx)
 ```
 
-#### Scope
-```typescript
-interface Scope {
-  variables: Map<string, Value>
-  parent: Scope | null          // static link (lexical parent)
-  functionDecl: ProcDecl | FuncDecl | null  // null = global
-}
-```
+- Pascal source is parsed to AST, then compiled to a JS source string
+- The JS string is wrapped in `new AsyncFunction('ctx', body)` and executed
+- `ctx` (JSCtx) provides sysCall/box/steps/outputBuffer/inputQueue
+- V8 JIT optimizes hot code; performance target: >20M steps/sec
 
-#### Frame
-Each statement type has its own Frame. A Frame is a record with:
-```typescript
-interface Frame {
-  kind: string
-  done: boolean
-  step(state: State): void  // can mutate self, push new frames, set done
-}
-```
+#### Key Files (`src/js-compiler/`)
+- `index.ts` — Public API: `runJS(source, options)` / `compileToJS(source)`
+- `compiler.ts` — Core compiler: AST → JS code (the `Compiler` class)
+- `context.ts` — Runtime context (`JSCtx`, `createJSCtx`, `ctxToRunState`)
+- `run-state.ts` — `RunState` / `RunError` interfaces (execution result)
+- `strategy.ts` — Goto compilation strategies (state machine with labeled break/continue)
+- `syscalls.ts` — Syscall handlers (WRITE/READ/ORD/RESET/...)
+- `file-model.ts` — Async file IO model (PascalFile/PascalFileOps/PascalIO)
+- `type-table-builder.ts` — Build TypeTable from AST (replaces old StaticAnalyzer)
+- `item.ts` — Scope, ProcInfo, builtins
+- `types/` — TypePlugin system
+  - `types.ts` — Core type definitions (PascalValue, TypeDef, TypeTable, TypeOps)
+  - `*.plugin.ts` — Type plugins (integer/boolean/char/real/array/record/enum/subrange/set/file/string)
 
-`run` logic:
-1. Get top frame from `state.stack`
-2. Call `frame.step(state)`
-3. Pop all `done` frames from top
+#### TypePlugin System
+Each plugin implements `TypeOps` with `can` (check) and `invoke` (runtime) methods.
+JS compiler only calls `invoke` — the old `toCode` (JsonCode generation) was removed in 5.5.1.
 
-#### Value (placeholder for M0)
-```typescript
-type Value = number | string | boolean | null | undefined
-```
-M0 does not implement expression evaluation. Tests mock values.
+#### Goto Compilation
+See [docs/design-goto-strategy.md](../../../docs/design-goto-strategy.md) for the full design.
+
+Key principles:
+- Transparent blocks (CompoundStatement/CaseStatement/WithStatement): labels hoist to outer state machine
+- Opaque blocks (While/Repeat/For/If): can have independent state machine
+- All goto uses pure `continue`/`break` with JS labels — NO `throw` for control flow
 
 ## Testing Strategy
 
-- Baby M0 uses minimal Pascal programs (handwritten)
-- Verify stack state (depth, frame kinds) — not output
-- Verify scope creation/destruction
-- Verify stackTrace() output
-- Mock expression evaluation where needed
+- `tests/m5/` — 400+ test cases, all run through JS compiler
+- `_helper.ts` provides `runJSTest(test)` / `runJSTests(tests)` / `getOutput(state)`
+- Test interface `JSTest` has: name, code, purpose, features, expectedOutput/expectedContains/expectedError
+- For debugging: `debugEmitJS: true` prints generated JS on failure
 
 ## Key Principles
 
-- FP style: records with duck typing, not classes
 - Frozen layers: never modify `src/ast/`, `src/lexer/`, `src/parser/`
-- State is single source of truth: `run(state, mode)` mutates state
-- Each statement has its own Frame with `step(state)`
-- Issues logged to `/issue` before fixing
-- Git commits on major changes
+- Compiler produces pure JS — no intermediate representation (JsonCode was removed)
+- `integer`/`boolean`/`char` compile to bare JS values for JIT optimization
+- `array`/`record`/`set`/`file` use PascalValue + plugin.invoke
+- Step limit check at loop heads to prevent infinite loops
+- Git commits on major changes and milestone boundaries

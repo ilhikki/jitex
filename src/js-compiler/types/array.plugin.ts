@@ -3,11 +3,8 @@
 import type {
   ArrayType,
   PascalValue,
-  Ref,
-  JsonInstruction,
   TypePlugin,
   TypeTable,
-  CodeGenContext,
   RuntimeCtx,
 } from './types'
 
@@ -28,17 +25,6 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
             return (typeDef as ArrayType).elementTypeId
           }
           return null
-        },
-        toCode: (dest: Ref, src: Ref[], ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'array',
-            opName: 'INDEX',
-            opKind: 'index',
-            dest,
-            src,
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (arrayValue: PascalValue, ...indexValues: PascalValue[]) => {
           const arr = arrayValue.raw as unknown[]
@@ -98,22 +84,11 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
           }
           return false
         },
-        toCode: (dest: Ref, src: Ref[], ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'array',
-            opName: 'SET_INDEX',
-            opKind: 'setIndex',
-            dest,
-            src,
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (arrayValue: PascalValue, ...args: PascalValue[]) => {
           const arr = arrayValue.raw as unknown[]
           const value = args[args.length - 1]
           const indices = args.slice(0, args.length - 1).map((iv) => iv.raw as number)
-          
+
           // 边界检查
           let currentTypeId = arrayValue.typeId
           for (let i = 0; i < indices.length; i++) {
@@ -130,7 +105,7 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
               break
             }
           }
-          
+
           let target: unknown[] = arr
           for (let i = 0; i < indices.length - 1; i++) {
             const idx = indices[i]
@@ -141,7 +116,7 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
           }
           const lastIdx = indices[indices.length - 1]
           target[lastIdx] = value.raw
-          
+
           return arrayValue
         },
       },
@@ -150,17 +125,6 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
         can: (typeId: string) => {
           const typeDef = typeTable.get(typeId)
           return typeDef?.kind === 'array'
-        },
-        toCode: (dest: Ref, typeId: string, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId,
-            opName: 'default',
-            opKind: 'default',
-            dest,
-            src: [],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (typeId: string, ctx: RuntimeCtx) => {
           const typeDef = ctx.typeTable.get(typeId)
@@ -207,17 +171,6 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
           const typeDef = typeTable.get(typeId)
           return typeDef?.kind === 'array'
         },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'array',
-            opName: 'copy',
-            opKind: 'copy',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
-        },
         invoke: (value: PascalValue) => {
           const deepCopy = (obj: unknown): unknown => {
             if (Array.isArray(obj)) {
@@ -234,17 +187,6 @@ export function createArrayPlugin(typeTable: TypeTable): TypePlugin {
           const fromDef = typeTable.get(fromType)
           const toDef = typeTable.get(toType)
           return fromDef?.kind === 'array' && toDef?.kind === 'array'
-        },
-        toCode: (dest: Ref, src: Ref, ctx: CodeGenContext): JsonInstruction[] => {
-          return [{
-            op: 'TYPE_OP',
-            typeId: ctx.typeId || 'array',
-            opName: 'assign',
-            opKind: 'assign',
-            dest,
-            src: [src],
-            sourcePos: ctx.sourcePos,
-          }]
         },
         invoke: (dest: PascalValue, src: PascalValue) => {
           const deepCopy = (obj: unknown): unknown => {

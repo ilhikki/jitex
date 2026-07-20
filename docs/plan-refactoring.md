@@ -207,7 +207,7 @@ src/
 
 ## 八、验证标准
 
-重构完成的标志：
+### 5.5（初次重构）已完成
 
 - [x] `npx tsc --noEmit` 无错误
 - [x] `npx jest tests/m5 --no-coverage` 全部通过（402/402）
@@ -217,3 +217,27 @@ src/
 - [x] `issue/` 目录已删除
 - [x] 计划文档已更新
 - [x] 重构计划文档已创建
+
+### 5.5.1（深度清理）进行中
+
+- [x] 修复 `tests-tex/tex82-trip.test.ts` 破损 import 路径
+- [x] 重命名 `complier.ts` → `compiler.ts`（修正拼写错误）
+- [x] 重命名 `VMState`/`VMError` → `RunState`/`RunError`，裁剪无用字段
+- [x] 重命名 `_helper.ts` 的 `runVM`/`VMTest` → `runTest`/`JSTest`，移除 `engine='vm'` 死分支
+- [x] 清理 `types/types.ts` 死代码（`JsonInstruction`/`CodeGenContext`/`toCode` 接口）
+- [x] 清理 12 个 plugin 文件中的 `toCode` 方法实现（-864 行死代码）
+- [x] 修复 15 个测试文件中 `describe('M4 VM ...')` → `describe('M5 JS ...')`
+- [x] 归档过期文档（`plan-vm-type-plugin-m4.0.md`、`plan-m4.1-pascal82-conformance.md`、`plan-ast-phase.md`）到 `docs/archive/`
+- [ ] 重写 `.trae/skills/` 下的 SKILL.md（反映当前架构）
+- [ ] 处理 tests-tex 其他测试文件的 VM 残留
+- [ ] 顶层 `src/index.ts` 导出 `runJS`/`compileToJS`
+
+### 5.5.2 待决策项（见 [refactoring-decisions.md](refactoring-decisions.md)）
+
+- 顶层 API 导出策略
+- `compiler.ts` 拆分方案（1500 行）
+- `item.ts` 拆分方案（职责混乱）
+- `issue-fixing/SKILL.md` 工作流定位
+- 提交信息规范（中英文混用）
+- `tests-tex/` VM 时代遗留测试的处理
+- `q10-m35-conformance.test.ts` 中 `expectedError` 对已支持特性的误报
