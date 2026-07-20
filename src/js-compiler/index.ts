@@ -61,6 +61,7 @@ import { createSubrangePlugin } from '../types/subrange.plugin'
 import { createSetPlugin } from '../types/set.plugin'
 import { createFilePlugin } from '../types/file.plugin'
 import { createDefaultSysCalls } from '../vm/io.plugin'
+import { createRecordFileOps, createDefaultIO, type PascalIO } from '../vm/file-model'
 import type { RuntimeCtx, SysCallHandler, TypePlugin, TypeTable } from '../types'
 import type { VMState } from '../vm/state'
 
@@ -209,7 +210,7 @@ class Compiler {
     this.typeTable = typeTable
   }
 
-  compile(program: ProgramNode): string {
+  compile(program: ProgramNode, programFileUrls?: Record<string, string>): string {
     // 0. 收集类型别名 + enum 常量 + const integer
     this.collectTypes(program.block)
 
@@ -233,11 +234,24 @@ class Compiler {
     // 4. 生成 main 体（用 emitBody 以支持 main 程序的 goto 标号状态机）
     const mainBody = this.emitBody(program.block, this.globalScope, 2)
 
+    // 4.5 programFileUrls：在 main 体前自动 ASSIGN（TANGLE 风格程序参数）
+    const assignLines: string[] = []
+    if (programFileUrls) {
+      for (const [varName, url] of Object.entries(programFileUrls)) {
+        // F 已在 globalDecls 中初始化为 PascalValue（file 句柄）
+        // ASSIGN(F, 'url') → ctx.sysCall("ASSIGN", [F, ctx.box('string', url)])
+        assignLines.push(`  await ctx.sysCall("ASSIGN", [${varName}, ctx.box('string', ${JSON.stringify(url)})])`)
+      }
+    }
+
     // 5. 组装
     const parts: string[] = []
     parts.push("'use strict'")
     parts.push(globalDecls)
     parts.push(procDefs.join('\n'))
+    if (assignLines.length > 0) {
+      parts.push(assignLines.join('\n'))
+    }
     parts.push(mainBody)
     return parts.join('\n')
   }
@@ -1018,8 +1032,34 @@ class Compiler {
       // WRITELN/WRITE: 对 real 参数预先用 ctx.formatReal 格式化为 string，
       // 绕过 io.plugin.formatReal 的指数补零 bug（src/vm 冻结，不能改）
       if (name === 'WRITE' || name === 'WRITELN') {
-        const argExprs = pc.arguments.map(a => this.emitExpr(a, scope))
-        const args = argExprs.map(e => {
+        const args = pc.arguments.map(a => {
+          // 处理格式化参数 value:width 或 value:width:precision
+          // parser 把 : 包装成 BinaryExpression { op: ':' }
+          if (a.kind === 'BinaryExpression' && (a as any).operator === ':') {
+            const bin = a as BinaryExpressionNode
+            // 内层可能是 value:width，外层是 (value:width):precision
+            let valueExpr: ExpressionNode = bin.left
+            let widthExpr: ExpressionNode = bin.right
+            let precExpr: ExpressionNode | null = null
+            if (bin.left.kind === 'BinaryExpression' && (bin.left as any).operator === ':') {
+              const inner = bin.left as BinaryExpressionNode
+              valueExpr = inner.left
+              widthExpr = inner.right
+              precExpr = bin.right
+            }
+            const v = this.emitExpr(valueExpr, scope)
+            const w = this.emitExpr(widthExpr, scope)
+            // real 类型在 JS path 已经预格式化；其他类型走 emitArgFromExpr 装箱
+            let valueCode: string
+            if (v.type === 'real') {
+              valueCode = `ctx.box('string', ctx.formatReal(${v.code}))`
+            } else {
+              valueCode = this.emitArgFromExpr(v)
+            }
+            const precPart = precExpr ? `, precision: ${this.emitExpr(precExpr, scope).code}` : ''
+            return `{value: ${valueCode}, width: ${this.toInt(w.code, w.type)}${precPart}}`
+          }
+          const e = this.emitExpr(a, scope)
           if (e.type === 'real') {
             return `ctx.box('string', ctx.formatReal(${e.code}))`
           }
@@ -1089,14 +1129,54 @@ class Compiler {
   // READ/READLN 内联生成
   // 控制台模式：从 ctx.inputQueue 取一行，按 whitespace 拆 token，依次赋给变量
   // 文件模式：暂走 sysCall（写回变量有 bug，待 Phase 3.5 实现 F^/文件 I/O 时一起修）
-  private emitRead(pc: ProcedureCallNode, scope: Scope, _isReadln: boolean): string {
+  private emitRead(pc: ProcedureCallNode, scope: Scope, isReadln: boolean): string {
     const args = pc.arguments
-    // 第一参数是 file 变量？走 sysCall
+    // 第一参数是 file 变量？文件模式内联（用 ctx.io.file 方法直接读 + 直接写回变量）
     if (args.length > 0 && args[0].kind === 'Identifier') {
-      const vi = scope.lookup((args[0] as IdentifierNode).name)
-      if (vi && (vi.typeId === 'text' || vi.typeId.startsWith('file-of-'))) {
-        const argCodes = args.map(a => this.emitArg(a, scope))
-        return `await ctx.sysCall(${JSON.stringify(_isReadln ? 'READLN' : 'READ')}, [${argCodes.join(', ')}])`
+      const vi0 = scope.lookup((args[0] as IdentifierNode).name)
+      if (vi0 && (vi0.typeId === 'text' || vi0.typeId.startsWith('file-of-'))) {
+        const lines: string[] = ['{']
+        lines.push(`  const __f = ${vi0.jsName}.raw`)
+        for (let i = 1; i < args.length; i++) {
+          const a = args[i]
+          if (a.kind !== 'Identifier') continue
+          const id = a as IdentifierNode
+          const vi = scope.lookup(id.name)
+          if (!vi) throw new Error(`JS VM: undefined variable ${id.name}`)
+          const st = vi.typeId
+          if (st === 'char') {
+            // char: 读当前字符（不跳过空白），然后 get 推进
+            lines.push(`  ${vi.jsName}.raw = String.fromCharCode(await ctx.io.file.bufferChar(__f))`)
+            lines.push(`  await ctx.io.file.get(__f)`)
+          } else {
+            // integer/real/string: 跳过空白，读 token
+            lines.push('  {')
+            lines.push('    let __ch = await ctx.io.file.bufferChar(__f)')
+            lines.push('    while (__ch === 32 || __ch === 10 || __ch === 13 || __ch === 9) {')
+            lines.push('      await ctx.io.file.get(__f)')
+            lines.push('      __ch = await ctx.io.file.bufferChar(__f)')
+            lines.push('    }')
+            lines.push('    let __s = ""')
+            lines.push('    while (__ch !== 32 && __ch !== 10 && __ch !== 13 && __ch !== 9 && __ch !== 0) {')
+            lines.push('      __s += String.fromCharCode(__ch)')
+            lines.push('      await ctx.io.file.get(__f)')
+            lines.push('      __ch = await ctx.io.file.bufferChar(__f)')
+            lines.push('    }')
+            if (st === 'integer') {
+              lines.push(`    ${vi.jsName} = parseInt(__s, 10) | 0`)
+            } else if (st === 'real') {
+              lines.push(`    ${vi.jsName} = parseFloat(__s)`)
+            } else if (st === 'string') {
+              lines.push(`    ${vi.jsName}.raw = __s`)
+            }
+            lines.push('  }')
+          }
+        }
+        if (isReadln) {
+          lines.push(`  await ctx.io.file.readln(__f)`)
+        }
+        lines.push('}')
+        return lines.join('\n')
       }
     }
     // 控制台模式：内联
@@ -1227,6 +1307,18 @@ class Compiler {
   private emitFieldAccess(node: FieldAccessNode, scope: Scope): { code: string; type: string } {
     const obj = this.emitExpr(node.object, scope)
     const fieldName = node.field.name.toUpperCase()
+    // F^：文件缓冲区访问（F 是 file 类型，F^ 是当前缓冲区字符/元素）
+    if (fieldName === '^') {
+      if (obj.type === 'text' || obj.type === 'file-of-char') {
+        // 无 io（无 files）时返回空格（与 VM bufferCharHandler 无 io 行为一致）
+        return {
+          code: `ctx.box('char', ctx.io ? String.fromCharCode(await ctx.io.file.bufferChar(${obj.code}.raw)) : ' ')`,
+          type: 'char',
+        }
+      }
+      // 其他 file-of-T：返回当前元素（暂只支持 char/text）
+      throw new Error(`JS VM: F^ on ${obj.type} not supported yet`)
+    }
     const fieldTypeId = this.recordFieldType(obj.type, fieldName)
     if (!fieldTypeId) throw new Error(`JS VM: record ${obj.type} has no field ${fieldName}`)
     const rawCode = `${obj.code}.raw[${JSON.stringify(fieldName)}]`
@@ -1440,6 +1532,7 @@ class Compiler {
     if (fromType === 'integer') return `(${code}) | 0`
     if (fromType === 'real') return `Math.trunc(${code}) | 0`
     if (fromType === 'boolean') return `(${code} ? 1 : 0)`
+    if (fromType === 'char') return `(${code}.raw.charCodeAt(0)) | 0`
     return code
   }
 
@@ -1458,6 +1551,11 @@ export interface JSRunOptions {
   input?: string[]
   plugins?: TypePlugin[]
   sysCalls?: Map<string, SysCallHandler>
+  // 内存文件存储：用户提供 Map<url, Uint8Array>，VM 会自动构造 PascalIO
+  // 程序执行后 Map 会更新以反映写入结果（与 VMRunOptions 一致）
+  files?: Map<string, Uint8Array>
+  // 全局文件变量名（大写）→ URL；程序启动时自动 ASSIGN（TANGLE 等 Knuth 风格程序用）
+  programFileUrls?: Record<string, string>
   maxSteps?: number
 }
 
@@ -1483,10 +1581,18 @@ function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: Runti
   const filePlugin = createFilePlugin(typeTable)
   const allPlugins = [...basePlugins, arrayPlugin, recordPlugin, enumPlugin, subrangePlugin, setPlugin, filePlugin]
   const sysCalls = options.sysCalls || createDefaultSysCalls()
+  // 构造 PascalIO（与 runVM 一致）：files 优先，否则用默认 console-only IO
+  let io: PascalIO | undefined
+  if (options.files) {
+    io = {
+      file: createRecordFileOps(options.files),
+      console: createDefaultIO([]).console,
+    }
+  }
   const runtime: RuntimeCtx = {
     typeTable,
     sysCalls,
-    io: undefined, // Phase 3 加文件支持
+    io,
   }
   // 把 allPlugins 信息塞进 runtime 供未来 invoke 使用（Phase 2/3）
   ;(runtime as any).plugins = allPlugins
@@ -1501,7 +1607,7 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
 
   // 编译
   const compiler = new Compiler(runtime.typeTable)
-  const body = compiler.compile(ast)
+  const body = compiler.compile(ast, options.programFileUrls)
 
   // 构造 ctx
   const ctx = createJSCtx({
@@ -1518,7 +1624,8 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
     return ctxToVMState(ctx, 'terminated')
   } catch (e: any) {
     const state = ctxToVMState(ctx, 'error')
-    state.error = e?.message || String(e)
+    // 与 VM 一致：state.error 是 VMError 对象（_helper 用 state.error?.message 访问）
+    state.error = { message: e?.message || String(e), instructionIndex: -1, stackTrace: [] } as any
     return state
   }
 }

@@ -37,6 +37,8 @@ export async function runVM(test: VMTest): Promise<VMState> {
       input: test.input,
       plugins: test.plugins,
       sysCalls: test.sysCalls,
+      files: test.files,
+      programFileUrls: test.programFileUrls,
       maxSteps: 1e9,
     })
   }

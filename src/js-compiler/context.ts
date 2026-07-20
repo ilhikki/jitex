@@ -10,6 +10,7 @@
 import type { PascalValue } from '../vm/jsoncode'
 import type { RuntimeCtx, SysCallHandler } from '../types'
 import type { VMState } from '../vm/state'
+import { createEmptyFile, type PascalIO } from '../vm/file-model'
 
 export interface JSCtx {
   sysCall: (name: string, args: any[]) => Promise<any>
@@ -20,6 +21,8 @@ export interface JSCtx {
   maxSteps: number
   outputBuffer: string[]
   inputQueue: string[]
+  // file IO（仅当 JSRunOptions.files 提供时存在；为 file-mode READ/READLN 内联用）
+  io?: PascalIO
 }
 
 export interface JSRuntimeOptions {
@@ -106,7 +109,7 @@ function buildDefaultValue(typeId: string, typeTable: any): unknown {
       return obj
     }
     case 'set': return new Set<number>()
-    case 'file': return null
+    case 'file': return createEmptyFile()
     default: return 0
   }
 }
@@ -136,6 +139,7 @@ export function createJSCtx(options: JSRuntimeOptions): JSCtx {
     maxSteps: options.maxSteps ?? 100000000,
     outputBuffer,
     inputQueue,
+    io: runtime.io as PascalIO | undefined,
   }
 }
 
