@@ -27,9 +27,9 @@ describe('Q05: Operations and Types', () => {
       {
         name: 'division',
         code: 'program test; var x, y: integer; begin x := 15; y := 3; writeln(x / y); end.',
-        purpose: '测试除法运算',
-        features: ['arithmetic', 'division'],
-        expectedOutput: '5\n',
+        purpose: '测试除法运算（Pascal82: / 为实数除法，结果为 real）',
+        features: ['arithmetic', 'division', 'real'],
+        expectedOutput: '5.00000000000000E+000\n',
       },
       {
         name: 'integer division (DIV)',

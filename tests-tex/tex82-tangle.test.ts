@@ -1,8 +1,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { runVM } from '../src/vm'
+import { runJS } from '../src/js-compiler'
 
-describe('TEX82 - TANGLE compile tex.web', () => {
+describe('TEX82 - TANGLE compile tex.web (JS)', () => {
   const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
   const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
@@ -15,7 +15,7 @@ describe('TEX82 - TANGLE compile tex.web', () => {
     files.set('PASCALFILE', new Uint8Array())
     files.set('POOL', new Uint8Array())
 
-    return runVM(pasSource, {
+    return runJS(pasSource, {
       input: [],
       files,
       programFileUrls: {
@@ -24,7 +24,7 @@ describe('TEX82 - TANGLE compile tex.web', () => {
         'PASCALFILE': 'PASCALFILE',
         'POOL': 'POOL',
       },
-      maxSteps: 2000000000,
+      maxSteps: 1e9,
     }).then((state: any) => {
       return {
         state,
@@ -52,5 +52,6 @@ describe('TEX82 - TANGLE compile tex.web', () => {
     }
     expect(result.pascal.length).toBeGreaterThan(100000)
     expect(result.pascal).toContain('PROGRAM TEX')
+    expect(result.pool.length).toBeGreaterThan(0)
   }, 300000)
 })

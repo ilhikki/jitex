@@ -5,6 +5,7 @@ describe('GOTO and Labels', () => {
     {
       name: 'goto-basic-same-procedure',
       code: `program test;
+label 100;
 begin
   writeln('Before');
   goto 100;
@@ -20,6 +21,7 @@ end.`,
     {
       name: 'goto-basic-forward',
       code: `program test;
+label 200;
 begin
   goto 200;
   writeln('First');
@@ -34,6 +36,7 @@ end.`,
     {
       name: 'goto-basic-backward',
       code: `program test;
+label 100;
 var i: integer;
 begin
   i := 0;
@@ -49,6 +52,7 @@ end.`,
     {
       name: 'goto-basic-skip-statements',
       code: `program test;
+label 300;
 begin
   writeln('A');
   goto 300;
@@ -65,6 +69,7 @@ end.`,
     {
       name: 'goto-basic-outside-loop',
       code: `program test;
+label 400;
 var i: integer;
 begin
   i := 0;
@@ -85,6 +90,7 @@ end.`,
     {
       name: 'goto-basic-into-loop',
       code: `program test;
+label 500;
 var x: integer;
 begin
   x := 1;
@@ -101,6 +107,7 @@ end.`,
     {
       name: 'label-single',
       code: `program test;
+label 10;
 begin
 10:
   writeln('Label 10');
@@ -112,21 +119,23 @@ end.`,
     {
       name: 'label-multiple',
       code: `program test;
+label 10, 20;
 begin
   goto 20;
 10:
   writeln('Label 10');
 20:
   writeln('Label 20');
-  goto 10;
 end.`,
       purpose: 'Multiple labels in same procedure',
       features: ['GOTO', 'label'],
-      expectedContains: 'Label 20\nLabel 10',
+      expectedContains: 'Label 20',
+      expectedNotContains: 'Label 10',
     },
     {
       name: 'label-max-value',
       code: `program test;
+label 9999;
 begin
   goto 9999;
   writeln('Skipped');
@@ -141,6 +150,7 @@ end.`,
     {
       name: 'label-zero',
       code: `program test;
+label 0;
 begin
   goto 0;
   writeln('Before');
@@ -155,6 +165,7 @@ end.`,
     {
       name: 'label-same-as-variable',
       code: `program test;
+label 100;
 var lbl: integer;
 begin
   lbl := 42;
@@ -170,6 +181,7 @@ end.`,
     {
       name: 'goto-control-if-then',
       code: `program test;
+label 100;
 var x: integer;
 begin
   x := 1;
@@ -190,6 +202,7 @@ end.`,
     {
       name: 'goto-control-if-then-else',
       code: `program test;
+label 200;
 var x: integer;
 begin
   x := 0;
@@ -212,6 +225,7 @@ end.`,
     {
       name: 'goto-control-while',
       code: `program test;
+label 300;
 var i: integer;
 begin
   i := 0;
@@ -232,6 +246,7 @@ end.`,
     {
       name: 'goto-control-for',
       code: `program test;
+label 400;
 var i: integer;
 begin
   for i := 1 to 10 do
@@ -250,6 +265,7 @@ end.`,
     {
       name: 'goto-control-repeat',
       code: `program test;
+label 500;
 var i: integer;
 begin
   i := 0;
@@ -269,6 +285,7 @@ end.`,
     {
       name: 'goto-control-case',
       code: `program test;
+label 600;
 var x: integer;
 begin
   x := 2;
@@ -293,6 +310,7 @@ end.`,
     {
       name: 'goto-control-case-internal',
       code: `program test;
+label 700;
 var x: integer;
 begin
   x := 1;
@@ -315,6 +333,7 @@ end.`,
     {
       name: 'goto-control-nested-loops',
       code: `program test;
+label 800;
 var i, j: integer;
 begin
   for i := 1 to 3 do
@@ -344,6 +363,7 @@ end.`,
     {
       name: 'goto-error-cross-procedure',
       code: `program test;
+label 100;
 procedure p;
 begin
   goto 100;
@@ -360,6 +380,7 @@ end.`,
     {
       name: 'goto-error-from-procedure-to-main',
       code: `program test;
+label 200;
 procedure p;
 begin
   goto 200;
@@ -376,6 +397,7 @@ end.`,
     {
       name: 'goto-error-from-outer-to-nested-procedure',
       code: `program test;
+label 300;
 procedure outer;
   procedure inner;
   begin
@@ -405,6 +427,7 @@ end.`,
     {
       name: 'goto-error-duplicate-label',
       code: `program test;
+label 100;
 begin
 100:
   writeln('First');
@@ -419,6 +442,7 @@ end.`,
       name: 'goto-in-function',
       code: `program test;
 function f: integer;
+label 10;
 begin
   goto 10;
   f := 1;
@@ -437,19 +461,21 @@ end.`,
       name: 'goto-in-nested-function',
       code: `program test;
 function outer: integer;
+  label 10;
   function inner: integer;
+    label 20;
+    begin
+      goto 20;
+      inner := 1;
+    20:
+      inner := 3;
+    end;
   begin
-    goto 20;
-    inner := 1;
-20:
-    inner := 3;
+    goto 10;
+    outer := 0;
+  10:
+    outer := inner;
   end;
-begin
-  goto 10;
-  outer := 0;
-10:
-  outer := inner;
-end;
 begin
   writeln(outer);
 end.`,
@@ -463,6 +489,7 @@ end.`,
       code: `program test;
 var count: integer;
 procedure rec;
+label 10, 20;
 begin
   count := count + 1;
   writeln(count);
@@ -484,6 +511,7 @@ end.`,
       name: 'goto-recursion-function',
       code: `program test;
 function fib(n: integer): integer;
+label 10, 20;
 begin
   if n <= 1 then goto 10;
   fib := fib(n-1) + fib(n-2);
@@ -502,6 +530,7 @@ end.`,
     {
       name: 'goto-recursion-label-in-recursive',
       code: `program test;
+label 99;
 var x: integer;
 procedure rec;
 begin
@@ -523,6 +552,7 @@ end.`,
     {
       name: 'goto-recursion-mutual',
       code: `program test;
+label 10, 20;
 var n: integer;
 procedure a;
 begin
@@ -550,6 +580,7 @@ end.`,
     {
       name: 'goto-recursion-deep-nested',
       code: `program test;
+label 30;
 var depth: integer;
 procedure level1;
   procedure level2;
@@ -581,6 +612,7 @@ end.`,
       code: `program test;
 var count: integer;
 procedure rec;
+label 40;
 begin
   count := count + 1;
   if count > 2 then goto 40;
@@ -602,6 +634,7 @@ end.`,
       code: `program test;
 var count: integer;
 procedure rec;
+label 50;
 begin
   count := count + 1;
   writeln('Enter:', count);
@@ -625,6 +658,7 @@ end.`,
       code: `program test;
 var count: integer;
 procedure rec;
+label 60;
 begin
 60:
   count := count + 1;

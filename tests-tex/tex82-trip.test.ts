@@ -2,13 +2,13 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { parse } from '../src/index'
 import { StaticAnalyzer } from '../src/static-analyzer'
-import { runVM } from '../src/vm'
+import { runJS } from '../src/js-compiler'
 import { stringPlugin } from '../src/types'
 import { createExtendedSysCalls } from '../src/vm/extended-io.plugin'
 
 const extendedSysCalls = createExtendedSysCalls()
 
-describe('TEX82 - TRIP test', () => {
+describe('TEX82 - TRIP test (JS)', () => {
   const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
   const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
   const tripTexFile = path.join(__dirname, '..', 'tests', 'resources', 'trip.tex')
@@ -27,7 +27,7 @@ describe('TEX82 - TRIP test', () => {
     files.set('PASCALFILE', new Uint8Array())
     files.set('POOL', new Uint8Array())
 
-    const state = await runVM(tanglePas, {
+    const state = await runJS(tanglePas, {
       input: [],
       files,
       programFileUrls: {
@@ -36,8 +36,10 @@ describe('TEX82 - TRIP test', () => {
         PASCALFILE: 'PASCALFILE',
         POOL: 'POOL',
       },
-      maxSteps: Number.MAX_VALUE,
+      maxSteps: 1e9,
     })
+    expect(state.status).toBe('terminated')
+    expect(files.get('PASCALFILE')!.length).toBeGreaterThan(100000)
     return {
       pas: Buffer.from(files.get('PASCALFILE')!).toString('utf-8'),
       pool: Buffer.from(files.get('POOL')!).toString('utf-8'),
@@ -76,12 +78,12 @@ describe('TEX82 - TRIP test', () => {
     files.set('trip.dvi', new Uint8Array())
     files.set('trip.tfm', new Uint8Array())
 
-    const state = await runVM(texPas, {
+    const state = await runJS(texPas, {
       input: [],
       files,
       plugins: [stringPlugin],
       sysCalls: extendedSysCalls,
-      maxSteps: Number.MAX_VALUE,
+      maxSteps: 1e9,
     })
 
     console.log('VM status:', state.status)

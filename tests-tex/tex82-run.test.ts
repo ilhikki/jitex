@@ -2,10 +2,10 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { parse } from '../src/index'
 import { StaticAnalyzer } from '../src/static-analyzer'
-import { runVM } from '../src/vm'
+import { runJS } from '../src/js-compiler'
 import { stringPlugin } from '../src/types'
 
-describe('TEX82 - run tex.pas on VM', () => {
+describe('TEX82 - run tex.pas on JS', () => {
   const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
   const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
@@ -20,17 +20,19 @@ describe('TEX82 - run tex.pas on VM', () => {
     files.set('PASCALFILE', new Uint8Array())
     files.set('POOL', new Uint8Array())
 
-    const state = await runVM(tanglePas, {
+    const state = await runJS(tanglePas, {
       input: [],
       files,
       programFileUrls: {
-        'WEBFILE': 'WEBFILE',
-        'CHANGEFILE': 'CHANGEFILE',
-        'PASCALFILE': 'PASCALFILE',
-        'POOL': 'POOL',
+        WEBFILE: 'WEBFILE',
+        CHANGEFILE: 'CHANGEFILE',
+        PASCALFILE: 'PASCALFILE',
+        POOL: 'POOL',
       },
-      maxSteps: 2000000000,
+      maxSteps: 1e9,
     })
+    expect(state.status).toBe('terminated')
+    expect(files.get('PASCALFILE')!.length).toBeGreaterThan(100000)
     return Buffer.from(files.get('PASCALFILE')!).toString('utf-8')
   }
 
@@ -55,11 +57,11 @@ describe('TEX82 - run tex.pas on VM', () => {
     files.set('TEXLOG', new Uint8Array())     // 日志文件占位
     files.set('TEXDVI', new Uint8Array())     // DVI 文件占位
 
-    const state = await runVM(texPas, {
+    const state = await runJS(texPas, {
       input: [],
       files,
       plugins: [stringPlugin],
-      maxSteps: 100000000,
+      maxSteps: 1e9,
     })
 
     console.log('VM status:', state.status)

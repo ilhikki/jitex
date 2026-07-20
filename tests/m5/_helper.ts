@@ -27,20 +27,27 @@ export interface VMTest {
   sysCalls?: Map<string, SysCallHandler>
   // 执行引擎：'js'（默认，M5 JS 编译器）| 'vm'（M4 解释器，回退用）
   engine?: 'vm' | 'js'
+  // 非标扩展：允许无 LABEL 声明的 goto（Berkeley/DEC Pascal 扩展）
+  allowUndeclaredLabels?: boolean
+  // 调试：失败时打印编译后的 JS 代码
+  debugEmitJS?: boolean
 }
 
 export async function runVM(test: VMTest): Promise<VMState> {
   const engine = test.engine || 'js'
   if (engine === 'js') {
     // M5: JS 编译器执行路径
-    return await runJSImpl(test.code, {
+    const state = await runJSImpl(test.code, {
       input: test.input,
       plugins: test.plugins,
       sysCalls: test.sysCalls,
       files: test.files,
       programFileUrls: test.programFileUrls,
       maxSteps: 1e9,
+      allowUndeclaredLabels: test.allowUndeclaredLabels,
+      debug: test.debugEmitJS ? { emitJS: true } : undefined,
     })
+    return state
   }
   return await runVMImpl(test.code, {
     input: test.input,
@@ -60,35 +67,45 @@ export async function runVMTest(test: VMTest): Promise<{ passed: boolean; messag
     const state = await runVM(test)
     const output = getOutput(state)
 
-    if (test.expectedError) {
+    if (test.expectedError !== undefined) {
       if (state.status !== 'error' && !state.error) {
+
         return { passed: false, message: `Expected error "${test.expectedError}", but no error occurred`, state }
       }
       const actualError = state.error?.message || ''
-      if (!actualError.includes(test.expectedError)) {
+      if (test.expectedError.length > 0 && !actualError.includes(test.expectedError)) {
+
         return { passed: false, message: `Expected error containing "${test.expectedError}", got "${actualError}"`, state }
       }
       return { passed: true, message: 'OK', state }
     }
 
     if (state.status === 'error') {
+      if (test.debugEmitJS && (state as any).__debugJS) {
+        console.log('\n===== Generated JS (for failed test) =====')
+        console.log((state as any).__debugJS)
+        console.log('===========================================\n')
+      }
       return { passed: false, message: `Unexpected error: ${state.error?.message}`, state }
     }
 
     if (test.expectedOutput !== undefined) {
       if (output !== test.expectedOutput) {
+
         return { passed: false, message: `Expected output "${JSON.stringify(test.expectedOutput)}", got "${JSON.stringify(output)}"`, state }
       }
     }
 
     if (test.expectedContains !== undefined) {
       if (!output.includes(test.expectedContains)) {
+
         return { passed: false, message: `Expected output to contain "${test.expectedContains}", got "${JSON.stringify(output)}"`, state }
       }
     }
 
     if (test.expectedNotContains !== undefined) {
       if (output.includes(test.expectedNotContains)) {
+
         return { passed: false, message: `Expected output to NOT contain "${test.expectedNotContains}", got "${JSON.stringify(output)}"`, state }
       }
     }
@@ -98,6 +115,11 @@ export async function runVMTest(test: VMTest): Promise<{ passed: boolean; messag
         const bytes = test.files.get(exp.url)
         const text = bytes ? new TextDecoder().decode(bytes) : ''
         if (!text.includes(exp.contains)) {
+          if (test.debugEmitJS && (state as any).__debugJS) {
+            console.log('\n===== Generated JS (for failed test) =====')
+            console.log((state as any).__debugJS)
+            console.log('===========================================\n')
+          }
           return { passed: false, message: `Expected file ${exp.url} to contain "${exp.contains}", got "${text}"`, state }
         }
       }
@@ -141,49 +163,19 @@ export interface InterpreterTestCompat {
   expectedNotContains?: string
   expectedError?: boolean
   input?: string[]
+  // 非标扩展：允许无 LABEL 声明的 goto（Berkeley/DEC Pascal 扩展）
+  allowUndeclaredLabels?: boolean
 }
 
 export async function runVMFromInterpreterTest(
   t: InterpreterTestCompat
 ): Promise<{ passed: boolean; message: string }> {
-  try {
-    const state = await runVMImpl(t.code, { input: t.input })
-    const output = getOutput(state)
-
-    if (t.expectedError === true) {
-      if (state.status !== 'error' && !state.error) {
-        return { passed: false, message: `Expected error but none occurred` }
-      }
-      return { passed: true, message: 'OK' }
-    }
-
-    if (state.status === 'error') {
-      return { passed: false, message: `Unexpected error: ${state.error?.message}` }
-    }
-
-    if (t.expectedOutput !== undefined) {
-      if (output !== t.expectedOutput) {
-        return { passed: false, message: `Expected output ${JSON.stringify(t.expectedOutput)}, got ${JSON.stringify(output)}` }
-      }
-    }
-
-    if (t.expectedContains !== undefined) {
-      if (!output.includes(t.expectedContains)) {
-        return { passed: false, message: `Expected output to contain ${JSON.stringify(t.expectedContains)}, got ${JSON.stringify(output)}` }
-      }
-    }
-
-    if (t.expectedNotContains !== undefined) {
-      if (output.includes(t.expectedNotContains)) {
-        return { passed: false, message: `Expected output to NOT contain ${JSON.stringify(t.expectedNotContains)}, got ${JSON.stringify(output)}` }
-      }
-    }
-
-    return { passed: true, message: 'OK' }
-  } catch (e: any) {
-    if (t.expectedError === true) {
-      return { passed: true, message: 'OK (error caught)' }
-    }
-    return { passed: false, message: `Exception: ${e.message}` }
-  }
+  // 兼容层也默认走 JS 编译器（M5）
+  const result = await runVMTest({
+    ...t,
+    engine: 'js',
+    expectedError: t.expectedError === true ? '' : undefined,
+    allowUndeclaredLabels: t.allowUndeclaredLabels,
+  } as VMTest)
+  return { passed: result.passed, message: result.message }
 }

@@ -316,6 +316,16 @@ end.`,
     expectedContains: 'TRUE',
   },
   {
+    name: 'ord without parentheses should fail',
+    code: `program test;
+begin
+  writeln(ord);
+end.`,
+    purpose: '有参内置函数省略括号应报错（风险覆盖：不是所有内置函数都能无参调用）',
+    features: ['ord', 'standard-function', 'error-case'],
+    expectedError: true,
+  },
+  {
     name: 'chr with boundary value',
     code: `program test;
 begin

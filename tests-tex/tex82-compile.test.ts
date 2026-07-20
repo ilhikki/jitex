@@ -2,9 +2,9 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { parse } from '../src/index'
 import { StaticAnalyzer } from '../src/static-analyzer'
-import { runVM } from '../src/vm'
+import { runJS } from '../src/js-compiler'
 
-describe('TEX82 - compile and analyze tex.pas', () => {
+describe('TEX82 - compile and analyze tex.pas (JS)', () => {
   const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
   const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
@@ -19,18 +19,21 @@ describe('TEX82 - compile and analyze tex.pas', () => {
     files.set('PASCALFILE', new Uint8Array())
     files.set('POOL', new Uint8Array())
 
-    const state = await runVM(tanglePas, {
+    const state = await runJS(tanglePas, {
       input: [],
       files,
       programFileUrls: {
-        'WEBFILE': 'WEBFILE',
-        'CHANGEFILE': 'CHANGEFILE',
-        'PASCALFILE': 'PASCALFILE',
-        'POOL': 'POOL',
+        WEBFILE: 'WEBFILE',
+        CHANGEFILE: 'CHANGEFILE',
+        PASCALFILE: 'PASCALFILE',
+        POOL: 'POOL',
       },
-      maxSteps: 2000000000,
+      maxSteps: 1e9,
     })
-    return Buffer.from(files.get('PASCALFILE')!).toString('utf-8')
+    expect(state.status).toBe('terminated')
+    const pascal = files.get('PASCALFILE')!
+    expect(pascal.length).toBeGreaterThan(100000)
+    return Buffer.from(pascal).toString('utf-8')
   }
 
   beforeAll(async () => {

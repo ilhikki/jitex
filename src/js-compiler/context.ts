@@ -16,6 +16,7 @@ export interface JSCtx {
   sysCall: (name: string, args: any[]) => Promise<any>
   box: (typeId: string, raw: unknown) => PascalValue
   defaultOf: (typeId: string) => PascalValue
+  checkArrayIndex: (idx: number, low: number, high: number) => number
   formatReal: (n: number) => string
   steps: number
   maxSteps: number
@@ -133,6 +134,12 @@ export function createJSCtx(options: JSRuntimeOptions): JSCtx {
     box: (typeId: string, raw: unknown): PascalValue => ({ typeId, raw }),
     defaultOf: (typeId: string): PascalValue => {
       return { typeId, raw: buildDefaultValue(typeId, typeTable) }
+    },
+    checkArrayIndex: (idx: number, low: number, high: number): number => {
+      if (idx < low || idx > high) {
+        throw new Error(`JS VM: array index ${idx} out of range ${low}..${high}`)
+      }
+      return idx
     },
     formatReal,
     steps: 0,

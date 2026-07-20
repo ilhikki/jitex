@@ -8,6 +8,7 @@
 // 详见 docs/plan-m5-high-performance.md
 
 import { parse } from '../index'
+import { analyzeLabels, type LabelAnalysis } from './strategy'
 import type {
   ProgramNode,
   BlockNode,
@@ -53,7 +54,6 @@ import { integerPlugin } from '../types/integer.plugin'
 import { booleanPlugin } from '../types/boolean.plugin'
 import { charPlugin } from '../types/char.plugin'
 import { realPlugin } from '../types/real.plugin'
-import { stringPlugin } from '../types/string.plugin'
 import { createArrayPlugin } from '../types/array.plugin'
 import { createRecordPlugin } from '../types/record.plugin'
 import { createEnumPlugin } from '../types/enum.plugin'
@@ -61,6 +61,7 @@ import { createSubrangePlugin } from '../types/subrange.plugin'
 import { createSetPlugin } from '../types/set.plugin'
 import { createFilePlugin } from '../types/file.plugin'
 import { createDefaultSysCalls } from '../vm/io.plugin'
+import { createExtendedSysCalls } from '../vm/extended-io.plugin'
 import { createRecordFileOps, createDefaultIO, type PascalIO } from '../vm/file-model'
 import type { RuntimeCtx, SysCallHandler, TypePlugin, TypeTable } from '../types'
 import type { VMState } from '../vm/state'
@@ -74,6 +75,9 @@ const BUILTIN_SYSCALLS = new Set([
   'TRUNC', 'ROUND', 'SIN', 'COS', 'EXP', 'LN', 'SQRT', 'ARCTAN',
   'NEW', 'DISPOSE', 'PACK', 'UNPACK', 'RANDOM',
 ])
+
+// 明确无参的内置函数（允许省略括号调用）
+const BUILTIN_NO_ARG = new Set(['EOF', 'EOLN', 'RANDOM'])
 
 // 返回内置函数的返回类型（用于类型推断）
 // polymorphic 参数：若 argType 提供，PRED/SUCC/ABS/SQR 跟随参数类型
@@ -120,7 +124,8 @@ function isScalar(typeId: string): boolean {
 
 interface VarInfo {
   jsName: string
-  typeId: string
+  typeId: string       // 运行时类型（scalarBase 缩并后）
+  origTypeId: string   // 原始类型（用于 subrange 边界检查/默认值）
   isVar: boolean // var 参数（Phase 4 处理引用语义）
 }
 
@@ -164,11 +169,11 @@ class Scope {
     }
     return result // 从内到外，从后到前
   }
-  declare(name: string, typeId: string, isVar = false): VarInfo {
+  declare(name: string, typeId: string, isVar = false, origTypeId?: string): VarInfo {
     const key = name.toUpperCase()
     const existing = this.vars.get(key)
     if (existing) return existing
-    const info: VarInfo = { jsName: name, typeId, isVar }
+    const info: VarInfo = { jsName: name, typeId, origTypeId: origTypeId ?? typeId, isVar }
     this.vars.set(key, info)
     return info
   }
@@ -205,9 +210,17 @@ class Compiler {
   // goto 状态机支持：当前过程体的 label -> case 编号映射（null 表示无 goto 上下文）
   labelCases: Map<string, number> | null = null
   labelSwitchName: string | null = null  // goto break 用的 JS label 名
+  // goto 优化模式：'continue' = 策略 B（后向循环），'break' = 策略 C（跳出循环），null = 正常
+  gotoMode: 'continue' | 'break' | null = null
+  gotoLabel: string | null = null  // 策略 B/C 的 JS label 名
+  // 非标扩展配置
+  allowUndeclaredLabels: boolean
+  // WITH 临时变量计数器（避免嵌套 WITH 变量名冲突）
+  withVarCounter = 0
 
-  constructor(typeTable: TypeTable) {
+  constructor(typeTable: TypeTable, options?: { allowUndeclaredLabels?: boolean }) {
     this.typeTable = typeTable
+    this.allowUndeclaredLabels = options?.allowUndeclaredLabels ?? false
   }
 
   compile(program: ProgramNode, programFileUrls?: Record<string, string>): string {
@@ -284,6 +297,10 @@ class Compiler {
     switch (node.kind) {
       case 'IntegerLiteral':
         return (node as any).value
+      case 'CharLiteral':
+        return (node as any).value.charCodeAt(0)
+      case 'BooleanLiteral':
+        return (node as any).value ? 1 : 0
       case 'Identifier': {
         const name = (node as IdentifierNode).name.toUpperCase()
         if (this.constInts.has(name)) return this.constInts.get(name)!
@@ -337,14 +354,15 @@ class Compiler {
         const r = node as RangeTypeNode
         const min = this.evalConstInt(r.start)
         const max = this.evalConstInt(r.end)
+        if (min > max) {
+          throw new Error(`JS VM: subrange lower bound ${min} > upper bound ${max}`)
+        }
         let baseTypeId = 'integer'
         if (r.start.kind === 'CharLiteral') baseTypeId = 'char'
         else if (r.start.kind === 'BooleanLiteral') baseTypeId = 'boolean'
         else if (r.start.kind === 'Identifier') {
           const name = (r.start as IdentifierNode).name.toUpperCase()
           if (this.enumConstants.has(name)) {
-            // enum-based subrange：baseTypeId 需要查 aliasMap 反向？
-            // 简化：用 integer
             baseTypeId = 'integer'
           }
         }
@@ -423,6 +441,10 @@ class Compiler {
       || typeId === 'char' || typeId === 'string' || typeId === 'text') {
       return typeId
     }
+    if (typeId === 'set' || typeId.startsWith('set-of-')) return 'set'
+    if (typeId.startsWith('array-')) return 'array'
+    if (typeId.startsWith('record-')) return 'record'
+    if (typeId.startsWith('file-of-')) return 'file'
     const td = this.typeTable.get(typeId) as any
     return td?.kind || 'unknown'
   }
@@ -434,15 +456,28 @@ class Compiler {
     return k === 'subrange' || k === 'enum'
   }
 
-  // 缩并为 integer（subrange/enum/boolean 都按 integer 处理）
+  // 缩并为基本标量类型（subrange → base, enum → integer）
   private scalarBase(typeId: string): string {
     if (typeId === 'integer') return 'integer'
     if (typeId === 'real') return 'real'
     if (typeId === 'boolean') return 'boolean'
+    if (typeId === 'char') return 'char'
+    if (typeId === 'string') return 'string'
     const k = this.typeKind(typeId)
-    if (k === 'subrange') return 'integer'
+    if (k === 'subrange') {
+      // 从 subrange-${min}-${max}-of-${base} 解析 base
+      const b = this.subrangeBounds(typeId)
+      return b ? b.base : 'integer'
+    }
     if (k === 'enum') return 'integer'
     return typeId
+  }
+
+  // 解析 subrange typeId 的边界信息
+  private subrangeBounds(typeId: string): { min: number; max: number; base: string } | null {
+    const m = typeId.match(/^subrange-(-?\d+)-(-?\d+)-of-(.+)$/)
+    if (!m) return null
+    return { min: parseInt(m[1], 10), max: parseInt(m[2], 10), base: m[3] }
   }
 
   // record 字段类型
@@ -453,11 +488,70 @@ class Compiler {
     return f ? f.typeId : null
   }
 
+  // 获取数组第 idx 个维度的边界（支持嵌套数组和压平多维数组）
+  private arrayDimAt(arrayTypeId: string, idx: number): { low: number; high: number } | null {
+    let t = arrayTypeId
+    let consumed = 0
+    while (idx >= consumed) {
+      const td = this.typeTable.get(t) as any
+      if (!td || td.kind !== 'array') return null
+      const dims = td.dimensions || []
+      if (dims.length === 0) return null
+      if (dims.length > 1) {
+        // 压平的多维数组：所有维度都在这一层
+        const offset = idx - consumed
+        if (offset < dims.length) {
+          return { low: dims[offset].low, high: dims[offset].high }
+        }
+        return null
+      }
+      // 嵌套数组：1 个维度，进入下一层
+      if (idx === consumed) {
+        return { low: dims[0].low, high: dims[0].high }
+      }
+      consumed++
+      t = td.elementTypeId
+    }
+    return null
+  }
+
+  // 从数组类型出发，应用 n 个索引后得到的最终类型
+  private arrayElementAfterNIndices(arrayTypeId: string, n: number): string | null {
+    let t = arrayTypeId
+    for (let i = 0; i < n; i++) {
+      const td = this.typeTable.get(t) as any
+      if (!td || td.kind !== 'array') return null
+      const dims = td.dimensions || []
+      if (dims.length === 0) return null
+      if (dims.length === 1) {
+        // 嵌套数组：消耗 1 个维度，进入 elementTypeId
+        t = td.elementTypeId
+      } else {
+        // 压平的多维数组：一次性消耗所有维度
+        if (i === 0) {
+          t = td.elementTypeId
+        }
+        // 剩下的索引已经没有更多维度可以消耗了，但压平数组要求所有索引一次性给出
+        // 这里我们假设调用方已经确保索引数量正确
+        break
+      }
+    }
+    return t
+  }
+
   // array 元素类型
   private arrayElementType(arrayTypeId: string): string | null {
     const td = this.typeTable.get(arrayTypeId) as any
     if (!td || td.kind !== 'array') return null
     return td.elementTypeId
+  }
+
+  // array 维度信息：[{low, high}, ...]
+  private arrayDims(arrayTypeId: string): { low: number; high: number }[] {
+    const td = this.typeTable.get(arrayTypeId) as any
+    if (!td || td.kind !== 'array') return []
+    const dims = td.dimensions || []
+    return dims.map((d: any) => ({ low: d.low, high: d.high }))
   }
 
   // ---- 收集 ----
@@ -473,10 +567,9 @@ class Compiler {
   private collectGlobals(vars: VariableDeclarationNode[]) {
     for (const decl of vars) {
       const t = this.resolveTypeId(decl.type)
-      // subrange/enum 当 integer 处理（性能优化，丢失边界检查）
       const st = this.scalarBase(t)
       for (const n of decl.names) {
-        this.globalScope.declare(n.name, st)
+        this.globalScope.declare(n.name, st, false, t)
       }
     }
   }
@@ -599,6 +692,15 @@ class Compiler {
 
   // defaultInit：t 是原始 typeId，st 是缩并后的 scalar 类型
   private defaultInit(t: string, st: string): string {
+    // subrange：用下界作为默认值
+    if (st === 'integer' || st === 'char' || st === 'boolean') {
+      const b = this.subrangeBounds(t)
+      if (b) {
+        if (st === 'char') return `ctx.box('char', String.fromCharCode(${b.min}))`
+        if (st === 'boolean') return b.min ? 'true' : 'false'
+        return `${b.min}`
+      }
+    }
     switch (st) {
       case 'integer': return '0'
       case 'real': return '0.0'
@@ -636,20 +738,13 @@ class Compiler {
     if (actual.isFunction) {
       hasRet = true
       scope.vars.set(actual.name, {
-        jsName: '__ret', typeId: actual.returnType, isVar: false,
+        jsName: '__ret', typeId: actual.returnType, origTypeId: actual.returnType, isVar: false,
       })
       localDecls.push(`let __ret = ${this.defaultInit(actual.returnType, actual.returnType)}`)
     }
-    // 局部类型声明：注册到 aliasMap（暂用 save/restore 模拟作用域）
+    // 局部 const integer（type 边界可能引用）— 先于 type 处理
     const savedAliases: [string, string | undefined][] = []
     const savedConstInts: [string, number | undefined][] = []
-    for (const t of block.typeDeclarations) {
-      const key = t.name.name.toUpperCase()
-      savedAliases.push([key, this.aliasMap.get(key)])
-      const typeId = this.resolveTypeId(t.typeDef)
-      this.aliasMap.set(key, typeId)
-    }
-    // 局部 const integer（type 边界可能引用）
     for (const c of block.constDeclarations) {
       const v = this.tryEvalConstInt(c.value)
       if (v !== undefined) {
@@ -658,13 +753,20 @@ class Compiler {
         this.constInts.set(key, v)
       }
     }
+    // 局部类型声明：注册到 aliasMap（暂用 save/restore 模拟作用域）
+    for (const t of block.typeDeclarations) {
+      const key = t.name.name.toUpperCase()
+      savedAliases.push([key, this.aliasMap.get(key)])
+      const typeId = this.resolveTypeId(t.typeDef)
+      this.aliasMap.set(key, typeId)
+    }
     // 局部变量
     for (const decl of block.variableDeclarations) {
       const t = this.resolveTypeId(decl.type)
       const st = this.scalarBase(t)
       const init = this.defaultInit(t, st)
       for (const n of decl.names) {
-        scope.declare(n.name, st)
+        scope.declare(n.name, st, false, t)
         localDecls.push(`let ${n.name} = ${init}`)
       }
     }
@@ -704,22 +806,169 @@ class Compiler {
 
   // ---- 语句生成 ----
 
-  // 过程/主程序体生成：检测 label 声明，有 label 则用状态机包装
-  private emitBody(block: BlockNode, scope: Scope, indent: number): string {
-    if (block.labelDeclarations && block.labelDeclarations.labels.length > 0) {
-      return this.emitLabeledBody(block.compound, scope, indent, block.labelDeclarations.labels)
+  // 扫描 compound 中顶层出现的 LabeledStatement，收集 label
+  private collectLabelsFromCompound(compound: CompoundStatementNode): IntegerLiteralNode[] {
+    const labels: IntegerLiteralNode[] = []
+    for (const s of compound.statements) {
+      if (s.kind === 'LabeledStatement') {
+        labels.push((s as LabeledStatementNode).label as IntegerLiteralNode)
+      }
     }
-    return this.emitCompound(block.compound, scope, indent)
+    return labels
   }
 
-  // goto 状态机：把 compound 切分成段，每段一个 case
-  // goto → 设置 __pc + break 跳出 switch
-  private emitLabeledBody(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[]): string {
+  // 选择 goto 编译策略
+  // 策略 B：单 label 后向循环 → while(true) + labeled continue
+  // 策略 C：单 label 前向跨循环 → labeled block + labeled break
+  // 策略 D：状态机（兜底）
+  private selectStrategy(analysis: LabelAnalysis): 'B' | 'C' | 'D' {
+    if (analysis.labels.size !== 1) return 'D'
+    
+    const labelEntry = [...analysis.labels.entries()][0]
+    const labelInfo = labelEntry[1]
+    
+    const hasBackward = labelInfo.hasGotoBefore
+    const hasForward = labelInfo.hasGotoAfter
+    
+    if (hasBackward && !hasForward) {
+      return 'B'
+    }
+    
+    if (hasForward && !hasBackward) {
+      if (!labelInfo.inLoop) {
+        return 'C'
+      }
+      return 'D'
+    }
+    
+    return 'D'
+  }
+
+  // 过程/主程序体生成：根据 label 分析选择最优策略
+  private emitBody(block: BlockNode, scope: Scope, indent: number): string {
+    const declaredLabels = block.labelDeclarations ? block.labelDeclarations.labels : []
+    let allLabels = declaredLabels
+    if (this.allowUndeclaredLabels && declaredLabels.length === 0) {
+      const inferred = this.collectLabelsFromCompound(block.compound)
+      if (inferred.length > 0) allLabels = inferred
+    }
+    if (allLabels.length === 0) {
+      return this.emitCompound(block.compound, scope, indent)
+    }
+
+    const analysis = analyzeLabels(block.compound, allLabels)
+    const strategy = this.selectStrategy(analysis)
+    switch (strategy) {
+      case 'B': return this.emitStrategyB(block.compound, scope, indent, allLabels, analysis)
+      case 'C': return this.emitStrategyC(block.compound, scope, indent, allLabels, analysis)
+      case 'D': return this.emitStrategyD(block.compound, scope, indent, allLabels, analysis)
+    }
+  }
+
+  // 策略 B：单 label 后向跳转循环
+  // 用 while(true) + labeled continue 实现，支持任意嵌套深度的 goto
+  private emitStrategyB(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[], analysis: LabelAnalysis): string {
     const pad = ' '.repeat(indent)
-    // label 名（数字字符串）→ case 编号（1..N）
+    const labelName = [...analysis.labels.keys()][0]
+    const labelInfo = analysis.labels.get(labelName)!
+
+    const beforeLabel: StatementNode[] = []
+    const fromLabel: StatementNode[] = []
+    let foundLabel = false
+
+    for (const s of compound.statements) {
+      if (!foundLabel && s.kind === 'LabeledStatement' &&
+          String(((s as LabeledStatementNode).label as any).value) === labelName) {
+        foundLabel = true
+        fromLabel.push((s as LabeledStatementNode).statement)
+      } else if (foundLabel) {
+        fromLabel.push(s)
+      } else {
+        beforeLabel.push(s)
+      }
+    }
+
+    const savedGotoMode = this.gotoMode
+    const savedGotoLabel = this.gotoLabel
+    this.gotoMode = 'continue'
+    this.gotoLabel = '__goto_loop'
+
+    const bodyLines = fromLabel.map(s => this.emitStmt(s, scope, indent + 2)).filter(x => x.length > 0)
+
+    this.gotoMode = savedGotoMode
+    this.gotoLabel = savedGotoLabel
+
+    const lines: string[] = []
+    lines.push(`${pad}__goto_loop: while (true) {`)
+    lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+    for (const line of bodyLines) {
+      lines.push(line)
+    }
+    lines.push(`${pad}  break`)
+    lines.push(`${pad}}`)
+
+    const beforeCode = beforeLabel.map(s => this.emitStmt(s, scope, indent)).filter(x => x.length > 0).join('\n')
+    return beforeCode + (beforeCode ? '\n' : '') + lines.join('\n')
+  }
+
+  // 策略 C：单 label 前向跨循环跳转（跳出循环）
+  // 用 labeled block + labeled break 实现，支持任意嵌套深度
+  private emitStrategyC(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[], analysis: LabelAnalysis): string {
+    const pad = ' '.repeat(indent)
+    const labelName = [...analysis.labels.keys()][0]
+    const labelInfo = analysis.labels.get(labelName)!
+
+    const beforeLabel: StatementNode[] = []
+    let foundLabel = false
+    let labelStmt: StatementNode | null = null
+    const afterLabel: StatementNode[] = []
+
+    for (const s of compound.statements) {
+      if (!foundLabel && s.kind === 'LabeledStatement' &&
+          String(((s as LabeledStatementNode).label as any).value) === labelName) {
+        foundLabel = true
+        labelStmt = (s as LabeledStatementNode).statement
+      } else if (foundLabel) {
+        afterLabel.push(s)
+      } else {
+        beforeLabel.push(s)
+      }
+    }
+
+    const savedGotoMode = this.gotoMode
+    const savedGotoLabel = this.gotoLabel
+    this.gotoMode = 'break'
+    this.gotoLabel = '__goto_block'
+
+    const beforeLabelCode = beforeLabel.map(s => this.emitStmt(s, scope, indent + 2)).filter(x => x.length > 0)
+
+    this.gotoMode = savedGotoMode
+    this.gotoLabel = savedGotoLabel
+
+    const lines: string[] = []
+    lines.push(`${pad}__goto_block: {`)
+    for (const line of beforeLabelCode) {
+      lines.push(line)
+    }
+    lines.push(`${pad}}`)
+    if (labelStmt) {
+      lines.push(this.emitStmt(labelStmt, scope, indent))
+    }
+    for (const s of afterLabel) {
+      const code = this.emitStmt(s, scope, indent)
+      if (code) lines.push(code)
+    }
+
+    return lines.join('\n')
+  }
+
+  // 策略 D：完整状态机（复杂场景）
+  // 修正版：确保 labeled break 能跳出所有嵌套结构
+  private emitStrategyD(compound: CompoundStatementNode, scope: Scope, indent: number, labels: IntegerLiteralNode[], analysis: LabelAnalysis): string {
+    const pad = ' '.repeat(indent)
     const labelCases = new Map<string, number>()
     labels.forEach((l, i) => labelCases.set(String((l as any).value), i + 1))
-    // 切分 compound.statements：按顶层 LabeledStatement 切段
+
     const segments: { caseNum: number; stmts: StatementNode[] }[] = []
     let curCase = 0
     let curStmts: StatementNode[] = []
@@ -734,31 +983,48 @@ class Compiler {
       }
     }
     segments.push({ caseNum: curCase, stmts: curStmts })
-    // 生成 while + switch
-    const switchLabel = '__goto_switch'
+
     const lines: string[] = []
     lines.push(`${pad}let __pc = 0`)
-    lines.push(`${pad}${switchLabel}: while (true) {`)
-    lines.push(`${pad}  switch (__pc) {`)
+    lines.push(`${pad}while (true) {`)
+    lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+    lines.push(`${pad}  if (__pc === -1) break`)
+    lines.push(`${pad}  try {`)
+    lines.push(`${pad}    __goto_switch: switch (__pc) {`)
+
     const savedLabelCases = this.labelCases
     const savedSwitchName = this.labelSwitchName
     this.labelCases = labelCases
-    this.labelSwitchName = switchLabel
+    this.labelSwitchName = '__goto_switch'
+
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i]
-      lines.push(`${pad}  case ${seg.caseNum}:`)
+      lines.push(`${pad}    case ${seg.caseNum}:`)
       for (const s of seg.stmts) {
-        const code = this.emitStmt(s, scope, indent + 4)
+        const code = this.emitStmt(s, scope, indent + 6)
         if (code) lines.push(code)
       }
       const nextCase = i + 1 < segments.length ? segments[i + 1].caseNum : -1
-      lines.push(`${pad}    __pc = ${nextCase}`)
-      lines.push(`${pad}    break`)
+      lines.push(`${pad}      __pc = ${nextCase}`)
+      lines.push(`${pad}      break __goto_switch`)
     }
-    lines.push(`${pad}  default:`)
-    lines.push(`${pad}    break ${switchLabel}`)
+    lines.push(`${pad}    default:`)
+    lines.push(`${pad}      __pc = -1`)
+    lines.push(`${pad}      break __goto_switch`)
+    lines.push(`${pad}    }`)
+    lines.push(`${pad}  } catch (__goto_ex) {`)
+    lines.push(`${pad}    if (__goto_ex && __goto_ex.__goto !== undefined) {`)
+    lines.push(`${pad}      const __target = __goto_ex.__goto`)
+    lines.push(`${pad}      const __caseNum = ${JSON.stringify([...labelCases.entries()].reduce((o, [k, v]) => { (o as any)[k] = v; return o }, {}))}[__target]`)
+    lines.push(`${pad}      if (__caseNum !== undefined) {`)
+    lines.push(`${pad}        __pc = __caseNum; continue`)
+    lines.push(`${pad}      }`)
+    lines.push(`${pad}      throw __goto_ex`)
+    lines.push(`${pad}    }`)
+    lines.push(`${pad}    throw __goto_ex`)
     lines.push(`${pad}  }`)
     lines.push(`${pad}}`)
+
     this.labelCases = savedLabelCases
     this.labelSwitchName = savedSwitchName
     return lines.join('\n')
@@ -853,18 +1119,23 @@ class Compiler {
       case 'GotoStatement': {
         const gs = node as GotoStatementNode
         const lblName = String((gs.label as any).value)
+        if (this.gotoMode === 'continue') {
+          return `${pad}continue ${this.gotoLabel}`
+        }
+        if (this.gotoMode === 'break') {
+          return `${pad}break ${this.gotoLabel}`
+        }
         if (this.labelCases) {
           const caseNum = this.labelCases.get(lblName)
           if (caseNum === undefined) {
             throw new Error(`JS VM: goto ${lblName} - label not found`)
           }
-          // break 跳出 switch；while 重新进入 switch 到目标 case
-          // 注：goto 在嵌套 while/for 内时需用 labeled break（暂不支持）
-          return `${pad}__pc = ${caseNum}; break`
+          // labeled break 跳出外层 switch（避免被内层 while/for 拦截）
+          const breakLabel = this.labelSwitchName ? ` ${this.labelSwitchName}` : ''
+          return `${pad}__pc = ${caseNum}; break${breakLabel}`
         }
-        // 跨过程 goto：当前过程无 label 上下文。运行时若执行到此处再报错，
-        // 这样未调用的过程不会被编译期拒绝（符合 Pascal 编译器惯例）
-        return `${pad}throw new Error('JS VM: goto ${lblName} - no label context in this scope')`
+        // 跨过程 goto：标准 Pascal 不允许，直接报错
+        return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in current scope')`
       }
 
       case 'LabeledStatement': {
@@ -932,10 +1203,9 @@ class Compiler {
     const tmpTypeIds: string[] = []
     const lines: string[] = []
     lines.push(`${pad}{`)
-    node.records.forEach((r, i) => {
+    node.records.forEach((r) => {
       const e = this.emitExpr(r, scope)
-      const tmpName = `__with_${i}`
-      // e.code 产出 PascalValue（record）
+      const tmpName = `__with_${this.withVarCounter++}`
       lines.push(`${pad}  const ${tmpName} = ${e.code}`)
       tmpNames.push(tmpName)
       tmpTypeIds.push(e.type)
@@ -946,6 +1216,17 @@ class Compiler {
     lines.push(body)
     lines.push(`${pad}}`)
     return lines.join('\n')
+  }
+
+  // 生成 subrange 边界检查代码（如果不是 subrange 则原样返回）
+  private rangeCheck(code: string, origTypeId: string): string {
+    const b = this.subrangeBounds(origTypeId)
+    if (!b) return code
+    if (b.base === 'char') {
+      // char 存储为 PascalValue，需取 .raw 转 charCode 检查
+      return `((__v) => { let __c = (typeof __v === 'object' && __v && __v.raw !== undefined) ? (typeof __v.raw === 'string' ? __v.raw.charCodeAt(0) : __v.raw) : __v; if (__c < ${b.min} || __c > ${b.max}) throw new Error('JS VM: char value ' + __c + ' out of range ${b.min}..${b.max}'); return __v })(${code})`
+    }
+    return `((__v) => { if (__v < ${b.min} || __v > ${b.max}) throw new Error('JS VM: value ' + __v + ' out of range ${b.min}..${b.max}'); return __v })(${code})`
   }
 
   private emitAssignment(a: AssignmentNode, scope: Scope): string {
@@ -961,32 +1242,48 @@ class Compiler {
       if (withField) {
         const rhs = this.emitExpr(a.right, scope)
         const target = `${withField.recordJsName}.raw[${JSON.stringify(id.name.toUpperCase())}]`
-        return `${target} = ${this.toRawValue(rhs.code, rhs.type, withField.fieldTypeId)}`
+        return `${target} = ${this.rangeCheck(this.toRawValue(rhs.code, rhs.type, withField.fieldTypeId), withField.fieldTypeId)}`
       }
       const vi = scope.lookup(id.name)
       if (!vi) throw new Error(`JS VM: undefined variable ${id.name}`)
       const rhs = this.emitExpr(a.right, scope)
       const code = this.coerce(rhs.code, rhs.type, vi.typeId)
+      const checked = this.rangeCheck(code, vi.origTypeId)
+      // set/array/record 赋值需要深拷贝
+      if (this.typeKind(vi.typeId) === 'set') {
+        const copied = `ctx.box(${JSON.stringify(vi.typeId)}, new Set((${checked}).raw))`
+        if (vi.isVar && this.isScalarBare(vi.typeId)) {
+          return `${vi.jsName}.v = ${copied}`
+        }
+        return `${vi.jsName} = ${copied}`
+      }
       // var 参数（scalar）：赋值到 .v
       if (vi.isVar && this.isScalarBare(vi.typeId)) {
-        return `${vi.jsName}.v = ${code}`
+        return `${vi.jsName}.v = ${checked}`
       }
-      return `${vi.jsName} = ${code}`
+      return `${vi.jsName} = ${checked}`
     }
     if (a.left.kind === 'ArrayAccess') {
       const aa = a.left as ArrayAccessNode
-      // 数组元素赋值：a[i] := v -> a.raw[i] = v.raw (或裸值)
       const arr = this.emitExpr(aa.array, scope)
-      const elemTypeId = this.arrayElementType(arr.type)
+      const elemTypeId = this.arrayElementAfterNIndices(arr.type, aa.indices.length)
       if (!elemTypeId) throw new Error(`JS VM: ${arr.type} is not indexable`)
-      // emit 下标
+      const idxCodes: string[] = []
+      for (let i = 0; i < aa.indices.length; i++) {
+        const idx = this.emitExpr(aa.indices[i], scope)
+        let idxCode = this.toInt(idx.code, idx.type)
+        const d = this.arrayDimAt(arr.type, i)
+        if (d) {
+          idxCode = `ctx.checkArrayIndex(${idxCode}, ${d.low}, ${d.high})`
+        }
+        idxCodes.push(idxCode)
+      }
       let idxCode = `${arr.code}.raw`
-      for (const idxExpr of aa.indices) {
-        const idx = this.emitExpr(idxExpr, scope)
-        idxCode += `[${this.toInt(idx.code, idx.type)}]`
+      for (const ic of idxCodes) {
+        idxCode += `[${ic}]`
       }
       const rhs = this.emitExpr(a.right, scope)
-      return `${idxCode} = ${this.toRawValue(rhs.code, rhs.type, elemTypeId)}`
+      return `${idxCode} = ${this.rangeCheck(this.toRawValue(rhs.code, rhs.type, elemTypeId), elemTypeId)}`
     }
     if (a.left.kind === 'FieldAccess') {
       const fa = a.left as FieldAccessNode
@@ -996,7 +1293,7 @@ class Compiler {
       const fieldTypeId = this.recordFieldType(obj.type, fieldName)
       if (!fieldTypeId) throw new Error(`JS VM: record ${obj.type} has no field ${fieldName}`)
       const rhs = this.emitExpr(a.right, scope)
-      return `${obj.code}.raw[${JSON.stringify(fieldName)}] = ${this.toRawValue(rhs.code, rhs.type, fieldTypeId)}`
+      return `${obj.code}.raw[${JSON.stringify(fieldName)}] = ${this.rangeCheck(this.toRawValue(rhs.code, rhs.type, fieldTypeId), fieldTypeId)}`
     }
     throw new Error(`JS VM: unsupported assignment target ${(a.left as any).kind}`)
   }
@@ -1253,6 +1550,15 @@ class Compiler {
             const actual = procInfo.forwardDef || procInfo
             return { code: `(await ${actual.jsName}(ctx))`, type: actual.returnType }
           }
+          // 内置无参函数（如 EOF、EOLN、RANDOM）
+          const upperName = name.toUpperCase()
+          if (BUILTIN_NO_ARG.has(upperName)) {
+            const retType = builtinReturnType(upperName)
+            if (isScalar(retType) && retType !== 'char' && retType !== 'string') {
+              return { code: `((await ctx.sysCall(${JSON.stringify(upperName)}, [])).raw)`, type: retType }
+            }
+            return { code: `(await ctx.sysCall(${JSON.stringify(upperName)}, []))`, type: retType }
+          }
           throw new Error(`JS VM: undefined variable ${name}`)
         }
         // var 参数（scalar）：访问 .v
@@ -1287,19 +1593,27 @@ class Compiler {
   // 数组访问：a[i] 或 a[i,j]
   private emitArrayAccess(node: ArrayAccessNode, scope: Scope): { code: string; type: string } {
     const arr = this.emitExpr(node.array, scope)
-    const elemTypeId = this.arrayElementType(arr.type)
+    const elemTypeId = this.arrayElementAfterNIndices(arr.type, node.indices.length)
     if (!elemTypeId) throw new Error(`JS VM: ${arr.type} is not indexable`)
-    let code = `${arr.code}.raw`
-    for (const idxExpr of node.indices) {
+    const idxCodes: string[] = []
+    for (let i = 0; i < node.indices.length; i++) {
+      const idxExpr = node.indices[i]
       const idx = this.emitExpr(idxExpr, scope)
-      code += `[${this.toInt(idx.code, idx.type)}]`
+      let idxCode = this.toInt(idx.code, idx.type)
+      const d = this.arrayDimAt(arr.type, i)
+      if (d) {
+        idxCode = `ctx.checkArrayIndex(${idxCode}, ${d.low}, ${d.high})`
+      }
+      idxCodes.push(idxCode)
+    }
+    let code = `${arr.code}.raw`
+    for (const idxCode of idxCodes) {
+      code += `[${idxCode}]`
     }
     const st = this.scalarBase(elemTypeId)
     if (st === 'integer' || st === 'real' || st === 'boolean') {
-      // 元素是裸值
       return { code, type: st }
     }
-    // char/string/array/record：raw 存的是裸 raw 值，包装成 PascalValue
     return { code: `ctx.box(${JSON.stringify(elemTypeId)}, ${code})`, type: elemTypeId }
   }
 
@@ -1362,6 +1676,25 @@ class Compiler {
 
     switch (op) {
       case '+': case '-': case '*': {
+        if (this.typeKind(resultType) === 'set') {
+          if (op === '+') {
+            return {
+              code: `ctx.box(${JSON.stringify(resultType)}, new Set([...${L.code}.raw, ...${R.code}.raw]))`,
+              type: resultType,
+            }
+          }
+          if (op === '*') {
+            return {
+              code: `ctx.box(${JSON.stringify(resultType)}, new Set([...${L.code}.raw].filter(x => ${R.code}.raw.has(x))))`,
+              type: resultType,
+            }
+          }
+          // '-' set difference
+          return {
+            code: `ctx.box(${JSON.stringify(resultType)}, new Set([...${L.code}.raw].filter(x => !${R.code}.raw.has(x))))`,
+            type: resultType,
+          }
+        }
         if (resultType === 'integer') {
           return { code: `((${L.code}) ${op} (${R.code})) | 0`, type: 'integer' }
         }
@@ -1377,10 +1710,9 @@ class Compiler {
       case '/': // Pascal 实数除
         return { code: `((${L.code}) / (${R.code}))`, type: 'real' }
       case 'DIV':
-        return { code: `(Math.trunc((${L.code}) / (${R.code}))) | 0`, type: 'integer' }
+        return { code: `(() => { const __d = ${R.code}; if (__d === 0) throw new Error('JS VM: division by zero'); return (Math.trunc((${L.code}) / __d)) | 0 })()`, type: 'integer' }
       case 'MOD':
-        // Pascal MOD: a - (a div b) * b，trunc 语义。非负操作数下与 % 等价
-        return { code: `((${L.code}) % (${R.code}))`, type: 'integer' }
+        return { code: `(() => { const __m = ${R.code}; if (__m === 0) throw new Error('JS VM: division by zero'); const __l = ${L.code}; return (__l - Math.trunc(__l / __m) * __m) | 0 })()`, type: 'integer' }
       case '=': case '<>': case '<': case '<=': case '>': case '>=': {
         const jsOp = op === '=' ? '===' : op === '<>' ? '!==' : op
         if (isStrChar(L.type) || isStrChar(R.type)) {
@@ -1497,6 +1829,9 @@ class Compiler {
   }
 
   private binaryResultType(op: string, lt: string, rt: string): string {
+    if (this.typeKind(lt) === 'set' && this.typeKind(rt) === 'set') {
+      if (op === '+' || op === '-' || op === '*') return lt
+    }
     switch (op) {
       case '+': case '-': case '*':
         if (lt === 'real' || rt === 'real') return 'real'
@@ -1547,6 +1882,15 @@ class Compiler {
 // 公开 API
 // ============================================================================
 
+export interface JSDebugOptions {
+  // 打印生成的 JS 代码到控制台
+  emitJS?: boolean
+  // 输出 JS 代码到文件（仅用于调试）
+  emitJSFile?: string
+  // 打印 label 静态分析结果
+  labelAnalysis?: boolean
+}
+
 export interface JSRunOptions {
   input?: string[]
   plugins?: TypePlugin[]
@@ -1557,6 +1901,10 @@ export interface JSRunOptions {
   // 全局文件变量名（大写）→ URL；程序启动时自动 ASSIGN（TANGLE 等 Knuth 风格程序用）
   programFileUrls?: Record<string, string>
   maxSteps?: number
+  // 非标扩展：允许无 LABEL 声明的 goto（Berkeley/DEC Pascal 扩展）
+  allowUndeclaredLabels?: boolean
+  // 调试选项
+  debug?: JSDebugOptions
 }
 
 function parseSource(source: string): ProgramNode {
@@ -1569,7 +1917,7 @@ function parseSource(source: string): ProgramNode {
 
 // 构造 runtime（复用 VM 的 typeTable/sysCalls 构造逻辑，保证语义一致）
 function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: RuntimeCtx; sysCalls: Map<string, SysCallHandler> } {
-  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin, stringPlugin, ...(options.plugins || [])]
+  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin, ...(options.plugins || [])]
   const analyzer = new StaticAnalyzer(basePlugins)
   analyzer.analyze(ast) // 只为 typeTable，JsonCode 丢弃
   const typeTable = analyzer.getTypeTable()
@@ -1580,7 +1928,7 @@ function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: Runti
   const setPlugin = createSetPlugin(typeTable)
   const filePlugin = createFilePlugin(typeTable)
   const allPlugins = [...basePlugins, arrayPlugin, recordPlugin, enumPlugin, subrangePlugin, setPlugin, filePlugin]
-  const sysCalls = options.sysCalls || createDefaultSysCalls()
+  const sysCalls = options.sysCalls || createExtendedSysCalls()
   // 构造 PascalIO（与 runVM 一致）：files 优先，否则用默认 console-only IO
   let io: PascalIO | undefined
   if (options.files) {
@@ -1602,31 +1950,56 @@ function buildRuntime(ast: ProgramNode, options: JSRunOptions): { runtime: Runti
 const AsyncFunction = Object.getPrototypeOf(async function () { /* */ }).constructor
 
 export async function runJS(source: string, options: JSRunOptions = {}): Promise<VMState> {
-  const ast = parseSource(source)
-  const { runtime, sysCalls } = buildRuntime(ast, options)
-
-  // 编译
-  const compiler = new Compiler(runtime.typeTable)
-  const body = compiler.compile(ast, options.programFileUrls)
-
-  // 构造 ctx
-  const ctx = createJSCtx({
-    sysCalls,
-    runtime,
-    input: options.input,
-    maxSteps: options.maxSteps,
-  })
-
-  // 执行
-  const fn = new AsyncFunction('ctx', body)
   try {
-    await fn(ctx)
-    return ctxToVMState(ctx, 'terminated')
+    const ast = parseSource(source)
+    const { runtime, sysCalls } = buildRuntime(ast, options)
+
+    // 编译
+    const compiler = new Compiler(runtime.typeTable, {
+      allowUndeclaredLabels: options.allowUndeclaredLabels,
+    })
+    const body = compiler.compile(ast, options.programFileUrls)
+
+    // 调试输出
+    if (options.debug?.emitJS) {
+      console.log('\n===== Generated JS =====')
+      console.log(body)
+      console.log('========================\n')
+    }
+    if (options.debug?.emitJSFile) {
+      const fs = await import('fs')
+      await fs.promises.writeFile(options.debug.emitJSFile, body, 'utf-8')
+    }
+
+    // 构造 ctx
+    const ctx = createJSCtx({
+      sysCalls,
+      runtime,
+      input: options.input,
+      maxSteps: options.maxSteps,
+    })
+
+    // 执行
+    const fn = new AsyncFunction('ctx', body)
+    try {
+      await fn(ctx)
+      return ctxToVMState(ctx, 'terminated')
+    } catch (e: any) {
+      const state = ctxToVMState(ctx, 'error')
+      // 与 VM 一致：state.error 是 VMError 对象（_helper 用 state.error?.message 访问）
+      state.error = { message: e?.message || String(e), instructionIndex: -1, stackTrace: [] } as any
+      return state
+    }
   } catch (e: any) {
-    const state = ctxToVMState(ctx, 'error')
-    // 与 VM 一致：state.error 是 VMError 对象（_helper 用 state.error?.message 访问）
-    state.error = { message: e?.message || String(e), instructionIndex: -1, stackTrace: [] } as any
-    return state
+    // parse / compile 阶段异常也包装为 error 状态（与 VM 行为一致）
+    return {
+      status: 'error',
+      outputBuffer: [],
+      globals: new Map(),
+      callStack: [],
+      steps: 0,
+      error: { message: e?.message || String(e), instructionIndex: -1, stackTrace: [] },
+    } as any
   }
 }
 
@@ -1634,7 +2007,7 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
 export function compileToJS(source: string): string {
   const ast = parseSource(source)
   // 构造一个最小 runtime 仅为 typeTable
-  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin, stringPlugin]
+  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin]
   const analyzer = new StaticAnalyzer(basePlugins)
   analyzer.analyze(ast)
   const compiler = new Compiler(analyzer.getTypeTable())

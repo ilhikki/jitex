@@ -2,9 +2,9 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { parse } from '../src/index'
 import { StaticAnalyzer } from '../src/static-analyzer'
-import { runVM } from '../src/vm'
+import { runJS } from '../src/js-compiler'
 
-describe('Tangle Official - VM run', () => {
+describe('Tangle Official - JS run', () => {
   const pasFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle-official.pas')
   const webFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle.web')
   const source = fs.readFileSync(pasFile, 'utf-8')
@@ -52,7 +52,7 @@ describe('Tangle Official - VM run', () => {
     files.set('PASCALFILE', new Uint8Array())
     files.set('POOL', new Uint8Array())
 
-    const state = await runVM(source, {
+    const state = await runJS(source, {
       input: [],
       files,
       programFileUrls: {
@@ -61,6 +61,7 @@ describe('Tangle Official - VM run', () => {
         'PASCALFILE': 'PASCALFILE',
         'POOL': 'POOL',
       },
+      maxSteps: 1e9,
     })
 
     console.log('VM final status:', state.status)
@@ -77,5 +78,11 @@ describe('Tangle Official - VM run', () => {
     }
 
     expect(['terminated', 'error']).toContain(state.status)
+
+    // 验证非标 I/O 确实生效：PASCALFILE / POOL 应有内容
+    const pascalSize = files.get('PASCALFILE')?.length || 0
+    const poolSize = files.get('POOL')?.length || 0
+    expect(pascalSize).toBeGreaterThan(0)
+    expect(poolSize).toBeGreaterThan(0)
   }, 60000)
 })

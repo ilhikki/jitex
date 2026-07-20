@@ -1,8 +1,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { runVM } from '../src/vm'
+import { runJS } from '../src/js-compiler'
 
-describe('TANGLE self-bootstrap test', () => {
+describe('TANGLE self-bootstrap test (JS)', () => {
   const webFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle.web')
   const officialPasFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
@@ -15,7 +15,7 @@ describe('TANGLE self-bootstrap test', () => {
     files.set('PASCALFILE', new Uint8Array())
     files.set('POOL', new Uint8Array())
 
-    return runVM(pasSource, {
+    return runJS(pasSource, {
       input: [],
       files,
       programFileUrls: {
@@ -24,6 +24,7 @@ describe('TANGLE self-bootstrap test', () => {
         'PASCALFILE': 'PASCALFILE',
         'POOL': 'POOL',
       },
+      maxSteps: 1e9,
     }).then((state: any) => {
       return {
         pascal: Buffer.from(files.get('PASCALFILE')!).toString('utf-8'),
@@ -37,6 +38,7 @@ describe('TANGLE self-bootstrap test', () => {
     const result = await runTangle(officialPas, webSource)
     expect(result.pascal.length).toBeGreaterThan(10000)
     expect(result.pascal).toContain('PROGRAM TANGLE')
+    expect(result.pool.length).toBeGreaterThan(0)
     console.log('First pass PASCALFILE size:', result.pascal.length, 'chars')
     console.log('First pass POOL size:', result.pool.length, 'chars')
   }, 60000)
