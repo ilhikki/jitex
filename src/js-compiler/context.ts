@@ -7,10 +7,9 @@
 //   - steps / maxSteps: 步数限制
 //   - outputBuffer / inputQueue: IO 缓冲（与 VM 状态结构兼容）
 
-import type { PascalValue } from '../vm/jsoncode'
-import type { RuntimeCtx, SysCallHandler } from '../types'
-import type { VMState } from '../vm/state'
-import { createEmptyFile, type PascalIO } from '../vm/file-model'
+import type { PascalValue, RuntimeCtx, SysCallHandler } from './types'
+import type { VMState } from './vm-state'
+import { createEmptyFile, type PascalIO } from './file-model'
 
 export interface JSCtx {
   sysCall: (name: string, args: any[]) => Promise<any>
@@ -46,8 +45,9 @@ function createMockState(outputBuffer: string[], inputQueue: string[]): VMState 
     inputQueue,
     error: null,
     status: 'running',
+    steps: 0,
     stepsExecuted: 0,
-  } as VMState
+  } as unknown as VMState
 }
 
 // Pascal 实数格式化（与 io.plugin 的 formatReal 行为一致，但修正指数补零为 3 位）
@@ -162,6 +162,7 @@ export function ctxToVMState(ctx: JSCtx, status: 'running' | 'terminated' | 'err
     inputQueue: ctx.inputQueue,
     error: null,
     status,
+    steps: ctx.steps,
     stepsExecuted: ctx.steps,
-  } as VMState
+  } as unknown as VMState
 }

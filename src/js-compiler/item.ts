@@ -1,5 +1,5 @@
 // 内置系统调用名（大写）。ProcedureCall/FunctionCall 命中此集合 → 走 sysCall
-import type { TypeTable } from '../types'
+import type { TypeTable } from './types'
 import type { BlockNode, ExpressionNode, IdentifierNode, ProgramNode } from '../ast/types'
 
 export const BUILTIN_SYSCALLS = new Set([

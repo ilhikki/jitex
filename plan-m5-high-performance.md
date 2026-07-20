@@ -2,29 +2,26 @@
 
 > **当前阶段**：M5
 > **目标**：在不改变语义的前提下，将 Pascal82 编译为 JS 执行，让 TEX82 能在合理时间内完成
-> **前置阶段**：[M4 VM + TypePlugin + Pascal82 + TEX82](docs/archive/plan-tex82.md)（已完成，代码冻结）
-> **指导原则**：代码冻结、测试复用、渐进验证、问题驱动
+> **指导原则**：测试复用、渐进验证、问题驱动
 
 ## 一、阶段定位
 
-M4 已经完成了 VM + TypePlugin 模型、Pascal82 规范一致性、TEX82 移植验证。但 VM 性能瓶颈凸显：1 亿步耗时 32 秒（264 万步/秒），TEX82 完整运行需要数十亿步，当前速度无法接受。
+M5 的核心任务是高性能执行。选定方案是**编译为 JS**（从 AST 直接生成 JS 代码字符串，`new AsyncFunction()` 执行），让 V8 JIT 优化热点代码。
 
-**M5 的核心任务是高性能执行**。选定方案是**编译为 JS**（从 AST 直接生成 JS 代码字符串，`new AsyncFunction()` 执行），让 V8 JIT 优化热点代码。
-
-## 二、代码冻结声明
-
-以下代码在 M5 期间**冻结，不修改**，作为基线保留：
+## 二、代码架构
 
 ```
-src/ast/                 ❄️ 冻结
-src/lexer/               ❄️ 冻结
-src/parser/              ❄️ 冻结
-src/static-analyzer/     ❄️ 冻结（AST → JsonCode）
-src/types/               ❄️ 冻结（TypePlugin 系统）
-src/vm/                  ❄️ 冻结（解释执行 VM，仅参考）
+src/
+├── ast/                 # AST 类型定义
+├── lexer/               # 词法分析器
+├── parser/              # 语法分析器
+└── js-compiler/         # JS 编译器（M5）
+    ├── types/           # TypePlugin 系统
+    ├── index.ts         # 公开 API
+    └── ...
 ```
 
-M5 的新代码放在 `src/js-compiler/` 下，不改动上述任何文件。
+前端（AST/Lexer/Parser）保持稳定，JS 编译器持续迭代。
 
 ## 三、方案选型
 
@@ -55,15 +52,13 @@ M5 的新代码放在 `src/js-compiler/` 下，不改动上述任何文件。
 
 ## 五、测试策略
 
-### 5.1 默认全部走 JS
+### 5.1 测试全部走 JS 编译器
 
-`tests/m5/` 和 `tests-tex/` 下所有测试**默认走 JS 编译器**（`engine: 'js'`）。VM 仅作为手动对比工具，不在 CI 中默认运行。
-
-任何差异视为 JS 编译器 bug，需修复。
+`tests/m5/` 和 `tests-tex/` 下所有测试全部走 JS 编译器。
 
 ### 5.2 非标扩展配置化
 
-VM 支持的部分非标扩展（如 goto 无 LABEL 声明）通过配置项开启：
+部分非标扩展（如 goto 无 LABEL 声明）通过配置项开启：
 
 ```typescript
 runJS(code, {
@@ -121,11 +116,26 @@ runJS(code, {
   - [x] 跨过程 goto：普通 Error 抛出，避免死循环
 - [x] 测试用例全部改为 pascal82 标准（显式 label 声明，默认不开非标扩展）
 
-### Phase 5: TEX82 验证
+### Phase 5: 项目重构 🚧
+
+- [x] 移除 VM 解释器和 static-analyzer 依赖
+- [x] TypePlugin 系统整合进 js-compiler
+- [x] JS 编译器独立可运行
+- [x] syscall 系统移植到 js-compiler
+- [x] 清理 issue 目录
+
+### Phase 6: 性能和便利性优化、bug 修复
+
+- [ ] 性能优化：热点代码内联、减少装箱拆箱
+- [ ] 开发便利性：更好的错误提示、调试工具
+- [ ] bug 修复：边缘场景修复
+- [ ] 代码质量：重构、类型完善
+
+### Phase 7: 跑 TEX82
 
 - [ ] TRIP 测试在新引擎下跑通
-- [ ] 对比 VM 输出一致性
 - [ ] 测量 TEX82 实际运行时间
+- [ ] 性能优化（如需要）
 
 ## 七、调试工具
 
@@ -172,18 +182,16 @@ const result = await runVMTest({
 
 ## 九、性能目标
 
-| 指标 | M4 VM 基线 | M5 JS 编译目标 |
-|------|-----------|---------------|
-| 1 亿步（纯计算） | 32 秒，264 万步/秒 | < 5 秒，> 2000 万步/秒 |
-| TEX82 TRIP | 未完成 | 完成且输出一致 |
-| TEX82 texbook | 不可行 | 可行（合理时间内） |
+| 指标 | 目标 |
+|------|------|
+| 1 亿步（纯计算） | < 5 秒，> 2000 万步/秒 |
+| TEX82 TRIP | 完成且输出一致 |
+| TEX82 texbook | 可行（合理时间内） |
 
 ## 十、参考
 
 - **主项目计划**：[plan.md](plan.md)
 - **goto 策略设计**：[docs/design-goto-strategy.md](docs/design-goto-strategy.md)
-- **M4 基线**：[docs/archive/plan-tex82.md](docs/archive/plan-tex82.md)
-- **现有 VM 实现**：`src/vm/vm.ts`（解释执行）
-- **TypePlugin 系统**：`src/types/index.ts`
+- **重构计划**：[docs/plan-refactoring.md](docs/plan-refactoring.md)
+- **TypePlugin 系统**：`src/js-compiler/types/`
 - **AST 结构**：`src/ast/types.ts`
-- **StaticAnalyzer**：`src/static-analyzer/index.ts`

@@ -1,5 +1,5 @@
 import { VMTest, runVMTest } from './_helper'
-import { stringPlugin } from '../../src/types/string.plugin'
+import { stringPlugin } from '../../src/js-compiler/types/string.plugin'
 
 const tests: VMTest[] = [
   // ==========================================================================

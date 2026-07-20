@@ -38,7 +38,7 @@ import type {
   WhileStatementNode,
   WithStatementNode,
 } from '../ast/types'
-import type { TypeTable } from '../types'
+import type { TypeTable } from './types'
 import {
   BUILTIN_NO_ARG,
   BUILTIN_SYSCALLS,
@@ -725,7 +725,7 @@ export class Compiler {
       return this.emitCompound(block.compound, scope, indent)
     }
 
-    return emitBlockWithGoto(block.compound, scope, indent, allLabels)
+    return emitBlockWithGoto(block.compound, scope, indent, allLabels, this)
   }
 
   private emitCompound(node: CompoundStatementNode, scope: Scope, indent: number): string {
@@ -736,7 +736,7 @@ export class Compiler {
     return lines.join('\n')
   }
 
-  private emitStmt(node: StatementNode, scope: Scope, indent: number): string {
+  emitStmt(node: StatementNode, scope: Scope, indent: number): string {
     const pad = ' '.repeat(indent)
     switch (node.kind) {
       case 'CompoundStatement':
@@ -854,10 +854,14 @@ export class Compiler {
         if (this.labelCases) {
           const caseNum = this.labelCases.get(lblName)
           if (caseNum === undefined) {
+            // 如果当前状态机找不到这个 label，说明要跳到外层，用 break 退出当前状态机
+            if (this.labelSwitchName) {
+              return `${pad}break ${this.labelSwitchName}`
+            }
             throw new Error(`JS VM: goto ${lblName} - label not found`)
           }
-          const breakLabel = this.labelSwitchName ? ` ${this.labelSwitchName}` : ''
-          return `${pad}__pc = ${caseNum}; break${breakLabel}`
+          const continueLabel = this.labelSwitchName ? ` ${this.labelSwitchName}` : ''
+          return `${pad}__pc = ${caseNum}; continue${continueLabel}`
         }
         return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in current scope')`
       }
@@ -1126,13 +1130,17 @@ export class Compiler {
             varBoxes.push({ argIdx: i, argJsName: argVi.jsName, boxName })
             return boxName
           }
+          // 复杂类型变量：直接传引用
+          if (argVi) {
+            return e.code
+          }
         }
-        if (this.isScalarBare(pType)) {
-          // scalar 表达式（非常量标识符）：box + 写回丢弃（无左值）
-          return `{v: ${this.coerce(e.code, e.type, pType)}}`
+        // 数组元素或记录字段：也是合法的 var 实参（左值）
+        if (a.kind === 'ArrayAccess' || a.kind === 'FieldAccess') {
+          return e.code
         }
-        // 复杂类型：直接传 PascalValue 引用（已经是对象）
-        return e.code
+        // var 参数必须是变量（左值），否则报错
+        throw new Error(`Variable required as var parameter: ${paramInfo.name || `arg${i}`}`)
       }
       // value 参数：传值（scalar 裸值 / 复杂类型 PascalValue）
       return this.coerce(e.code, e.type, pType)

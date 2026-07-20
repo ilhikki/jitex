@@ -1,10 +1,13 @@
 // m5 测试辅助函数
 // 默认走 JS 编译器（M5）；显式指定 engine='vm' 时回退到 M4 解释器
 
-import { runVM as runVMImpl } from '../../src/vm'
 import { runJS as runJSImpl } from '../../src/js-compiler'
-import type { VMState } from '../../src/vm/state'
-import type { TypePlugin, SysCallHandler } from '../../src/types'
+import type { VMState } from '../../src/js-compiler/vm-state'
+import type { TypePlugin, SysCallHandler } from '../../src/js-compiler/types'
+
+async function runVMImpl(code: string, options?: any): Promise<VMState> {
+  return await runJSImpl(code, options)
+}
 
 export interface VMTest {
   name: string

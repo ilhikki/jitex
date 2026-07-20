@@ -10,21 +10,21 @@
 import { parse } from '../index'
 import type { ProgramNode } from '../ast/types'
 import { createJSCtx, ctxToVMState } from './context'
-import { StaticAnalyzer } from '../static-analyzer'
-import { integerPlugin } from '../types/integer.plugin'
-import { booleanPlugin } from '../types/boolean.plugin'
-import { charPlugin } from '../types/char.plugin'
-import { realPlugin } from '../types/real.plugin'
-import { createArrayPlugin } from '../types/array.plugin'
-import { createRecordPlugin } from '../types/record.plugin'
-import { createEnumPlugin } from '../types/enum.plugin'
-import { createSubrangePlugin } from '../types/subrange.plugin'
-import { createSetPlugin } from '../types/set.plugin'
-import { createFilePlugin } from '../types/file.plugin'
-import { createExtendedSysCalls } from '../vm/extended-io.plugin'
-import { createDefaultIO, createRecordFileOps, type PascalIO } from '../vm/file-model'
-import type { RuntimeCtx, SysCallHandler, TypePlugin } from '../types'
-import type { VMState } from '../vm/state'
+import { buildTypeTable } from './type-table-builder'
+import { integerPlugin } from './types/integer.plugin'
+import { booleanPlugin } from './types/boolean.plugin'
+import { charPlugin } from './types/char.plugin'
+import { realPlugin } from './types/real.plugin'
+import { createArrayPlugin } from './types/array.plugin'
+import { createRecordPlugin } from './types/record.plugin'
+import { createEnumPlugin } from './types/enum.plugin'
+import { createSubrangePlugin } from './types/subrange.plugin'
+import { createSetPlugin } from './types/set.plugin'
+import { createFilePlugin, TEXT_TYPE } from './types/file.plugin'
+import { createExtendedSysCalls } from './syscalls'
+import { createDefaultIO, createRecordFileOps, type PascalIO } from './file-model'
+import type { RuntimeCtx, SysCallHandler, TypePlugin, TypeDef } from './types'
+import type { VMState } from './vm-state'
 import { Compiler } from './complier'
 
 // ============================================================================
@@ -64,21 +64,26 @@ function parseSource(source: string): ProgramNode {
   return (result as any).astNode as ProgramNode
 }
 
-// 构造 runtime（复用 VM 的 typeTable/sysCalls 构造逻辑，保证语义一致）
+// 构造 runtime
 function buildRuntime(
   ast: ProgramNode,
   options: JSRunOptions
 ): { runtime: RuntimeCtx; sysCalls: Map<string, SysCallHandler> } {
+  const fileTypePlugin: TypePlugin = {
+    name: 'file-types',
+    version: '1.0.0',
+    types: [TEXT_TYPE as TypeDef],
+    ops: {},
+  }
   const basePlugins: TypePlugin[] = [
     integerPlugin,
     booleanPlugin,
     charPlugin,
     realPlugin,
+    fileTypePlugin,
     ...(options.plugins || []),
   ]
-  const analyzer = new StaticAnalyzer(basePlugins)
-  analyzer.analyze(ast) // 只为 typeTable，JsonCode 丢弃
-  const typeTable = analyzer.getTypeTable()
+  const typeTable = buildTypeTable(ast, basePlugins)
   const arrayPlugin = createArrayPlugin(typeTable)
   const recordPlugin = createRecordPlugin(typeTable)
   const enumPlugin = createEnumPlugin(typeTable)
@@ -95,7 +100,6 @@ function buildRuntime(
     filePlugin,
   ]
   const sysCalls = options.sysCalls || createExtendedSysCalls()
-  // 构造 PascalIO（与 runVM 一致）：files 优先，否则用默认 console-only IO
   let io: PascalIO | undefined
   if (options.files) {
     io = {
@@ -108,7 +112,6 @@ function buildRuntime(
     sysCalls,
     io,
   }
-  // 把 allPlugins 信息塞进 runtime 供未来 invoke 使用（Phase 2/3）
   ;(runtime as any).plugins = allPlugins
   return { runtime, sysCalls }
 }
@@ -178,10 +181,8 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
 // 调试用：返回编译生成的 JS 源码（不执行）
 export function compileToJS(source: string): string {
   const ast = parseSource(source)
-  // 构造一个最小 runtime 仅为 typeTable
   const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin]
-  const analyzer = new StaticAnalyzer(basePlugins)
-  analyzer.analyze(ast)
-  const compiler = new Compiler(analyzer.getTypeTable())
+  const typeTable = buildTypeTable(ast, basePlugins)
+  const compiler = new Compiler(typeTable)
   return compiler.compile(ast)
 }

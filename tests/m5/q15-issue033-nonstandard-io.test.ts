@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from '@jest/globals'
 import { runVMTest, type VMTest } from './_helper'
-import { createExtendedSysCalls } from '../../src/vm/extended-io.plugin'
+import { createExtendedSysCalls } from '../../src/js-compiler/syscalls'
 
 function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)
