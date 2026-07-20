@@ -29,6 +29,7 @@ describe('TEX82 - compile and analyze tex.pas (JS)', () => {
         POOL: 'POOL',
       },
       maxSteps: 1e9,
+      allowUndeclaredLabels: true,
     })
     expect(state.status).toBe('terminated')
     const pascal = files.get('PASCALFILE')!

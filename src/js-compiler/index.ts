@@ -848,9 +848,14 @@ class Compiler {
   private emitBody(block: BlockNode, scope: Scope, indent: number): string {
     const declaredLabels = block.labelDeclarations ? block.labelDeclarations.labels : []
     let allLabels = declaredLabels
-    if (this.allowUndeclaredLabels && declaredLabels.length === 0) {
+    if (this.allowUndeclaredLabels) {
       const inferred = this.collectLabelsFromCompound(block.compound)
-      if (inferred.length > 0) allLabels = inferred
+      const declaredSet = new Set(declaredLabels.map(l => l.value))
+      for (const l of inferred) {
+        if (!declaredSet.has(l.value)) {
+          allLabels = [...allLabels, l]
+        }
+      }
     }
     if (allLabels.length === 0) {
       return this.emitCompound(block.compound, scope, indent)

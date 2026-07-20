@@ -37,6 +37,7 @@ describe('TEX82 - TRIP test (JS)', () => {
         POOL: 'POOL',
       },
       maxSteps: 1e9,
+      allowUndeclaredLabels: true,
     })
     expect(state.status).toBe('terminated')
     expect(files.get('PASCALFILE')!.length).toBeGreaterThan(100000)
@@ -84,6 +85,7 @@ describe('TEX82 - TRIP test (JS)', () => {
       plugins: [stringPlugin],
       sysCalls: extendedSysCalls,
       maxSteps: 1e9,
+      allowUndeclaredLabels: true,
     })
 
     console.log('VM status:', state.status)

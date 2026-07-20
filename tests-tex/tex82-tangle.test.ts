@@ -25,6 +25,7 @@ describe('TEX82 - TANGLE compile tex.web (JS)', () => {
         'POOL': 'POOL',
       },
       maxSteps: 1e9,
+      allowUndeclaredLabels: true,
     }).then((state: any) => {
       return {
         state,

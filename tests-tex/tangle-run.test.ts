@@ -62,6 +62,7 @@ describe('Tangle Official - JS run', () => {
         'POOL': 'POOL',
       },
       maxSteps: 1e9,
+      allowUndeclaredLabels: true,
     })
 
     console.log('VM final status:', state.status)

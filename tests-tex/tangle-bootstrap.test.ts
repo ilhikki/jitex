@@ -25,6 +25,7 @@ describe('TANGLE self-bootstrap test (JS)', () => {
         'POOL': 'POOL',
       },
       maxSteps: 1e9,
+      allowUndeclaredLabels: true,
     }).then((state: any) => {
       return {
         pascal: Buffer.from(files.get('PASCALFILE')!).toString('utf-8'),
