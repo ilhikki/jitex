@@ -22,7 +22,7 @@ export class Compiler {
   constInts = new Map<string, number>()
   labelCases: Map<string, number> | null = null
   labelSwitchName: string | null = null
-  gotoMode: 'continue' | 'break' | 'exception' | null = null
+  gotoMode: 'continue' | 'break' | 'exception' | 'simple' | null = null
   gotoLabel: string | null = null
   allowUndeclaredLabels: boolean
   withVarCounter = 0

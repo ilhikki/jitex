@@ -5,9 +5,27 @@ import type {
   LabeledStatementNode,
   CaseStatementNode,
   WithStatementNode,
+  GotoStatementNode,
 } from '../ast/types'
 import { Scope } from './emit/utils'
 import type { Compiler } from './compiler'
+
+export type GotoStrategy = 'A' | 'B' | 'C' | 'D'
+
+interface LabelInfo {
+  stmt: LabeledStatementNode
+  remaining: StatementNode[]
+  position: 'forward' | 'backward' | 'middle'
+  hasForwardGoto: boolean
+  hasBackwardGoto: boolean
+}
+
+interface GotoAnalysis {
+  labels: Map<string, LabelInfo>
+  gotoCount: number
+  complexity: 'simple' | 'medium' | 'complex'
+  strategy: GotoStrategy
+}
 
 function isTransparentBlock(stmt: StatementNode): boolean {
   return (
@@ -15,6 +33,104 @@ function isTransparentBlock(stmt: StatementNode): boolean {
     stmt.kind === 'CaseStatement' ||
     stmt.kind === 'WithStatement'
   )
+}
+
+function analyzeGoto(
+  stmts: StatementNode[],
+  labelInfo: Map<string, { stmt: LabeledStatementNode; remaining: StatementNode[] }>
+): GotoAnalysis {
+  const labels = new Map<string, LabelInfo>()
+  let gotoCount = 0
+  const gotoTargets = new Set<string>()
+
+  for (let i = 0; i < stmts.length; i++) {
+    const stmt = stmts[i]
+    if (stmt.kind === 'GotoStatement') {
+      const gs = stmt as GotoStatementNode
+      const target = String((gs.label as any).value)
+      gotoCount++
+      gotoTargets.add(target)
+    }
+    if (isTransparentBlock(stmt)) {
+      const innerStmts = flattenTransparentBlock(stmt)
+      for (const inner of innerStmts) {
+        if (inner.kind === 'GotoStatement') {
+          const gs = inner as GotoStatementNode
+          const target = String((gs.label as any).value)
+          gotoCount++
+          gotoTargets.add(target)
+        }
+      }
+    }
+  }
+
+  for (const [name, info] of labelInfo) {
+    const labelStmt = info.stmt
+    let position: 'forward' | 'backward' | 'middle' = 'middle'
+    let hasForwardGoto = false
+    let hasBackwardGoto = false
+
+    const labelIndex = stmts.findIndex((s) => s === labelStmt || (isTransparentBlock(s) && flattenTransparentBlock(s).includes(labelStmt)))
+
+    for (let i = 0; i < stmts.length; i++) {
+      const stmt = stmts[i]
+      const checkStmt = (s: StatementNode) => {
+        if (s.kind === 'GotoStatement') {
+          const gs = s as GotoStatementNode
+          const target = String((gs.label as any).value)
+          if (target === name) {
+            if (i < labelIndex) {
+              hasBackwardGoto = true
+              position = 'backward'
+            } else {
+              hasForwardGoto = true
+              if (position !== 'backward') position = 'forward'
+            }
+          }
+        }
+      }
+      checkStmt(stmt)
+      if (isTransparentBlock(stmt)) {
+        for (const inner of flattenTransparentBlock(stmt)) {
+          checkStmt(inner)
+        }
+      }
+    }
+
+    labels.set(name, {
+      ...info,
+      position,
+      hasForwardGoto,
+      hasBackwardGoto,
+    })
+  }
+
+  let complexity: 'simple' | 'medium' | 'complex' = 'simple'
+  let strategy: GotoStrategy = 'D'
+
+  const labelCount = labels.size
+
+  if (labelCount === 0) {
+    complexity = 'simple'
+    strategy = 'A'
+  } else if (labelCount === 1 && gotoCount <= 2) {
+    const [name, info] = [...labels][0]
+    if (info.position === 'forward' && !info.hasBackwardGoto) {
+      complexity = 'simple'
+      strategy = 'A'
+    } else if (info.position === 'backward' && !info.hasForwardGoto) {
+      complexity = 'simple'
+      strategy = 'B'
+    } else {
+      complexity = 'medium'
+      strategy = 'C'
+    }
+  } else {
+    complexity = 'complex'
+    strategy = 'D'
+  }
+
+  return { labels, gotoCount, complexity, strategy }
 }
 
 function collectLabelsFlat(
@@ -181,6 +297,83 @@ function emitStateMachine(
 
   lines.push(`${pad}    default: break ${loopLabel};`)
   lines.push(`${pad}  }`)
+  lines.push(`${pad}}`)
+
+  compiler.labelCases = savedLabelCases
+  compiler.labelSwitchName = savedSwitchName
+  compiler.gotoMode = savedGotoMode
+  compiler.gotoLabel = savedGotoLabel
+
+  return lines.join('\n')
+}
+
+function emitStrategyA(
+  compound: CompoundStatementNode,
+  scope: Scope,
+  indent: number,
+  labels: IntegerLiteralNode[],
+  compiler: Compiler
+): string {
+  const pad = ' '.repeat(indent)
+  const labelNames = new Set(labels.map((l) => String(l.value)))
+  const lines: string[] = []
+
+  const savedLabelCases = compiler.labelCases
+  const savedSwitchName = compiler.labelSwitchName
+  const savedGotoMode = compiler.gotoMode
+  const savedGotoLabel = compiler.gotoLabel
+
+  compiler.labelCases = null
+  compiler.labelSwitchName = null
+  compiler.gotoMode = 'simple'
+  compiler.gotoLabel = null
+
+  for (const stmt of compound.statements) {
+    const code = compiler.emitStmt(stmt, scope, indent)
+    if (code) lines.push(code)
+  }
+
+  compiler.labelCases = savedLabelCases
+  compiler.labelSwitchName = savedSwitchName
+  compiler.gotoMode = savedGotoMode
+  compiler.gotoLabel = savedGotoLabel
+
+  return lines.join('\n')
+}
+
+function emitStrategyB(
+  compound: CompoundStatementNode,
+  scope: Scope,
+  indent: number,
+  labels: IntegerLiteralNode[],
+  compiler: Compiler
+): string {
+  const pad = ' '.repeat(indent)
+  const labelName = String(labels[0].value)
+  const labelInfo = collectLabelsFlat(compound.statements)
+  const info = labelInfo.get(labelName)
+  if (!info) return emitStrategyA(compound, scope, indent, labels, compiler)
+
+  const lines: string[] = []
+
+  const savedLabelCases = compiler.labelCases
+  const savedSwitchName = compiler.labelSwitchName
+  const savedGotoMode = compiler.gotoMode
+  const savedGotoLabel = compiler.gotoLabel
+
+  compiler.labelCases = null
+  compiler.labelSwitchName = null
+  compiler.gotoMode = 'break'
+  compiler.gotoLabel = '__goto_label_b'
+
+  lines.push(`${pad}__goto_label_b: while (true) {`)
+
+  for (const stmt of compound.statements) {
+    const code = compiler.emitStmt(stmt, scope, indent + 2)
+    if (code) lines.push(code)
+  }
+
+  lines.push(`${pad}  break __goto_label_b;`)
   lines.push(`${pad}}`)
 
   compiler.labelCases = savedLabelCases

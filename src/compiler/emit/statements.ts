@@ -173,6 +173,9 @@ export function emitStmt(
       if (compiler.gotoMode === 'exception') {
         return `${pad}throw Object.assign(new Error('goto'), { __goto: ${JSON.stringify(lblName)} })`
       }
+      if (compiler.gotoMode === 'simple') {
+        return `${pad}throw new Error('JS VM: goto ${lblName} - not supported in simple mode')`
+      }
       if (compiler.labelCases) {
         const caseNum = compiler.labelCases.get(lblName)
         if (caseNum === undefined) {
