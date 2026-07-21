@@ -2,7 +2,6 @@ import { parse } from '@/index'
 import { runJS } from '@/index'
 import { loadTexResources, readResource, runTangle, TRIP_TEX } from './_helper'
 import { createExtendedSysCalls } from '@/runtime'
-import { Types } from '../../src'
 
 const extendedSysCalls = createExtendedSysCalls()
 
@@ -41,10 +40,9 @@ describe.skip('TEX82 - TRIP test (JS) - SKIPPED until Phase 7', () => {
     const state = await runJS(texPas, {
       input: [],
       files,
-      extraTypes: [Types.STRING_TYPE],
+      extensions: ['string', 'allowUndeclaredLabels'],
       sysCalls: extendedSysCalls,
       maxSteps: 1e9,
-      allowUndeclaredLabels: true,
     })
 
     console.log('Status:', state.status)

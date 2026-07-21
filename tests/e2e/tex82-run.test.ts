@@ -1,4 +1,4 @@
-import { parse, Types } from '@/index'
+import { parse } from '@/index'
 import { compileToJS, runJS } from '@/index'
 import { loadTexResources, runTangle } from './_helper'
 
@@ -33,9 +33,8 @@ describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
     const state = await runJS(texPas, {
       input: [],
       files,
-      extraTypes: [Types.STRING_TYPE],
+      extensions: ['string', 'allowUndeclaredLabels'],
       maxSteps: 1e9,
-      allowUndeclaredLabels: true,
     })
 
     console.log('Status:', state.status)

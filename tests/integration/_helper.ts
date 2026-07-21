@@ -11,7 +11,7 @@
 // 测试原则见 ../README.md；
 // 执行引擎实现见 @/js-compiler/index.ts。
 
-import { runJS, RunState, SysCallHandler, TypeDef } from '@/index'
+import { runJS, RunState, SysCallHandler, type Extension } from '@/index'
 
 export interface PascalTest {
   name: string
@@ -23,7 +23,8 @@ export interface PascalTest {
   expectedNotContains?: string
   expectedError?: string
   input?: string[]
-  extraTypes?: TypeDef[]
+  // 非标扩展配置
+  extensions?: Extension[]
   // 内存文件存储
   files?: Map<string, Uint8Array>
   // 全局文件变量名 → URL
@@ -32,8 +33,6 @@ export interface PascalTest {
   expectedFileContains?: { url: string; contains: string }[]
   // 自定义系统调用（非标扩展用）
   sysCalls?: Map<string, SysCallHandler>
-  // 非标扩展：允许无 LABEL 声明的 goto（Berkeley/DEC Pascal 扩展）
-  allowUndeclaredLabels?: boolean
   // 调试：失败时打印编译后的 JS 代码
   debugEmitJS?: boolean
 }
@@ -41,12 +40,11 @@ export interface PascalTest {
 export async function runPascal(test: PascalTest): Promise<RunState> {
   return await runJS(test.code, {
     input: test.input,
-    extraTypes: test.extraTypes,
+    extensions: test.extensions,
     sysCalls: test.sysCalls,
     files: test.files,
     programFileUrls: test.programFileUrls,
     maxSteps: 1e9,
-    allowUndeclaredLabels: test.allowUndeclaredLabels,
     debug: test.debugEmitJS ? { emitJS: true } : undefined,
   })
 }
@@ -179,8 +177,8 @@ export interface LegacyTestCompat {
   expectedNotContains?: string
   expectedError?: boolean
   input?: string[]
-  // 非标扩展：允许无 LABEL 声明的 goto（Berkeley/DEC Pascal 扩展）
-  allowUndeclaredLabels?: boolean
+  // 非标扩展配置
+  extensions?: Extension[]
 }
 
 export async function runLegacyTest(
@@ -189,7 +187,6 @@ export async function runLegacyTest(
   const result = await runPascalTest({
     ...t,
     expectedError: t.expectedError === true ? '' : undefined,
-    allowUndeclaredLabels: t.allowUndeclaredLabels,
   } as PascalTest)
   return { passed: result.passed, message: result.message }
 }

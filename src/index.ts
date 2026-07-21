@@ -19,8 +19,11 @@ export * from './parser/helpers'
 export { nodeToCode } from './ast/printer'
 
 // JS 编译器公开 API
-export { runJS, compileToJS } from './js-compiler'
-export type { RunState, RunError, JSRunOptions, JSDebugOptions } from './js-compiler'
+export { runJS, compileToJS } from './compiler'
+export type { RunState, RunError, JSRunOptions, JSDebugOptions, Extension } from './compiler'
+
+// 类型定义
+export type { SysCallHandler } from './types'
 
 import { lex } from './lexer/lexer'
 import { parseProgram } from './parser/declarations'

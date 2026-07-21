@@ -1,7 +1,7 @@
 export { Compiler } from './compiler'
 export { buildTypeTable } from './type-table-builder'
 export { runJS, compileToJS } from './run-js'
-export type { RunState, RunError, JSRunOptions, JSDebugOptions } from './run-js'
+export type { RunState, RunError, JSRunOptions, JSDebugOptions, Extension } from './run-js'
 export { collectTypes } from './emit/types'
 export {
   collectConsts,

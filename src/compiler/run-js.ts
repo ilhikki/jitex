@@ -11,26 +11,25 @@ import { Compiler } from './compiler'
 
 export type { RunState, RunError } from '../runtime/run-state'
 
+export type Extension = 'allowUndeclaredLabels' | 'string' | string
+
 export interface JSDebugOptions {
   emitJS?: boolean
   emitJSFile?: string
   labelAnalysis?: boolean
 }
 
-export interface NonstandardOptions {
-  allowUndeclaredLabels?: boolean
-}
-
 export interface JSRunOptions {
   input?: string[]
-  extraTypes?: TypeDef[]
+  extensions?: Extension[]
   sysCalls?: Map<string, SysCallHandler>
   files?: Map<string, Uint8Array>
   programFileUrls?: Record<string, string>
   maxSteps?: number
-  nonstandard?: NonstandardOptions
   debug?: JSDebugOptions
 }
+
+import { STRING_TYPE } from '../types/types'
 
 function parseSource(source: string): ProgramNode {
   const tokens = lex(source)
@@ -42,11 +41,34 @@ function parseSource(source: string): ProgramNode {
   return (result as any).astNode as ProgramNode
 }
 
+function resolveExtensions(
+  extensions: Extension[] = []
+): { extraTypes: TypeDef[]; allowUndeclaredLabels: boolean } {
+  const extraTypes: TypeDef[] = []
+  let allowUndeclaredLabels = false
+
+  for (const ext of extensions) {
+    switch (ext) {
+      case 'string':
+        if (!extraTypes.find((t) => t.id === 'string')) {
+          extraTypes.push(STRING_TYPE)
+        }
+        break
+      case 'allowUndeclaredLabels':
+        allowUndeclaredLabels = true
+        break
+    }
+  }
+
+  return { extraTypes, allowUndeclaredLabels }
+}
+
 function buildRuntime(
   ast: ProgramNode,
   options: JSRunOptions
 ): { runtime: RuntimeCtx; sysCalls: Map<string, SysCallHandler> } {
-  const typeTable = buildTypeTable(ast, options.extraTypes)
+  const { extraTypes } = resolveExtensions(options.extensions)
+  const typeTable = buildTypeTable(ast, extraTypes)
   const sysCalls = options.sysCalls || createExtendedSysCalls()
   let io: PascalIO | undefined
   if (options.files) {
@@ -71,9 +93,10 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
   try {
     const ast = parseSource(source)
     const { runtime, sysCalls } = buildRuntime(ast, options)
+    const { allowUndeclaredLabels } = resolveExtensions(options.extensions)
 
     const compiler = new Compiler(runtime.typeTable, {
-      allowUndeclaredLabels: options.nonstandard?.allowUndeclaredLabels,
+      allowUndeclaredLabels,
     })
     const body = compiler.compile(ast, options.programFileUrls)
 
