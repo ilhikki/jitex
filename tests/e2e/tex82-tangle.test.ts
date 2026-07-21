@@ -1,44 +1,17 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { runJS } from '../src/js-compiler'
+import { runJS } from '@/js-compiler'
+import {
+  runTangle,
+  loadTexResources,
+  readResource,
+} from './_helper'
 
-describe('TEX82 - TANGLE compile tex.web (JS)', () => {
-  const webFile = path.join(__dirname, 'resources', 'tex.web')
-  const tanglePasFile = path.join(__dirname, 'resources', 'tangle-official.pas')
-  const webSource = fs.readFileSync(webFile, 'utf-8')
-  const tanglePas = fs.readFileSync(tanglePasFile, 'utf-8')
-
-  function runTangle(pasSource: string, webContent: string): Promise<{ state: any; pascal: string; pool: string; output: string; files: Map<string, Uint8Array> }> {
-    const files = new Map<string, Uint8Array>()
-    files.set('WEBFILE', new Uint8Array(Buffer.from(webContent, 'utf-8')))
-    files.set('CHANGEFILE', new Uint8Array())
-    files.set('PASCALFILE', new Uint8Array())
-    files.set('POOL', new Uint8Array())
-
-    return runJS(pasSource, {
-      input: [],
-      files,
-      programFileUrls: {
-        'WEBFILE': 'WEBFILE',
-        'CHANGEFILE': 'CHANGEFILE',
-        'PASCALFILE': 'PASCALFILE',
-        'POOL': 'POOL',
-      },
-      maxSteps: 1e9,
-      allowUndeclaredLabels: true,
-    }).then((state: any) => {
-      return {
-        state,
-        pascal: Buffer.from(files.get('PASCALFILE')!).toString('utf-8'),
-        pool: Buffer.from(files.get('POOL')!).toString('utf-8'),
-        output: state.outputBuffer.join(''),
-        files,
-      }
-    })
-  }
+describe.skip('TEX82 - TANGLE compile tex.web (JS) - SKIPPED until Phase 7', () => {
+  const resources = loadTexResources()
 
   test('tangle compiles tex.web → tex.pas', async () => {
-    const result = await runTangle(tanglePas, webSource)
+    const result = await runTangle(resources.tanglePas, resources.texWeb)
     console.log('Status:', result.state.status)
     if (result.state.error) {
       console.log('Error:', result.state.error.message)

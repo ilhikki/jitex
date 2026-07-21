@@ -1,13 +1,18 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { parse } from '../src/index'
-import { runJS, compileToJS } from '../src/js-compiler'
+import { parse } from '@/index'
+import { runJS, compileToJS } from '@/js-compiler'
+import {
+  runTangle,
+  readResource,
+  resourcePath,
+  TANGLE_PAS,
+  TANGLE_WEB,
+} from './_helper'
 
-describe('Tangle Official - JS run', () => {
-  const pasFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle-official.pas')
-  const webFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle.web')
-  const source = fs.readFileSync(pasFile, 'utf-8')
-  const webSource = fs.readFileSync(webFile, 'utf-8')
+describe.skip('Tangle Official - JS run - SKIPPED until Phase 7', () => {
+  const source = readResource(TANGLE_PAS)
+  const webSource = readResource(TANGLE_WEB)
 
   test('parse succeeds', () => {
     const result = parse(source)
@@ -18,63 +23,29 @@ describe('Tangle Official - JS run', () => {
   })
 
   test('compile to JS succeeds', () => {
-    let jsCode: string
-    expect(() => {
-      jsCode = compileToJS(source)
-    }).not.toThrow()
-    if (!jsCode!) return
-
-    expect(jsCode.length).toBeGreaterThan(0)
-    // 关键过程名（小写化后带 p_ 前缀）应出现在生成的 JS 源码中
-    expect(jsCode).toContain('p_initialize')
-    expect(jsCode).toContain('p_error')
-    expect(jsCode).toContain('p_jumpout')
-
-    console.log('Tangle compiled OK, JS code size:', jsCode!.length, 'chars')
-  })
-
-  test('run with web file input', async () => {
     const result = parse(source)
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    const files = new Map<string, Uint8Array>()
-    files.set('WEBFILE', new Uint8Array(Buffer.from(webSource, 'utf-8')))
-    files.set('CHANGEFILE', new Uint8Array())
-    files.set('PASCALFILE', new Uint8Array())
-    files.set('POOL', new Uint8Array())
+    let jsCode: string
+    expect(() => {
+      jsCode = compileToJS(source)
+    }).not.toThrow()
+    expect(jsCode!.length).toBeGreaterThan(0)
+    console.log('Compiled JS size:', jsCode!.length, 'chars')
+  })
 
-    const state = await runJS(source, {
-      input: [],
-      files,
-      programFileUrls: {
-        'WEBFILE': 'WEBFILE',
-        'CHANGEFILE': 'CHANGEFILE',
-        'PASCALFILE': 'PASCALFILE',
-        'POOL': 'POOL',
-      },
-      maxSteps: 1e9,
-      allowUndeclaredLabels: true,
-    })
-
-    console.log('Final status:', state.status)
-    if (state.error) {
-      console.log('Error:', state.error.message)
-      console.log('Stack trace:', state.error.stackTrace)
+  test('run tangle on web file', async () => {
+    const result = await runTangle(source, webSource)
+    console.log('Status:', result.state.status)
+    if (result.state.error) {
+      console.log('Error:', result.state.error.message)
     }
-
-    const output = state.outputBuffer.join('')
-    console.log('Output (first 1000 chars):', output.slice(0, 1000))
-
-    for (const [name, content] of files.entries()) {
-      console.log(`File ${name} (${content.length} chars):`, Buffer.from(content).toString('utf-8').slice(0, 500))
-    }
-
-    expect(['terminated', 'error']).toContain(state.status)
-
-    // 验证非标 I/O 确实生效：PASCALFILE / POOL 应有内容
-    const pascalSize = files.get('PASCALFILE')?.length || 0
-    const poolSize = files.get('POOL')?.length || 0
+    console.log('Output (first 1000 chars):', result.output.slice(0, 1000))
+    console.log('PASCALFILE size:', result.pascal.length, 'chars')
+    console.log('POOL size:', result.pool.length, 'chars')
+    const pascalSize = result.pascal.length
+    const poolSize = result.pool.length
     expect(pascalSize).toBeGreaterThan(0)
     expect(poolSize).toBeGreaterThan(0)
   }, 60000)

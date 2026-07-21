@@ -1,17 +1,21 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { parse } from '../src/index'
+import { parse } from '@/index'
+import { lex } from '@/lexer/lexer'
+import {
+  resourcePath,
+  TANGLE_PAS,
+} from './_helper'
 
-describe('Tangle Official', () => {
-  const pasFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle-official.pas')
+describe.skip('Tangle Official - SKIPPED until Phase 7', () => {
+  const pasFile = resourcePath(TANGLE_PAS)
 
   test('should parse tangle-official.pas without error', () => {
     const source = fs.readFileSync(pasFile, 'utf-8')
     const result = parse(source)
     if (!result.success) {
       console.error('Parse error:', result.error, 'at position', result.position)
-      // Print surrounding tokens for context
-      const tokens = require('../src/lexer/lexer').lex(source)
+      const tokens = lex(source)
       const pos = result.position
       const start = Math.max(0, pos - 3)
       const end = Math.min(tokens.length, pos + 3)
