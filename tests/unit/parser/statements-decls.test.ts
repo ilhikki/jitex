@@ -1,13 +1,13 @@
-import { lex } from '../../../src/lexer/lexer'
-import { ParserInput, ProgramNode, CaseStatementNode } from '../../../src/ast/types'
-import { parseStatement } from '../../../src/parser/statements'
+import { lex } from '@/lexer/lexer'
+import { ParserInput, ProgramNode, CaseStatementNode } from '@/ast/types'
+import { parseStatement } from '@/parser/statements'
 import {
   parseProgram,
   parseProcedureDeclaration,
   parseFunctionDeclaration,
   parseBlock,
-} from '../../../src/parser/declarations'
-import { parse } from '../../../src/index'
+} from '@/parser/declarations'
+import { parse } from '@/index'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

@@ -1,13 +1,4 @@
-import * as fs from 'fs'
-import * as path from 'path'
-import { runJS } from '@/js-compiler'
-import {
-  runTangle,
-  readResource,
-  resourcePath,
-  TANGLE_PAS,
-  TANGLE_WEB,
-} from './_helper'
+import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from './_helper'
 
 describe.skip('TANGLE self-bootstrap test (JS) - SKIPPED until Phase 7', () => {
   const webSource = readResource(TANGLE_WEB)

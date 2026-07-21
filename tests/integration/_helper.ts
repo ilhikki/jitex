@@ -9,11 +9,11 @@
 // - LegacyTestCompat / runLegacyTest: 兼容旧格式的适配层
 //
 // 测试原则见 ../README.md；
-// 执行引擎实现见 ../../src/js-compiler/index.ts。
+// 执行引擎实现见 @/js-compiler/index.ts。
 
-import { runJS } from '../../src/js-compiler'
-import type { RunState } from '../../src/js-compiler/run-state'
-import type { TypePlugin, SysCallHandler } from '../../src/js-compiler/types'
+import { runJS } from '@/js-compiler'
+import type { RunState } from '@/js-compiler/run-state'
+import type { SysCallHandler, TypePlugin } from '@/js-compiler/types'
 
 export interface PascalTest {
   name: string
@@ -57,18 +57,28 @@ export function getOutput(state: RunState): string {
   return state.outputBuffer.join('')
 }
 
-export async function runPascalTest(test: PascalTest): Promise<{ passed: boolean; message: string; state: RunState }> {
+export async function runPascalTest(
+  test: PascalTest
+): Promise<{ passed: boolean; message: string; state: RunState }> {
   try {
     const state = await runPascal(test)
     const output = getOutput(state)
 
     if (test.expectedError !== undefined) {
       if (state.status !== 'error' && !state.error) {
-        return { passed: false, message: `Expected error "${test.expectedError}", but no error occurred`, state }
+        return {
+          passed: false,
+          message: `Expected error "${test.expectedError}", but no error occurred`,
+          state,
+        }
       }
       const actualError = state.error?.message || ''
       if (test.expectedError.length > 0 && !actualError.includes(test.expectedError)) {
-        return { passed: false, message: `Expected error containing "${test.expectedError}", got "${actualError}"`, state }
+        return {
+          passed: false,
+          message: `Expected error containing "${test.expectedError}", got "${actualError}"`,
+          state,
+        }
       }
       return { passed: true, message: 'OK', state }
     }
@@ -84,19 +94,31 @@ export async function runPascalTest(test: PascalTest): Promise<{ passed: boolean
 
     if (test.expectedOutput !== undefined) {
       if (output !== test.expectedOutput) {
-        return { passed: false, message: `Expected output "${JSON.stringify(test.expectedOutput)}", got "${JSON.stringify(output)}"`, state }
+        return {
+          passed: false,
+          message: `Expected output "${JSON.stringify(test.expectedOutput)}", got "${JSON.stringify(output)}"`,
+          state,
+        }
       }
     }
 
     if (test.expectedContains !== undefined) {
       if (!output.includes(test.expectedContains)) {
-        return { passed: false, message: `Expected output to contain "${test.expectedContains}", got "${JSON.stringify(output)}"`, state }
+        return {
+          passed: false,
+          message: `Expected output to contain "${test.expectedContains}", got "${JSON.stringify(output)}"`,
+          state,
+        }
       }
     }
 
     if (test.expectedNotContains !== undefined) {
       if (output.includes(test.expectedNotContains)) {
-        return { passed: false, message: `Expected output to NOT contain "${test.expectedNotContains}", got "${JSON.stringify(output)}"`, state }
+        return {
+          passed: false,
+          message: `Expected output to NOT contain "${test.expectedNotContains}", got "${JSON.stringify(output)}"`,
+          state,
+        }
       }
     }
 
@@ -110,7 +132,11 @@ export async function runPascalTest(test: PascalTest): Promise<{ passed: boolean
             console.log((state as any).__debugJS)
             console.log('===========================================\n')
           }
-          return { passed: false, message: `Expected file ${exp.url} to contain "${exp.contains}", got "${text}"`, state }
+          return {
+            passed: false,
+            message: `Expected file ${exp.url} to contain "${exp.contains}", got "${text}"`,
+            state,
+          }
         }
       }
     }
@@ -121,7 +147,9 @@ export async function runPascalTest(test: PascalTest): Promise<{ passed: boolean
   }
 }
 
-export async function runPascalTests(tests: PascalTest[]): Promise<{ passed: number; failed: number; failures: string[] }> {
+export async function runPascalTests(
+  tests: PascalTest[]
+): Promise<{ passed: number; failed: number; failures: string[] }> {
   let passed = 0
   let failed = 0
   const failures: string[] = []

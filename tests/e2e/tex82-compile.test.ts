@@ -1,11 +1,6 @@
-import * as fs from 'fs'
-import * as path from 'path'
 import { parse } from '@/index'
-import { runJS, compileToJS } from '@/js-compiler'
-import {
-  runTangle,
-  loadTexResources,
-} from './_helper'
+import { compileToJS } from '@/js-compiler'
+import { loadTexResources, runTangle } from './_helper'
 
 describe.skip('TEX82 - compile and analyze tex.pas (JS) - SKIPPED until Phase 7', () => {
   const resources = loadTexResources()

@@ -1,11 +1,4 @@
-import * as fs from 'fs'
-import * as path from 'path'
-import { runJS } from '@/js-compiler'
-import {
-  runTangle,
-  loadTexResources,
-  readResource,
-} from './_helper'
+import { loadTexResources, runTangle } from './_helper'
 
 describe.skip('TEX82 - TANGLE compile tex.web (JS) - SKIPPED until Phase 7', () => {
   const resources = loadTexResources()

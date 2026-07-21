@@ -1,4 +1,4 @@
-﻿import { parse } from '../../../src/index'
+﻿import { parse } from '@/index'
 import { ConformanceTest } from './_helper'
 
 interface RobustnessTest {

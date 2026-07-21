@@ -1,4 +1,4 @@
-import { lex } from '../../src/lexer/lexer'
+import { lex } from '@/index'
 
 describe('Lexer', () => {
   test('should tokenize identifiers and keywords', () => {

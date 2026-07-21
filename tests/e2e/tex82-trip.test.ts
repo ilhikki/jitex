@@ -1,16 +1,8 @@
-import * as fs from 'fs'
-import * as path from 'path'
 import { parse } from '@/index'
 import { runJS } from '@/js-compiler'
 import { stringPlugin } from '@/js-compiler/types'
 import { createExtendedSysCalls } from '@/js-compiler/syscalls'
-import {
-  runTangle,
-  loadTexResources,
-  readResource,
-  TRIP_TEX,
-  TRIP_TYP,
-} from './_helper'
+import { loadTexResources, readResource, runTangle, TRIP_TEX } from './_helper'
 
 const extendedSysCalls = createExtendedSysCalls()
 

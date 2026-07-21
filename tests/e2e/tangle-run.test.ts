@@ -1,14 +1,6 @@
-import * as fs from 'fs'
-import * as path from 'path'
 import { parse } from '@/index'
-import { runJS, compileToJS } from '@/js-compiler'
-import {
-  runTangle,
-  readResource,
-  resourcePath,
-  TANGLE_PAS,
-  TANGLE_WEB,
-} from './_helper'
+import { compileToJS } from '@/js-compiler'
+import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from './_helper'
 
 describe.skip('Tangle Official - JS run - SKIPPED until Phase 7', () => {
   const source = readResource(TANGLE_PAS)

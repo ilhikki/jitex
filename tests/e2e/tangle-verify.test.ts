@@ -1,10 +1,5 @@
-import * as fs from 'fs'
-import * as path from 'path'
-import { parse, ProgramNode, BlockNode } from '@/index'
-import {
-  readResource,
-  TANGLE_PAS,
-} from './_helper'
+import { BlockNode, parse, ProgramNode } from '@/index'
+import { readResource, TANGLE_PAS } from './_helper'
 
 describe.skip('Tangle Official Verification - SKIPPED until Phase 7', () => {
   const source = readResource(TANGLE_PAS)

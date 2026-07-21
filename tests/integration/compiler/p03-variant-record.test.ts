@@ -1,4 +1,4 @@
-import { parse } from '../../../src/index'
+import { parse } from '@/index'
 
 describe('ISSUE-026: Variant record parsing', () => {
   test('simple variant record with tag', () => {

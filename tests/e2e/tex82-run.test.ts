@@ -1,12 +1,7 @@
-import * as fs from 'fs'
-import * as path from 'path'
 import { parse } from '@/index'
-import { runJS, compileToJS } from '@/js-compiler'
+import { compileToJS, runJS } from '@/js-compiler'
 import { stringPlugin } from '@/js-compiler/types'
-import {
-  runTangle,
-  loadTexResources,
-} from './_helper'
+import { loadTexResources, runTangle } from './_helper'
 
 describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
   const resources = loadTexResources()
