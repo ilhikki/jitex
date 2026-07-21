@@ -10,17 +10,7 @@
 ### Phase 3：array/record/set/file/WITH ✅（明细已删除）
 ### Phase 4：嵌套过程/var参数/goto ✅（明细已删除）
 
-### Phase 5：项目重构 ✅（明细已删除，见 git history）
-
-- 5.5：移除 VM/static-analyzer，JS 编译器独立 ✅
-- 5.5.1：深度清理（命名/死代码/文档归档）✅
-- 5.5.2：执行决策 D1-D8 + I1-I3 ✅
-- 5.5.2：文档体系重构（AGENTS.md 入口 + 代码即文档）✅
-- 5.5.3：决策项执行（I2/D6）✅
-- 5.5.4：重构 /tests 目录（unit/integration/e2e 分层）✅
-- 5.5.5：按 feature 合并测试 ✅
-- 5.6：测试覆盖提升（printer.ts 单元测试、strategy.ts 覆盖率 100%）✅
-- 5.7：goto 高级测试（非正常场景、嵌套非透明块、防死循环）✅
+### Phase 5：项目重构 ✅（明细已删除）
 
 ---
 
