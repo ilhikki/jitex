@@ -1,6 +1,9 @@
-import { LegacyTestCompat, runLegacyTest } from './_helper'
+import { describe, it, expect } from '@jest/globals'
+import { runPascalTest, type PascalTest } from '../_helper'
 
-const tests: LegacyTestCompat[] = [
+describe('Phase 1: Control Flow', () => {
+  // Original m36 tests
+  const m36Tests: PascalTest[] = [
   {
     name: 'if-then simple true',
     code: `program test;
@@ -737,14 +740,17 @@ end.`,
   },
 ]
 
-describe('M5 JS (from M3.6): Control Flow', () => {
-  tests.forEach((t) => {
-    test(t.name, async () => {
-      const result = await runLegacyTest(t)
+  const tests: PascalTest[] = [
+    ...m36Tests,
+  ]
+
+  it('should pass all tests', async () => {
+    for (const test of tests) {
+      const result = await runPascalTest(test)
       if (!result.passed) {
-        console.error(`FAIL: ${t.name}: ${result.message}`)
+        console.error(`FAIL: ${test.name}: ${result.message}`)
       }
       expect(result.passed).toBe(true)
-    })
+    }
   })
 })

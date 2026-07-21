@@ -1,7 +1,7 @@
 // m4 过程和函数测试
 
 import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from './_helper'
+import { runPascalTest, type PascalTest } from '../_helper'
 
 describe('M5 JS Procedures and Functions', () => {
   const tests: PascalTest[] = [

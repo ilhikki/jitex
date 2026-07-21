@@ -7,8 +7,16 @@
 | 目录 | 层级 | 说明 |
 |------|------|------|
 | `unit/` | 单元测试 | lexer/parser 单个模块的独立测试 |
-| `integration/` | 集成测试 | JS 编译器端到端执行 Pascal 程序的测试（原 m5/m3.5） |
+| `integration/` | 集成测试 | 按模块分组的端到端执行测试 |
+| `integration/compiler/` | 编译器集成测试 | JS 编译器执行 Pascal 程序的测试（原 m5 + m36） |
+| `integration/parser/` | 解析器集成测试 | 解析器语法解析测试（原 m3.5） |
 | `e2e/` | 端到端测试 | TEX82 完整编译执行的端到端测试（原 tests-tex） |
+
+## 测试文件命名
+
+- `p{phase}-{feature}.test.ts`：对应 Phase X 的 feature 测试
+- `p00-{feature}.test.ts`：基础设施/跨 phase 测试
+- `p10+`：兼容性/综合测试（保留原编号）
 
 ## 原则
 

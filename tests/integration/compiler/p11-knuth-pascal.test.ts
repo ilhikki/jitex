@@ -3,7 +3,7 @@
 // 代码风格模仿 tangle-official.pas（紧凑、大写关键字、OTHERS: 等）
 
 import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from './_helper'
+import { runPascalTest, type PascalTest } from '../_helper'
 
 describe('M5 JS - Knuth Pascal Style', () => {
   const tests: PascalTest[] = [

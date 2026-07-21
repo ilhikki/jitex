@@ -1,5 +1,5 @@
-import { PascalTest, runPascalTest } from './_helper'
-import { stringPlugin } from '../../src/js-compiler/types/string.plugin'
+import { PascalTest, runPascalTest } from '../_helper'
+import { stringPlugin } from '../../../src/js-compiler/types/string.plugin'
 
 const tests: PascalTest[] = [
   // ==========================================================================

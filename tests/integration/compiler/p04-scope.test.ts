@@ -1,6 +1,9 @@
-import { LegacyTestCompat, runLegacyTest } from './_helper'
+import { describe, it, expect } from '@jest/globals'
+import { runPascalTest, type PascalTest } from '../_helper'
 
-const tests: LegacyTestCompat[] = [
+describe('Phase 4: Scope', () => {
+  // Original m36 tests
+  const m36Tests: PascalTest[] = [
   {
     name: 'global var used in main',
     code: `program test;
@@ -193,7 +196,7 @@ begin
 end.`,
     purpose: 'local variable not accessible outside its scope',
     features: ['local-variable', 'scope', 'error'],
-    expectedError: true,
+    expectedError: '',
   },
   {
     name: 'value parameter passing',
@@ -675,14 +678,17 @@ end.`,
   },
 ]
 
-describe('M5 JS (from M3.6): Scope', () => {
-  tests.forEach((t) => {
-    test(t.name, async () => {
-      const result = await runLegacyTest(t)
+  const tests: PascalTest[] = [
+    ...m36Tests,
+  ]
+
+  it('should pass all tests', async () => {
+    for (const test of tests) {
+      const result = await runPascalTest(test)
       if (!result.passed) {
-        console.error(`FAIL: ${t.name}: ${result.message}`)
+        console.error(`FAIL: ${test.name}: ${result.message}`)
       }
       expect(result.passed).toBe(true)
-    })
+    }
   })
 })

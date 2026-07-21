@@ -18,12 +18,10 @@
   - I2: types/ 目录整体重构
   - D6: 提交信息规范
 
-- 5.5.4：重构 /tests 目录
-  - 新建 tests/unit/：lexer/parser 单元测试
-  - 新建 tests/integration/：按模块分组的集成测试（原 m5/m3.5 迁移）
-  - 新建 tests/e2e/：端到端测试（原 tests-tex 迁移）
-  - 重命名测试文件为 p{phase}-{feature}.test.ts 格式
-  - 更新 tests/README.md
+- 5.5.5：按 feature 合并测试 🚧
+  - 合并 compiler/ 下相同 feature 的测试（pXX + m36）
+  - parser/ 测试重命名为 p?-{feature}.test.ts 格式
+  - 清理旧文件（p01-p15, m36-q*, m35/）
 
 #### 已完成（明细已删除，见 git history）
 
@@ -31,6 +29,7 @@
 - 5.5.1：深度清理（命名/死代码/文档归档）✅
 - 5.5.2：执行决策 D1-D8 + I1-I3 ✅
 - 5.5.2：文档体系重构（AGENTS.md 入口 + 代码即文档）✅
+- 5.5.4：重构 /tests 目录（unit/integration/e2e 分层）✅
 
 ---
 

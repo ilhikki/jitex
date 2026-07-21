@@ -1,6 +1,9 @@
-import { LegacyTestCompat, runLegacyTest } from './_helper'
+import { describe, it, expect } from '@jest/globals'
+import { runPascalTest, type PascalTest } from '../_helper'
 
-const tests: LegacyTestCompat[] = [
+describe('Phase 1: I/O', () => {
+  // Original m36 tests
+  const m36Tests: PascalTest[] = [
   {
     name: 'writeln with no arguments',
     code: `program test;
@@ -238,7 +241,7 @@ begin
 end.`,
     purpose: 'Pascal82 standard feature not yet implemented; must report friendly error, not crash',
     features: ['new', 'dispose', 'pointer', 'unsupported'],
-    expectedError: true,
+    expectedError: '',
   },
   {
     name: 'file does not exist (mock IO does not simulate file errors)',
@@ -323,7 +326,7 @@ begin
 end.`,
     purpose: '有参内置函数省略括号应报错（风险覆盖：不是所有内置函数都能无参调用）',
     features: ['ord', 'standard-function', 'error-case'],
-    expectedError: true,
+    expectedError: '',
   },
   {
     name: 'chr with boundary value',
@@ -412,14 +415,17 @@ end.`,
   },
 ]
 
-describe('M5 JS (from M3.6): IO and Standard Library', () => {
-  tests.forEach((t) => {
-    test(t.name, async () => {
-      const result = await runLegacyTest(t)
+  const tests: PascalTest[] = [
+    ...m36Tests,
+  ]
+
+  it('should pass all tests', async () => {
+    for (const test of tests) {
+      const result = await runPascalTest(test)
       if (!result.passed) {
-        console.error(`FAIL: ${t.name}: ${result.message}`)
+        console.error(`FAIL: ${test.name}: ${result.message}`)
       }
       expect(result.passed).toBe(true)
-    })
+    }
   })
 })

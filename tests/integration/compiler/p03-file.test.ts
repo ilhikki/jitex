@@ -3,7 +3,7 @@
 // 这些用例覆盖 RESET/REWRITE/GET/PUT/EOF/EOLN/READ/READLN/WRITE/WRITELN/F^/ASSIGN
 
 import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from './_helper'
+import { runPascalTest, type PascalTest } from '../_helper'
 
 function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)

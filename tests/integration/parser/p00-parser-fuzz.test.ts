@@ -1,4 +1,4 @@
-import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
+﻿import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
 
 function repeatStr(s: string, n: number): string {
   let result = ''
