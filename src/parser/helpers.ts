@@ -1,4 +1,4 @@
-import { Token, ParserInput, ParseResult, AstNode, Position, SourceLocation } from '../ast/types'
+import { AstNode, ParseResult, ParserInput, Position, SourceLocation, Token } from '../ast/types'
 
 // ============================================================================
 // Parser helpers — pure functions operating on {tokens, position}
@@ -6,32 +6,6 @@ import { Token, ParserInput, ParseResult, AstNode, Position, SourceLocation } fr
 
 export function peek(input: ParserInput): Token {
   return input.tokens[input.position]
-}
-
-export function peekAt(input: ParserInput, offset: number): Token {
-  const idx = input.position + offset
-  if (idx >= input.tokens.length) return input.tokens[input.tokens.length - 1]
-  return input.tokens[idx]
-}
-
-export function isType(input: ParserInput, type: string): boolean {
-  return peek(input).type === type
-}
-
-export function isKeyword(input: ParserInput, kw: string): boolean {
-  return peek(input).type === kw
-}
-
-export function atEnd(input: ParserInput): boolean {
-  return peek(input).type === 'EOF'
-}
-
-export function tokenContent(input: ParserInput): string {
-  return peek(input).content
-}
-
-export function tokenPosition(input: ParserInput): Position {
-  return peek(input).start
 }
 
 // 给 AST 节点添加源码位置
@@ -65,14 +39,6 @@ export function fail<T>(error: string, position: number): ParseResult<T> {
 
 // --- Token consumers ---
 
-export function consume(input: ParserInput): ParseResult<Token> {
-  const token = peek(input)
-  if (token.type === 'EOF') {
-    return fail('Unexpected end of input', input.position)
-  }
-  return ok(input.position + 1, token)
-}
-
 export function expectType(input: ParserInput, type: string): ParseResult<Token> {
   const token = peek(input)
   if (token.type !== type) {
@@ -93,22 +59,6 @@ export function expectKeyword(input: ParserInput, kw: string): ParseResult<Token
     )
   }
   return ok(input.position + 1, token)
-}
-
-// --- Optional consumers (return null if not matched, advance if matched) ---
-
-export function matchType(input: ParserInput, type: string): Token | null {
-  if (peek(input).type === type) {
-    return input.tokens[input.position++]
-  }
-  return null
-}
-
-export function matchKeyword(input: ParserInput, kw: string): Token | null {
-  if (peek(input).type === kw) {
-    return input.tokens[input.position++]
-  }
-  return null
 }
 
 // --- List parsers ---

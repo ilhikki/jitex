@@ -1,36 +1,23 @@
 import {
-  ParserInput,
-  ParseResult,
-  AstNode,
-  LabelDeclarationNode,
-  ConstDeclarationNode,
-  TypeDeclarationNode,
-  VariableDeclarationNode,
-  ProcedureDeclarationNode,
-  FunctionDeclarationNode,
-  ParameterDeclarationNode,
   BlockNode,
-  ProgramNode,
+  ConstDeclarationNode,
+  FunctionDeclarationNode,
   IdentifierNode,
   IntegerLiteralNode,
-  TypeNode,
+  LabelDeclarationNode,
+  ParameterDeclarationNode,
+  ParseResult,
+  ParserInput,
+  ProcedureDeclarationNode,
+  ProgramNode,
   StatementNode,
-  CompoundStatementNode,
+  TypeDeclarationNode,
+  VariableDeclarationNode,
 } from '../ast/types'
-import {
-  peek,
-  ok,
-  fail,
-  matchType,
-  matchKeyword,
-  expectType,
-  expectKeyword,
-  parseList,
-  withLoc,
-} from './helpers'
-import { parseIdentifier, parseExpression } from './expressions'
+import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
+import { parseExpression, parseIdentifier } from './expressions'
 import { parseType, parseVariableDeclaration } from './types'
-import { parseStatement, parseCompoundStatement } from './statements'
+import { parseCompoundStatement } from './statements'
 
 // ============================================================================
 // Declaration Parsers

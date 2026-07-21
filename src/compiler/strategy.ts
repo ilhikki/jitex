@@ -5,10 +5,6 @@ import type {
   LabeledStatementNode,
   CaseStatementNode,
   WithStatementNode,
-  IfStatementNode,
-  WhileStatementNode,
-  RepeatStatementNode,
-  ForStatementNode,
 } from '../ast/types'
 import { Scope } from './emit/utils'
 import type { Compiler } from './compiler'
@@ -18,15 +14,6 @@ function isTransparentBlock(stmt: StatementNode): boolean {
     stmt.kind === 'CompoundStatement' ||
     stmt.kind === 'CaseStatement' ||
     stmt.kind === 'WithStatement'
-  )
-}
-
-function isOpaqueBlock(stmt: StatementNode): boolean {
-  return (
-    stmt.kind === 'IfStatement' ||
-    stmt.kind === 'WhileStatement' ||
-    stmt.kind === 'RepeatStatement' ||
-    stmt.kind === 'ForStatement'
   )
 }
 
@@ -106,21 +93,14 @@ function collectLabelsFromTransparentBlock(
 
 function getRemainingStatements(stmts: StatementNode[], startIndex: number): StatementNode[] {
   const result: StatementNode[] = []
-  const firstStmt = stmts[startIndex]
+  const firstStmt = stmts[startIndex] as LabeledStatementNode
+  const ls = firstStmt
 
-  if (firstStmt.kind === 'LabeledStatement') {
-    const ls = firstStmt as LabeledStatementNode
-    if (isTransparentBlock(ls.statement)) {
-      const innerStmts = flattenTransparentBlock(ls.statement)
-      result.push(...innerStmts)
-    } else {
-      result.push(ls.statement)
-    }
-  } else if (isTransparentBlock(firstStmt)) {
-    const innerStmts = flattenTransparentBlock(firstStmt)
+  if (isTransparentBlock(ls.statement)) {
+    const innerStmts = flattenTransparentBlock(ls.statement)
     result.push(...innerStmts)
   } else {
-    result.push(firstStmt)
+    result.push(ls.statement)
   }
 
   for (let i = startIndex + 1; i < stmts.length; i++) {
@@ -149,49 +129,6 @@ function flattenTransparentBlock(block: StatementNode): StatementNode[] {
     return result
   }
   return [block]
-}
-
-function hasLabelsInOpaqueBlock(stmt: StatementNode): boolean {
-  if (stmt.kind === 'WhileStatement') {
-    const w = stmt as WhileStatementNode
-    return hasLabelsInStatement(w.body)
-  }
-  if (stmt.kind === 'RepeatStatement') {
-    const r = stmt as RepeatStatementNode
-    for (const s of r.statements) {
-      if (hasLabelsInStatement(s)) return true
-    }
-    return false
-  }
-  if (stmt.kind === 'ForStatement') {
-    const f = stmt as ForStatementNode
-    return hasLabelsInStatement(f.body)
-  }
-  if (stmt.kind === 'IfStatement') {
-    const i = stmt as IfStatementNode
-    if (hasLabelsInStatement(i.thenBranch)) return true
-    if (i.elseBranch && hasLabelsInStatement(i.elseBranch)) return true
-    return false
-  }
-  return false
-}
-
-function hasLabelsInStatement(stmt: StatementNode): boolean {
-  if (stmt.kind === 'LabeledStatement') return true
-  if (stmt.kind === 'CompoundStatement') {
-    const cs = stmt as CompoundStatementNode
-    for (const s of cs.statements) {
-      if (hasLabelsInStatement(s)) return true
-    }
-    return false
-  }
-  if (isTransparentBlock(stmt)) {
-    return false
-  }
-  if (isOpaqueBlock(stmt)) {
-    return false
-  }
-  return false
 }
 
 function emitStateMachine(

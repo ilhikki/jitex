@@ -906,6 +906,235 @@ end.`,
       expectedContains: 'i=1 j=10\ni=2 j=20\nBreak at j=30\nDone',
       expectedNotContains: 'i=3 j=30',
     },
+    {
+      name: 'goto-label-inside-case-branch-compound',
+      code: `program test;
+label 50;
+var x: integer;
+begin
+  x := 1;
+  case x of
+    1:
+      begin
+        writeln('Case 1');
+        goto 50;
+20:
+        writeln('Label 20 in case 1');
+      end;
+    2: writeln('Case 2');
+  end;
+  writeln('After case');
+50:
+  writeln('Label 50 outside');
+end.`,
+      purpose: 'CASE分支内compound块中的label（collectLabelsFromTransparentBlock case分支透明块）',
+      expectedContains: 'Case 1\nLabel 50 outside',
+      expectedNotContains: 'Label 20 in case 1\nAfter case',
+    },
+    {
+      name: 'goto-label-directly-in-case-branch',
+      code: `program test;
+label 60;
+var x: integer;
+begin
+  x := 2;
+  case x of
+    1: writeln('Case 1');
+    2:
+30:
+      writeln('Label 30 is case 2 body');
+  end;
+  goto 60;
+  writeln('Skipped');
+60:
+  writeln('Label 60');
+end.`,
+      purpose: 'CASE分支直接是LabeledStatement（collectLabelsFromTransparentBlock case分支LabeledStatement）',
+      expectedContains: 'Label 30 is case 2 body\nLabel 60',
+      expectedNotContains: 'Skipped',
+    },
+    {
+      name: 'goto-label-in-case-otherwise-compound',
+      code: `program test;
+label 70;
+var x: integer;
+begin
+  x := 99;
+  case x of
+    1: writeln('One');
+    2: writeln('Two');
+  otherwise
+    begin
+      writeln('Otherwise begin');
+      goto 70;
+40:
+      writeln('Label 40 in otherwise');
+    end;
+  end;
+  writeln('After case');
+70:
+  writeln('Label 70 outside');
+end.`,
+      purpose: 'CASE otherwise中compound块的label（collectLabelsFromTransparentBlock otherwise透明块）',
+      expectedContains: 'Otherwise begin\nLabel 70 outside',
+      expectedNotContains: 'Label 40 in otherwise\nAfter case',
+    },
+    {
+      name: 'goto-label-in-with-body-compound',
+      code: `program test;
+label 80;
+type
+  r = record
+    x: integer;
+    y: integer;
+  end;
+var
+  p: r;
+begin
+  p.x := 10;
+  p.y := 20;
+  with p do
+    begin
+      writeln(x);
+      goto 80;
+55:
+      writeln(y);
+    end;
+  writeln('After with');
+80:
+  writeln('Label 80 outside');
+end.`,
+      purpose: 'WITH body中compound块的label（collectLabelsFromTransparentBlock with透明块）',
+      expectedContains: '10\nLabel 80 outside',
+      expectedNotContains: '20\nAfter with',
+    },
+    {
+      name: 'goto-label-directly-in-with-body',
+      code: `program test;
+label 90;
+type
+  r = record
+    x: integer;
+  end;
+var
+  p: r;
+begin
+  p.x := 100;
+  with p do
+66:
+    writeln(x);
+  goto 90;
+  writeln('Skipped');
+90:
+  writeln('Label 90');
+end.`,
+      purpose: 'WITH body直接是LabeledStatement（collectLabelsFromTransparentBlock with LabeledStatement）',
+      expectedContains: '100\nLabel 90',
+      expectedNotContains: 'Skipped',
+    },
+    {
+      name: 'goto-label-first-is-labeled-transparent',
+      code: `program test;
+label 100;
+begin
+  goto 100;
+  writeln('Skipped');
+100:
+  begin
+    writeln('In compound after label');
+  end;
+  writeln('After compound');
+end.`,
+      purpose: 'label后紧跟透明块（getRemainingStatements labeled+transparent first）',
+      expectedContains: 'In compound after label\nAfter compound',
+      expectedNotContains: 'Skipped',
+    },
+    {
+      name: 'goto-label-then-multi-transparent-after',
+      code: `program test;
+label 200;
+begin
+  goto 200;
+  writeln('Skipped');
+200:
+  begin
+    writeln('First compound');
+  end;
+  begin
+    writeln('Second compound');
+  end;
+  writeln('Last');
+end.`,
+      purpose: 'label后有多个透明块（getRemainingStatements 后续透明块）',
+      expectedContains: 'First compound\nSecond compound\nLast',
+      expectedNotContains: 'Skipped',
+    },
+    {
+      name: 'goto-deep-nested-label-then-flatten',
+      code: `program test;
+label 300;
+begin
+  goto 300;
+  writeln('Skipped');
+  begin
+    begin
+300:
+      begin
+        writeln('Deep nested 1');
+      end;
+      writeln('Deep nested 2');
+    end;
+    writeln('Deep nested 3');
+  end;
+  writeln('Outer');
+end.`,
+      purpose: '深层嵌套透明块中的label（flattenTransparentBlock递归 + getRemainingStatements）',
+      expectedContains: 'Deep nested 1\nDeep nested 2\nDeep nested 3\nOuter',
+      expectedNotContains: 'Skipped',
+    },
+    {
+      name: 'goto-label-with-nested-transparent-in-remaining',
+      code: `program test;
+label 400;
+begin
+  goto 400;
+  writeln('Skipped');
+400:
+  begin
+    begin
+      writeln('Inner compound');
+    end;
+    writeln('Outer compound');
+  end;
+  writeln('After');
+end.`,
+      purpose: 'label后compound内还有compound（flattenTransparentBlock递归子透明块）',
+      expectedContains: 'Inner compound\nOuter compound\nAfter',
+      expectedNotContains: 'Skipped',
+    },
+    {
+      name: 'goto-label-then-with-statement',
+      code: `program test;
+label 500;
+type
+  r = record
+    x: integer;
+  end;
+var
+  p: r;
+begin
+  p.x := 42;
+  goto 500;
+  writeln('Skipped');
+500:
+  with p do
+    writeln(x);
+  writeln('After with');
+end.`,
+      purpose: 'label后紧跟with语句（flattenTransparentBlock处理非Compound透明块）',
+      expectedContains: '42\nAfter with',
+      expectedNotContains: 'Skipped',
+    },
   ]
 
   for (const t of tests) {
