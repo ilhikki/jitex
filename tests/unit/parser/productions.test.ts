@@ -1,8 +1,8 @@
-import { lex } from '../../src/lexer/lexer'
-import { ParserInput } from '../../src/ast/types'
-import { parseExpression, parseIdentifier, parseExpressionList } from '../../src/parser/expressions'
-import { parseType, parseVariableDeclaration } from '../../src/parser/types'
-import { parseStatement, parseCompoundStatement } from '../../src/parser/statements'
+import { lex } from '../../../src/lexer/lexer'
+import { ParserInput } from '../../../src/ast/types'
+import { parseExpression, parseIdentifier, parseExpressionList } from '../../../src/parser/expressions'
+import { parseType, parseVariableDeclaration } from '../../../src/parser/types'
+import { parseStatement, parseCompoundStatement } from '../../../src/parser/statements'
 import {
   parseLabelDeclaration,
   parseConstDeclarations,
@@ -13,7 +13,7 @@ import {
   parseParameterList,
   parseBlock,
   parseProgram,
-} from '../../src/parser/declarations'
+} from '../../../src/parser/declarations'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

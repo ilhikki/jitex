@@ -1,4 +1,4 @@
-import { parse } from '../../src/index'
+import { parse } from '../../../src/index'
 
 export interface ConformanceTest {
   name: string

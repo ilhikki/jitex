@@ -1,6 +1,14 @@
 # tests/
 
-> 标准测试目录。代码即文档——具体测试用例见各测试文件。
+> 测试目录。代码即文档——具体测试用例见各测试文件。
+
+## 目录结构
+
+| 目录 | 层级 | 说明 |
+|------|------|------|
+| `unit/` | 单元测试 | lexer/parser 单个模块的独立测试 |
+| `integration/` | 集成测试 | JS 编译器端到端执行 Pascal 程序的测试（原 m5/m3.5） |
+| `e2e/` | 端到端测试 | TEX82 完整编译执行的端到端测试（原 tests-tex） |
 
 ## 原则
 
@@ -9,8 +17,7 @@
 - **非标测试**：每个非标特性必须有正反测试：
   - 正测试：注入/配置启用非标，验证功能正常
   - 反测试：默认配置下，验证非标特性报错
-- **标准测试集**：`m5/` 下 400+ 用例，全部走 JS 编译器。
-- **测试 helper**：`m5/_helper.ts` 提供 PascalTest / runPascal / runPascalTest / runPascalTests。
+- **测试 helper**：`integration/_helper.ts` 提供 PascalTest / runPascal / runPascalTest / runPascalTests。
 
 ## 如何更新本文档
 

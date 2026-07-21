@@ -4,6 +4,12 @@
 
 ## M5 — 高性能 JS 编译器
 
+### Phase 0：基础设施 ✅（明细已删除）
+### Phase 1：integer/boolean/基础控制流 ✅（明细已删除）
+### Phase 2：char/real/string ✅（明细已删除）
+### Phase 3：array/record/set/file/WITH ✅（明细已删除）
+### Phase 4：嵌套过程/var参数/goto ✅（明细已删除）
+
 ### Phase 5：项目重构 🚧
 
 #### 进行中
@@ -12,20 +18,19 @@
   - I2: types/ 目录整体重构
   - D6: 提交信息规范
 
-- 5.5.2 文档体系重构 🚧
-  - 入口改为 AGENTS.md（路由器 + 铁律）
-  - 任务追踪 task.md、问题追踪 issue.md
-  - 各目录新建 README（原则性描述，不写文件列表）
-  - 删除 .trae/、plan.md、docs/refactoring-decisions.md
-  - 代码即文档：export 函数和文件顶部加文档注释
+- 5.5.4：重构 /tests 目录
+  - 新建 tests/unit/：lexer/parser 单元测试
+  - 新建 tests/integration/：按模块分组的集成测试（原 m5/m3.5 迁移）
+  - 新建 tests/e2e/：端到端测试（原 tests-tex 迁移）
+  - 重命名测试文件为 p{phase}-{feature}.test.ts 格式
+  - 更新 tests/README.md
 
 #### 已完成（明细已删除，见 git history）
 
 - 5.5：移除 VM/static-analyzer，JS 编译器独立 ✅
 - 5.5.1：深度清理（命名/死代码/文档归档）✅
 - 5.5.2：执行决策 D1-D8 + I1-I3 ✅
-
-### Phase 0-4 ✅（明细已删除）
+- 5.5.2：文档体系重构（AGENTS.md 入口 + 代码即文档）✅
 
 ---
 
