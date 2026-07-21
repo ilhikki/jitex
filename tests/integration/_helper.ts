@@ -64,6 +64,9 @@ export interface PascalTest {
 
   /** 自定义系统调用处理器 */
   sysCalls?: Map<string, SysCallHandler>
+
+  /** 最大执行步数（覆盖默认 1e9，用于测试死循环场景） */
+  maxSteps?: number
 }
 
 /** 执行单个测试用例，返回 runJS 原始结果 */
@@ -74,7 +77,7 @@ export async function runPascal(test: PascalTest): Promise<RunState> {
     sysCalls: test.sysCalls,
     files: test.files,
     programFileUrls: test.programFileUrls,
-    maxSteps: 1e9,
+    maxSteps: test.maxSteps ?? 1e9,
   })
 }
 

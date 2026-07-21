@@ -176,9 +176,6 @@ export function emitStmt(
       if (compiler.labelCases) {
         const caseNum = compiler.labelCases.get(lblName)
         if (caseNum === undefined) {
-          if (compiler.labelSwitchName) {
-            return `${pad}break ${compiler.labelSwitchName}`
-          }
           throw new Error(`JS VM: goto ${lblName} - label not found`)
         }
         const continueLabel = compiler.labelSwitchName ? ` ${compiler.labelSwitchName}` : ''
