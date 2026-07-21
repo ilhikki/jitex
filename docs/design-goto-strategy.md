@@ -158,29 +158,35 @@ console.log('exit')
 - 双向跳转
 - goto 密集代码
 
-**实现（修正版）**：
+**实现**：
 
 ```js
-// 确保 break 能跳出所有嵌套结构
-__goto_switch: switch (__pc) {
-  case 0:
-    while (cond) {
-      if (need_goto) {
-        __pc = 1
-        break __goto_switch  // 标签 break，跳出 switch
+let __pc = 0
+__goto_loop: while (true) {
+  switch (__pc) {
+    case 0: {
+      while (cond) {
+        if (need_goto) {
+          __pc = 1
+          continue __goto_loop  // 标签 continue，跳过内层循环，回到外层 while
+        }
       }
+      __pc = -1; continue __goto_loop;
     }
-    break __goto_switch
-  case 1:
-    // label 1 的代码
-    break __goto_switch
+    case 1: {
+      // label 1 的代码
+      __pc = -1; continue __goto_loop;
+    }
+    default: break __goto_loop;
+  }
 }
 ```
 
-**关键修正**：
-1. 用 `labeled break`（`break __goto_switch`）确保跳出 switch
-2. 不再需要外层 `while(true)`（由顶层循环统一管理）
-3. 状态机仅用于复杂跳转，简单场景用策略 A/B/C
+**关键设计**：
+1. 用 `labeled continue`（`continue __goto_loop`）确保跳过所有内层循环，回到外层 while 的下一次迭代
+2. `__pc = -1` 表示正常结束，进入 default 分支跳出 while
+3. `__pc = N` 后 `continue __goto_loop` 实现 goto 跳转
+4. 状态机仅用于复杂跳转，简单场景用策略 A/B/C
 
 ### 策略 E：异常模拟（仅用于跨过程 goto）
 
@@ -422,9 +428,9 @@ console.log(js)
 ### Phase 1：基础设施（当前）
 
 1. ✅ 增加 `allowUndeclaredLabels` 配置
-2. ✅ 修复状态机 `labeled break` 问题
-3. 📝 实现 `compileToJS` 公开 API（用于调试）
-4. 📝 增加 `debug.emitJS` 选项
+2. ✅ 实现状态机 `labeled continue` 方案（使用 `continue __goto_loop` 跳出内层循环）
+3. ✅ 实现 `compileToJS` 公开 API（支持 extensions 参数）
+4. ✅ 增加 `debug.emitJS` 选项
 
 ### Phase 2：简单场景优化
 

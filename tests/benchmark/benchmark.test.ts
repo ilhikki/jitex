@@ -117,7 +117,8 @@ function printReport(results: BenchmarkResult[]): void {
         ' | ' +
         padLeft(String(Math.round(r.avgSteps)), 10) +
         ' | ' +
-        r.status + (r.error ? ` (${r.error})` : '')
+        r.status +
+        (r.error ? ` (${r.error})` : '')
     )
   }
 
@@ -148,9 +149,13 @@ begin
   writeln('x=', x, ' y=', y);
 end.`
 
-      const r = await measureExecution('arithmetic-loop-100k', async () => {
-        return await runJS(code)
-      }, 5)
+      const r = await measureExecution(
+        'arithmetic-loop-100k',
+        async () => {
+          return await runJS(code)
+        },
+        5
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -169,9 +174,13 @@ begin
   writeln('sum=', sum);
 end.`
 
-      const r = await measureExecution('array-access-10k', async () => {
-        return await runJS(code)
-      }, 5)
+      const r = await measureExecution(
+        'array-access-10k',
+        async () => {
+          return await runJS(code)
+        },
+        5
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -187,9 +196,13 @@ begin
   writeln('len=', length(s));
 end.`
 
-      const r = await measureExecution('string-concat-10k', async () => {
-        return await runJS(code, { extensions: ['string'] })
-      }, 5)
+      const r = await measureExecution(
+        'string-concat-10k',
+        async () => {
+          return await runJS(code, { extensions: ['string'] })
+        },
+        5
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -206,9 +219,13 @@ begin
   writeln('sum=', sum);
 end.`
 
-      const r = await measureExecution('nested-loops-100x100x100', async () => {
-        return await runJS(code)
-      }, 3)
+      const r = await measureExecution(
+        'nested-loops-100x100x100',
+        async () => {
+          return await runJS(code)
+        },
+        3
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -227,9 +244,13 @@ begin
   writeln('sum=', sum);
 end.`
 
-      const r = await measureExecution('goto-backward-100k', async () => {
-        return await runJS(code)
-      }, 5)
+      const r = await measureExecution(
+        'goto-backward-100k',
+        async () => {
+          return await runJS(code)
+        },
+        5
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -250,9 +271,13 @@ begin
   writeln('x=', x);
 end.`
 
-      const r = await measureExecution('goto-forward-skip', async () => {
-        return await runJS(code)
-      }, 10)
+      const r = await measureExecution(
+        'goto-forward-skip',
+        async () => {
+          return await runJS(code)
+        },
+        10
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -275,9 +300,13 @@ begin
   writeln('sum=', sum);
 end.`
 
-      const r = await measureExecution('procedure-calls-4', async () => {
-        return await runJS(code)
-      }, 10)
+      const r = await measureExecution(
+        'procedure-calls-4',
+        async () => {
+          return await runJS(code)
+        },
+        10
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -300,9 +329,13 @@ begin
   writeln('p.x=', p.x, ' p.y=', p.y);
 end.`
 
-      const r = await measureExecution('record-access-100k', async () => {
-        return await runJS(code)
-      }, 5)
+      const r = await measureExecution(
+        'record-access-100k',
+        async () => {
+          return await runJS(code)
+        },
+        5
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
@@ -313,25 +346,33 @@ end.`
       const source = readResource(TANGLE_PAS)
       const webSource = readResource(TANGLE_WEB)
 
-      const r = await measureExecution('tangle-web-pass3', async () => {
-        const result = await runTangle(source, webSource)
-        return {
-          steps: result.state.steps,
-          outputBuffer: [result.pascal],
-        }
-      }, 1)
+      const r = await measureExecution(
+        'tangle-web-pass3',
+        async () => {
+          const result = await runTangle(source, webSource)
+          return {
+            steps: result.state.steps,
+            outputBuffer: [result.pascal],
+          }
+        },
+        1
+      )
       results.push(r)
 
       expect(r.status).toBe('success')
     }, 120000)
 
-    test.skip('tangle compile only', async () => {
+    test('tangle compile only', async () => {
       const source = readResource(TANGLE_PAS)
 
-      const r = await measureExecution('tangle-compile-only', async () => {
-        const js = compileToJS(source, { extensions: ['allowUndeclaredLabels', 'string'] })
-        return { steps: 0, outputBuffer: [js.length.toString()] }
-      }, 3)
+      const r = await measureExecution(
+        'tangle-compile-only',
+        async () => {
+          const js = compileToJS(source, { extensions: ['allowUndeclaredLabels', 'string'] })
+          return { steps: 0, outputBuffer: [js.length.toString()] }
+        },
+        3
+      )
       results.push(r)
       expect(r.status).toBe('success')
     }, 60000)
