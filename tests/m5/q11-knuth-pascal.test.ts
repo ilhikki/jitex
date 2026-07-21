@@ -3,10 +3,10 @@
 // 代码风格模仿 tangle-official.pas（紧凑、大写关键字、OTHERS: 等）
 
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 describe('M5 JS - Knuth Pascal Style', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     // ==========================================================================
     // FILE OF CHAR 类型（Knuth 用 TEXTFILE = PACKED FILE OF CHAR）
     // ==========================================================================
@@ -341,7 +341,7 @@ END.`,
 
   it('should pass Knuth Pascal style tests', async () => {
     for (const test of tests) {
-      const result = await runVMTest(test)
+      const result = await runPascalTest(test)
       if (!result.passed) {
         console.error(`FAIL: ${test.name}: ${result.message}`)
       }

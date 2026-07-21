@@ -1,6 +1,6 @@
-import { InterpreterTestCompat, runVMFromInterpreterTest } from './_helper'
+import { LegacyTestCompat, runLegacyTest } from './_helper'
 
-const tests: InterpreterTestCompat[] = [
+const tests: LegacyTestCompat[] = [
   {
     name: 'global var used in main',
     code: `program test;
@@ -678,7 +678,7 @@ end.`,
 describe('M5 JS (from M3.6): Scope', () => {
   tests.forEach((t) => {
     test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }

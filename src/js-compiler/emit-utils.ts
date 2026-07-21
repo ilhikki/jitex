@@ -1,7 +1,9 @@
-// 内置系统调用名（大写）。ProcedureCall/FunctionCall 命中此集合 → 走 sysCall
-import type { TypeTable } from './types'
-import type { BlockNode, ExpressionNode, IdentifierNode, ProgramNode } from '../ast/types'
+// 编译器工具函数、内置函数表、作用域与过程信息
+//
+// 由原 item.ts 内容迁入；D2/D3 拆分后此文件作为 emit-*.ts 系列的共享基础。
+import type { BlockNode } from '../ast/types'
 
+// 内置系统调用名（大写）。ProcedureCall/FunctionCall 命中此集合 → 走 sysCall
 export const BUILTIN_SYSCALLS = new Set([
   'WRITE',
   'WRITELN',

@@ -8,10 +8,10 @@ import { createExtendedSysCalls } from '../src/js-compiler/syscalls'
 const extendedSysCalls = createExtendedSysCalls()
 
 describe('TEX82 - TRIP test (JS)', () => {
-  const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
-  const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
-  const tripTexFile = path.join(__dirname, '..', 'tests', 'resources', 'trip.tex')
-  const tripTypFile = path.join(__dirname, '..', 'tests', 'resources', 'trip.typ')
+  const webFile = path.join(__dirname, 'resources', 'tex.web')
+  const tanglePasFile = path.join(__dirname, 'resources', 'tangle-official.pas')
+  const tripTexFile = path.join(__dirname, 'resources', 'trip.tex')
+  const tripTypFile = path.join(__dirname, 'resources', 'trip.typ')
   const webSource = fs.readFileSync(webFile, 'utf-8')
   const tanglePas = fs.readFileSync(tanglePasFile, 'utf-8')
   const tripTex = fs.readFileSync(tripTexFile, 'utf-8')
@@ -87,11 +87,11 @@ describe('TEX82 - TRIP test (JS)', () => {
       allowUndeclaredLabels: true,
     })
 
-    console.log('VM status:', state.status)
+    console.log('Status:', state.status)
     if (state.error) {
-      console.log('VM error:', state.error.message?.slice(0, 500))
+      console.log('Error:', state.error.message?.slice(0, 500))
     }
-    console.log('VM output (first 1000 chars):', state.outputBuffer.join('').slice(0, 1000))
+    console.log('Output (first 1000 chars):', state.outputBuffer.join('').slice(0, 1000))
 
     // 检查终端输出文件 (TERMOUT 也会写 'TTY:' 但用 REWRITE 打开)
     const ttyContent = Buffer.from(files.get('TTY:') || new Uint8Array()).toString('utf-8')

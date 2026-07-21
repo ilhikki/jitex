@@ -1,11 +1,11 @@
 // m5 测试辅助函数
-// 走 JS 编译器（M5）
+// 测试的是 Pascal 语义，与具体引擎无关
 
 import { runJS } from '../../src/js-compiler'
 import type { RunState } from '../../src/js-compiler/run-state'
 import type { TypePlugin, SysCallHandler } from '../../src/js-compiler/types'
 
-export interface JSTest {
+export interface PascalTest {
   name: string
   code: string
   purpose: string
@@ -30,7 +30,7 @@ export interface JSTest {
   debugEmitJS?: boolean
 }
 
-export async function runTest(test: JSTest): Promise<RunState> {
+export async function runPascal(test: PascalTest): Promise<RunState> {
   return await runJS(test.code, {
     input: test.input,
     plugins: test.plugins,
@@ -47,9 +47,9 @@ export function getOutput(state: RunState): string {
   return state.outputBuffer.join('')
 }
 
-export async function runJSTest(test: JSTest): Promise<{ passed: boolean; message: string; state: RunState }> {
+export async function runPascalTest(test: PascalTest): Promise<{ passed: boolean; message: string; state: RunState }> {
   try {
-    const state = await runTest(test)
+    const state = await runPascal(test)
     const output = getOutput(state)
 
     if (test.expectedError !== undefined) {
@@ -111,13 +111,13 @@ export async function runJSTest(test: JSTest): Promise<{ passed: boolean; messag
   }
 }
 
-export async function runJSTests(tests: JSTest[]): Promise<{ passed: number; failed: number; failures: string[] }> {
+export async function runPascalTests(tests: PascalTest[]): Promise<{ passed: number; failed: number; failures: string[] }> {
   let passed = 0
   let failed = 0
   const failures: string[] = []
 
   for (const test of tests) {
-    const result = await runJSTest(test)
+    const result = await runPascalTest(test)
     if (result.passed) {
       passed++
     } else {
@@ -130,19 +130,10 @@ export async function runJSTests(tests: JSTest[]): Promise<{ passed: number; fai
 }
 
 // ===========================================================================
-// 向后兼容别名（测试文件中的 runVM/runVMTest/VMTest 调用过渡期保留）
+// 兼容层：将 m3.6 LegacyTest 格式适配
 // ===========================================================================
 
-export type VMTest = JSTest
-export const runVM = runTest
-export const runVMTest = runJSTest
-export const runVMTests = runJSTests
-
-// ===========================================================================
-// 兼容层：将 m3.6 InterpreterTest 格式适配
-// ===========================================================================
-
-export interface InterpreterTestCompat {
+export interface LegacyTestCompat {
   name: string
   code: string
   purpose: string
@@ -156,13 +147,13 @@ export interface InterpreterTestCompat {
   allowUndeclaredLabels?: boolean
 }
 
-export async function runVMFromInterpreterTest(
-  t: InterpreterTestCompat
+export async function runLegacyTest(
+  t: LegacyTestCompat
 ): Promise<{ passed: boolean; message: string }> {
-  const result = await runJSTest({
+  const result = await runPascalTest({
     ...t,
     expectedError: t.expectedError === true ? '' : undefined,
     allowUndeclaredLabels: t.allowUndeclaredLabels,
-  } as JSTest)
+  } as PascalTest)
   return { passed: result.passed, message: result.message }
 }

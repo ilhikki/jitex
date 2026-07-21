@@ -1,8 +1,8 @@
-import { runVMFromInterpreterTest, InterpreterTestCompat } from './_helper'
+import { runLegacyTest, LegacyTestCompat } from './_helper'
 
 describe('Q05: Operations and Types', () => {
   describe('Arithmetic Operations', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'addition',
         code: 'program test; var x, y: integer; begin x := 5; y := 3; writeln(x + y); end.',
@@ -75,7 +75,7 @@ describe('Q05: Operations and Types', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -84,7 +84,7 @@ describe('Q05: Operations and Types', () => {
   })
 
   describe('Relational Operations', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'equality (equals)',
         code: "program test; var x, y: integer; begin x := 5; y := 5; if x = y then writeln('equal') else writeln('not equal'); end.",
@@ -136,7 +136,7 @@ describe('Q05: Operations and Types', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -145,7 +145,7 @@ describe('Q05: Operations and Types', () => {
   })
 
   describe('Logical Operations', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'NOT operation',
         code: "program test; var b: boolean; begin b := true; if not b then writeln('false') else writeln('true'); b := false; if not b then writeln('true') else writeln('false'); end.",
@@ -197,7 +197,7 @@ describe('Q05: Operations and Types', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -206,7 +206,7 @@ describe('Q05: Operations and Types', () => {
   })
 
   describe('Set Operations', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'set union',
         code: "program test; type T = set of 1..10; var a, b, c: T; begin a := [1, 2, 3]; b := [3, 4, 5]; c := a + b; if 1 in c then writeln('1'); if 5 in c then writeln('5'); end.",
@@ -244,7 +244,7 @@ describe('Q05: Operations and Types', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -253,7 +253,7 @@ describe('Q05: Operations and Types', () => {
   })
 
   describe('Type Conversions', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'integer to char',
         code: 'program test; var i: integer; c: char; begin i := 65; c := chr(i); writeln(c); end.',
@@ -298,7 +298,7 @@ describe('Q05: Operations and Types', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -307,7 +307,7 @@ describe('Q05: Operations and Types', () => {
   })
 
   describe('Operation Boundaries', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'division by zero',
         code: 'program test; var x: integer; begin x := 10 div 0; end.',
@@ -366,7 +366,7 @@ describe('Q05: Operations and Types', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }

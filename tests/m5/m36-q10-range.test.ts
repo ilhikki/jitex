@@ -1,4 +1,4 @@
-import { runVMFromInterpreterTest, InterpreterTestCompat } from './_helper'
+import { runLegacyTest, LegacyTestCompat } from './_helper'
 
 /**
  * Q10: Subrange (range) 类型专项测试
@@ -13,7 +13,7 @@ import { runVMFromInterpreterTest, InterpreterTestCompat } from './_helper'
  */
 describe('Q10: Subrange (Range) Type', () => {
   describe('Basic Subrange', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'integer subrange basic assignment',
         code: 'program test; type T = 1..10; var a: T; begin a := 5; writeln(a); end.',
@@ -65,7 +65,7 @@ describe('Q10: Subrange (Range) Type', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -74,7 +74,7 @@ describe('Q10: Subrange (Range) Type', () => {
   })
 
   describe('Boundary Check on Assignment', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'assign above upper bound should error',
         code: 'program test; type T = 1..10; var a: T; begin a := 11; end.',
@@ -126,7 +126,7 @@ describe('Q10: Subrange (Range) Type', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -135,7 +135,7 @@ describe('Q10: Subrange (Range) Type', () => {
   })
 
   describe('Boundary Expressions', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'const identifier as bound',
         code: 'program test; const n = 10; type T = 1..n; var a: T; begin a := 10; writeln(a); end.',
@@ -173,7 +173,7 @@ describe('Q10: Subrange (Range) Type', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -182,7 +182,7 @@ describe('Q10: Subrange (Range) Type', () => {
   })
 
   describe('Scope Isolation', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'local const with same name does not affect global subrange type',
         code: `program test;
@@ -280,7 +280,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -289,7 +289,7 @@ end.`,
   })
 
   describe('Type Compatibility', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'subrange assign to integer should succeed',
         code: 'program test; type T = 1..10; var a: T; i: integer; begin a := 5; i := a; writeln(i); end.',
@@ -334,7 +334,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -343,7 +343,7 @@ end.`,
   })
 
   describe('Subrange as Array Index', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'subrange as array index type',
         code: 'program test; type Index = 1..5; var a: array[Index] of integer; begin a[1] := 10; a[5] := 50; writeln(a[1]); writeln(a[5]); end.',
@@ -360,7 +360,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -369,7 +369,7 @@ end.`,
   })
 
   describe('Subrange in FOR Loop', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'subrange as for loop variable',
         code: 'program test; type T = 1..5; var i: T; s: integer; begin s := 0; for i := 1 to 5 do s := s + i; writeln(s); end.',
@@ -393,7 +393,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -402,7 +402,7 @@ end.`,
   })
 
   describe('Subrange Operations', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'subrange arithmetic in range',
         code: 'program test; type T = 1..20; var a, b: T; begin a := 5; b := 10; writeln(a + b); writeln(b - a); writeln(a * 2); end.',
@@ -433,7 +433,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -442,7 +442,7 @@ end.`,
   })
 
   describe('Subrange Parameter Passing', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'subrange as value parameter',
         code: `program test;
@@ -496,7 +496,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -505,7 +505,7 @@ end.`,
   })
 
   describe('Subrange Boundary Order (Pascal82 Compliance)', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'lower bound greater than upper bound should error',
         code: 'program test; type T = 10..1; var a: T; begin a := 5; end.',
@@ -529,7 +529,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -538,7 +538,7 @@ end.`,
   })
 
   describe('Subrange Edge Cases', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'subrange default value is lower bound',
         code: 'program test; type T = 3..10; var a: T; begin writeln(a); end.',
@@ -597,7 +597,7 @@ end.`,
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }

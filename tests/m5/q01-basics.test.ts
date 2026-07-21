@@ -1,10 +1,10 @@
 // m4 基础测试：变量声明、赋值、输出
 
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 describe('M5 JS Basic', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     {
       name: 'integer literal output',
       code: `program test; begin writeln(42); end.`,
@@ -100,7 +100,7 @@ describe('M5 JS Basic', () => {
 
   it('should pass all basic tests', async () => {
     for (const test of tests) {
-      const result = await runVMTest(test)
+      const result = await runPascalTest(test)
       if (!result.passed) {
         console.error(`FAIL: ${test.name}: ${result.message}`)
       }

@@ -1,10 +1,10 @@
 // m4 控制流测试
 
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 describe('M5 JS Control Flow', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     {
       name: 'if true',
       code: `program test; begin if true then writeln(1) else writeln(2); end.`,
@@ -79,7 +79,7 @@ describe('M5 JS Control Flow', () => {
 
   it('should pass all control flow tests', async () => {
     for (const test of tests) {
-      const result = await runVMTest(test)
+      const result = await runPascalTest(test)
       if (!result.passed) {
         console.error(`FAIL: ${test.name}: ${result.message}`)
       }

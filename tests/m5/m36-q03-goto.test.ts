@@ -1,7 +1,7 @@
-import { runVMFromInterpreterTest, InterpreterTestCompat } from './_helper'
+import { runLegacyTest, LegacyTestCompat } from './_helper'
 
 describe('GOTO and Labels', () => {
-  const tests: InterpreterTestCompat[] = [
+  const tests: LegacyTestCompat[] = [
     {
       name: 'goto-basic-same-procedure',
       code: `program test;
@@ -677,7 +677,7 @@ end.`,
 
   tests.forEach((t) => {
     test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }

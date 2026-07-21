@@ -1,8 +1,8 @@
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 describe('M5 JS Scope', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     {
       name: 'global var used in main',
       code: `program test;
@@ -188,7 +188,7 @@ end.`,
 
   it('should pass scope tests', async () => {
     for (const test of tests) {
-      const result = await runVMTest(test)
+      const result = await runPascalTest(test)
       if (!result.passed) {
         console.error(`FAIL: ${test.name}: ${result.message}`)
       }

@@ -5,7 +5,7 @@
 // - string/char/array/record/file 保持 PascalValue，通过 ctx.sysCall/plugin 桥接
 // - 异步操作（WRITELN/READ/file）用 async/await 原生处理
 //
-// 详见 docs/plan-m5-high-performance.md
+// 详见 plan.md（项目总览）与 docs/refactoring-decisions.md（决策与原则）
 
 import { parse } from '../index'
 import type { ProgramNode } from '../ast/types'
@@ -24,8 +24,10 @@ import { createFilePlugin, TEXT_TYPE } from './types/file.plugin'
 import { createExtendedSysCalls } from './syscalls'
 import { createDefaultIO, createRecordFileOps, type PascalIO } from './file-model'
 import type { RuntimeCtx, SysCallHandler, TypePlugin, TypeDef } from './types'
-import type { RunState } from './run-state'
+import type { RunState, RunError } from './run-state'
 import { Compiler } from './compiler'
+
+export type { RunState, RunError } from './run-state'
 
 // ============================================================================
 // 公开 API
@@ -176,10 +178,10 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
 }
 
 // 调试用：返回编译生成的 JS 源码（不执行）
+// 默认加载与 runJS 一致的标准 plugins，确保编译结果与实际执行一致
 export function compileToJS(source: string): string {
   const ast = parseSource(source)
-  const basePlugins: TypePlugin[] = [integerPlugin, booleanPlugin, charPlugin, realPlugin]
-  const typeTable = buildTypeTable(ast, basePlugins)
-  const compiler = new Compiler(typeTable)
+  const { runtime } = buildRuntime(ast, {})
+  const compiler = new Compiler(runtime.typeTable)
   return compiler.compile(ast)
 }

@@ -1,8 +1,8 @@
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 describe('M5 JS Goto', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     {
       name: 'goto in procedure',
       code: `program test;
@@ -274,7 +274,7 @@ end.`,
 
   it('should pass goto tests', async () => {
     for (const test of tests) {
-      const result = await runVMTest(test)
+      const result = await runPascalTest(test)
       if (!result.passed) {
         console.error(`FAIL: ${test.name}: ${result.message}`)
       }
@@ -283,7 +283,7 @@ end.`,
   })
 
   it('should reject undeclared label in standard mode', async () => {
-    const result = await runVMTest({
+    const result = await runPascalTest({
       name: 'undeclared-label-standard',
       code: `program test;
 begin

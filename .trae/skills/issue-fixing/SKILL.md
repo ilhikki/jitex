@@ -18,9 +18,10 @@ This skill manages the bug diagnosis and resolution workflow for pascal-ts.
 
 1. **Atomic Fixes**: One commit per logical fix. Never bundle unrelated changes.
 2. **Regression Protection**: Full test baseline before and after every fix.
-3. **No Guessing on Standards**: If Pascal82 behavior is unclear, stop and ask the user.
-4. **Side Issue Quarantine**: New problems discovered during a fix are logged but NOT fixed in the same commit unless they are the direct root cause.
-5. **Fail Fast**: The system MUST reject invalid input explicitly. Silent acceptance or fallback to default behavior is a bug, not a feature.
+3. **Standard Anchor (原则 A)**: ISO Pascal 1983 (ISO 7185) 是唯一行为标准。默认行为必须符合 ISO 标准；非标特性默认必须报错；启用非标特性遵循"注入优先，无法注入才配置"；非标特性必须配正反测试。详见 [docs/refactoring-decisions.md](../../../docs/refactoring-decisions.md)。
+4. **No Guessing on Standards**: If Pascal82 behavior is unclear, stop and ask the user.
+5. **Side Issue Quarantine**: New problems discovered during a fix are logged but NOT fixed in the same commit unless they are the direct root cause.
+6. **Fail Fast**: The system MUST reject invalid input explicitly. Silent acceptance or fallback to default behavior is a bug, not a feature. **非标特性默认不报错 = silent bug = P0**。
 
 ---
 
@@ -29,12 +30,11 @@ This skill manages the bug diagnosis and resolution workflow for pascal-ts.
 | Priority | Category | Examples | Action |
 |----------|----------|----------|--------|
 | **P0** | Test code errors | Test uses invalid syntax; helper bug | Fix immediately, same commit allowed if trivial |
-| **P0** | Silent Bug | System accepts garbage input; type resolver falls back to default | Fix before any other code work — these hide real bugs |
+| **P0** | Silent Bug | System accepts garbage input; type resolver falls back to default; **非标特性默认不报错**（违反原则 A） | Fix before any other code work — these hide real bugs |
 | **P1** | Crash / Panic | Parser throws on valid input; unhandled exception | High priority; blocks everything else |
 | **P2** | Regression | Previously passing tests now fail | Fix before touching new features |
 | **P3** | Core feature missing | Key language feature broken | Medium priority; fix after P0-P2 |
-| **P4** | Standard compliance | Non-standard feature implemented by default | Low priority; clean up after core features work |
-| **P5** | Refactor / Performance | Code cleanup; optimization | Only when user explicitly requests |
+| **P4** | Refactor / Performance | Code cleanup; optimization | Only when user explicitly requests |
 
 ---
 

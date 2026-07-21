@@ -1,13 +1,12 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { parse } from '../src/index'
-import { StaticAnalyzer } from '../src/static-analyzer'
-import { runJS } from '../src/js-compiler'
-import { stringPlugin } from '../src/types'
+import { runJS, compileToJS } from '../src/js-compiler'
+import { stringPlugin } from '../src/js-compiler/types'
 
 describe('TEX82 - run tex.pas on JS', () => {
-  const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
-  const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
+  const webFile = path.join(__dirname, 'resources', 'tex.web')
+  const tanglePasFile = path.join(__dirname, 'resources', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
   const tanglePas = fs.readFileSync(tanglePasFile, 'utf-8')
 
@@ -42,16 +41,19 @@ describe('TEX82 - run tex.pas on JS', () => {
     console.log('tex.pas size:', texPas.length, 'chars')
   }, 600000)
 
-  test('run tex.pas on VM (initialization)', async () => {
+  test('run tex.pas (initialization)', async () => {
     const result = parse(texPas)
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    const analyzer = new StaticAnalyzer([])
-    const jsonCode = analyzer.analyze(result.astNode as any)
-    expect(jsonCode).toBeDefined()
+    // 验证 tex.pas 能成功编译为 JS
+    let jsCode: string
+    expect(() => {
+      jsCode = compileToJS(texPas)
+    }).not.toThrow()
+    expect(jsCode!.length).toBeGreaterThan(0)
 
-    // 尝试在 VM 上运行 TEX82
+    // 尝试运行 TEX82
     const files = new Map<string, Uint8Array>()
     files.set('TEXINPUT', new Uint8Array())   // 输入文件占位
     files.set('TEXOUTPUT', new Uint8Array())  // 输出文件占位
@@ -66,11 +68,11 @@ describe('TEX82 - run tex.pas on JS', () => {
       allowUndeclaredLabels: true,
     })
 
-    console.log('VM status:', state.status)
+    console.log('Status:', state.status)
     if (state.error) {
-      console.log('VM error:', state.error.message?.slice(0, 500))
+      console.log('Error:', state.error.message?.slice(0, 500))
     }
-    console.log('VM output (first 1000 chars):', state.outputBuffer.join('').slice(0, 1000))
+    console.log('Output (first 1000 chars):', state.outputBuffer.join('').slice(0, 1000))
 
     // 期望 VM 能执行不崩溃（terminated 或 error 都可接受）
     expect(['terminated', 'error']).toContain(state.status)

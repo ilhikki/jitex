@@ -1,8 +1,8 @@
-import { runVMFromInterpreterTest, InterpreterTestCompat } from './_helper'
+import { runLegacyTest, LegacyTestCompat } from './_helper'
 
 describe('Q04: Array, Record and WITH', () => {
   describe('Array Basics', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'array declaration and access',
         code: 'program test; var arr: array[1..5] of integer; begin arr[1] := 10; arr[3] := 30; writeln(arr[1]); writeln(arr[3]); end.',
@@ -60,7 +60,7 @@ describe('Q04: Array, Record and WITH', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -69,7 +69,7 @@ describe('Q04: Array, Record and WITH', () => {
   })
 
   describe('Array Operations', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'array element as lvalue',
         code: 'program test; var arr: array[1..3] of integer; begin arr[2] := 42; writeln(arr[2]); end.',
@@ -114,7 +114,7 @@ describe('Q04: Array, Record and WITH', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -123,7 +123,7 @@ describe('Q04: Array, Record and WITH', () => {
   })
 
   describe('Record Basics', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'record declaration',
         code: 'program test; type Point = record x, y: integer end; var p: Point; begin p.x := 10; p.y := 20; writeln(p.x, p.y); end.',
@@ -168,7 +168,7 @@ describe('Q04: Array, Record and WITH', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -177,7 +177,7 @@ describe('Q04: Array, Record and WITH', () => {
   })
 
   describe('WITH Statement', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'WITH single record',
         code: 'program test; type Point = record x, y: integer end; var p: Point; begin p.x := 0; p.y := 0; with p do begin x := 10; y := 20; end; writeln(p.x, p.y); end.',
@@ -222,7 +222,7 @@ describe('Q04: Array, Record and WITH', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }
@@ -231,7 +231,7 @@ describe('Q04: Array, Record and WITH', () => {
   })
 
   describe('Array and Record Combination', () => {
-    const tests: InterpreterTestCompat[] = [
+    const tests: LegacyTestCompat[] = [
       {
         name: 'array of records',
         code: 'program test; type Point = record x, y: integer end; var arr: array[1..2] of Point; begin arr[1].x := 1; arr[1].y := 2; arr[2].x := 3; arr[2].y := 4; writeln(arr[1].x, arr[2].y); end.',
@@ -268,7 +268,7 @@ describe('Q04: Array, Record and WITH', () => {
       },
     ]
     tests.forEach((t) => test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }

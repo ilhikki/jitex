@@ -1,8 +1,8 @@
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 describe('M5 JS Parameters', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     {
       name: 'value parameter passing',
       code: `program test;
@@ -135,7 +135,7 @@ end.`,
 
   it('should pass parameter tests', async () => {
     for (const test of tests) {
-      const result = await runVMTest(test)
+      const result = await runPascalTest(test)
       if (!result.passed) {
         console.error(`FAIL: ${test.name}: ${result.message}`)
       }

@@ -17,7 +17,7 @@ import type {
   RepeatStatementNode,
   ForStatementNode,
 } from '../ast/types'
-import { Scope } from './item'
+import { Scope } from './emit-utils'
 import type { Compiler } from './compiler'
 
 // 判断是否为透明块（不生成独立状态机，标签可穿透）

@@ -1,8 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { parse } from '../src/index'
-import { StaticAnalyzer } from '../src/static-analyzer'
-import { runJS } from '../src/js-compiler'
+import { runJS, compileToJS } from '../src/js-compiler'
 
 describe('Tangle Official - JS run', () => {
   const pasFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle-official.pas')
@@ -18,30 +17,23 @@ describe('Tangle Official - JS run', () => {
     expect(result.success).toBe(true)
   })
 
-  test('analyze (compile to JsonCode) succeeds', () => {
-    const result = parse(source)
-    expect(result.success).toBe(true)
-    if (!result.success) return
-
-    const analyzer = new StaticAnalyzer([])
-    let jsonCode: any
+  test('compile to JS succeeds', () => {
+    let jsCode: string
     expect(() => {
-      jsonCode = analyzer.analyze(result.astNode as any)
+      jsCode = compileToJS(source)
     }).not.toThrow()
-    if (!jsonCode) return
+    if (!jsCode!) return
 
-    expect(jsonCode.version).toBe('1.0.0')
-    expect(jsonCode.entry).toBe('MAIN')
-    expect(jsonCode.procedures.length).toBeGreaterThan(10)
-    expect(jsonCode.typeTable.length).toBeGreaterThan(20)
+    expect(jsCode.length).toBeGreaterThan(0)
+    // 关键过程名（小写化后带 p_ 前缀）应出现在生成的 JS 源码中
+    expect(jsCode).toContain('p_initialize')
+    expect(jsCode).toContain('p_error')
+    expect(jsCode).toContain('p_jumpout')
 
-    console.log('Tangle compiled OK:')
-    console.log('  procedures:', jsonCode.procedures.length)
-    console.log('  types:', jsonCode.typeTable.length)
-    console.log('  main body instructions:', jsonCode.procedures[jsonCode.procedures.length - 1].body.length)
+    console.log('Tangle compiled OK, JS code size:', jsCode!.length, 'chars')
   })
 
-  test('run VM with web file input', async () => {
+  test('run with web file input', async () => {
     const result = parse(source)
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -65,14 +57,14 @@ describe('Tangle Official - JS run', () => {
       allowUndeclaredLabels: true,
     })
 
-    console.log('VM final status:', state.status)
+    console.log('Final status:', state.status)
     if (state.error) {
-      console.log('VM error:', state.error.message)
-      console.log('VM stack trace:', state.error.stackTrace)
+      console.log('Error:', state.error.message)
+      console.log('Stack trace:', state.error.stackTrace)
     }
 
     const output = state.outputBuffer.join('')
-    console.log('VM output (first 1000 chars):', output.slice(0, 1000))
+    console.log('Output (first 1000 chars):', output.slice(0, 1000))
 
     for (const [name, content] of files.entries()) {
       console.log(`File ${name} (${content.length} chars):`, Buffer.from(content).toString('utf-8').slice(0, 500))

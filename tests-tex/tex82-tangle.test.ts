@@ -3,8 +3,8 @@ import * as path from 'path'
 import { runJS } from '../src/js-compiler'
 
 describe('TEX82 - TANGLE compile tex.web (JS)', () => {
-  const webFile = path.join(__dirname, '..', 'tests', 'resources', 'tex.web')
-  const tanglePasFile = path.join(__dirname, '..', 'tests', 'resources', 'tangle-official.pas')
+  const webFile = path.join(__dirname, 'resources', 'tex.web')
+  const tanglePasFile = path.join(__dirname, 'resources', 'tangle-official.pas')
   const webSource = fs.readFileSync(webFile, 'utf-8')
   const tanglePas = fs.readFileSync(tanglePasFile, 'utf-8')
 
@@ -39,10 +39,10 @@ describe('TEX82 - TANGLE compile tex.web (JS)', () => {
 
   test('tangle compiles tex.web → tex.pas', async () => {
     const result = await runTangle(tanglePas, webSource)
-    console.log('VM status:', result.state.status)
+    console.log('Status:', result.state.status)
     if (result.state.error) {
-      console.log('VM error:', result.state.error.message)
-      console.log('VM error stack:', result.state.error.stackTrace)
+      console.log('Error:', result.state.error.message)
+      console.log('Error stack:', result.state.error.stackTrace)
     }
     console.log('Output (first 2000 chars):', result.output.slice(0, 2000))
     console.log('Output (last 2000 chars):', result.output.slice(-2000))

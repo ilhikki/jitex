@@ -3,14 +3,14 @@
 // 这些用例覆盖 RESET/REWRITE/GET/PUT/EOF/EOLN/READ/READLN/WRITE/WRITELN/F^/ASSIGN
 
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)
 }
 
 describe('M5 JS - File Model (async)', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     // ==========================================================================
     // REWRITE + WRITE/WRITELN：写入到内存文件
     // ==========================================================================
@@ -208,7 +208,7 @@ describe('M5 JS - File Model (async)', () => {
 
   for (const t of tests) {
     it(t.name, async () => {
-      const result = await runVMTest(t)
+      const result = await runPascalTest(t)
       if (!result.passed) {
         console.error(`  [${t.name}] FAIL: ${result.message}`)
         if (result.state?.error) {

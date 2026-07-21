@@ -1,7 +1,7 @@
-import { runVMFromInterpreterTest, InterpreterTestCompat } from './_helper'
+import { runLegacyTest, LegacyTestCompat } from './_helper'
 
 describe('参数绑定测试', () => {
-  const tests: InterpreterTestCompat[] = [
+  const tests: LegacyTestCompat[] = [
     {
       name: '过程参数基础-无参过程',
       code: `
@@ -735,7 +735,7 @@ end.
 
   tests.forEach((t) => {
     test(t.name, async () => {
-      const result = await runVMFromInterpreterTest(t)
+      const result = await runLegacyTest(t)
       if (!result.passed) {
         console.error(`FAIL: ${t.name}: ${result.message}`)
       }

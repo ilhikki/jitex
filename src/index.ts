@@ -8,6 +8,10 @@ export { parseType, parseVariableDeclaration } from './parser/types'
 export * from './parser/helpers'
 export { nodeToCode } from './ast/printer'
 
+// JS 编译器公开 API
+export { runJS, compileToJS } from './js-compiler'
+export type { RunState, RunError, JSRunOptions, JSDebugOptions } from './js-compiler'
+
 import { lex } from './lexer/lexer'
 import { parseProgram } from './parser/declarations'
 import { ParserInput, ParseResult, ProgramNode } from './ast/types'

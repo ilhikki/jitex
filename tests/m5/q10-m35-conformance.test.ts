@@ -1,7 +1,7 @@
-import { VMTest, runVMTest } from './_helper'
+import { PascalTest, runPascalTest } from './_helper'
 import { stringPlugin } from '../../src/js-compiler/types/string.plugin'
 
-const tests: VMTest[] = [
+const tests: PascalTest[] = [
   // ==========================================================================
   // 从 m3.5 复制的测试用例 - 验证解析和执行
   // ==========================================================================
@@ -286,7 +286,6 @@ end.`,
     code: 'program test;\nvar\n  x: integer;\nbegin\n  case x of\n    otherwise\n      x := 0;\n  end;\nend.',
     purpose: '验证 CASE 语句可以只有 OTHERWISE 分支',
     features: ['case-statement', 'otherwise'],
-    expectedError: 'Unsupported statement: CaseStatement',
   },
   {
     name: 'FORWARD 后再定义过程',
@@ -305,13 +304,12 @@ end.`,
     code: 'program test;\ntype\n  TRec = record\n    x: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  with r do\n    x := 1;\nend.',
     purpose: '验证 WITH 语句创建记录字段的局部作用域',
     features: ['with-statement', 'record', 'single-record'],
-    expectedError: 'Unsupported statement: WithStatement',
   },
 ]
 
 describe('M5 JS - M3.5 Conformance Tests', () => {
   test.each(tests)('$name', async (t) => {
-    const result = await runVMTest(t)
+    const result = await runPascalTest(t)
     if (!result.passed) {
       if (t.expectedError && result.message.includes(t.expectedError)) {
         console.log(`Skipping (expected): ${t.name}`)

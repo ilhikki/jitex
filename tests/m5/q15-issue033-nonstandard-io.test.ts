@@ -5,7 +5,7 @@
 // 分类：非标扩展，插件实现
 
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 import { createExtendedSysCalls } from '../../src/js-compiler/syscalls'
 
 function text(s: string): Uint8Array {
@@ -15,7 +15,7 @@ function text(s: string): Uint8Array {
 const extendedSysCalls = createExtendedSysCalls()
 
 describe('ISSUE-033: RESET/REWRITE multi-arg (nonstandard)', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     {
       name: 'RESET(F, name) 应关联文件名并读取内容',
       code: `PROGRAM TANGLE;VAR F:FILE OF CHAR;N:INTEGER;BEGIN RESET(F,'DATA.TXT');READ(F,N);WRITELN(N);END.`,
@@ -49,7 +49,7 @@ describe('ISSUE-033: RESET/REWRITE multi-arg (nonstandard)', () => {
 
   for (const t of tests) {
     it(t.name, async () => {
-      const result = await runVMTest(t)
+      const result = await runPascalTest(t)
       if (!result.passed) {
         console.error(`  [${t.name}] FAIL: ${result.message}`)
       }

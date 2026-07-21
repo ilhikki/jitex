@@ -3,10 +3,10 @@
 // 这些用例覆盖 ISO 7185 标准中容易出错的边界情况
 
 import { describe, it, expect } from '@jest/globals'
-import { runVMTest, type VMTest } from './_helper'
+import { runPascalTest, type PascalTest } from './_helper'
 
 describe('M4.1 Pascal82 Conformance', () => {
-  const tests: VMTest[] = [
+  const tests: PascalTest[] = [
     // ==========================================================================
     // ARRAY[CHAR] — 索引范围应为 0..255（Pascal82 §6.4.3.1）
     // ==========================================================================
@@ -66,7 +66,7 @@ describe('M4.1 Pascal82 Conformance', () => {
 
   for (const t of tests) {
     it(t.name, async () => {
-      const result = await runVMTest(t)
+      const result = await runPascalTest(t)
       expect(result.passed).toBe(true)
     })
   }
