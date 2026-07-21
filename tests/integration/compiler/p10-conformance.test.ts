@@ -1,7 +1,7 @@
 import { PascalTest, runPascalTest } from '../_helper'
 import { Types } from '@/index'
 
-const stringPlugin = Types.stringPlugin
+const STRING_TYPE = Types.STRING_TYPE
 
 const tests: PascalTest[] = [
   // ==========================================================================
@@ -93,21 +93,21 @@ end.`,
     code: `program test;\nvar\n  s: string;\nbegin\n  s := '';\nend.`,
     purpose: '验证空字符串字面量',
     features: ['string-literal', 'empty-string'],
-    plugins: [stringPlugin],
+    extraTypes: [STRING_TYPE],
   },
   {
     name: '单字符字符串',
     code: `program test;\nvar\n  s: string;\nbegin\n  s := 'a';\nend.`,
     purpose: '验证单字符字符串',
     features: ['string-literal', 'single-char'],
-    plugins: [stringPlugin],
+    extraTypes: [STRING_TYPE],
   },
   {
     name: '转义引号（双写单引号）',
     code: `program test;\nvar\n  s: string;\nbegin\n  s := 'it''s';\nend.`,
     purpose: '验证 Pascal 中通过双写单引号转义引号',
     features: ['string-literal', 'escaped-quote'],
-    plugins: [stringPlugin],
+    extraTypes: [STRING_TYPE],
   },
 
   // ------------------------------

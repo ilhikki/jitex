@@ -3,19 +3,9 @@ import { parseProgram } from '../parser/declarations'
 import type { ProgramNode, ParserInput } from '../ast/types'
 import { createJSCtx, ctxToRunState } from '../runtime/context'
 import { buildTypeTable } from './type-table-builder'
-import { integerPlugin } from '../types/plugins/integer.plugin'
-import { booleanPlugin } from '../types/plugins/boolean.plugin'
-import { charPlugin } from '../types/plugins/char.plugin'
-import { realPlugin } from '../types/plugins/real.plugin'
-import { createArrayPlugin } from '../types/plugins/array.plugin'
-import { createRecordPlugin } from '../types/plugins/record.plugin'
-import { createEnumPlugin } from '../types/plugins/enum.plugin'
-import { createSubrangePlugin } from '../types/plugins/subrange.plugin'
-import { createSetPlugin } from '../types/plugins/set.plugin'
-import { createFilePlugin, TEXT_TYPE } from '../types/plugins/file.plugin'
 import { createExtendedSysCalls } from '../runtime/syscalls'
 import { createDefaultIO, createRecordFileOps, type PascalIO } from '../runtime/file-model'
-import type { RuntimeCtx, SysCallHandler, TypePlugin, TypeDef } from '../types/types'
+import type { RuntimeCtx, SysCallHandler, TypeDef } from '../types/types'
 import type { RunState, RunError } from '../runtime/run-state'
 import { Compiler } from './compiler'
 
@@ -29,7 +19,7 @@ export interface JSDebugOptions {
 
 export interface JSRunOptions {
   input?: string[]
-  plugins?: TypePlugin[]
+  extraTypes?: TypeDef[]
   sysCalls?: Map<string, SysCallHandler>
   files?: Map<string, Uint8Array>
   programFileUrls?: Record<string, string>
@@ -52,35 +42,7 @@ function buildRuntime(
   ast: ProgramNode,
   options: JSRunOptions
 ): { runtime: RuntimeCtx; sysCalls: Map<string, SysCallHandler> } {
-  const fileTypePlugin: TypePlugin = {
-    name: 'file-types',
-    version: '1.0.0',
-    types: [TEXT_TYPE as TypeDef],
-  }
-  const basePlugins: TypePlugin[] = [
-    integerPlugin,
-    booleanPlugin,
-    charPlugin,
-    realPlugin,
-    fileTypePlugin,
-    ...(options.plugins || []),
-  ]
-  const typeTable = buildTypeTable(ast, basePlugins)
-  const arrayPlugin = createArrayPlugin(typeTable)
-  const recordPlugin = createRecordPlugin(typeTable)
-  const enumPlugin = createEnumPlugin(typeTable)
-  const subrangePlugin = createSubrangePlugin(typeTable)
-  const setPlugin = createSetPlugin(typeTable)
-  const filePlugin = createFilePlugin(typeTable)
-  const allPlugins = [
-    ...basePlugins,
-    arrayPlugin,
-    recordPlugin,
-    enumPlugin,
-    subrangePlugin,
-    setPlugin,
-    filePlugin,
-  ]
+  const typeTable = buildTypeTable(ast, options.extraTypes)
   const sysCalls = options.sysCalls || createExtendedSysCalls()
   let io: PascalIO | undefined
   if (options.files) {
@@ -94,7 +56,6 @@ function buildRuntime(
     sysCalls,
     io,
   }
-  ;(runtime as any).plugins = allPlugins
   return { runtime, sysCalls }
 }
 

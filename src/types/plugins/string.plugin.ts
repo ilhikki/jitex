@@ -1,9 +1,3 @@
-import type { TypePlugin } from '../types'
+import type { StringType } from '../types'
 
-export const stringPlugin: TypePlugin = {
-  name: 'string',
-  version: '1.0.0',
-  types: [
-    { id: 'string', kind: 'string' }
-  ]
-}
+export const STRING_TYPE: StringType = { id: 'string', kind: 'string' }

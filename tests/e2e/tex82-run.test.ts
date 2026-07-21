@@ -33,7 +33,7 @@ describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
     const state = await runJS(texPas, {
       input: [],
       files,
-      plugins: [Types.stringPlugin],
+      extraTypes: [Types.STRING_TYPE],
       maxSteps: 1e9,
       allowUndeclaredLabels: true,
     })

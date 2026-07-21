@@ -26,7 +26,6 @@ import type {
 import type {
   TypeTable,
   TypeDef,
-  TypePlugin,
   ArrayType,
   RecordType,
   SubrangeType,
@@ -34,7 +33,7 @@ import type {
   SetType,
   FileType,
 } from '../types'
-import { createTypeTable } from '../types'
+import { createTypeTable, INTEGER_TYPE, REAL_TYPE, BOOLEAN_TYPE, CHAR_TYPE, TEXT_TYPE } from '../types'
 
 interface Scope {
   types: Map<string, string>
@@ -71,17 +70,26 @@ function lookupConstInt(scope: Scope, name: string): number | undefined {
   return undefined
 }
 
+const BUILTIN_TYPES: TypeDef[] = [
+  INTEGER_TYPE,
+  REAL_TYPE,
+  BOOLEAN_TYPE,
+  CHAR_TYPE,
+  TEXT_TYPE,
+]
+
 export class TypeTableBuilder {
   private typeTable: TypeTable
   private scope: Scope
 
-  constructor(plugins: TypePlugin[]) {
+  constructor(extraTypes: TypeDef[] = []) {
     this.typeTable = createTypeTable()
-    for (const plugin of plugins) {
-      for (const t of plugin.types) {
-        if (!this.typeTable.has(t.id)) {
-          this.typeTable.register(t)
-        }
+    for (const t of BUILTIN_TYPES) {
+      this.typeTable.register(t)
+    }
+    for (const t of extraTypes) {
+      if (!this.typeTable.has(t.id)) {
+        this.typeTable.register(t)
       }
     }
     this.scope = createScope()
@@ -436,7 +444,7 @@ export class TypeTableBuilder {
   }
 }
 
-export function buildTypeTable(ast: ProgramNode, plugins: TypePlugin[]): TypeTable {
-  const builder = new TypeTableBuilder(plugins)
+export function buildTypeTable(ast: ProgramNode, extraTypes: TypeDef[] = []): TypeTable {
+  const builder = new TypeTableBuilder(extraTypes)
   return builder.build(ast)
 }

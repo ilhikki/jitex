@@ -11,7 +11,7 @@
 // 测试原则见 ../README.md；
 // 执行引擎实现见 @/js-compiler/index.ts。
 
-import { runJS, RunState, SysCallHandler, TypePlugin } from '@/index'
+import { runJS, RunState, SysCallHandler, TypeDef } from '@/index'
 
 export interface PascalTest {
   name: string
@@ -23,7 +23,7 @@ export interface PascalTest {
   expectedNotContains?: string
   expectedError?: string
   input?: string[]
-  plugins?: TypePlugin[]
+  extraTypes?: TypeDef[]
   // 内存文件存储
   files?: Map<string, Uint8Array>
   // 全局文件变量名 → URL
@@ -41,7 +41,7 @@ export interface PascalTest {
 export async function runPascal(test: PascalTest): Promise<RunState> {
   return await runJS(test.code, {
     input: test.input,
-    plugins: test.plugins,
+    extraTypes: test.extraTypes,
     sysCalls: test.sysCalls,
     files: test.files,
     programFileUrls: test.programFileUrls,

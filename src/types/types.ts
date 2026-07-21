@@ -145,8 +145,9 @@ export interface RuntimeCtx {
   io?: PascalIO
 }
 
-export interface TypePlugin {
-  name: string
-  version: string
-  types: TypeDef[]
-}
+export const INTEGER_TYPE: IntegerType = { id: 'integer', kind: 'integer', size: 32, signed: true }
+export const REAL_TYPE: RealType = { id: 'real', kind: 'real', size: 64 }
+export const BOOLEAN_TYPE: BooleanType = { id: 'boolean', kind: 'boolean' }
+export const CHAR_TYPE: CharType = { id: 'char', kind: 'char' }
+export const STRING_TYPE: StringType = { id: 'string', kind: 'string' }
+export const TEXT_TYPE: FileType = { id: 'text', kind: 'file' }

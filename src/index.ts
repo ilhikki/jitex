@@ -8,20 +8,9 @@ import { runJS, compileToJS } from './compiler/run-js'
 import type { RunState, RunError, JSRunOptions, JSDebugOptions } from './compiler/run-js'
 import { Compiler as CompilerClass } from './compiler/compiler'
 import { buildTypeTable } from './compiler/type-table-builder'
-import type { TypeDef, TypePlugin, TypeTable, PascalValue, RuntimeCtx, SysCallHandler } from './types/types'
+import type { TypeDef, TypeTable, PascalValue, RuntimeCtx, SysCallHandler } from './types/types'
 import { createTypeTable } from './types/types'
-import { integerPlugin } from './types/plugins/integer.plugin'
-import { booleanPlugin } from './types/plugins/boolean.plugin'
-import { charPlugin } from './types/plugins/char.plugin'
-import { realPlugin } from './types/plugins/real.plugin'
-import { stringPlugin } from './types/plugins/string.plugin'
-import { createArrayPlugin } from './types/plugins/array.plugin'
-import { createRecordPlugin } from './types/plugins/record.plugin'
-import { createEnumPlugin } from './types/plugins/enum.plugin'
-import { createSubrangePlugin } from './types/plugins/subrange.plugin'
-import { createSetPlugin } from './types/plugins/set.plugin'
-import { createFilePlugin } from './types/plugins/file.plugin'
-import { createTanglePlugin } from './types/plugins/tangle.plugin'
+import { STRING_TYPE } from './types/plugins/string.plugin'
 import { nodeToCode } from './ast/printer'
 
 export const Lexer = {
@@ -63,21 +52,10 @@ export type { RunState, RunError, JSRunOptions, JSDebugOptions }
 
 export const Types = {
   createTypeTable,
-  integerPlugin,
-  booleanPlugin,
-  charPlugin,
-  realPlugin,
-  stringPlugin,
-  createArrayPlugin,
-  createRecordPlugin,
-  createEnumPlugin,
-  createSubrangePlugin,
-  createSetPlugin,
-  createFilePlugin,
-  createTanglePlugin,
+  STRING_TYPE,
 }
 
-export type { TypeDef, TypePlugin, TypeTable, PascalValue, RuntimeCtx, SysCallHandler }
+export type { TypeDef, TypeTable, PascalValue, RuntimeCtx, SysCallHandler }
 
 export * as AST from './ast/types'
 
