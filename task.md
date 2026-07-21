@@ -10,26 +10,44 @@
 ### Phase 3：array/record/set/file/WITH ✅（明细已删除）
 ### Phase 4：嵌套过程/var参数/goto ✅（明细已删除）
 
-### Phase 5：项目重构 🚧
-
-#### 进行中
-
-- 5.5.3：待决策项
-  - I2: types/ 目录整体重构
-  - D6: 提交信息规范
-
-- 5.5.5：按 feature 合并测试 🚧
-  - 合并 compiler/ 下相同 feature 的测试（pXX + m36）
-  - parser/ 测试重命名为 p?-{feature}.test.ts 格式
-  - 清理旧文件（p01-p15, m36-q*, m35/）
-
-#### 已完成（明细已删除，见 git history）
+### Phase 5：项目重构 ✅（明细已删除，见 git history）
 
 - 5.5：移除 VM/static-analyzer，JS 编译器独立 ✅
 - 5.5.1：深度清理（命名/死代码/文档归档）✅
 - 5.5.2：执行决策 D1-D8 + I1-I3 ✅
 - 5.5.2：文档体系重构（AGENTS.md 入口 + 代码即文档）✅
+- 5.5.3：决策项执行（I2/D6）✅
 - 5.5.4：重构 /tests 目录（unit/integration/e2e 分层）✅
+- 5.5.5：按 feature 合并测试 ✅
+- 5.6：测试覆盖提升（printer.ts 单元测试、strategy.ts 覆盖率 100%）✅
+- 5.7：goto 高级测试（非正常场景、嵌套非透明块、防死循环）✅
+
+---
+
+### Phase 6：性能优化与功能增强 🚧
+
+#### 进行中
+
+- 6.1：性能优化
+  - 6.1.1：建立基准测试
+    - 编写多个单元基准测试目标
+    - e2e 中的"pass 3: tangle.pas (v2) + tangle.web → stable output"作为基准点
+  - 6.1.2：排查项目热点并优化
+  - 6.1.3：优化 goto 策略（参考 design-goto-strategy.md）
+    - 不要实现文档中的策略 E（异常机制）
+    - 在代码中使用字母命名策略（替代数字 case）
+
+- 6.2：功能优化
+  - 6.2.1：支持 max_step
+    - 在 index 的文档注释中定义行为
+    - 编写测试验证功能
+  - 6.2.2：支持没有 max_step 的模式
+    - 对比两种模式的性能差异
+
+- 6.3：记录痛点
+  - 在开发过程中记录遇到的难受痛点
+
+#### 已完成（明细已删除，见 git history）
 
 ---
 
