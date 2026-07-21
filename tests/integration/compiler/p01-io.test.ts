@@ -376,6 +376,198 @@ end.`,
       purpose: 'eof works with files (case is implementation-defined per Pascal82)',
       expectedContains: 'TRUE',
     },
+    {
+      name: 'real-format-width-precision',
+      code: `program test;
+var r: real;
+begin
+  r := 3.14159;
+  writeln(r:20);
+  writeln(r:10);
+  writeln(r);
+end.`,
+      purpose: 'real 格式化：不同宽度',
+      expectedContains: '3.14159',
+    },
+    {
+      name: 'real-format-integer-value',
+      code: `program test;
+var r: real;
+begin
+  r := 5.0;
+  writeln(r);
+end.`,
+      purpose: '整数值的real格式化（科学计数法）',
+      expectedContains: 'E+000',
+    },
+    {
+      name: 'integer-format-width',
+      code: `program test;
+var i: integer;
+begin
+  i := 42;
+  write(i:6);
+  write(i:3);
+  write(i:1);
+  writeln;
+end.`,
+      purpose: 'integer 格式化宽度',
+      expectedContains: '    42 4242',
+    },
+    {
+      name: 'boolean-format',
+      code: `program test;
+var b: boolean;
+begin
+  b := true;
+  writeln(b);
+  b := false;
+  writeln(b);
+end.`,
+      purpose: 'boolean 输出 TRUE/FALSE',
+      expectedContains: 'TRUE\nFALSE',
+    },
+    {
+      name: 'char-format-width',
+      code: `program test;
+var c: char;
+begin
+  c := 'A';
+  write(c:5);
+  writeln;
+end.`,
+      purpose: 'char 格式化宽度',
+      expectedContains: '    A',
+    },
+    {
+      name: 'readln-mixed-types',
+      code: `program test;
+var i: integer;
+    r: real;
+    c: char;
+begin
+  readln(i, r);
+  writeln(i);
+  writeln(r:0:2);
+end.`,
+      purpose: 'readln 读取 integer 和 real 混合',
+      input: ['10 3.14'],
+      expectedContains: '10\n3.14',
+    },
+    {
+      name: 'readln-empty-input',
+      code: `program test;
+var i: integer;
+begin
+  readln(i);
+  writeln(i);
+end.`,
+      purpose: 'readln 空行输入（默认值）',
+      input: [''],
+      expectedContains: '0',
+    },
+    {
+      name: 'readln-multiple-lines',
+      code: `program test;
+var a, b, c: integer;
+begin
+  readln(a);
+  readln(b);
+  readln(c);
+  writeln(a + b + c);
+end.`,
+      purpose: 'readln 多行输入',
+      input: ['10', '20', '30'],
+      expectedContains: '60',
+    },
+    {
+      name: 'eof-input-end',
+      code: `program test;
+var i: integer;
+begin
+  while not eof do
+    begin
+      readln(i);
+      writeln(i);
+    end;
+  writeln('EOF reached');
+end.`,
+      purpose: 'eof 在输入结束时为 true',
+      input: ['1', '2', '3'],
+      expectedContains: '1\n2\n3\nEOF reached',
+    },
+    {
+      name: 'eoln-before-read',
+      code: `program test;
+var f: text;
+    c: char;
+begin
+  rewrite(f);
+  writeln(f, 'ab');
+  writeln(f, 'cd');
+  reset(f);
+  while not eof(f) do
+    begin
+      while not eoln(f) do
+        begin
+          read(f, c);
+          write(c);
+        end;
+      readln(f);
+      writeln;
+    end;
+end.`,
+      purpose: '文件 eoln 行末检测',
+      expectedContains: 'ab\ncd',
+    },
+    {
+      name: 'file-write-and-reset',
+      code: `program test;
+var f: text;
+    s: char;
+begin
+  rewrite(f);
+  writeln(f, 'Hello');
+  writeln(f, 'World');
+  reset(f);
+  while not eof(f) do
+    begin
+      while not eoln(f) do
+        begin
+          read(f, s);
+          write(s);
+        end;
+      readln(f);
+      writeln;
+    end;
+end.`,
+      purpose: '写入文件后 reset 再读取',
+      expectedContains: 'Hello\nWorld',
+    },
+    {
+      name: 'file-write-integer-and-read',
+      code: `program test;
+var f: text;
+    i, j: integer;
+    s: char;
+begin
+  rewrite(f);
+  writeln(f, '42 99');
+  reset(f);
+  while not eof(f) do
+    begin
+      while not eoln(f) do
+        begin
+          read(f, s);
+          write(s);
+        end;
+      readln(f);
+      writeln;
+    end;
+end.`,
+      purpose: '写入整数到文件再逐字符读取',
+      expectedContains: '42 99',
+    },
   ]
 
   const tests: PascalTest[] = [...m36Tests]

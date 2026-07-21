@@ -639,6 +639,273 @@ end.`,
       purpose: 'GOTO to recursive entry label (simulating loop)（Pascal82: 数字 label）',
       expectedContains: '1\n2\n3',
     },
+    {
+      name: 'goto-label-inside-nested-begin-end',
+      code: `program test;
+label 10, 20;
+begin
+  writeln('Outer begin');
+  begin
+    writeln('Inner begin');
+    goto 20;
+10:
+    writeln('Inner label 10');
+  end;
+  writeln('Should not reach');
+20:
+  writeln('Outer label 20');
+end.`,
+      purpose: 'GOTO跨越嵌套begin块（透明块中的label收集）',
+      expectedContains: 'Inner begin\nOuter label 20',
+      expectedNotContains: 'Inner label 10\nShould not reach',
+    },
+    {
+      name: 'goto-from-inner-label-to-outer',
+      code: `program test;
+label 10, 20;
+begin
+  goto 10;
+  writeln('Skipped outer');
+  begin
+10:
+    writeln('Inner label 10');
+    goto 20;
+    writeln('Skipped inner');
+  end;
+20:
+  writeln('Outer label 20');
+end.`,
+      purpose: 'GOTO跳到嵌套begin中的label再跳出',
+      expectedContains: 'Inner label 10\nOuter label 20',
+      expectedNotContains: 'Skipped outer\nSkipped inner',
+    },
+    {
+      name: 'goto-triple-nested-compound',
+      code: `program test;
+label 10, 20, 30;
+begin
+  writeln('L1');
+  begin
+    writeln('L2');
+    begin
+      writeln('L3');
+      goto 30;
+10:
+      writeln('Label L3-10');
+    end;
+20:
+    writeln('Label L2-20');
+  end;
+30:
+  writeln('Label L1-30');
+end.`,
+      purpose: '三层嵌套begin-end中的GOTO（透明块label收集）',
+      expectedContains: 'L1\nL2\nL3\nLabel L1-30',
+      expectedNotContains: 'Label L3-10\nLabel L2-20',
+    },
+    {
+      name: 'goto-case-with-otherwise',
+      code: `program test;
+label 10;
+var x: integer;
+begin
+  x := 5;
+  case x of
+    1: writeln('One');
+    2: writeln('Two');
+  otherwise
+    goto 10;
+  end;
+  writeln('After case');
+10:
+  writeln('Label 10');
+end.`,
+      purpose: 'GOTO从CASE的otherwise分支跳出',
+      expectedContains: 'Label 10',
+      expectedNotContains: 'After case',
+    },
+    {
+      name: 'goto-case-branch-with-begin-end',
+      code: `program test;
+label 50;
+var x: integer;
+begin
+  x := 1;
+  case x of
+    1:
+      begin
+        writeln('Case 1 begin');
+        goto 50;
+        writeln('Case 1 end');
+      end;
+    2: writeln('Case 2');
+  end;
+  writeln('After case');
+50:
+  writeln('Label 50');
+end.`,
+      purpose: 'GOTO从CASE分支内的begin-end块跳出',
+      expectedContains: 'Case 1 begin\nLabel 50',
+      expectedNotContains: 'Case 1 end\nAfter case',
+    },
+    {
+      name: 'goto-out-of-while-loop',
+      code: `program test;
+label 99;
+var i: integer;
+begin
+  i := 1;
+  while i <= 10 do
+    begin
+      writeln(i);
+      if i = 3 then goto 99;
+      i := i + 1;
+    end;
+  writeln('After while');
+99:
+  writeln('Exited at 3');
+end.`,
+      purpose: 'GOTO跳出while循环（不透明块中的goto）',
+      expectedContains: '1\n2\n3\nExited at 3',
+      expectedNotContains: '4\nAfter while',
+    },
+    {
+      name: 'goto-out-of-repeat-loop',
+      code: `program test;
+label 88;
+var i: integer;
+begin
+  i := 1;
+  repeat
+    writeln(i);
+    if i = 4 then goto 88;
+    i := i + 1;
+  until i > 10;
+  writeln('After repeat');
+88:
+  writeln('Exited at 4');
+end.`,
+      purpose: 'GOTO跳出repeat循环',
+      expectedContains: '1\n2\n3\n4\nExited at 4',
+      expectedNotContains: '5\nAfter repeat',
+    },
+    {
+      name: 'goto-out-of-for-loop',
+      code: `program test;
+label 77;
+var i: integer;
+begin
+  for i := 1 to 10 do
+    begin
+      writeln(i);
+      if i = 5 then goto 77;
+    end;
+  writeln('After for');
+77:
+  writeln('Exited at 5');
+end.`,
+      purpose: 'GOTO跳出for循环',
+      expectedContains: '1\n2\n3\n4\n5\nExited at 5',
+      expectedNotContains: '6\nAfter for',
+    },
+    {
+      name: 'goto-out-of-if-then',
+      code: `program test;
+label 66;
+var x: integer;
+begin
+  x := 1;
+  if x > 0 then
+    begin
+      writeln('If then');
+      goto 66;
+      writeln('Skipped');
+    end;
+  writeln('After if');
+66:
+  writeln('Label 66');
+end.`,
+      purpose: 'GOTO跳出if-then块',
+      expectedContains: 'If then\nLabel 66',
+      expectedNotContains: 'Skipped\nAfter if',
+    },
+    {
+      name: 'goto-out-of-if-else',
+      code: `program test;
+label 55;
+var x: integer;
+begin
+  x := 0;
+  if x > 0 then
+    writeln('Then')
+  else
+    begin
+      writeln('Else');
+      goto 55;
+      writeln('Skipped else');
+    end;
+  writeln('After if');
+55:
+  writeln('Label 55');
+end.`,
+      purpose: 'GOTO跳出if-else块',
+      expectedContains: 'Else\nLabel 55',
+      expectedNotContains: 'Skipped else\nAfter if',
+    },
+    {
+      name: 'goto-with-statement',
+      code: `program test;
+label 44;
+type
+  r = record
+    x: integer;
+    y: integer;
+  end;
+var
+  p: r;
+begin
+  p.x := 10;
+  p.y := 20;
+  with p do
+    begin
+      writeln(x);
+      goto 44;
+      writeln(y);
+    end;
+  writeln('After with');
+44:
+  writeln('Label 44');
+end.`,
+      purpose: 'GOTO跳出with语句',
+      expectedContains: '10\nLabel 44',
+      expectedNotContains: '20\nAfter with',
+    },
+    {
+      name: 'goto-multiple-labels-mixed-blocks',
+      code: `program test;
+label 100, 200, 300;
+var i, j: integer;
+begin
+  i := 0;
+  j := 0;
+  while i < 10 do
+    begin
+      i := i + 1;
+      j := j + 10;
+      if j = 30 then goto 300;
+100:
+      writeln('i=', i, ' j=', j);
+    end;
+  goto 200;
+300:
+  writeln('Break at j=30');
+200:
+  writeln('Done');
+end.`,
+      purpose: '多label与while循环混合场景',
+      expectedContains: 'i=1 j=10\ni=2 j=20\nBreak at j=30\nDone',
+      expectedNotContains: 'i=3 j=30',
+    },
   ]
 
   for (const t of tests) {

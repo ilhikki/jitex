@@ -322,6 +322,54 @@ const writeFileHandler: SysCallHandler = async (args, _state, runtime) => {
   await io.file.write(file, text)
 }
 
+const truncHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'integer', raw: Math.trunc(raw) | 0 }
+}
+
+const roundHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'integer', raw: Math.round(raw) | 0 }
+}
+
+const sinHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'real', raw: Math.sin(raw) }
+}
+
+const cosHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'real', raw: Math.cos(raw) }
+}
+
+const expHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'real', raw: Math.exp(raw) }
+}
+
+const lnHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'real', raw: Math.log(raw) }
+}
+
+const sqrtHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'real', raw: Math.sqrt(raw) }
+}
+
+const arctanHandler: SysCallHandler = (args) => {
+  const value = (args[0] as any).value || args[0]
+  const raw = value.raw as number
+  return { typeId: 'real', raw: Math.atan(raw) }
+}
+
 const pageHandler: SysCallHandler = async (args, state, runtime) => {
   const s = state as SysCallState
   const typeTable = runtime?.typeTable || null
@@ -391,6 +439,14 @@ export function createDefaultSysCalls(): Map<string, SysCallHandler> {
   map.set('ERSTAT', erstatHandler)
   map.set('WRITE_FILE', writeFileHandler)
   map.set('PAGE', pageHandler)
+  map.set('TRUNC', truncHandler)
+  map.set('ROUND', roundHandler)
+  map.set('SIN', sinHandler)
+  map.set('COS', cosHandler)
+  map.set('EXP', expHandler)
+  map.set('LN', lnHandler)
+  map.set('SQRT', sqrtHandler)
+  map.set('ARCTAN', arctanHandler)
   return map
 }
 

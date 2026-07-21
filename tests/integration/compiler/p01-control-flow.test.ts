@@ -694,6 +694,159 @@ end.`,
       purpose: 'WHILE loop controlled by boolean flag',
       expectedContains: '3',
     },
+    {
+      name: 'with-simple-record',
+      code: `program test;
+type
+  Point = record
+    x: integer;
+    y: integer;
+  end;
+var
+  p: Point;
+begin
+  p.x := 10;
+  p.y := 20;
+  with p do
+    begin
+      writeln(x);
+      writeln(y);
+    end;
+end.`,
+      purpose: 'WITH 语句访问记录字段',
+      expectedContains: '10\n20',
+    },
+    {
+      name: 'with-assign-fields',
+      code: `program test;
+type
+  Rect = record
+    left: integer;
+    top: integer;
+    right: integer;
+    bottom: integer;
+  end;
+var
+  r: Rect;
+begin
+  with r do
+    begin
+      left := 1;
+      top := 2;
+      right := 3;
+      bottom := 4;
+    end;
+  writeln(r.left);
+  writeln(r.bottom);
+end.`,
+      purpose: 'WITH 语句中赋值记录字段',
+      expectedContains: '1\n4',
+    },
+    {
+      name: 'nested-with-statements',
+      code: `program test;
+type
+  Inner = record
+    a: integer;
+  end;
+  Outer = record
+    x: integer;
+    inr: Inner;
+  end;
+var
+  o: Outer;
+begin
+  o.x := 100;
+  o.inr.a := 200;
+  with o do
+    with inr do
+      begin
+        writeln(x);
+        writeln(a);
+      end;
+end.`,
+      purpose: '嵌套 WITH 语句',
+      expectedContains: '100\n200',
+    },
+    {
+      name: 'case-multi-value-branch',
+      code: `program test;
+var i: integer;
+begin
+  for i := 1 to 5 do
+    case i of
+      1, 3, 5: writeln('odd');
+      2, 4: writeln('even');
+    end;
+end.`,
+      purpose: 'CASE 语句多值分支',
+      expectedContains: 'odd\neven\nodd\neven\nodd',
+    },
+    {
+      name: 'for-downto-negative',
+      code: `program test;
+var i: integer;
+begin
+  for i := -2 downto -5 do
+    writeln(i);
+end.`,
+      purpose: 'FOR DOWNTO 负数范围',
+      expectedContains: '-2\n-3\n-4\n-5',
+    },
+    {
+      name: 'for-to-zero-iterations',
+      code: `program test;
+var i: integer;
+begin
+  for i := 5 to 1 do
+    writeln(i);
+  writeln('done');
+end.`,
+      purpose: 'FOR TO 起始大于结束时零次迭代',
+      expectedOutput: 'done\n',
+    },
+    {
+      name: 'repeat-until-true-first',
+      code: `program test;
+var i: integer;
+begin
+  i := 10;
+  repeat
+    writeln(i);
+    i := i + 1;
+  until i > 5;
+end.`,
+      purpose: 'REPEAT 条件一开始就满足（至少执行一次）',
+      expectedContains: '10',
+      expectedNotContains: '11',
+    },
+    {
+      name: 'empty-statement',
+      code: `program test;
+var i: integer;
+begin
+  i := 1;
+  ;
+  i := i + 1;
+  ;
+  writeln(i);
+end.`,
+      purpose: '空语句',
+      expectedContains: '2',
+    },
+    {
+      name: 'if-without-else-false',
+      code: `program test;
+var x: integer;
+begin
+  x := 0;
+  if false then
+    x := 1;
+  writeln(x);
+end.`,
+      purpose: 'IF 无 ELSE 且条件为假',
+      expectedContains: '0',
+    },
   ]
 
   const tests: PascalTest[] = [...m36Tests]

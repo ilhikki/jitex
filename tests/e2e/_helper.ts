@@ -41,7 +41,7 @@ export async function runTangle(pasSource: string, webContent: string): Promise<
       POOL: 'POOL',
     },
     maxSteps: 1e9,
-    extensions: ['allowUndeclaredLabels'],
+    extensions: ['allowUndeclaredLabels', 'string'],
   })
 
   return {

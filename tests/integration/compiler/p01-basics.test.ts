@@ -261,6 +261,206 @@ describe('Phase 1: Basics and Operations', () => {
       purpose: '测试子界类型边界检查',
       expectedError: '',
     },
+    {
+      name: 'set-constructor-range',
+      code: `program test;
+var s: set of 0..10;
+begin
+  s := [1..5];
+  if 3 in s then writeln('3 in set');
+  if 6 in s then writeln('6 in set') else writeln('6 not in set');
+end.`,
+      purpose: '集合构造器的范围形式 [a..b]',
+      expectedContains: '3 in set\n6 not in set',
+    },
+    {
+      name: 'set-constructor-mixed',
+      code: `program test;
+var s: set of 0..20;
+begin
+  s := [1, 3..5, 10];
+  if 1 in s then writeln('1 yes');
+  if 4 in s then writeln('4 yes');
+  if 10 in s then writeln('10 yes');
+  if 2 in s then writeln('2 yes') else writeln('2 no');
+end.`,
+      purpose: '集合构造器混合单个元素和范围',
+      expectedContains: '1 yes\n4 yes\n10 yes\n2 no',
+    },
+    {
+      name: 'string-concat-plus',
+      code: `program test;
+var s: string;
+begin
+  s := 'Hello' + ' ' + 'World';
+  writeln(s);
+end.`,
+      purpose: '字符串拼接 + 运算符（非标扩展）',
+      extensions: ['string'],
+      expectedContains: 'Hello World',
+    },
+    {
+      name: 'real-arithmetic-basic',
+      code: `program test;
+var r1, r2: real;
+begin
+  r1 := 2.5;
+  r2 := 1.5;
+  writeln(r1 + r2);
+  writeln(r1 - r2);
+  writeln(r1 * r2);
+  writeln(r1 / r2);
+end.`,
+      purpose: 'real 基本算术运算',
+      expectedContains: '4.0',
+    },
+    {
+      name: 'real-mixed-with-integer',
+      code: `program test;
+var r: real;
+    i: integer;
+begin
+  i := 3;
+  r := i + 2.5;
+  writeln(r);
+  r := r - 1;
+  writeln(r);
+end.`,
+      purpose: 'real 与 integer 混合运算',
+      expectedContains: '5.5',
+    },
+    {
+      name: 'integer-bitwise-and',
+      code: `program test;
+var a, b: integer;
+begin
+  a := 12;
+  b := 10;
+  writeln(a AND b);
+end.`,
+      purpose: 'integer 位与运算（Pascal 中 AND 对整数是位运算）',
+      expectedContains: '8',
+    },
+    {
+      name: 'integer-bitwise-or',
+      code: `program test;
+var a, b: integer;
+begin
+  a := 12;
+  b := 10;
+  writeln(a OR b);
+end.`,
+      purpose: 'integer 位或运算（Pascal 中 OR 对整数是位运算）',
+      expectedContains: '14',
+    },
+    {
+      name: 'unary-not-boolean',
+      code: `program test;
+var b: boolean;
+begin
+  b := true;
+  writeln(NOT b);
+  b := false;
+  writeln(NOT b);
+end.`,
+      purpose: '布尔 NOT 运算',
+      expectedContains: 'FALSE\nTRUE',
+    },
+    {
+      name: 'unary-minus-real',
+      code: `program test;
+var r: real;
+begin
+  r := 3.14;
+  writeln(-r:0:2);
+end.`,
+      purpose: 'real 一元负号',
+      expectedContains: '-3.14',
+    },
+    {
+      name: 'string-literal-single-char',
+      code: `program test;
+var c: char;
+begin
+  c := 'X';
+  writeln(c);
+end.`,
+      purpose: '单字符字符串字面量赋值给 char',
+      expectedContains: 'X',
+    },
+    {
+      name: 'chr-ord-roundtrip',
+      code: `program test;
+var c: char;
+    i: integer;
+begin
+  c := chr(65);
+  writeln(c);
+  i := ord('B');
+  writeln(i);
+end.`,
+      purpose: 'chr 和 ord 往返转换',
+      expectedContains: 'A\n66',
+    },
+    {
+      name: 'trunc-function',
+      code: `program test;
+var r: real;
+begin
+  r := 3.7;
+  writeln(trunc(r));
+  r := -2.3;
+  writeln(trunc(r));
+end.`,
+      purpose: 'trunc 函数（截断取整）',
+      expectedContains: '3\n-2',
+    },
+    {
+      name: 'round-function',
+      code: `program test;
+var r: real;
+begin
+  r := 3.4;
+  writeln(round(r));
+  r := 3.6;
+  writeln(round(r));
+end.`,
+      purpose: 'round 函数（四舍五入）',
+      expectedContains: '3\n4',
+    },
+    {
+      name: 'sqrt-function',
+      code: `program test;
+var r: real;
+begin
+  r := sqrt(16.0);
+  writeln(r:0:2);
+end.`,
+      purpose: 'sqrt 函数（平方根）',
+      expectedContains: '4.00',
+    },
+    {
+      name: 'exp-function',
+      code: `program test;
+var r: real;
+begin
+  r := exp(0.0);
+  writeln(r:0:2);
+end.`,
+      purpose: 'exp 函数（自然指数）',
+      expectedContains: '1.00',
+    },
+    {
+      name: 'ln-function',
+      code: `program test;
+var r: real;
+begin
+  r := ln(1.0);
+  writeln(r:0:2);
+end.`,
+      purpose: 'ln 函数（自然对数）',
+      expectedContains: '0.00',
+    },
   ]
 
   for (const t of tests) {
