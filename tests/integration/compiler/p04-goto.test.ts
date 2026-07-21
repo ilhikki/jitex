@@ -15,7 +15,6 @@ begin
   writeln('After');
 end.`,
       purpose: 'GOTO to label in same procedure',
-      features: ['GOTO', 'label'],
       expectedContains: 'Before\nAfter',
       expectedNotContains: 'Skipped',
     },
@@ -30,7 +29,6 @@ begin
   writeln('Second');
 end.`,
       purpose: 'GOTO forward jump',
-      features: ['GOTO', 'label'],
       expectedContains: 'Second',
       expectedNotContains: 'First',
     },
@@ -47,7 +45,6 @@ begin
   if i < 3 then goto 100;
 end.`,
       purpose: 'GOTO backward jump',
-      features: ['GOTO', 'label', 'loop'],
       expectedContains: '1\n2\n3',
     },
     {
@@ -63,7 +60,6 @@ begin
   writeln('D');
 end.`,
       purpose: 'GOTO skip multiple statements',
-      features: ['GOTO', 'label'],
       expectedContains: 'A\nD',
       expectedNotContains: 'B\nC',
     },
@@ -84,7 +80,6 @@ begin
   writeln('Exit');
 end.`,
       purpose: 'GOTO jump out of loop',
-      features: ['GOTO', 'label', 'while'],
       expectedContains: '1\n2\n3\n4\nExit',
       expectedNotContains: '5\n6\n7\n8\n9\n10',
     },
@@ -101,7 +96,6 @@ begin
   writeln(x);
 end.`,
       purpose: 'GOTO jump into loop area',
-      features: ['GOTO', 'label'],
       expectedContains: '1',
       expectedNotContains: '2',
     },
@@ -114,7 +108,6 @@ begin
   writeln('Label 10');
 end.`,
       purpose: 'Single label declaration',
-      features: ['label'],
       expectedContains: 'Label 10',
     },
     {
@@ -129,7 +122,6 @@ begin
   writeln('Label 20');
 end.`,
       purpose: 'Multiple labels in same procedure',
-      features: ['GOTO', 'label'],
       expectedContains: 'Label 20',
       expectedNotContains: 'Label 10',
     },
@@ -144,7 +136,6 @@ begin
   writeln('Label 9999');
 end.`,
       purpose: 'Label with maximum value 9999',
-      features: ['GOTO', 'label'],
       expectedContains: 'Label 9999',
       expectedNotContains: 'Skipped',
     },
@@ -159,7 +150,6 @@ begin
   writeln('Label 0');
 end.`,
       purpose: 'Label with value 0',
-      features: ['GOTO', 'label'],
       expectedContains: 'Label 0',
       expectedNotContains: 'Before',
     },
@@ -176,7 +166,6 @@ begin
 end.`,
       purpose:
         'Label coexists with variable of same name（Pascal82: label 是关键字，不能作变量名）',
-      features: ['GOTO', 'label', 'variable'],
       expectedContains: '42\nLabel 100',
     },
     {
@@ -196,7 +185,6 @@ begin
   writeln('After goto');
 end.`,
       purpose: 'GOTO out of IF-THEN block',
-      features: ['GOTO', 'label', 'if-then'],
       expectedContains: 'After goto',
       expectedNotContains: 'Inside if\nAfter if',
     },
@@ -219,7 +207,6 @@ begin
   writeln('After goto');
 end.`,
       purpose: 'GOTO out of IF-THEN-ELSE block',
-      features: ['GOTO', 'label', 'if-then-else'],
       expectedContains: 'After goto',
       expectedNotContains: 'Then\nElse\nAfter if',
     },
@@ -240,7 +227,6 @@ begin
   writeln('Exit while');
 end.`,
       purpose: 'GOTO out of WHILE loop',
-      features: ['GOTO', 'label', 'while'],
       expectedContains: '1\n2\n3\nExit while',
       expectedNotContains: '4\n5\n6\n7\n8\n9\n10',
     },
@@ -259,7 +245,6 @@ begin
   writeln('Exit for');
 end.`,
       purpose: 'GOTO out of FOR loop',
-      features: ['GOTO', 'label', 'for'],
       expectedContains: '1\n2\n3\n4\nExit for',
       expectedNotContains: '5\n6\n7\n8\n9\n10',
     },
@@ -279,7 +264,6 @@ begin
   writeln('Exit repeat');
 end.`,
       purpose: 'GOTO out of REPEAT loop',
-      features: ['GOTO', 'label', 'repeat'],
       expectedContains: '1\n2\n3\n4\n5\nExit repeat',
       expectedNotContains: '6\n7\n8\n9\n10',
     },
@@ -304,7 +288,6 @@ begin
   writeln('After goto');
 end.`,
       purpose: 'GOTO out of CASE statement',
-      features: ['GOTO', 'label', 'case'],
       expectedContains: 'After goto',
       expectedNotContains: 'Two\nAfter case',
     },
@@ -327,7 +310,6 @@ begin
   writeln('Label 700');
 end.`,
       purpose: 'GOTO within CASE statement',
-      features: ['GOTO', 'label', 'case'],
       expectedContains: 'Label 700',
       expectedNotContains: 'Case 1',
     },
@@ -347,9 +329,7 @@ begin
   writeln('Exit nested loops');
 end.`,
       purpose: 'GOTO out of nested loops',
-      features: ['GOTO', 'label', 'for', 'nested'],
-      expectedContains:
-        'i=1 j=1\ni=1 j=2\ni=1 j=3\ni=2 j=1\ni=2 j=2\nExit nested loops',
+      expectedContains: 'i=1 j=1\ni=1 j=2\ni=1 j=3\ni=2 j=1\ni=2 j=2\nExit nested loops',
       expectedNotContains: 'i=2 j=3\ni=3',
     },
     {
@@ -359,7 +339,6 @@ begin
   goto 999;
 end.`,
       purpose: 'GOTO to non-existent label should error',
-      features: ['GOTO', 'error'],
       expectedError: '',
     },
     {
@@ -376,7 +355,6 @@ begin
   p;
 end.`,
       purpose: 'GOTO to label in different procedure should error',
-      features: ['GOTO', 'label', 'procedure', 'error'],
       expectedError: '',
     },
     {
@@ -393,7 +371,6 @@ begin
   writeln('Main');
 end.`,
       purpose: 'GOTO from procedure to main program label should error',
-      features: ['GOTO', 'label', 'procedure', 'error'],
       expectedError: '',
     },
     {
@@ -413,7 +390,6 @@ begin
   outer;
 end.`,
       purpose: 'GOTO from outer to nested procedure label should error',
-      features: ['GOTO', 'label', 'nested-procedure', 'error'],
       expectedError: '',
     },
     {
@@ -423,7 +399,6 @@ begin
   goto;
 end.`,
       purpose: 'GOTO without label should error',
-      features: ['GOTO', 'error'],
       expectedError: '',
     },
     {
@@ -437,7 +412,6 @@ begin
   writeln('Second');
 end.`,
       purpose: 'Duplicate label declaration should error',
-      features: ['label', 'error'],
       expectedError: '',
     },
     {
@@ -455,7 +429,6 @@ begin
   writeln(f);
 end.`,
       purpose: 'GOTO in function',
-      features: ['GOTO', 'label', 'function'],
       expectedContains: '2',
       expectedNotContains: '1',
     },
@@ -482,7 +455,6 @@ begin
   writeln(outer);
 end.`,
       purpose: 'GOTO in nested function',
-      features: ['GOTO', 'label', 'nested-function'],
       expectedContains: '3',
       expectedNotContains: '0\n1',
     },
@@ -506,7 +478,6 @@ begin
   rec;
 end.`,
       purpose: 'GOTO in recursive procedure（Pascal82: 无 exit，用 goto 跳转）',
-      features: ['GOTO', 'label', 'procedure', 'recursion'],
       expectedContains: '1\n2\n3',
     },
     {
@@ -526,7 +497,6 @@ begin
   writeln(fib(5));
 end.`,
       purpose: 'GOTO in recursive function（Pascal82: 数字 label）',
-      features: ['GOTO', 'label', 'function', 'recursion'],
       expectedContains: '5',
     },
     {
@@ -548,7 +518,6 @@ begin
   writeln('Exit');
 end.`,
       purpose: 'GOTO from procedure to main program label should error (Pascal82: 禁止跨过程 GOTO)',
-      features: ['GOTO', 'label', 'procedure', 'recursion', 'error'],
       expectedError: '',
     },
     {
@@ -576,7 +545,6 @@ begin
   b;
 end.`,
       purpose: 'GOTO from procedure to main program label should error (Pascal82: 禁止跨过程 GOTO)',
-      features: ['GOTO', 'label', 'procedure', 'mutual-recursion', 'error'],
       expectedError: '',
     },
     {
@@ -606,7 +574,6 @@ begin
   level1;
 end.`,
       purpose: 'GOTO in deeply nested procedures should error (Pascal82: GOTO 不能跨 block)',
-      features: ['GOTO', 'label', 'nested-procedure', 'recursion', 'error'],
       expectedError: '',
     },
     {
@@ -628,7 +595,6 @@ begin
   rec;
 end.`,
       purpose: 'GOTO before recursive call（Pascal82: 数字 label，count 为全局变量）',
-      features: ['GOTO', 'label', 'procedure', 'recursion'],
       expectedContains: 'Before:1\nBefore:2\nAfter:3\nAfter:3\nAfter:3',
     },
     {
@@ -651,7 +617,6 @@ begin
   rec;
 end.`,
       purpose: 'GOTO after recursive call（Pascal82: 数字 label）',
-      features: ['GOTO', 'label', 'procedure', 'recursion'],
       expectedContains: 'Enter:1\nEnter:2\nEnter:3\nLeave:3\nLeave:3\nLeave:3',
       expectedNotContains: 'Skipped:',
     },
@@ -672,7 +637,6 @@ begin
   rec;
 end.`,
       purpose: 'GOTO to recursive entry label (simulating loop)（Pascal82: 数字 label）',
-      features: ['GOTO', 'label', 'procedure', 'recursion'],
       expectedContains: '1\n2\n3',
     },
   ]

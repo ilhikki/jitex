@@ -20,7 +20,6 @@ BEGIN
   WRITELN('OK');
 END.`,
       purpose: 'Knuth 风格：声明 FILE OF CHAR 类型变量，等价于 text',
-      features: ['file-of-char', 'text-type'],
       expectedContains: 'OK',
     },
 
@@ -33,8 +32,8 @@ BEGIN
   REWRITE(TERMOUT);
   WRITELN(TERMOUT, 'Hello');
 END.`,
-      purpose: 'Knuth 风格：TEXTFILE = PACKED FILE OF CHAR 类型定义（tangle-official.pas 中的定义）',
-      features: ['packed', 'file-of-char', 'type-definition'],
+      purpose:
+        'Knuth 风格：TEXTFILE = PACKED FILE OF CHAR 类型定义（tangle-official.pas 中的定义）',
       expectedContains: 'Hello',
     },
 
@@ -51,7 +50,6 @@ BEGIN
   WRITELN(PASCALFILE, 'pascal');
 END.`,
       purpose: 'Knuth 风格：TANGLE 程序头声明的三个文件变量',
-      features: ['file-of-char', 'multiple-files'],
       expectedContains: 'web',
     },
 
@@ -72,7 +70,6 @@ BEGIN
   END;
 END.`,
       purpose: 'Knuth 风格：OTHERS: 作为 case 默认分支（tangle-official.pas 第 221 行风格）',
-      features: ['case', 'others', 'default-branch'],
       expectedContains: 'other:5',
     },
 
@@ -90,7 +87,6 @@ BEGIN
   END;
 END.`,
       purpose: 'Knuth 风格：OTHERS: 之前的显式分支命中（模仿 TANGLE 字符转义 case）',
-      features: ['case', 'others'],
       expectedContains: 'tab',
     },
 
@@ -107,7 +103,6 @@ BEGIN
   END;
 END.`,
       purpose: 'Knuth 风格：无显式分支匹配时走 OTHERS:',
-      features: ['case', 'others', 'default'],
       expectedContains: 'default',
     },
 
@@ -124,7 +119,6 @@ BEGIN
   WRITELN('after case');
 END.`,
       purpose: 'Knuth 风格：OTHERS: 分支执行后继续执行 case 后的语句',
-      features: ['case', 'others'],
       expectedContains: 'other',
     },
 
@@ -143,7 +137,6 @@ BEGIN
   WRITELN('done');
 END.`,
       purpose: 'Knuth 风格：BREAK 过程刷新输出缓冲区（tangle-official.pas 中 ERROR 过程使用）',
-      features: ['break', 'file', 'flush'],
       expectedContains: 'done',
     },
 
@@ -156,7 +149,6 @@ BEGIN
   WRITELN('ok');
 END.`,
       purpose: 'BREAK 无参数调用',
-      features: ['break'],
       expectedContains: 'ok',
     },
 
@@ -169,7 +161,6 @@ BEGIN
   WRITELN('page2');
 END.`,
       purpose: 'PAGE 过程输出换页符（Knuth 用于分页输出）',
-      features: ['page', 'form-feed'],
       expectedContains: '\f',
     },
 
@@ -184,7 +175,6 @@ BEGIN
   WRITELN(F, 'after');
 END.`,
       purpose: 'PAGE 带文件参数（Knuth 风格）',
-      features: ['page', 'file'],
       expectedContains: 'before',
     },
 
@@ -203,7 +193,6 @@ BEGIN
   WRITELN('ch=', CH);
 END.`,
       purpose: 'Knuth 风格：F^ 访问文件缓冲区（tangle-official.pas 中 INPUTLN 等过程使用）',
-      features: ['file-buffer', 'caret', 'dereference'],
       expectedContains: 'ch=',
     },
 
@@ -218,7 +207,6 @@ BEGIN
   WRITELN('x=', X);
 END.`,
       purpose: 'F^ 赋值给 char 变量',
-      features: ['file-buffer', 'caret', 'assignment'],
       expectedContains: 'x=',
     },
 
@@ -231,7 +219,6 @@ BEGIN
   IF F^ = ' ' THEN WRITELN('space') ELSE WRITELN('other');
 END.`,
       purpose: 'F^ 在 if 表达式中使用',
-      features: ['file-buffer', 'caret', 'expression', 'if'],
       expectedContains: 'space',
     },
 
@@ -254,7 +241,6 @@ BEGIN
   END;
 END.`,
       purpose: '模仿 tangle-official.pas 第 217-221 行的字符转义 case 语句',
-      features: ['case', 'others', 'tangle-style'],
       expectedContains: 'dollar',
     },
 
@@ -276,7 +262,6 @@ BEGIN
   WRITELN('history=', HISTORY);
 END.`,
       purpose: '模仿 tangle-official.pas 的 ERROR 过程（使用 BREAK 和文件输出）',
-      features: ['procedure', 'file', 'break', 'tangle-style'],
       expectedContains: 'history=2',
     },
 
@@ -292,7 +277,6 @@ BEGIN
   WRITELN('all opened');
 END.`,
       purpose: '模仿 tangle-official.pas 程序头和变量声明',
-      features: ['file-of-char', 'program-parameters', 'tangle-style'],
       expectedContains: 'all opened',
     },
 
@@ -316,7 +300,6 @@ BEGIN
   WRITELN('end=', CURSTATE.ENDFIELD, ' name=', CURSTATE.NAMEFIELD);
 END.`,
       purpose: '模仿 tangle-official.pas 的 OUTPUTSTATE record 类型定义',
-      features: ['record', 'subrange', 'type-definition', 'tangle-style'],
       expectedContains: 'end=100 name=42',
     },
 
@@ -334,7 +317,6 @@ BEGIN
   WRITELN('byte=', BYTEMEM[1, 3]);
 END.`,
       purpose: '模仿 tangle-official.pas 的 BYTEMEM 二维数组',
-      features: ['array', 'multidimensional', 'const', 'subrange', 'tangle-style'],
       expectedContains: 'byte=13',
     },
   ]

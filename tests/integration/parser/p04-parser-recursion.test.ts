@@ -19,7 +19,6 @@ end;
 `
     ),
     purpose: '测试最简单的直接递归过程：过程调用自身',
-    features: ['procedure declaration', 'direct recursion', 'if statement', 'procedure call'],
     shouldParse: true,
   },
   {
@@ -41,13 +40,6 @@ end;
 `
     ),
     purpose: '测试带多个参数的递归过程，包含值参数和 VAR 参数',
-    features: [
-      'procedure declaration',
-      'direct recursion',
-      'value parameter',
-      'var parameter',
-      'compound statement',
-    ],
     shouldParse: true,
   },
   {
@@ -71,13 +63,6 @@ end;
 `
     ),
     purpose: '测试通过 VAR 参数返回结果的递归过程',
-    features: [
-      'procedure declaration',
-      'direct recursion',
-      'var parameter',
-      'local variables',
-      'if-else',
-    ],
     shouldParse: true,
   },
   {
@@ -100,12 +85,6 @@ end;
 `
     ),
     purpose: '测试递归过程中使用局部变量',
-    features: [
-      'procedure declaration',
-      'direct recursion',
-      'local variables',
-      'variable declaration',
-    ],
     shouldParse: true,
   },
   {
@@ -129,7 +108,6 @@ end;
 `
     ),
     purpose: '测试递归过程中使用 label 和 goto 语句',
-    features: ['procedure declaration', 'direct recursion', 'label declaration', 'goto statement'],
     shouldParse: true,
   },
 
@@ -153,13 +131,6 @@ end;
 `
     ),
     purpose: '测试经典的阶乘递归函数模式',
-    features: [
-      'function declaration',
-      'direct recursion',
-      'if-else',
-      'return value assignment',
-      'arithmetic expression',
-    ],
     shouldParse: true,
   },
   {
@@ -179,13 +150,6 @@ end;
 `
     ),
     purpose: '测试斐波那契数列递归函数，包含多次自调用',
-    features: [
-      'function declaration',
-      'direct recursion',
-      'multiple recursive calls',
-      'if-else',
-      'arithmetic expression',
-    ],
     shouldParse: true,
   },
   {
@@ -207,13 +171,6 @@ end;
 `
     ),
     purpose: '测试包含复杂条件分支的递归函数（Ackermann函数）',
-    features: [
-      'function declaration',
-      'direct recursion',
-      'nested if-else',
-      'nested recursive calls',
-      'multiple parameters',
-    ],
     shouldParse: true,
   },
   {
@@ -237,13 +194,6 @@ end;
 `
     ),
     purpose: '测试递归函数中使用局部变量存储中间结果',
-    features: [
-      'function declaration',
-      'direct recursion',
-      'local variables',
-      'compound statement',
-      'if-else',
-    ],
     shouldParse: true,
   },
   {
@@ -264,12 +214,6 @@ end;
 `
     ),
     purpose: '测试递归函数调用作为表达式的一部分，包括嵌套调用',
-    features: [
-      'function declaration',
-      'direct recursion',
-      'function call in expression',
-      'nested calls',
-    ],
     shouldParse: true,
   },
 
@@ -297,12 +241,6 @@ end;
 `
     ),
     purpose: '测试两个过程通过 forward 声明实现相互递归',
-    features: [
-      'procedure declaration',
-      'mutual recursion',
-      'forward declaration',
-      'indirect recursion',
-    ],
     shouldParse: true,
   },
   {
@@ -331,13 +269,6 @@ end;
 `
     ),
     purpose: '测试两个函数通过 forward 声明实现相互递归',
-    features: [
-      'function declaration',
-      'mutual recursion',
-      'forward declaration',
-      'indirect recursion',
-      'boolean type',
-    ],
     shouldParse: true,
   },
   {
@@ -367,13 +298,6 @@ end;
 `
     ),
     purpose: '测试三个过程形成链式递归：A -> B -> C -> A',
-    features: [
-      'procedure declaration',
-      'mutual recursion',
-      'forward declaration',
-      'chain recursion',
-      'three procedures',
-    ],
     shouldParse: true,
   },
   {
@@ -403,13 +327,6 @@ end;
 `
     ),
     purpose: '测试过程和函数混合的相互递归',
-    features: [
-      'procedure declaration',
-      'function declaration',
-      'mutual recursion',
-      'forward declaration',
-      'mixed recursion',
-    ],
     shouldParse: true,
   },
   {
@@ -451,13 +368,6 @@ end;
 `
     ),
     purpose: '测试五个过程形成的深层相互递归链',
-    features: [
-      'procedure declaration',
-      'mutual recursion',
-      'forward declaration',
-      'deep recursion chain',
-      'multiple procedures',
-    ],
     shouldParse: true,
   },
 
@@ -484,7 +394,6 @@ end;
 `
     ),
     purpose: '测试嵌套过程调用外层过程形成的间接递归',
-    features: ['nested procedure', 'indirect recursion', 'outer procedure', 'inner procedure'],
     shouldParse: true,
   },
   {
@@ -506,12 +415,6 @@ end;
 `
     ),
     purpose: '测试递归过程内部定义嵌套过程（非递归的辅助过程）',
-    features: [
-      'nested procedure',
-      'direct recursion',
-      'helper procedure',
-      'procedure contains procedure',
-    ],
     shouldParse: true,
   },
   {
@@ -535,12 +438,6 @@ end;
 `
     ),
     purpose: '测试递归函数内部定义嵌套辅助函数',
-    features: [
-      'nested function',
-      'direct recursion',
-      'helper function',
-      'function contains function',
-    ],
     shouldParse: true,
   },
   {
@@ -562,12 +459,6 @@ end;
 `
     ),
     purpose: '测试嵌套在过程内部的过程自身递归（不依赖外层）',
-    features: [
-      'nested procedure',
-      'direct recursion',
-      'inner recursion',
-      'nested recursive procedure',
-    ],
     shouldParse: true,
   },
 
@@ -592,7 +483,6 @@ end;
 `
     ),
     purpose: '测试递归函数中使用 CASE 语句进行分支控制',
-    features: ['function declaration', 'direct recursion', 'case statement', 'branching'],
     shouldParse: true,
   },
   {
@@ -615,13 +505,6 @@ end;
 `
     ),
     purpose: '测试递归过程中包含 WHILE 循环',
-    features: [
-      'procedure declaration',
-      'direct recursion',
-      'while statement',
-      'loop',
-      'local variables',
-    ],
     shouldParse: true,
   },
   {
@@ -643,13 +526,6 @@ end;
 `
     ),
     purpose: '测试递归函数中包含 FOR 循环',
-    features: [
-      'function declaration',
-      'direct recursion',
-      'for statement',
-      'loop',
-      'local variables',
-    ],
     shouldParse: true,
   },
   {
@@ -673,13 +549,6 @@ end;
 `
     ),
     purpose: '测试递归过程中包含 REPEAT-UNTIL 循环',
-    features: [
-      'procedure declaration',
-      'direct recursion',
-      'repeat statement',
-      'loop',
-      'local variables',
-    ],
     shouldParse: true,
   },
   {
@@ -702,13 +571,6 @@ end;
 `
     ),
     purpose: '测试递归过程中使用 WITH 语句访问记录字段',
-    features: [
-      'procedure declaration',
-      'direct recursion',
-      'with statement',
-      'record type',
-      'var parameter',
-    ],
     shouldParse: true,
   },
   {
@@ -734,12 +596,6 @@ end;
 `
     ),
     purpose: '测试递归过程调用递归函数，两种递归形式组合',
-    features: [
-      'procedure declaration',
-      'function declaration',
-      'direct recursion',
-      'recursive procedure calls recursive function',
-    ],
     shouldParse: true,
   },
 ]

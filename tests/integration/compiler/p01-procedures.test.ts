@@ -12,7 +12,6 @@ describe('M5 JS Procedures and Functions', () => {
         begin writeln(1); end;
         begin sayhello; end.`,
       purpose: '简单过程调用',
-      features: ['procedure', 'call'],
       expectedOutput: '1\n',
     },
     {
@@ -22,7 +21,6 @@ describe('M5 JS Procedures and Functions', () => {
         begin writeln(n); end;
         begin printn(42); end.`,
       purpose: '带值参数的过程',
-      features: ['procedure', 'param', 'value-param'],
       expectedOutput: '42\n',
     },
     {
@@ -33,7 +31,6 @@ describe('M5 JS Procedures and Functions', () => {
         begin x := x + 1; end;
         begin a := 5; incvar(a); writeln(a); end.`,
       purpose: '带 var 参数的过程',
-      features: ['procedure', 'param', 'var-param'],
       expectedOutput: '6\n',
     },
     {
@@ -44,7 +41,6 @@ describe('M5 JS Procedures and Functions', () => {
         begin double := n * 2; end;
         begin r := double(5); writeln(r); end.`,
       purpose: '简单函数调用',
-      features: ['function', 'return', 'call'],
       expectedOutput: '10\n',
     },
     {
@@ -56,7 +52,6 @@ describe('M5 JS Procedures and Functions', () => {
         begin inner; end;
         begin outer; end.`,
       purpose: '嵌套过程调用',
-      features: ['procedure', 'nested'],
       expectedOutput: '1\n',
     },
     {
@@ -70,7 +65,6 @@ describe('M5 JS Procedures and Functions', () => {
         end;
         begin r := fact(5); writeln(r); end.`,
       purpose: '递归阶乘',
-      features: ['function', 'recursion'],
       expectedOutput: '120\n',
     },
   ]

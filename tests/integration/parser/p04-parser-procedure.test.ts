@@ -17,7 +17,6 @@ end;
 `
     ),
     purpose: '测试无参数过程的声明和调用',
-    features: ['procedure declaration', 'procedure call', 'no parameters'],
     shouldParse: true,
   },
   {
@@ -33,7 +32,6 @@ end;
 `
     ),
     purpose: '测试单个值参数的过程声明和调用',
-    features: ['procedure declaration', 'procedure call', 'value parameter'],
     shouldParse: true,
   },
   {
@@ -49,7 +47,6 @@ end;
 `
     ),
     purpose: '测试多个参数的过程声明和调用',
-    features: ['procedure declaration', 'procedure call', 'multiple parameters'],
     shouldParse: true,
   },
   {
@@ -70,7 +67,6 @@ end;
 `
     ),
     purpose: '测试值参数传递的过程',
-    features: ['procedure declaration', 'value parameter', 'local variables'],
     shouldParse: true,
   },
   {
@@ -91,7 +87,6 @@ end;
 `
     ),
     purpose: '测试 VAR 参数（引用传递）的过程',
-    features: ['procedure declaration', 'var parameter', 'reference parameter'],
     shouldParse: true,
   },
   {
@@ -107,7 +102,6 @@ end;
 `
     ),
     purpose: '测试值参数和 VAR 参数混合的过程',
-    features: ['procedure declaration', 'mixed parameters', 'var parameter'],
     shouldParse: true,
   },
   {
@@ -127,7 +121,6 @@ end;
 `
     ),
     purpose: '测试嵌套过程的声明和调用',
-    features: ['procedure declaration', 'nested procedure', 'nested call'],
     shouldParse: true,
   },
   {
@@ -145,7 +138,6 @@ end;
 `
     ),
     purpose: '测试递归过程的声明',
-    features: ['procedure declaration', 'recursion', 'if statement'],
     shouldParse: true,
   },
 
@@ -166,7 +158,6 @@ end;
 `
     ),
     purpose: '测试无参数函数的声明和调用',
-    features: ['function declaration', 'function call', 'return value'],
     shouldParse: true,
   },
   {
@@ -183,7 +174,6 @@ end;
 `
     ),
     purpose: '测试单个参数函数的声明和调用',
-    features: ['function declaration', 'function call', 'single parameter'],
     shouldParse: true,
   },
   {
@@ -200,7 +190,6 @@ end;
 `
     ),
     purpose: '测试多个参数函数的声明和调用',
-    features: ['function declaration', 'function call', 'multiple parameters'],
     shouldParse: true,
   },
   {
@@ -220,7 +209,6 @@ end;
 `
     ),
     purpose: '测试函数体内对函数名赋值（返回值）',
-    features: ['function declaration', 'return value assignment', 'if-else'],
     shouldParse: true,
   },
   {
@@ -241,7 +229,6 @@ end;
 `
     ),
     purpose: '测试嵌套函数的声明和调用',
-    features: ['function declaration', 'nested function', 'nested call'],
     shouldParse: true,
   },
   {
@@ -261,7 +248,6 @@ end;
 `
     ),
     purpose: '测试递归函数的声明',
-    features: ['function declaration', 'recursion', 'if-else'],
     shouldParse: true,
   },
   {
@@ -278,7 +264,6 @@ end;
 `
     ),
     purpose: '测试函数调用作为算术表达式的一部分',
-    features: ['function call', 'expression', 'arithmetic'],
     shouldParse: true,
   },
   {
@@ -299,7 +284,6 @@ end;
 `
     ),
     purpose: '测试函数调用嵌套在复杂表达式中',
-    features: ['function call', 'nested calls', 'complex expression'],
     shouldParse: true,
   },
 
@@ -320,7 +304,6 @@ end;
 `
     ),
     purpose: '测试 integer 类型参数（值和 VAR）',
-    features: ['parameter', 'integer type', 'var parameter'],
     shouldParse: true,
   },
   {
@@ -337,7 +320,6 @@ end;
 `
     ),
     purpose: '测试 char 类型参数（值和 VAR）',
-    features: ['parameter', 'char type', 'var parameter'],
     shouldParse: true,
   },
   {
@@ -354,7 +336,6 @@ end;
 `
     ),
     purpose: '测试 boolean 类型参数（值和 VAR）',
-    features: ['parameter', 'boolean type', 'var parameter'],
     shouldParse: true,
   },
   {
@@ -371,7 +352,6 @@ end;
 `
     ),
     purpose: '测试数组类型的值参数',
-    features: ['parameter', 'array type', 'value parameter'],
     shouldParse: true,
   },
   {
@@ -389,7 +369,6 @@ end;
 `
     ),
     purpose: '测试数组类型的 VAR 参数',
-    features: ['parameter', 'array type', 'var parameter'],
     shouldParse: true,
   },
   {
@@ -406,7 +385,6 @@ end;
 `
     ),
     purpose: '测试 record 类型的值参数',
-    features: ['parameter', 'record type', 'value parameter'],
     shouldParse: true,
   },
   {
@@ -424,7 +402,6 @@ end;
 `
     ),
     purpose: '测试 record 类型的 VAR 参数',
-    features: ['parameter', 'record type', 'var parameter'],
     shouldParse: true,
   },
   {
@@ -444,7 +421,6 @@ end;
 `
     ),
     purpose: '测试枚举类型参数',
-    features: ['parameter', 'enumeration type', 'type declaration'],
     shouldParse: true,
   },
 
@@ -465,7 +441,6 @@ end;
 `
     ),
     purpose: '测试过程的 FORWARD 声明',
-    features: ['procedure declaration', 'forward declaration'],
     shouldParse: true,
   },
   {
@@ -483,7 +458,6 @@ end;
 `
     ),
     purpose: '测试函数的 FORWARD 声明',
-    features: ['function declaration', 'forward declaration'],
     shouldParse: true,
   },
   {
@@ -501,7 +475,6 @@ end;
 `
     ),
     purpose: '测试 FORWARD 声明与实际定义参数列表一致',
-    features: ['forward declaration', 'parameters', 'procedure declaration'],
     shouldParse: true,
   },
   {
@@ -525,7 +498,6 @@ end;
 `
     ),
     purpose: '测试使用 FORWARD 实现相互递归的过程',
-    features: ['forward declaration', 'mutual recursion', 'procedure declaration'],
     shouldParse: true,
   },
   {
@@ -553,7 +525,6 @@ end;
 `
     ),
     purpose: '测试多个 FORWARD 声明',
-    features: ['forward declaration', 'multiple declarations'],
     shouldParse: true,
   },
 
@@ -577,7 +548,6 @@ end;
 `
     ),
     purpose: '测试一层嵌套的过程',
-    features: ['nested procedure', 'one level nesting'],
     shouldParse: true,
   },
   {
@@ -598,7 +568,6 @@ end;
 `
     ),
     purpose: '测试一层嵌套的函数',
-    features: ['nested function', 'one level nesting'],
     shouldParse: true,
   },
   {
@@ -622,7 +591,6 @@ end;
 `
     ),
     purpose: '测试两层嵌套（L1 -> L2 -> L3）',
-    features: ['nested procedure', 'two level nesting'],
     shouldParse: true,
   },
   {
@@ -650,7 +618,6 @@ end;
 `
     ),
     purpose: '测试三层深度嵌套过程',
-    features: ['nested procedure', 'deep nesting', '3 levels'],
     shouldParse: true,
   },
   {
@@ -674,7 +641,6 @@ end;
 `
     ),
     purpose: '测试嵌套过程访问外层作用域的变量',
-    features: ['nested procedure', 'variable scope', 'outer variable'],
     shouldParse: true,
   },
   {
@@ -695,7 +661,6 @@ end;
 `
     ),
     purpose: '测试嵌套函数在外层函数体内被调用',
-    features: ['nested function', 'function call', 'scope'],
     shouldParse: true,
   },
   {
@@ -715,7 +680,6 @@ end;
 `
     ),
     purpose: '测试同一级别的过程相互调用',
-    features: ['procedure call', 'sibling scope'],
     shouldParse: true,
   },
   {
@@ -742,7 +706,6 @@ end;
 `
     ),
     purpose: '测试过程中嵌套函数，函数中再嵌套过程',
-    features: ['nested procedure', 'nested function', 'mixed nesting'],
     shouldParse: true,
   },
 
@@ -762,7 +725,6 @@ end;
 `
     ),
     purpose: '测试过程体只有 begin end，没有任何语句',
-    features: ['procedure declaration', 'empty body', 'compound statement'],
     shouldParse: true,
   },
   {
@@ -782,7 +744,6 @@ end;
 `
     ),
     purpose: '测试过程只有 LABEL 声明段',
-    features: ['procedure declaration', 'label declaration'],
     shouldParse: true,
   },
   {
@@ -801,7 +762,6 @@ end;
 `
     ),
     purpose: '测试过程只有 CONST 声明段',
-    features: ['procedure declaration', 'const declaration'],
     shouldParse: true,
   },
   {
@@ -820,7 +780,6 @@ end;
 `
     ),
     purpose: '测试过程只有 TYPE 声明段',
-    features: ['procedure declaration', 'type declaration'],
     shouldParse: true,
   },
   {
@@ -839,7 +798,6 @@ end;
 `
     ),
     purpose: '测试过程只有 VAR 声明段',
-    features: ['procedure declaration', 'variable declaration'],
     shouldParse: true,
   },
   {
@@ -871,7 +829,6 @@ end;
 `
     ),
     purpose: '测试过程包含所有声明段：label, const, type, var, procedure, function',
-    features: ['procedure declaration', 'all declaration sections'],
     shouldParse: true,
   },
   {
@@ -888,7 +845,6 @@ end;
 `
     ),
     purpose: '测试最简单的函数：无参数、无局部变量',
-    features: ['function declaration', 'minimal function'],
     shouldParse: true,
   },
   {
@@ -907,7 +863,6 @@ end;
 `
     ),
     purpose: '测试包含10个参数的过程',
-    features: ['procedure declaration', 'long parameter list', 'many parameters'],
     shouldParse: true,
   },
   {
@@ -930,7 +885,6 @@ end;
 `
     ),
     purpose: '测试过程内部定义函数',
-    features: ['nested function', 'procedure contains function'],
     shouldParse: true,
   },
   {
@@ -955,7 +909,6 @@ end;
 `
     ),
     purpose: '测试函数内部定义过程',
-    features: ['nested procedure', 'function contains procedure'],
     shouldParse: true,
   },
   {
@@ -988,7 +941,6 @@ end;
 `
     ),
     purpose: '测试多个过程和函数混合声明',
-    features: ['multiple declarations', 'procedure and function mix'],
     shouldParse: true,
   },
   {
@@ -1009,7 +961,6 @@ end;
 `
     ),
     purpose: '测试函数返回值为数组类型',
-    features: ['function declaration', 'array return type', 'type declaration'],
     shouldParse: true,
   },
   {
@@ -1029,7 +980,6 @@ end;
 `
     ),
     purpose: '测试子界类型参数',
-    features: ['parameter', 'range type', 'subrange'],
     shouldParse: true,
   },
 ]

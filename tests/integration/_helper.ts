@@ -31,9 +31,6 @@ export interface PascalTest {
   /** 一句话描述本用例测什么 */
   purpose: string
 
-  /** 特性标签，用于分类和检索 */
-  features: string[]
-
   /** 要求输出精确等于此字符串（不含此字段则不校验） */
   expectedOutput?: string
 

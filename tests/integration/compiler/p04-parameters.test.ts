@@ -16,7 +16,6 @@ begin
 end.
       `,
       purpose: '测试无参数过程的调用',
-      features: ['procedure', 'no parameters'],
       expectedOutput: 'Hello\n',
     },
     {
@@ -32,7 +31,6 @@ begin
 end.
       `,
       purpose: '测试单个整数参数的过程',
-      features: ['procedure', 'single parameter', 'integer'],
       expectedOutput: '42\n',
     },
     {
@@ -48,7 +46,6 @@ begin
 end.
       `,
       purpose: '测试多个参数的过程',
-      features: ['procedure', 'multiple parameters', 'integer'],
       expectedOutput: '30\n',
     },
     {
@@ -64,7 +61,6 @@ begin
 end.
       `,
       purpose: '测试多个相同类型的参数',
-      features: ['procedure', 'multiple parameters', 'same type'],
       expectedOutput: '24\n',
     },
     {
@@ -81,7 +77,6 @@ begin
 end.
       `,
       purpose: '测试不同类型的参数',
-      features: ['procedure', 'multiple parameters', 'mixed types', 'integer', 'char'],
       expectedOutput: '100\nA\n',
     },
     {
@@ -98,7 +93,6 @@ begin
 end.
       `,
       purpose: '测试参数传递的顺序',
-      features: ['procedure', 'parameter order'],
       expectedOutput: '1\n2\n',
     },
     {
@@ -116,7 +110,6 @@ begin
 end.
       `,
       purpose: '测试参数名与全局变量同名时的作用域',
-      features: ['procedure', 'parameter scope', 'global variable'],
       expectedOutput: '42\n',
     },
     {
@@ -134,7 +127,6 @@ begin
 end.
       `,
       purpose: '测试参数名与局部变量同名（应该报错）',
-      features: ['procedure', 'parameter scope', 'local variable'],
       expectedError: '',
     },
     {
@@ -150,7 +142,6 @@ begin
 end.
       `,
       purpose: '测试无参数函数返回值',
-      features: ['function', 'no parameters', 'return value'],
       expectedOutput: '42\n',
     },
     {
@@ -166,7 +157,6 @@ begin
 end.
       `,
       purpose: '测试单个参数的函数',
-      features: ['function', 'single parameter', 'integer'],
       expectedOutput: '20\n',
     },
     {
@@ -182,7 +172,6 @@ begin
 end.
       `,
       purpose: '测试多个参数的函数',
-      features: ['function', 'multiple parameters', 'integer'],
       expectedOutput: '8\n',
     },
     {
@@ -198,7 +187,6 @@ begin
 end.
       `,
       purpose: '测试函数返回值与参数的运算',
-      features: ['function', 'parameter operation', 'arithmetic'],
       expectedOutput: '10\n',
     },
     {
@@ -214,7 +202,6 @@ begin
 end.
       `,
       purpose: '测试函数调用作为表达式的一部分',
-      features: ['function', 'expression', 'arithmetic'],
       expectedOutput: '34\n',
     },
     {
@@ -230,7 +217,6 @@ begin
 end.
       `,
       purpose: '测试函数调用的嵌套',
-      features: ['function', 'nested call'],
       expectedOutput: '4\n',
     },
     {
@@ -249,7 +235,6 @@ begin
 end.
       `,
       purpose: '测试递归函数的参数处理',
-      features: ['function', 'recursion', 'parameter'],
       expectedOutput: '120\n',
     },
     {
@@ -269,7 +254,6 @@ begin
 end.
       `,
       purpose: '测试嵌套函数中的参数访问',
-      features: ['function', 'nested function', 'parameter scope'],
       expectedOutput: '15\n',
     },
     {
@@ -288,7 +272,6 @@ begin
 end.
       `,
       purpose: '测试值参数不会修改调用方的变量',
-      features: ['procedure', 'value parameter', 'pass by value'],
       expectedOutput: '10\n',
     },
     {
@@ -307,7 +290,6 @@ begin
 end.
       `,
       purpose: '测试var参数会修改调用方的变量',
-      features: ['procedure', 'var parameter', 'pass by reference'],
       expectedOutput: '11\n',
     },
     {
@@ -323,7 +305,6 @@ begin
 end.
       `,
       purpose: '测试值参数可以传递表达式',
-      features: ['procedure', 'value parameter', 'expression'],
       expectedOutput: '11\n',
     },
     {
@@ -339,7 +320,6 @@ begin
 end.
       `,
       purpose: '测试var参数不能传递常量（应该报错）',
-      features: ['procedure', 'var parameter', 'constant'],
       expectedError: '',
     },
     {
@@ -363,7 +343,6 @@ begin
 end.
       `,
       purpose: '测试多个var参数',
-      features: ['procedure', 'multiple var parameters', 'swap'],
       expectedOutput: '2\n1\n',
     },
     {
@@ -382,7 +361,6 @@ begin
 end.
       `,
       purpose: '测试值参数和var参数混合使用',
-      features: ['procedure', 'value parameter', 'var parameter', 'mixed'],
       expectedOutput: '15\n',
     },
     {
@@ -405,7 +383,6 @@ begin
 end.
       `,
       purpose: '测试嵌套过程中的var参数',
-      features: ['procedure', 'nested procedure', 'var parameter'],
       expectedOutput: '11\n',
     },
     {
@@ -428,7 +405,6 @@ begin
 end.
       `,
       purpose: '测试递归过程中的var参数',
-      features: ['procedure', 'recursion', 'var parameter'],
       expectedOutput: '15\n',
     },
     {
@@ -451,7 +427,6 @@ begin
 end.
       `,
       purpose: '测试数组作为值参数',
-      features: ['procedure', 'value parameter', 'array'],
       expectedOutput: '1\n2\n3\n',
     },
     {
@@ -474,7 +449,6 @@ begin
 end.
       `,
       purpose: '测试记录作为值参数',
-      features: ['procedure', 'value parameter', 'record'],
       expectedOutput: '10\n20\n',
     },
     {
@@ -490,7 +464,6 @@ begin
 end.
       `,
       purpose: '测试参数传递常量',
-      features: ['procedure', 'constant parameter'],
       expectedOutput: '42\n',
     },
     {
@@ -510,7 +483,6 @@ begin
 end.
       `,
       purpose: '测试参数传递函数调用的结果',
-      features: ['procedure', 'function call as parameter'],
       expectedOutput: '100\n',
     },
     {
@@ -528,7 +500,6 @@ begin
 end.
       `,
       purpose: '测试参数传递数组元素',
-      features: ['procedure', 'array element as parameter'],
       expectedOutput: '42\n',
     },
     {
@@ -549,7 +520,6 @@ begin
 end.
       `,
       purpose: '测试参数传递记录字段',
-      features: ['procedure', 'record field as parameter'],
       expectedOutput: '100\n',
     },
     {
@@ -565,7 +535,6 @@ begin
 end.
       `,
       purpose: '测试参数传递负数',
-      features: ['procedure', 'negative parameter'],
       expectedOutput: '-42\n',
     },
     {
@@ -581,7 +550,6 @@ begin
 end.
       `,
       purpose: '测试参数传递零',
-      features: ['procedure', 'zero parameter'],
       expectedOutput: '0\n',
     },
     {
@@ -597,7 +565,6 @@ begin
 end.
       `,
       purpose: '测试参数传递最大整数',
-      features: ['procedure', 'max integer parameter'],
       expectedOutput: '32767\n',
     },
     {
@@ -613,7 +580,6 @@ begin
 end.
       `,
       purpose: '测试integer类型参数',
-      features: ['procedure', 'integer parameter'],
       expectedOutput: '123\n',
     },
     {
@@ -629,7 +595,6 @@ begin
 end.
       `,
       purpose: '测试char类型参数',
-      features: ['procedure', 'char parameter'],
       expectedOutput: 'X\n',
     },
     {
@@ -646,7 +611,6 @@ begin
 end.
       `,
       purpose: '测试boolean类型参数',
-      features: ['procedure', 'boolean parameter'],
       expectedOutput: 'true\nfalse\n',
     },
     {
@@ -663,7 +627,6 @@ begin
 end.
       `,
       purpose: '测试子界类型参数',
-      features: ['procedure', 'subrange parameter'],
       expectedOutput: '50\n',
     },
     {
@@ -684,7 +647,6 @@ begin
 end.
       `,
       purpose: '测试枚举类型参数',
-      features: ['procedure', 'enum parameter'],
       expectedOutput: 'green\n',
     },
     {
@@ -704,7 +666,6 @@ begin
 end.
       `,
       purpose: '测试数组类型参数（Pascal82 标准：var 在 function 之前；var 参数作为 P3 单独测试）',
-      features: ['function', 'array parameter'],
       expectedOutput: '30\n',
     },
     {
@@ -727,8 +688,8 @@ begin
   PrintPerson(p);
 end.
       `,
-      purpose: '测试记录类型参数（Pascal82 标准：var 在 procedure 之前；不使用非标 string[n] 类型）',
-      features: ['procedure', 'record parameter'],
+      purpose:
+        '测试记录类型参数（Pascal82 标准：var 在 procedure 之前；不使用非标 string[n] 类型）',
       expectedOutput: 'A\n25\n',
     },
   ]

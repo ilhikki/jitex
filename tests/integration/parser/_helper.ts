@@ -4,7 +4,6 @@ export interface ConformanceTest {
   name: string
   code: string
   purpose: string
-  features: string[]
   shouldParse: boolean
 }
 
