@@ -11,21 +11,32 @@ import { Compiler } from './compiler'
 
 export type { RunState, RunError } from '../runtime/run-state'
 
+/** 非标扩展标识符。内置扩展：'string' | 'allowUndeclaredLabels' */
 export type Extension = 'allowUndeclaredLabels' | 'string' | string
 
+/** 调试选项 */
 export interface JSDebugOptions {
+  /** 在控制台打印生成的 JS 代码 */
   emitJS?: boolean
+  /** 将生成的 JS 代码写入指定文件路径 */
   emitJSFile?: string
-  labelAnalysis?: boolean
 }
 
+/** runJS 的运行时选项 */
 export interface JSRunOptions {
+  /** 模拟输入（按行），供 readln/read 使用 */
   input?: string[]
+  /** 启用的非标扩展列表 */
   extensions?: Extension[]
+  /** 自定义系统调用处理器（覆盖默认实现） */
   sysCalls?: Map<string, SysCallHandler>
+  /** 内存文件系统：文件名 → 文件内容 */
   files?: Map<string, Uint8Array>
+  /** 程序文件变量名 → files 中的键名（用于 ASSIGN） */
   programFileUrls?: Record<string, string>
+  /** 最大执行步数（默认无限制） */
   maxSteps?: number
+  /** 调试选项 */
   debug?: JSDebugOptions
 }
 
@@ -89,6 +100,13 @@ const AsyncFunction = Object.getPrototypeOf(async function () {
   /* */
 }).constructor
 
+/**
+ * 编译并执行 Pascal 源码。
+ *
+ * @param source - Pascal 源码字符串
+ * @param options - 运行时选项
+ * @returns 执行后的状态（包含输出、错误等信息）
+ */
 export async function runJS(source: string, options: JSRunOptions = {}): Promise<RunState> {
   try {
     const ast = parseSource(source)
@@ -140,6 +158,12 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
   }
 }
 
+/**
+ * 将 Pascal 源码编译为 JS 代码字符串（不执行）。
+ *
+ * @param source - Pascal 源码字符串
+ * @returns 生成的 JavaScript 代码
+ */
 export function compileToJS(source: string): string {
   const ast = parseSource(source)
   const { runtime } = buildRuntime(ast, {})
