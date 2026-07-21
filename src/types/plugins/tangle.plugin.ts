@@ -36,4 +36,3 @@ export function createTanglePlugin(options: TanglePluginOptions): TypePlugin[] {
   ]
 }
 
-export const tanglePlugins = createTanglePlugin

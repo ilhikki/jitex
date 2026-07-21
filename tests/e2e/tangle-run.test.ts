@@ -1,5 +1,5 @@
 import { parse } from '@/index'
-import { compileToJS } from '@/js-compiler'
+import { compileToJS } from '@/index'
 import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from './_helper'
 
 describe.skip('Tangle Official - JS run - SKIPPED until Phase 7', () => {

@@ -1,8 +1,8 @@
 import { parse } from '@/index'
-import { runJS } from '@/js-compiler'
-import { stringPlugin } from '@/js-compiler/types'
-import { createExtendedSysCalls } from '@/js-compiler/syscalls'
+import { runJS } from '@/index'
 import { loadTexResources, readResource, runTangle, TRIP_TEX } from './_helper'
+import { createExtendedSysCalls } from '@/runtime'
+import { Types } from '../../src'
 
 const extendedSysCalls = createExtendedSysCalls()
 
@@ -41,7 +41,7 @@ describe.skip('TEX82 - TRIP test (JS) - SKIPPED until Phase 7', () => {
     const state = await runJS(texPas, {
       input: [],
       files,
-      plugins: [stringPlugin],
+      plugins: [Types.stringPlugin],
       sysCalls: extendedSysCalls,
       maxSteps: 1e9,
       allowUndeclaredLabels: true,

@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { runJS } from '@/js-compiler'
+import { runJS } from '@/index'
 
 export function readResource(name: string): string {
   return fs.readFileSync(path.join(__dirname, 'resources', name), 'utf-8')
@@ -65,7 +65,9 @@ export function loadTexResources(): TexResources {
   }
 }
 
-export async function compileTexPas(resources: TexResources): Promise<{ pas: string; pool: string }> {
+export async function compileTexPas(
+  resources: TexResources
+): Promise<{ pas: string; pool: string }> {
   const result = await runTangle(resources.tanglePas, resources.texWeb)
   if (result.state.status !== 'terminated') {
     throw new Error(`TANGLE failed: ${result.state.status} - ${result.state.error?.message}`)

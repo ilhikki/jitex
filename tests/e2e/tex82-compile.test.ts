@@ -1,5 +1,5 @@
 import { parse } from '@/index'
-import { compileToJS } from '@/js-compiler'
+import { compileToJS } from '@/index'
 import { loadTexResources, runTangle } from './_helper'
 
 describe.skip('TEX82 - compile and analyze tex.pas (JS) - SKIPPED until Phase 7', () => {

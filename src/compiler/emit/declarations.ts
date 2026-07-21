@@ -7,14 +7,9 @@ import type {
   VariableDeclarationNode,
 } from '../../ast/types'
 import { ProcInfo, Scope } from './utils'
-import { emitExpr, inferType, coerce } from './expressions'
-import {
-  resolveTypeId,
-  scalarBase,
-  subrangeBounds,
-  tryEvalConstInt,
-} from './types'
-import { emitStmt, emitCompound, collectLabelsFromCompound } from './statements'
+import { coerce, emitExpr, inferType } from './expressions'
+import { resolveTypeId, scalarBase, subrangeBounds, tryEvalConstInt } from './types'
+import { collectLabelsFromCompound, emitCompound } from './statements'
 import { emitBlockWithGoto } from '../strategy'
 import type { Compiler } from '../compiler'
 

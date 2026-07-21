@@ -1,6 +1,5 @@
-import { parse } from '@/index'
-import { compileToJS, runJS } from '@/js-compiler'
-import { stringPlugin } from '@/js-compiler/types'
+import { parse, Types } from '@/index'
+import { compileToJS, runJS } from '@/index'
 import { loadTexResources, runTangle } from './_helper'
 
 describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
@@ -34,7 +33,7 @@ describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
     const state = await runJS(texPas, {
       input: [],
       files,
-      plugins: [stringPlugin],
+      plugins: [Types.stringPlugin],
       maxSteps: 1e9,
       allowUndeclaredLabels: true,
     })

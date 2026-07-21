@@ -120,7 +120,6 @@ export interface TypeTable {
   get(id: string): TypeDef | undefined
   has(id: string): boolean
   register(def: TypeDef): void
-  all(): TypeDef[]
 }
 
 export function createTypeTable(): TypeTable {
@@ -135,9 +134,6 @@ export function createTypeTable(): TypeTable {
     register(def) {
       types.set(def.id, def)
     },
-    all() {
-      return Array.from(types.values())
-    },
   }
 }
 
@@ -149,84 +145,8 @@ export interface RuntimeCtx {
   io?: PascalIO
 }
 
-export interface TypeOps {
-  literal?: LiteralOp
-  assign?: AssignOp
-  unary?: Record<string, UnaryOp>
-  binary?: Record<string, BinaryOp>
-  compare?: Record<string, CompareOp>
-  index?: IndexOp
-  setIndex?: SetIndexOp
-  field?: FieldOp
-  setField?: SetFieldOp
-  control?: ControlOp
-  default?: DefaultOp
-  copy?: CopyOp
-}
-
-export interface LiteralOp {
-  can: (node: unknown, typeTable: TypeTable) => string | null
-  invoke: (value: unknown, typeId: string, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface AssignOp {
-  can: (fromType: string, toType: string, typeTable: TypeTable) => boolean
-  invoke: (dest: PascalValue, src: PascalValue, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface UnaryOp {
-  can: (operandType: string, typeTable: TypeTable) => string | null
-  invoke: (operand: PascalValue, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface BinaryOp {
-  can: (leftType: string, rightType: string, typeTable: TypeTable) => string | null
-  invoke: (left: PascalValue, right: PascalValue, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface CompareOp {
-  can: (leftType: string, rightType: string, typeTable: TypeTable) => string | null
-  invoke: (left: PascalValue, right: PascalValue, op: string, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface IndexOp {
-  can: (arrayType: string, indexType: string, typeTable: TypeTable) => string | null
-  invoke: (array: PascalValue, ...indexValues: PascalValue[]) => PascalValue
-}
-
-export interface SetIndexOp {
-  can: (arrayType: string, indexType: string, valueType: string, typeTable: TypeTable) => boolean
-  invoke: (array: PascalValue, ...args: PascalValue[]) => PascalValue
-}
-
-export interface FieldOp {
-  can: (recordType: string, fieldName: string, typeTable: TypeTable) => string | null
-  invoke: (record: PascalValue, fieldName: string, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface SetFieldOp {
-  can: (recordType: string, fieldName: string, valueType: string, typeTable: TypeTable) => boolean
-  invoke: (record: PascalValue, value: PascalValue, fieldName: string, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface ControlOp {
-  can: (typeId: string, typeTable: TypeTable) => boolean
-  invoke: (value: PascalValue, runtime: RuntimeCtx) => boolean
-}
-
-export interface DefaultOp {
-  can: (typeId: string, typeTable: TypeTable) => boolean
-  invoke: (typeId: string, runtime: RuntimeCtx) => PascalValue
-}
-
-export interface CopyOp {
-  can: (typeId: string, typeTable: TypeTable) => boolean
-  invoke: (value: PascalValue, runtime: RuntimeCtx) => PascalValue
-}
-
 export interface TypePlugin {
   name: string
   version: string
   types: TypeDef[]
-  ops: TypeOps
 }

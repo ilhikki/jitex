@@ -56,7 +56,6 @@ function buildRuntime(
     name: 'file-types',
     version: '1.0.0',
     types: [TEXT_TYPE as TypeDef],
-    ops: {},
   }
   const basePlugins: TypePlugin[] = [
     integerPlugin,

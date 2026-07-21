@@ -11,9 +11,7 @@
 // 测试原则见 ../README.md；
 // 执行引擎实现见 @/js-compiler/index.ts。
 
-import { runJS } from '@/js-compiler'
-import type { RunState } from '@/js-compiler/run-state'
-import type { SysCallHandler, TypePlugin } from '@/js-compiler/types'
+import { runJS, RunState, SysCallHandler, TypePlugin } from '@/index'
 
 export interface PascalTest {
   name: string
