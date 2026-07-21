@@ -682,13 +682,13 @@ end.`,
     ...m36Tests,
   ]
 
-  it('should pass all tests', async () => {
-    for (const test of tests) {
-      const result = await runPascalTest(test)
+  for (const t of tests) {
+    it(t.name, async () => {
+      const result = await runPascalTest(t)
       if (!result.passed) {
-        console.error(`FAIL: ${test.name}: ${result.message}`)
+        console.error(`  [${t.name}] FAIL: ${result.message}`)
       }
       expect(result.passed).toBe(true)
-    }
-  })
+    })
+  }
 })
