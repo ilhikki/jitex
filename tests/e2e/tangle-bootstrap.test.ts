@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { runJS } from '../src/js-compiler'
+import { runJS } from '../../src'
 
 describe('TANGLE self-bootstrap test (JS)', () => {
   const webFile = path.join(__dirname, '..', 'knuth', 'web', 'tangle.web')
@@ -8,7 +8,10 @@ describe('TANGLE self-bootstrap test (JS)', () => {
   const webSource = fs.readFileSync(webFile, 'utf-8')
   const officialPas = fs.readFileSync(officialPasFile, 'utf-8')
 
-  function runTangle(pasSource: string, webContent: string): Promise<{ pascal: string; pool: string; output: string }> {
+  function runTangle(
+    pasSource: string,
+    webContent: string
+  ): Promise<{ pascal: string; pool: string; output: string }> {
     const files = new Map<string, Uint8Array>()
     files.set('WEBFILE', new Uint8Array(Buffer.from(webContent, 'utf-8')))
     files.set('CHANGEFILE', new Uint8Array())
@@ -19,10 +22,10 @@ describe('TANGLE self-bootstrap test (JS)', () => {
       input: [],
       files,
       programFileUrls: {
-        'WEBFILE': 'WEBFILE',
-        'CHANGEFILE': 'CHANGEFILE',
-        'PASCALFILE': 'PASCALFILE',
-        'POOL': 'POOL',
+        WEBFILE: 'WEBFILE',
+        CHANGEFILE: 'CHANGEFILE',
+        PASCALFILE: 'PASCALFILE',
+        POOL: 'POOL',
       },
       maxSteps: 1e9,
       allowUndeclaredLabels: true,
