@@ -33,7 +33,14 @@ import type {
   SetType,
   FileType,
 } from '../types'
-import { createTypeTable, INTEGER_TYPE, REAL_TYPE, BOOLEAN_TYPE, CHAR_TYPE, TEXT_TYPE } from '../types'
+import {
+  createTypeTable,
+  INTEGER_TYPE,
+  REAL_TYPE,
+  BOOLEAN_TYPE,
+  CHAR_TYPE,
+  TEXT_TYPE,
+} from '../types'
 
 interface Scope {
   types: Map<string, string>
@@ -70,13 +77,7 @@ function lookupConstInt(scope: Scope, name: string): number | undefined {
   return undefined
 }
 
-const BUILTIN_TYPES: TypeDef[] = [
-  INTEGER_TYPE,
-  REAL_TYPE,
-  BOOLEAN_TYPE,
-  CHAR_TYPE,
-  TEXT_TYPE,
-]
+const BUILTIN_TYPES: TypeDef[] = [INTEGER_TYPE, REAL_TYPE, BOOLEAN_TYPE, CHAR_TYPE, TEXT_TYPE]
 
 export class TypeTableBuilder {
   private typeTable: TypeTable
@@ -123,8 +124,7 @@ export class TypeTableBuilder {
     try {
       const val = this.evaluateConstExpr(c.value, scope)
       scope.constInts.set(name, val)
-    } catch {
-    }
+    } catch {}
   }
 
   private processTypeDecl(t: TypeDeclarationNode, scope: Scope): void {
@@ -135,8 +135,7 @@ export class TypeTableBuilder {
 
     if (typeDef.kind === 'enum') {
       const enumType = typeDef as EnumType
-      for (let i = 0; i < enumType.values.length; i++) {
-      }
+      for (let i = 0; i < enumType.values.length; i++) {}
     }
   }
 

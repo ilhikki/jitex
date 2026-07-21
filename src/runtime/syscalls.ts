@@ -47,12 +47,7 @@ function formatRaw(value: PascalValue): string {
   }
 }
 
-function applyFormat(
-  s: string,
-  value: PascalValue,
-  width?: number,
-  precision?: number
-): string {
+function applyFormat(s: string, value: PascalValue, width?: number, precision?: number): string {
   if (value.typeId === 'real' && precision !== undefined) {
     const n = value.raw as number
     s = n.toFixed(precision)
@@ -212,7 +207,8 @@ const sqrHandler: SysCallHandler = (args) => {
 const predHandler: SysCallHandler = (args) => {
   const value = (args[0] as any).value || args[0]
   const raw = value.raw
-  if (typeof raw === 'string') return { typeId: value.typeId, raw: String.fromCharCode(raw.charCodeAt(0) - 1) }
+  if (typeof raw === 'string')
+    return { typeId: value.typeId, raw: String.fromCharCode(raw.charCodeAt(0) - 1) }
   if (typeof raw === 'boolean') return { typeId: value.typeId, raw: false }
   return { typeId: value.typeId, raw: (raw as number) - 1 }
 }
@@ -220,7 +216,8 @@ const predHandler: SysCallHandler = (args) => {
 const succHandler: SysCallHandler = (args) => {
   const value = (args[0] as any).value || args[0]
   const raw = value.raw
-  if (typeof raw === 'string') return { typeId: value.typeId, raw: String.fromCharCode(raw.charCodeAt(0) + 1) }
+  if (typeof raw === 'string')
+    return { typeId: value.typeId, raw: String.fromCharCode(raw.charCodeAt(0) + 1) }
   if (typeof raw === 'boolean') return { typeId: value.typeId, raw: true }
   return { typeId: value.typeId, raw: (raw as number) + 1 }
 }
@@ -304,11 +301,9 @@ const bufferCharHandler: SysCallHandler = async (args, _state, runtime) => {
   return { typeId: 'char', raw: String.fromCharCode(code) }
 }
 
-const breakHandler: SysCallHandler = async (_args, _state, runtime) => {
-}
+const breakHandler: SysCallHandler = async (_args, _state, runtime) => {}
 
-const breakinHandler: SysCallHandler = async (_args, _state, _runtime) => {
-}
+const breakinHandler: SysCallHandler = async (_args, _state, _runtime) => {}
 
 const erstatHandler: SysCallHandler = async (_args, _state, _runtime) => {
   return { typeId: 'integer', raw: 0 }
@@ -411,7 +406,10 @@ function extractFileName(val: PascalValue, typeTable: TypeTable | null): string 
   const raw = val.raw
   if (typeof raw === 'string') return raw
   if (Array.isArray(raw)) {
-    return raw.map((c: any) => typeof c === 'number' ? String.fromCharCode(c) : String(c)).join('').replace(/\s+$/, '')
+    return raw
+      .map((c: any) => (typeof c === 'number' ? String.fromCharCode(c) : String(c)))
+      .join('')
+      .replace(/\s+$/, '')
   }
   return String(raw)
 }

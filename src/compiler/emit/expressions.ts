@@ -25,11 +25,7 @@ export interface EmitExprResult {
   type: string
 }
 
-export function emitExpr(
-  compiler: Compiler,
-  node: ExpressionNode,
-  scope: Scope
-): EmitExprResult {
+export function emitExpr(compiler: Compiler, node: ExpressionNode, scope: Scope): EmitExprResult {
   switch (node.kind) {
     case 'IntegerLiteral':
       return { code: String((node as any).value), type: 'integer' }
@@ -266,12 +262,10 @@ export function emitBinary(
       return { code: `((${L.code}) ${jsOp} (${R.code}))`, type: 'boolean' }
     }
     case 'AND':
-      if (resultType === 'boolean')
-        return { code: `((${L.code}) && (${R.code}))`, type: 'boolean' }
+      if (resultType === 'boolean') return { code: `((${L.code}) && (${R.code}))`, type: 'boolean' }
       return { code: `((${L.code}) & (${R.code}))`, type: 'integer' }
     case 'OR':
-      if (resultType === 'boolean')
-        return { code: `((${L.code}) || (${R.code}))`, type: 'boolean' }
+      if (resultType === 'boolean') return { code: `((${L.code}) || (${R.code}))`, type: 'boolean' }
       return { code: `((${L.code}) | (${R.code}))`, type: 'integer' }
     default:
       throw new Error(`JS VM: unsupported binary operator ${op}`)
@@ -385,12 +379,7 @@ export function inferType(compiler: Compiler, node: ExpressionNode, scope: Scope
   }
 }
 
-export function binaryResultType(
-  compiler: Compiler,
-  op: string,
-  lt: string,
-  rt: string
-): string {
+export function binaryResultType(compiler: Compiler, op: string, lt: string, rt: string): string {
   if (typeKind(compiler, lt) === 'set' && typeKind(compiler, rt) === 'set') {
     if (op === '+' || op === '-' || op === '*') return lt
   }

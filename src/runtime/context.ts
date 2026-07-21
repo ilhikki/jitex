@@ -51,14 +51,22 @@ function buildDefaultValue(typeId: string, typeTable: any): unknown {
   const td = typeTable.get(typeId) as any
   if (!td) return 0
   switch (td.kind) {
-    case 'integer': return 0
-    case 'real': return 0.0
-    case 'boolean': return false
-    case 'char': return '\x00'
-    case 'string': return ''
-    case 'text': return null
-    case 'subrange': return 0
-    case 'enum': return 0
+    case 'integer':
+      return 0
+    case 'real':
+      return 0.0
+    case 'boolean':
+      return false
+    case 'char':
+      return '\x00'
+    case 'string':
+      return ''
+    case 'text':
+      return null
+    case 'subrange':
+      return 0
+    case 'enum':
+      return 0
     case 'array': {
       const dims = td.dimensions
       const elemTypeId = td.elementTypeId
@@ -82,9 +90,12 @@ function buildDefaultValue(typeId: string, typeTable: any): unknown {
       }
       return obj
     }
-    case 'set': return new Set<number>()
-    case 'file': return createEmptyFile()
-    default: return 0
+    case 'set':
+      return new Set<number>()
+    case 'file':
+      return createEmptyFile()
+    default:
+      return 0
   }
 }
 
@@ -123,7 +134,10 @@ export function createJSCtx(options: JSRuntimeOptions): JSCtx {
   }
 }
 
-export function ctxToRunState(ctx: JSCtx, status: 'running' | 'terminated' | 'error' = 'terminated'): RunState {
+export function ctxToRunState(
+  ctx: JSCtx,
+  status: 'running' | 'terminated' | 'error' = 'terminated'
+): RunState {
   return {
     outputBuffer: ctx.outputBuffer,
     inputQueue: ctx.inputQueue,

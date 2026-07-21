@@ -208,7 +208,9 @@ function emitStateMachine(
 
   lines.push(`${pad}let __pc = 0`)
   lines.push(`${pad}${loopLabel}: while (true) {`)
-  lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+  lines.push(
+    `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
+  )
   lines.push(`${pad}  switch (__pc) {`)
 
   const savedLabelCases = compiler.labelCases

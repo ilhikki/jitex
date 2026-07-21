@@ -52,9 +52,10 @@ function parseSource(source: string): ProgramNode {
   return (result as any).astNode as ProgramNode
 }
 
-function resolveExtensions(
-  extensions: Extension[] = []
-): { extraTypes: TypeDef[]; allowUndeclaredLabels: boolean } {
+function resolveExtensions(extensions: Extension[] = []): {
+  extraTypes: TypeDef[]
+  allowUndeclaredLabels: boolean
+} {
   const extraTypes: TypeDef[] = []
   let allowUndeclaredLabels = false
 

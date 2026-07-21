@@ -39,9 +39,7 @@ import {
 } from './types'
 import type { Compiler } from '../compiler'
 
-export function collectLabelsFromCompound(
-  compound: CompoundStatementNode
-): IntegerLiteralNode[] {
+export function collectLabelsFromCompound(compound: CompoundStatementNode): IntegerLiteralNode[] {
   const labels: IntegerLiteralNode[] = []
   for (const s of compound.statements) {
     if (s.kind === 'LabeledStatement') {
@@ -282,11 +280,7 @@ export function rangeCheck(compiler: Compiler, code: string, origTypeId: string)
   return `((__v) => { if (__v < ${b.min} || __v > ${b.max}) throw new Error('JS VM: value ' + __v + ' out of range ${b.min}..${b.max}'); return __v })(${code})`
 }
 
-export function emitAssignment(
-  compiler: Compiler,
-  a: AssignmentNode,
-  scope: Scope
-): string {
+export function emitAssignment(compiler: Compiler, a: AssignmentNode, scope: Scope): string {
   if (a.left.kind === 'Identifier') {
     const id = a.left as IdentifierNode
     const withField = findWithField(compiler, id.name, scope)
@@ -358,11 +352,7 @@ export function toRawValue(
   return `(${code}).raw`
 }
 
-export function emitProcedureCall(
-  compiler: Compiler,
-  pc: ProcedureCallNode,
-  scope: Scope
-): string {
+export function emitProcedureCall(compiler: Compiler, pc: ProcedureCallNode, scope: Scope): string {
   const name = pc.name.name.toUpperCase()
   if (BUILTIN_SYSCALLS.has(name)) {
     if (name === 'WRITE' || name === 'WRITELN') {
@@ -469,9 +459,7 @@ export function emitRead(
         if (!vi) throw new Error(`JS VM: undefined variable ${id.name}`)
         const st = vi.typeId
         if (st === 'char') {
-          lines.push(
-            `  ${vi.jsName}.raw = String.fromCharCode(await ctx.io.file.bufferChar(__f))`
-          )
+          lines.push(`  ${vi.jsName}.raw = String.fromCharCode(await ctx.io.file.bufferChar(__f))`)
           lines.push(`  await ctx.io.file.get(__f)`)
         } else {
           lines.push('  {')
@@ -520,9 +508,7 @@ export function emitRead(
     } else if (st === 'real') {
       lines.push(`  ${vi.jsName} = (__i < __toks.length) ? parseFloat(__toks[__i++]) : 0`)
     } else if (st === 'char') {
-      lines.push(
-        `  ${vi.jsName}.raw = (__i < __toks.length) ? __toks[__i++].charAt(0) : '\\u0000'`
-      )
+      lines.push(`  ${vi.jsName}.raw = (__i < __toks.length) ? __toks[__i++].charAt(0) : '\\u0000'`)
     } else if (st === 'string') {
       lines.push(`  ${vi.jsName}.raw = (__i < __toks.length) ? __toks[__i++] : ''`)
     }

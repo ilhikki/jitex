@@ -41,9 +41,7 @@ export function createDefaultIO(inputQueue: string[]): PascalIO {
 
 function createThrowFileOps(): PascalFileOps {
   const notImpl = (m: string): never => {
-    throw new Error(
-      `IO.file.${m} is not implemented. Pass a files Map to runVM to enable file IO.`
-    )
+    throw new Error(`IO.file.${m} is not implemented. Pass a files Map to runVM to enable file IO.`)
   }
   return {
     reset: (_f: PascalFile) => Promise.resolve(notImpl('reset')),
@@ -153,8 +151,7 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
       }
     },
 
-    async put(_file: PascalFile): Promise<void> {
-    },
+    async put(_file: PascalFile): Promise<void> {},
 
     async close(file: PascalFile): Promise<void> {
       const s = getState(file)

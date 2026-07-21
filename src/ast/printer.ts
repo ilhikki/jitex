@@ -222,7 +222,10 @@ function printArrayAccess(node: ArrayAccessNode, ctx: PrintContext): string {
   return `${base}[${indices}]`
 }
 
-function printFieldAccess(node: { object: ExpressionNode; field: IdentifierNode }, ctx: PrintContext): string {
+function printFieldAccess(
+  node: { object: ExpressionNode; field: IdentifierNode },
+  ctx: PrintContext
+): string {
   const obj = printExpr(node.object, ctx)
   // Pascal 指针解引用/文件缓冲区：F^ 在 AST 中表示为 FieldAccess(field.name='^')
   if (node.field.name === '^') return `${obj}^`
@@ -250,9 +253,7 @@ function printIn(node: InExpressionNode, ctx: PrintContext): string {
 
 function printProgram(node: ProgramNode, ctx: PrintContext): string {
   const params =
-    node.parameters.length > 0
-      ? `(${node.parameters.map((p) => p.name).join(', ')})`
-      : ''
+    node.parameters.length > 0 ? `(${node.parameters.map((p) => p.name).join(', ')})` : ''
   const header = `program ${node.name.name}${params};`
   const block = printBlock(node.block, ctx)
   return `${header}\n${block}.`
@@ -298,10 +299,12 @@ function printCompound(node: CompoundStatementNode, ctx: PrintContext): string {
     return 'begin\nend'
   }
   const innerCtx = withIndent(ctx, 1)
-  const stmts = node.statements.map((s) => {
-    const code = printStatement(s, innerCtx)
-    return code === '' ? null : indentStr(innerCtx) + code
-  }).filter((x) => x !== null)
+  const stmts = node.statements
+    .map((s) => {
+      const code = printStatement(s, innerCtx)
+      return code === '' ? null : indentStr(innerCtx) + code
+    })
+    .filter((x) => x !== null)
   return `begin\n${stmts.join(';\n')}\n${indentStr(ctx)}end`
 }
 
@@ -403,9 +406,10 @@ function printWith(node: WithStatementNode, ctx: PrintContext): string {
 }
 
 function printProcedureCall(node: ProcedureCallNode): string {
-  const args = node.arguments.length > 0
-    ? `(${node.arguments.map((a) => printExpr(a, { indent: 0 })).join(', ')})`
-    : ''
+  const args =
+    node.arguments.length > 0
+      ? `(${node.arguments.map((a) => printExpr(a, { indent: 0 })).join(', ')})`
+      : ''
   return `${node.name.name}${args}`
 }
 
@@ -434,9 +438,10 @@ function printVarDecl(node: VariableDeclarationNode, ctx: PrintContext): string 
 }
 
 function printProcedureDecl(node: ProcedureDeclarationNode, ctx: PrintContext): string {
-  const params = node.parameters.length > 0
-    ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
-    : ''
+  const params =
+    node.parameters.length > 0
+      ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
+      : ''
   let result = `procedure ${node.name.name}${params}`
   if (node.isForward) {
     result += '; forward'
@@ -450,9 +455,10 @@ function printProcedureDecl(node: ProcedureDeclarationNode, ctx: PrintContext): 
 }
 
 function printFunctionDecl(node: FunctionDeclarationNode, ctx: PrintContext): string {
-  const params = node.parameters.length > 0
-    ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
-    : ''
+  const params =
+    node.parameters.length > 0
+      ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
+      : ''
   const returnType = printType(node.returnType, ctx)
   let result = `function ${node.name.name}${params}: ${returnType}`
   if (node.isForward) {

@@ -69,10 +69,16 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
     case 'UNTIL':
     case 'EOF':
       // Empty statement
-      return ok(input.position, withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end))
+      return ok(
+        input.position,
+        withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end)
+      )
 
     default:
-      return ok(input.position, withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end))
+      return ok(
+        input.position,
+        withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end)
+      )
   }
 }
 
@@ -106,7 +112,14 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
   if (!endResult.success) return fail(endResult.error, endResult.position)
   pos = endResult.newPosition
 
-  return ok(pos, withLoc({ kind: 'CompoundStatement', statements } as CompoundStatementNode, startToken.start, endResult.astNode.end))
+  return ok(
+    pos,
+    withLoc(
+      { kind: 'CompoundStatement', statements } as CompoundStatementNode,
+      startToken.start,
+      endResult.astNode.end
+    )
+  )
 }
 
 function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
@@ -123,15 +136,22 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
   if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
 
-  return ok(stmtResult.newPosition, withLoc({
-    kind: 'LabeledStatement',
-    label: {
-      kind: 'IntegerLiteral',
-      value: labelValue,
-      raw: labelToken.content,
-    } as IntegerLiteralNode,
-    statement: stmtResult.astNode,
-  } as LabeledStatementNode, startToken.start, input.tokens[stmtResult.newPosition - 1].end))
+  return ok(
+    stmtResult.newPosition,
+    withLoc(
+      {
+        kind: 'LabeledStatement',
+        label: {
+          kind: 'IntegerLiteral',
+          value: labelValue,
+          raw: labelToken.content,
+        } as IntegerLiteralNode,
+        statement: stmtResult.astNode,
+      } as LabeledStatementNode,
+      startToken.start,
+      input.tokens[stmtResult.newPosition - 1].end
+    )
+  )
 }
 
 function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
@@ -160,29 +180,50 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
     if (!rightResult.success) return fail(rightResult.error, rightResult.position)
     pos = rightResult.newPosition
 
-    return ok(pos, withLoc({
-      kind: 'Assignment',
-      left: exprResult.astNode,
-      right: rightResult.astNode,
-    } as AssignmentNode, startToken.start, input.tokens[pos - 1].end))
+    return ok(
+      pos,
+      withLoc(
+        {
+          kind: 'Assignment',
+          left: exprResult.astNode,
+          right: rightResult.astNode,
+        } as AssignmentNode,
+        startToken.start,
+        input.tokens[pos - 1].end
+      )
+    )
   }
 
   // If it's a function call without :=, it's a procedure call
   if (exprResult.astNode.kind === 'FunctionCall') {
-    return ok(pos, withLoc({
-      kind: 'ProcedureCall',
-      name: (exprResult.astNode as any).name,
-      arguments: (exprResult.astNode as any).arguments,
-    } as ProcedureCallNode, startToken.start, input.tokens[pos - 1].end))
+    return ok(
+      pos,
+      withLoc(
+        {
+          kind: 'ProcedureCall',
+          name: (exprResult.astNode as any).name,
+          arguments: (exprResult.astNode as any).arguments,
+        } as ProcedureCallNode,
+        startToken.start,
+        input.tokens[pos - 1].end
+      )
+    )
   }
 
   // If it's just an identifier, it's a procedure call with no args
   if (exprResult.astNode.kind === 'Identifier') {
-    return ok(pos, withLoc({
-      kind: 'ProcedureCall',
-      name: exprResult.astNode as IdentifierNode,
-      arguments: [],
-    } as ProcedureCallNode, startToken.start, input.tokens[pos - 1].end))
+    return ok(
+      pos,
+      withLoc(
+        {
+          kind: 'ProcedureCall',
+          name: exprResult.astNode as IdentifierNode,
+          arguments: [],
+        } as ProcedureCallNode,
+        startToken.start,
+        input.tokens[pos - 1].end
+      )
+    )
   }
 
   return fail(
@@ -246,11 +287,18 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
     pos = closeResult.newPosition
   }
 
-  return ok(pos, withLoc({
-    kind: 'ProcedureCall',
-    name: { kind: 'Identifier', name } as IdentifierNode,
-    arguments: args,
-  } as ProcedureCallNode, startToken.start, input.tokens[pos - 1].end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'ProcedureCall',
+        name: { kind: 'Identifier', name } as IdentifierNode,
+        arguments: args,
+      } as ProcedureCallNode,
+      startToken.start,
+      input.tokens[pos - 1].end
+    )
+  )
 }
 
 // IF expression THEN statement [ELSE statement]
@@ -279,12 +327,19 @@ function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
     pos = elseResult.newPosition
   }
 
-  return ok(pos, withLoc({
-    kind: 'IfStatement',
-    condition: condResult.astNode,
-    thenBranch: thenStmtResult.astNode,
-    elseBranch,
-  } as IfStatementNode, startToken.start, input.tokens[pos - 1].end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'IfStatement',
+        condition: condResult.astNode,
+        thenBranch: thenStmtResult.astNode,
+        elseBranch,
+      } as IfStatementNode,
+      startToken.start,
+      input.tokens[pos - 1].end
+    )
+  )
 }
 
 // WHILE expression DO statement
@@ -304,11 +359,18 @@ function parseWhileStatement(input: ParserInput): ParseResult<WhileStatementNode
   if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
   pos = bodyResult.newPosition
 
-  return ok(pos, withLoc({
-    kind: 'WhileStatement',
-    condition: condResult.astNode,
-    body: bodyResult.astNode,
-  } as WhileStatementNode, startToken.start, input.tokens[pos - 1].end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'WhileStatement',
+        condition: condResult.astNode,
+        body: bodyResult.astNode,
+      } as WhileStatementNode,
+      startToken.start,
+      input.tokens[pos - 1].end
+    )
+  )
 }
 
 // REPEAT statements UNTIL expression
@@ -342,11 +404,18 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
   if (!condResult.success) return fail(condResult.error, condResult.position)
   pos = condResult.newPosition
 
-  return ok(pos, withLoc({
-    kind: 'RepeatStatement',
-    statements,
-    untilCondition: condResult.astNode,
-  } as RepeatStatementNode, startToken.start, input.tokens[pos - 1].end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'RepeatStatement',
+        statements,
+        untilCondition: condResult.astNode,
+      } as RepeatStatementNode,
+      startToken.start,
+      input.tokens[pos - 1].end
+    )
+  )
 }
 
 // FOR identifier := expression (TO|DOWNTO) expression DO statement
@@ -394,14 +463,21 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
   pos = bodyResult.newPosition
 
-  return ok(pos, withLoc({
-    kind: 'ForStatement',
-    variable: varResult.astNode,
-    initial: initResult.astNode,
-    final: finalResult.astNode,
-    direction,
-    body: bodyResult.astNode,
-  } as ForStatementNode, startToken.start, input.tokens[pos - 1].end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'ForStatement',
+        variable: varResult.astNode,
+        initial: initResult.astNode,
+        final: finalResult.astNode,
+        direction,
+        body: bodyResult.astNode,
+      } as ForStatementNode,
+      startToken.start,
+      input.tokens[pos - 1].end
+    )
+  )
 }
 
 // CASE expression OF case_branch {; case_branch} [; OTHERWISE statement] END
@@ -424,7 +500,10 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
     // Check for OTHERWISE / OTHERS (UCSD Pascal 别名)
     // 两种语法：`OTHERWISE statement` 或 `OTHERS: statement`
     const peekTok = peek({ tokens: input.tokens, position: pos })
-    if (peekTok.type === 'OTHERWISE' || (peekTok.type === 'IDENTIFIER' && peekTok.content.toUpperCase() === 'OTHERS')) {
+    if (
+      peekTok.type === 'OTHERWISE' ||
+      (peekTok.type === 'IDENTIFIER' && peekTok.content.toUpperCase() === 'OTHERS')
+    ) {
       pos++
       // 可选冒号（OTHERS: statement 风格）
       if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
@@ -474,12 +553,19 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   if (!endResult.success) return fail(endResult.error, endResult.position)
   pos = endResult.newPosition
 
-  return ok(pos, withLoc({
-    kind: 'CaseStatement',
-    expression: exprResult.astNode,
-    branches,
-    otherwise,
-  } as CaseStatementNode, startToken.start, endResult.astNode.end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'CaseStatement',
+        expression: exprResult.astNode,
+        branches,
+        otherwise,
+      } as CaseStatementNode,
+      startToken.start,
+      endResult.astNode.end
+    )
+  )
 }
 
 // GOTO label
@@ -493,14 +579,21 @@ function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> 
   }
   pos++
 
-  return ok(pos, withLoc({
-    kind: 'GotoStatement',
-    label: {
-      kind: 'IntegerLiteral',
-      value: parseInt(token.content, 10),
-      raw: token.content,
-    } as IntegerLiteralNode,
-  } as GotoStatementNode, startToken.start, token.end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'GotoStatement',
+        label: {
+          kind: 'IntegerLiteral',
+          value: parseInt(token.content, 10),
+          raw: token.content,
+        } as IntegerLiteralNode,
+      } as GotoStatementNode,
+      startToken.start,
+      token.end
+    )
+  )
 }
 
 // WITH expression {, expression} DO statement
@@ -520,9 +613,16 @@ function parseWithStatement(input: ParserInput): ParseResult<WithStatementNode> 
   if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
   pos = bodyResult.newPosition
 
-  return ok(pos, withLoc({
-    kind: 'WithStatement',
-    records: recordsResult.astNode,
-    body: bodyResult.astNode,
-  } as WithStatementNode, startToken.start, input.tokens[pos - 1].end))
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'WithStatement',
+        records: recordsResult.astNode,
+        body: bodyResult.astNode,
+      } as WithStatementNode,
+      startToken.start,
+      input.tokens[pos - 1].end
+    )
+  )
 }
