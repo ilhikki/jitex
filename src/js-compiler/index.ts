@@ -1,11 +1,20 @@
 // M5 JS 编译器：从 AST 编译为 JS 代码字符串，new AsyncFunction 执行
 //
+// 本文件是 JS 编译器的对外入口，导出：
+// - runJS(source, options): 编译并执行 Pascal 程序，返回 RunState
+// - compileToJS(source): 仅编译，返回 JS 代码字符串
+// - 类型：RunState, RunError, JSRunOptions, JSDebugOptions
+//
 // 核心思想：
 // - integer/real/boolean 用 JS 裸值（无 PascalValue 装箱），V8 JIT 可优化
-// - string/char/array/record/file 保持 PascalValue，通过 ctx.sysCall/plugin 桥接
+// - array/record/set/file 保持 PascalValue，通过 ctx.sysCall/plugin 桥接
 // - 异步操作（WRITELN/READ/file）用 async/await 原生处理
+// - 默认加载标准 plugins（integer/boolean/char/real/array/record/enum/subrange/set/file）
+// - string 是非标扩展，需用户注入 stringPlugin
 //
-// 详见 plan.md（项目总览）与 docs/refactoring-decisions.md（决策与原则）
+// 编译策略和架构见同目录 compiler.ts；
+// TypePlugin 系统见 types/types.ts 和 types/*.plugin.ts；
+// 项目顶层入口见 ../../AGENTS.md。
 
 import { parse } from '../index'
 import type { ProgramNode } from '../ast/types'
@@ -122,6 +131,32 @@ const AsyncFunction = Object.getPrototypeOf(async function () {
   /* */
 }).constructor
 
+/**
+ * 编译并执行 Pascal 程序，返回执行结果。
+ *
+ * 默认行为符合 ISO Pascal 1983 标准。
+ * 非标特性（如 string 类型）需通过 options.plugins 注入。
+ *
+ * @param source - Pascal 源码字符串
+ * @param options - 运行选项（plugins/sysCalls/files/maxSteps/debug 等）
+ * @returns RunState - 执行状态（terminated/error + outputBuffer + error）
+ *
+ * @example
+ * ```ts
+ * import { runJS } from 'pascal-ts'
+ * const state = await runJS(`
+ *   program hello;
+ *   begin writeln('Hello, Pascal!'); end.
+ * `)
+ * console.log(state.status, state.outputBuffer.join(''))
+ * ```
+ *
+ * @example 注入非标 string 插件
+ * ```ts
+ * import { runJS, stringPlugin } from 'pascal-ts'
+ * const state = await runJS(code, { plugins: [stringPlugin] })
+ * ```
+ */
 export async function runJS(source: string, options: JSRunOptions = {}): Promise<RunState> {
   try {
     const ast = parseSource(source)
@@ -177,8 +212,24 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
   }
 }
 
-// 调试用：返回编译生成的 JS 源码（不执行）
-// 默认加载与 runJS 一致的标准 plugins，确保编译结果与实际执行一致
+/**
+ * 仅编译 Pascal 源码为 JS 代码字符串，不执行。
+ *
+ * 默认加载与 runJS 一致的标准 plugins，确保编译结果与实际执行一致。
+ *
+ * @param source - Pascal 源码字符串
+ * @returns string - 编译生成的 JS 代码字符串
+ *
+ * @example
+ * ```ts
+ * import { compileToJS } from 'pascal-ts'
+ * const js = compileToJS(`
+ *   program hello;
+ *   begin writeln(42); end.
+ * `)
+ * console.log(js)
+ * ```
+ */
 export function compileToJS(source: string): string {
   const ast = parseSource(source)
   const { runtime } = buildRuntime(ast, {})

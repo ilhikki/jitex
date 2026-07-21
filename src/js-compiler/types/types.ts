@@ -1,3 +1,15 @@
+// TypePlugin 核心类型定义
+//
+// 本文件定义了 Pascal 类型系统的核心接口：
+// - PascalValue: 运行时 Pascal 值（装箱后的值，含 typeId）
+// - TypeDef: 类型定义（integer/real/boolean/char/string/array/record/set/file/enum/subrange）
+// - TypeOps: 类型插件需实现的操作接口（can/invoke）
+// - TypePlugin: 类型插件（name + types + ops）
+// - TypeTable: 类型表（所有类型定义的集合）
+// - RuntimeCtx: 运行时上下文（typeTable + sysCalls + io）
+// - SysCallHandler: 系统调用处理器
+//
+// 详细插件机制见同目录下的 *.plugin.ts 文件。
 export interface PascalValue {
   typeId: string
   raw: unknown

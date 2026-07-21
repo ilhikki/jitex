@@ -1,5 +1,15 @@
 // m5 测试辅助函数
-// 测试的是 Pascal 语义，与具体引擎无关
+//
+// 测试的是 Pascal 语义，与具体引擎无关。
+//
+// 导出：
+// - PascalTest: 测试用例接口（引擎无关命名）
+// - runPascal / runPascalTest / runPascalTests: 执行测试的函数
+// - getOutput: 从 RunState 提取输出字符串
+// - LegacyTestCompat / runLegacyTest: 兼容旧格式的适配层
+//
+// 测试原则见 ../README.md；
+// 执行引擎实现见 ../../src/js-compiler/index.ts。
 
 import { runJS } from '../../src/js-compiler'
 import type { RunState } from '../../src/js-compiler/run-state'
