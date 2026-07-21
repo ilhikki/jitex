@@ -17,6 +17,10 @@ export interface JSDebugOptions {
   labelAnalysis?: boolean
 }
 
+export interface NonstandardOptions {
+  allowUndeclaredLabels?: boolean
+}
+
 export interface JSRunOptions {
   input?: string[]
   extraTypes?: TypeDef[]
@@ -24,7 +28,7 @@ export interface JSRunOptions {
   files?: Map<string, Uint8Array>
   programFileUrls?: Record<string, string>
   maxSteps?: number
-  allowUndeclaredLabels?: boolean
+  nonstandard?: NonstandardOptions
   debug?: JSDebugOptions
 }
 
@@ -69,7 +73,7 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
     const { runtime, sysCalls } = buildRuntime(ast, options)
 
     const compiler = new Compiler(runtime.typeTable, {
-      allowUndeclaredLabels: options.allowUndeclaredLabels,
+      allowUndeclaredLabels: options.nonstandard?.allowUndeclaredLabels,
     })
     const body = compiler.compile(ast, options.programFileUrls)
 
