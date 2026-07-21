@@ -163,11 +163,16 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
  * 将 Pascal 源码编译为 JS 代码字符串（不执行）。
  *
  * @param source - Pascal 源码字符串
+ * @param options - 编译选项
  * @returns 生成的 JavaScript 代码
  */
-export function compileToJS(source: string): string {
+export function compileToJS(
+  source: string,
+  options: JSRunOptions = {}
+): string {
   const ast = parseSource(source)
-  const { runtime } = buildRuntime(ast, {})
-  const compiler = new Compiler(runtime.typeTable)
+  const { runtime } = buildRuntime(ast, options)
+  const { allowUndeclaredLabels } = resolveExtensions(options.extensions)
+  const compiler = new Compiler(runtime.typeTable, { allowUndeclaredLabels })
   return compiler.compile(ast)
 }

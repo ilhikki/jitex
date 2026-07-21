@@ -127,7 +127,7 @@ export function createJSCtx(options: JSRuntimeOptions): JSCtx {
     },
     formatReal,
     steps: 0,
-    maxSteps: options.maxSteps ?? 100000000,
+    maxSteps: options.maxSteps ?? Infinity,
     outputBuffer,
     inputQueue,
     io: runtime.io as PascalIO | undefined,
