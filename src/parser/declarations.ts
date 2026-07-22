@@ -34,9 +34,13 @@ export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDecl
     if (token.type !== 'INTEGER') {
       return fail(`Expected label number but got ${token.type} at line ${token.start.line}`, pos)
     }
+    const value = parseInt(token.content, 10)
+    if (value < 0 || value > 9999) {
+      return fail(`Label ${value} out of range (0..9999) at line ${token.start.line}`, pos)
+    }
     labels.push({
       kind: 'IntegerLiteral',
-      value: parseInt(token.content, 10),
+      value,
       raw: token.content,
     } as IntegerLiteralNode)
     pos++
