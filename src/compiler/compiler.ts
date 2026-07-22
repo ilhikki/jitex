@@ -11,7 +11,8 @@ import {
 } from './emit/declarations'
 import { collectTypes } from './emit/types'
 import { emitStmt as emitStmtImpl } from './emit/statements'
-import { analyzeLabels, type BlockLabelAnalysis, type LabelAnalysisResult } from './label-analysis'
+import { analyzeLabels, type BlockLabelAnalysis, type LabelAnalysisResult, type GotoTarget } from './label-analysis'
+import type { GotoStatementNode } from '../ast/types'
 
 /**
  * 循环上下文：当 goto 在循环内部时，需要知道循环的 JS 标签
@@ -51,6 +52,9 @@ export class Compiler {
   /** 当前正在编译的 block 的 analysis（用于 GotoStatement 编译时查 visibleGotoTargets） */
   currentBlockAnalysis: BlockLabelAnalysis | null = null
 
+  /** 当前正在编译的函数/过程 block 的 id（用于判断 goto 是否跨函数） */
+  currentFunctionBlockId: number = -1
+
   /** 程序中是否存在任何函数逃逸 goto（跨函数/过程 block 的 goto） */
   hasFunctionEscapingGoto(): boolean {
     if (!this.labelAnalysis) return false
@@ -86,6 +90,18 @@ export class Compiler {
     return result
   }
 
+  /**
+   * 获取 goto 语句的目标信息（预计算结果）。
+   * 生成器通过此方法查询，无需运行时查找。
+   *
+   * @param gotoNode GotoStatement AST 节点
+   * @returns 目标信息（blockId + caseNum），未找到返回 null
+   */
+  getGotoTarget(gotoNode: GotoStatementNode): GotoTarget | null {
+    if (!this.labelAnalysis) return null
+    return this.labelAnalysis.gotoTargets.get(gotoNode) ?? null
+  }
+
   compile(program: ProgramNode, programFileUrls?: Record<string, string>): string {
     this.labelAnalysis = analyzeLabels(program)
 
@@ -117,10 +133,8 @@ export class Compiler {
 
     const parts: string[] = []
     parts.push("'use strict'")
-    // 仅在有函数逃逸 goto 时注入 __GotoSignal 类（分析阶段预判）
-    if (this.hasFunctionEscapingGoto()) {
-      parts.push('class __GotoSignal extends Error { constructor(targetPc, targetCase) { super("goto escape"); this.targetPc = targetPc; this.targetCase = targetCase; } }')
-    }
+    // 总是注入 __GotoSignal 类，因为所有 goto 都统一抛出异常
+    parts.push('class __GotoSignal extends Error { constructor(targetPc, targetCase) { super("goto escape"); this.targetPc = targetPc; this.targetCase = targetCase; } }')
     parts.push(globalDecls)
     parts.push(procDefs.join('\n'))
     if (assignLines.length > 0) {

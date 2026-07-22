@@ -266,10 +266,19 @@ export function emitBody(
   indent: number
 ): string {
   const labels = block.labelDeclarations ? block.labelDeclarations.labels : []
-  if (labels.length === 0) {
-    return emitCompound(compiler, block.compound, scope, indent)
-  }
-
+  
+  // 保存并设置当前函数/过程 block 的 id
+  const savedFunctionBlockId = compiler.currentFunctionBlockId
   const analysis = compiler.getLabelAnalysis(block)
-  return emitBlockWithGoto(block.compound, analysis, scope, indent, compiler)
+  compiler.currentFunctionBlockId = analysis.functionBlockId
+  
+  let result: string
+  if (labels.length === 0) {
+    result = emitCompound(compiler, block.compound, scope, indent)
+  } else {
+    result = emitBlockWithGoto(block.compound, analysis, scope, indent, compiler)
+  }
+  
+  compiler.currentFunctionBlockId = savedFunctionBlockId
+  return result
 }

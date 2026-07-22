@@ -77,6 +77,8 @@ export interface BlockLabelAnalysis {
 export interface LabelAnalysisResult {
   root: BlockLabelAnalysis
   blockMap: WeakMap<BlockNode, BlockLabelAnalysis>
+  /** 预计算：每个 goto 语句的目标信息（label 所在 blockId + caseNum） */
+  gotoTargets: WeakMap<GotoStatementNode, GotoTarget>
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +371,76 @@ function collectGotos(stmts: StatementNode[]): GotoInfo[] {
   return result
 }
 
+/**
+ * 递归收集语句及所有子语句中的 goto（包括非透明块内的）。
+ *
+ * 用于第五遍遍历时预计算每个 goto 的目标信息。
+ * 与 collectGotos 不同，此函数会递归进入 if/while/for/repeat 等非透明块。
+ *
+ * @param stmts 语句列表
+ * @returns GotoInfo 列表（包含所有嵌套层级的 goto）
+ */
+function collectAllGotosRecursive(stmts: StatementNode[]): GotoInfo[] {
+  const result: GotoInfo[] = []
+  const stack: StatementNode[] = [...stmts]
+  while (stack.length > 0) {
+    const stmt = stack.pop()!
+    if (stmt.kind === 'GotoStatement') {
+      const gs = stmt as GotoStatementNode
+      result.push({ stmt: gs, target: (gs.label as IntegerLiteralNode).value })
+      continue
+    }
+    // 只展开 CompoundStatement（真正的透明块，可直接展开为语句列表）
+    // CaseStatement 和 WithStatement 在下面的 switch 中专门处理
+    if (stmt.kind === 'CompoundStatement') {
+      const cs = stmt as CompoundStatementNode
+      for (let i = cs.statements.length - 1; i >= 0; i--) {
+        stack.push(cs.statements[i])
+      }
+      continue
+    }
+    switch (stmt.kind) {
+      case 'IfStatement': {
+        const is = stmt as any
+        stack.push(is.thenBranch)
+        if (is.elseBranch) stack.push(is.elseBranch)
+        break
+      }
+      case 'WhileStatement':
+      case 'ForStatement': {
+        stack.push((stmt as any).body)
+        break
+      }
+      case 'RepeatStatement': {
+        const rs = stmt as any
+        for (let i = rs.statements.length - 1; i >= 0; i--) {
+          stack.push(rs.statements[i])
+        }
+        break
+      }
+      case 'CaseStatement': {
+        const cs = stmt as any
+        for (const branch of cs.branches) {
+          stack.push(branch.statement)
+        }
+        if (cs.otherwise) stack.push(cs.otherwise)
+        break
+      }
+      case 'WithStatement': {
+        const ws = stmt as any
+        stack.push(ws.body)
+        break
+      }
+      case 'LabeledStatement': {
+        const ls = stmt as any
+        stack.push(ls.statement)
+        break
+      }
+    }
+  }
+  return result
+}
+
 // ---------------------------------------------------------------------------
 // 分析整个 block
 // ---------------------------------------------------------------------------
@@ -551,7 +623,21 @@ export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
     }
   }
 
-  return { root, blockMap }
+  // 第五遍：预计算每个 goto 语句的目标信息
+  // 递归收集所有 goto（包括 if/while/for/repeat 等非透明块内的）
+  // 生成器通过 gotoTargets.get(gotoNode) 直接获取目标，无需运行时查找
+  const gotoTargets = new WeakMap<GotoStatementNode, GotoTarget>()
+  for (const [block, analysis] of iterateBlocks(root)) {
+    const allGotos = collectAllGotosRecursive(block.compound.statements)
+    for (const g of allGotos) {
+      const target = analysis.visibleGotoTargets.get(String(g.target))
+      if (target) {
+        gotoTargets.set(g.stmt, target)
+      }
+    }
+  }
+
+  return { root, blockMap, gotoTargets }
 }
 
 /**

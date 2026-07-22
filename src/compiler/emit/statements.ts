@@ -232,17 +232,29 @@ export function emitStmt(
       const gs = node as GotoStatementNode
       const lblName = String((gs.label as any).value)
 
-      const currentAnalysis = compiler.currentBlockAnalysis
-      if (!currentAnalysis) {
-        return `${pad}throw new Error('JS VM: goto ${lblName} - no block analysis context')`
-      }
-      const target = currentAnalysis.visibleGotoTargets.get(lblName)
+      // 通过预计算的结果获取 goto 目标信息（分析阶段预计算，生成器直接查询）
+      const target = compiler.getGotoTarget(gs)
       if (!target) {
         return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in any visible block (ISO 7185 6.1.6)')`
       }
 
+      const targetAnalysis = findAnalysisByBlockId(compiler, target.blockId)
+      if (!targetAnalysis) {
+        return `${pad}throw new Error('JS VM: goto ${lblName} - target block not found')`
+      }
+
+      const currentAnalysis = compiler.currentBlockAnalysis
+
+      // 函数逃逸（跨函数/过程 block）：抛出 __GotoSignal，由目标的 try/catch 捕获并 dispatch
+      // 判断条件：目标 functionBlockId 与当前编译的 functionBlockId 不同
+      if (targetAnalysis.functionBlockId !== compiler.currentFunctionBlockId) {
+        return `${pad}throw new __GotoSignal(${JSON.stringify(targetAnalysis.pcVar)}, ${target.caseNum})`
+      }
+
+      // 同函数内：沿用原有的状态机跳转逻辑
+
       // 在循环内的情况
-      if (compiler.insideLoop) {
+      if (compiler.insideLoop && currentAnalysis) {
         // 循环体末尾 label：用 continue（适用于本 block）
         if (compiler.isLabelAtLoopTail(lblName) && target.blockId === currentAnalysis.blockId) {
           const loop = compiler.currentLoop!
@@ -263,30 +275,19 @@ export function emitStmt(
         // 注意：如果当前状态机是内层 sm（loopLabel != currentAnalysis.loopLabel），
         // 也要先 break 出内层 sm 的 while 循环
         const loop = compiler.currentLoop!
-        const targetAnalysis = findAnalysisByBlockId(compiler, target.blockId)
-        const targetPcVar = targetAnalysis?.pcVar ?? currentAnalysis.pcVar
-        return `${pad}${targetPcVar} = ${target.caseNum}; break ${loop.jsLabel}`
+        return `${pad}${targetAnalysis.pcVar} = ${target.caseNum}; break ${loop.jsLabel}`
       }
 
       // 不在循环中：状态机跳转
-      if (target.blockId === currentAnalysis.blockId) {
+      if (currentAnalysis && target.blockId === currentAnalysis.blockId) {
         // 跨 block goto 在 GotoStatement 中需要 break 出当前状态机循环。
         // 但 JS continue label 不能跨 labeled while —— 必须 break。
         // 同 block 时：__pc_<self> = caseNum; continue __goto_loop_<self>
         return `${pad}${currentAnalysis.pcVar} = ${target.caseNum}; continue ${currentAnalysis.loopLabel}`
       }
 
-      // 跨 block goto：目标是外层 block X
-      // 函数逃逸（跨函数/过程 block）：抛出 __GotoSignal，由目标的 try/catch 捕获并 dispatch
-      // 循环逃逸（同函数内跨 block）：写外层 pc + continue 外层 while
-      const targetAnalysis = findAnalysisByBlockId(compiler, target.blockId)
-      if (targetAnalysis
-          && targetAnalysis.functionBlockId !== currentAnalysis.functionBlockId) {
-        // 函数逃逸：抛信号（targetPc = 外层 pc 变量名，targetCase = 外层 caseNum）
-        return `${pad}throw new __GotoSignal(${JSON.stringify(targetAnalysis.pcVar)}, ${target.caseNum})`
-      }
       // 同函数内（循环逃逸）：写外层 pc + continue 外层 while
-      return `${pad}${targetAnalysis!.pcVar} = ${target.caseNum}; continue ${targetAnalysis!.loopLabel}`
+      return `${pad}${targetAnalysis.pcVar} = ${target.caseNum}; continue ${targetAnalysis.loopLabel}`
     }
     case 'LabeledStatement': {
       const ls = node as LabeledStatementNode

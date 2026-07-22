@@ -227,20 +227,28 @@ function emitStateMachine(
   const pad = ' '.repeat(indent)
   const lines: string[] = []
 
-  // 判断本 block 状态机是否需要 try/catch 包裹
-  // 条件：本 block 的某个 label 被来自其他函数/过程的 goto 引用（needsTryCatch）
-  let needsTryCatch = false
+  // 查找对应的 analysis
+  let activeBlockAnalysis: BlockLabelAnalysis | null = null
   if (compiler.labelAnalysis) {
     for (const [, a] of iterateAnalyses(compiler.labelAnalysis.root)) {
-      if (a.pcVar === pcVar && a.needsTryCatch) {
-        needsTryCatch = true
+      if (a.pcVar === pcVar) {
+        activeBlockAnalysis = a
         break
       }
     }
   }
 
+  // 判断本 block 状态机是否需要 try/catch 包裹
+  // 条件：本 block 的某个 label 被来自其他函数/过程的 goto 引用（needsTryCatch）
+  const needsTryCatch = activeBlockAnalysis?.needsTryCatch ?? false
+
   lines.push(`${pad}let ${pcVar} = 0`)
   lines.push(`${pad}${loopLabel}: while (true) {`)
+
+  // 设置运行时的当前 block 标识
+  // __currentGotoBlockId 用于在运行时确定当前执行的 block，支持跨过程 goto
+  lines.push(`${pad}  ctx.__currentGotoBlockId = ${activeBlockAnalysis?.blockId ?? -1}`)
+  lines.push(`${pad}  ctx.__currentGotoPcVar = ${JSON.stringify(pcVar)}`)
 
   // try/catch 必须放在状态机循环里面、switch 外面（用户要求）
   // 仅在该 block 有来自其他函数/过程的 goto 目标时添加
@@ -257,16 +265,6 @@ function emitStateMachine(
   const savedPcVar = compiler.currentPcVar
   const savedBlockAnalysis: BlockLabelAnalysis | null = compiler.currentBlockAnalysis
 
-  // 查找对应的 analysis
-  let activeBlockAnalysis: BlockLabelAnalysis | null = null
-  if (compiler.labelAnalysis) {
-    for (const [, a] of iterateAnalyses(compiler.labelAnalysis.root)) {
-      if (a.pcVar === pcVar) {
-        activeBlockAnalysis = a
-        break
-      }
-    }
-  }
   compiler.currentBlockAnalysis = activeBlockAnalysis
   compiler.labelCases = labelCases
   compiler.labelSwitchName = loopLabel

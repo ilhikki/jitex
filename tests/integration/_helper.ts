@@ -77,7 +77,7 @@ export async function runPascal(test: PascalTest): Promise<RunState> {
     sysCalls: test.sysCalls,
     files: test.files,
     programFileUrls: test.programFileUrls,
-    maxSteps: test.maxSteps ?? 1e9,
+    maxSteps: test.maxSteps ?? 1e5,
   })
 }
 

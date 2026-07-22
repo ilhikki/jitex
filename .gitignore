@@ -5,5 +5,5 @@ dist/
 *.iml
 /coverage
 /temp
-
+/test/temp/
 coverage-temp/

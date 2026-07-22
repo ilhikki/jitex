@@ -358,7 +358,7 @@ end.`,
       expectedError: '',
     },
     {
-      name: 'goto-error-from-procedure-to-main',
+      name: 'goto-from-procedure-to-main-label',
       code: `program test;
 label 200;
 procedure p;
@@ -370,8 +370,8 @@ begin
 200:
   writeln('Main');
 end.`,
-      purpose: 'GOTO from procedure to main program label should error',
-      expectedError: '',
+      purpose: 'GOTO from procedure to main program label (ISO 7185 允许：goto 可以跳到外层 block 的 label)',
+      expectedContains: 'Main',
     },
     {
       name: 'goto-error-from-outer-to-nested-procedure',
