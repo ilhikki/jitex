@@ -27,6 +27,14 @@ interface LoopAnalysis {
   needsInner: boolean
 }
 
+/**
+ * 分析循环体内的 label 和 goto，决定是否需要内层状态机。
+ *
+ * @param compiler 编译器实例
+ * @param body 循环体语句（可能是单个语句或 CompoundStatement）
+ * @param allBodyStmts 可选的已展开的循环体语句列表（用于正确识别末尾 label）
+ * @returns LoopAnalysis 分析结果
+ */
 function analyzeLoopBody(
   compiler: Compiler,
   body: StatementNode,
@@ -86,6 +94,14 @@ function analyzeLoopBody(
  *     default: throw ...;
  *   }
  * }
+ *
+ * @param body 循环体语句（原始 AST 节点）
+ * @param bodyStmts 展开后的循环体语句列表
+ * @param innerLabelInfo 内层 label 信息映射（label 名 -> { remaining 语句 }）
+ * @param compiler 编译器实例
+ * @param scope 当前作用域
+ * @param indent 当前缩进级别
+ * @returns 生成的 JS 代码字符串
  */
 let _innerLoopCounter = 0
 
@@ -175,14 +191,28 @@ function emitInnerStateMachine(
 /**
  * 发射外层状态机
  *
- * __pc: while (true) {
- *   switch (__pc) {
+ * 结构：
+ * let __pc_N = 0;
+ * __goto_loop_N: while (true) {
+ *   switch (__pc_N) {
  *     case 0:   // 入口：执行全部代码
  *     case 1:   // label X 的剩余代码
  *     case -1:  // 正常退出
  *     default:  // 快速失败
  *   }
  * }
+ *
+ * 当该 block 需要处理跨函数 goto 时，会在外层包裹 try/catch。
+ *
+ * @param pcVar 程序计数器变量名（如 __pc_0）
+ * @param loopLabel while 循环的 JS label（如 __goto_loop_0）
+ * @param labelCases label 名到 case 编号的映射
+ * @param fullStmts block 顶层 compound 的所有语句
+ * @param labelStmts 每个 label 的剩余语句映射
+ * @param compiler 编译器实例
+ * @param scope 当前作用域
+ * @param indent 当前缩进级别
+ * @returns 生成的 JS 代码字符串
  */
 function emitStateMachine(
   pcVar: string,
@@ -295,7 +325,12 @@ function emitStateMachine(
   return lines.join('\n')
 }
 
-/** 遍历所有 block analysis（深度优先） */
+/**
+ * 遍历所有 block analysis（深度优先）
+ *
+ * @param root 根 block 的 label analysis
+ * @returns 迭代器，每次返回 [BlockNode, BlockLabelAnalysis] 对
+ */
 function* iterateAnalyses(root: BlockLabelAnalysis): Iterable<[BlockNode, BlockLabelAnalysis]> {
   const stack: BlockLabelAnalysis[] = [root]
   while (stack.length > 0) {
@@ -307,6 +342,19 @@ function* iterateAnalyses(root: BlockLabelAnalysis): Iterable<[BlockNode, BlockL
   }
 }
 
+/**
+ * 为包含 goto/label 的 block 发射状态机代码。
+ *
+ * 根据 label analysis 结果，为每个声明的 label 生成对应的 case，
+ * 并调用 emitStateMachine 生成完整的状态机结构。
+ *
+ * @param compound block 的顶层 compound 语句
+ * @param analysis 该 block 的 label analysis 结果
+ * @param scope 当前作用域
+ * @param indent 当前缩进级别
+ * @param compiler 编译器实例
+ * @returns 生成的 JS 状态机代码字符串
+ */
 export function emitBlockWithGoto(
   compound: CompoundStatementNode,
   analysis: BlockLabelAnalysis,
@@ -346,13 +394,28 @@ export function emitBlockWithGoto(
 // 循环辅助：判断循环体是否需要 JS label / 内层状态机
 // ---------------------------------------------------------------------------
 
+/** 循环计数器，用于生成唯一的循环 JS label */
 let _loopCounter = 0
 
+/**
+ * 生成下一个唯一的循环 JS label。
+ *
+ * @param prefix 前缀（如 '__for_loop'）
+ * @returns 带计数器的唯一 label（如 '__for_loop_0'）
+ */
 export function nextLoopLabel(prefix: string): string {
   return `${prefix}_${_loopCounter++}`
 }
 
-/** 判断循环体是否与状态机有交互（包含 goto 或 label） */
+/**
+ * 判断循环体是否与状态机有交互（包含 goto 或 label）。
+ *
+ * 如果循环体包含任何 goto 语句或 label 语句，则需要特殊处理（如添加 JS label、内层状态机）。
+ *
+ * @param compiler 编译器实例
+ * @param body 循环体语句
+ * @returns 如果循环体包含 goto 或 label，返回 true
+ */
 export function loopNeedsLabel(compiler: Compiler, body: StatementNode): boolean {
   if (!compiler.labelCases) return false
   const gotos = collectGotoTargetsInStmt(body)
@@ -360,7 +423,16 @@ export function loopNeedsLabel(compiler: Compiler, body: StatementNode): boolean
   return gotos.size > 0 || labels.size > 0
 }
 
-/** 分析循环体，返回 LoopAnalysis */
+/**
+ * 分析循环体，返回 LoopAnalysis 结果。
+ *
+ * 封装了内部函数 analyzeLoopBody，提供公共接口。
+ *
+ * @param compiler 编译器实例
+ * @param body 循环体语句（可能是单个语句或 CompoundStatement）
+ * @param allBodyStmts 可选的已展开的循环体语句列表
+ * @returns LoopAnalysis 分析结果
+ */
 export function getLoopAnalysis(
   compiler: Compiler,
   body: StatementNode,
@@ -369,7 +441,20 @@ export function getLoopAnalysis(
   return analyzeLoopBody(compiler, body, allBodyStmts)
 }
 
-/** 为循环体生成内层状态机 */
+/**
+ * 为循环体生成内层状态机代码。
+ *
+ * 当循环体内有 goto 指向同循环体内非末尾 label 时，需要生成内层状态机。
+ * 封装了内部函数 emitInnerStateMachine，提供公共接口。
+ *
+ * @param body 循环体语句（原始 AST 节点）
+ * @param bodyStmts 展开后的循环体语句列表
+ * @param innerLabelInfo 内层 label 信息映射（label 名 -> { remaining 语句 }）
+ * @param compiler 编译器实例
+ * @param scope 当前作用域
+ * @param indent 当前缩进级别
+ * @returns 生成的 JS 状态机代码字符串
+ */
 export function emitLoopInnerStateMachine(
   body: StatementNode,
   bodyStmts: StatementNode[],

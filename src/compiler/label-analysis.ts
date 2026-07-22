@@ -83,6 +83,15 @@ export interface LabelAnalysisResult {
 // 透明块 / 非透明块
 // ---------------------------------------------------------------------------
 
+/**
+ * 判断一个语句是否是"透明块"。
+ *
+ * 透明块是指其内部的 label 可以被外部直接引用的语句。
+ * 在 label 分析中，透明块会被展开，其内部的 label 被视为所在外层 block 的 label。
+ *
+ * @param stmt 待判断的语句
+ * @returns 如果是透明块（CompoundStatement/CaseStatement/WithStatement），返回 true
+ */
 function isTransparentBlock(stmt: StatementNode): boolean {
   return (
     stmt.kind === 'CompoundStatement' ||
@@ -91,7 +100,15 @@ function isTransparentBlock(stmt: StatementNode): boolean {
   )
 }
 
-/** 把透明块展开成平铺语句列表 */
+/**
+ * 把透明块递归展开成平铺语句列表。
+ *
+ * 对于 CompoundStatement，递归展开其内部的所有子语句；
+ * 对于其他透明块（CaseStatement/WithStatement），返回自身（它们的内部结构由专门的函数处理）。
+ *
+ * @param block 待展开的透明块
+ * @returns 展开后的语句列表
+ */
 function flattenTransparentBlock(block: StatementNode): StatementNode[] {
   if (block.kind === 'CompoundStatement') {
     const cs = block as CompoundStatementNode
@@ -112,6 +129,16 @@ function flattenTransparentBlock(block: StatementNode): StatementNode[] {
 // 收集 label 的 remaining 语句
 // ---------------------------------------------------------------------------
 
+/**
+ * 获取从指定索引开始到块结束的所有剩余语句。
+ *
+ * 对于 LabeledStatement，会展开其内部的透明块；
+ * 对于后续语句，也会展开透明块。
+ *
+ * @param stmts 语句列表
+ * @param startIndex 起始索引（指向 LabeledStatement）
+ * @returns 剩余语句列表
+ */
 function getRemainingStatements(stmts: StatementNode[], startIndex: number): StatementNode[] {
   const result: StatementNode[] = []
   const firstStmt = stmts[startIndex] as LabeledStatementNode
@@ -138,6 +165,16 @@ function getRemainingStatements(stmts: StatementNode[], startIndex: number): Sta
 // 收集 label
 // ---------------------------------------------------------------------------
 
+/**
+ * 在平铺的语句列表中收集所有 label。
+ *
+ * 处理透明块（CompoundStatement/CaseStatement/WithStatement）和非透明块（If/While/Repeat/For）。
+ * 对于透明块，递归展开并收集其内部的 label；
+ * 对于非透明块，label 的 remaining 语句包含块内剩余语句 + 块外后续语句。
+ *
+ * @param stmts 语句列表
+ * @returns label 名到 { stmt, remaining } 的映射
+ */
 export function collectLabelsFlat(
   stmts: StatementNode[]
 ): Map<string, { stmt: LabeledStatementNode; remaining: StatementNode[] }> {
@@ -203,6 +240,15 @@ export function collectLabelsFlat(
   return result
 }
 
+/**
+ * 从非透明块中收集 label。
+ *
+ * 非透明块（If/While/Repeat/For）内部的 label 只能被块内的 goto 引用。
+ * 递归遍历块内的所有语句，收集 label 及其直接的 remaining 语句。
+ *
+ * @param stmt 非透明块语句
+ * @returns label 名到 { stmt, remaining } 的映射
+ */
 function collectLabelsFromNonTransparentBlock(
   stmt: StatementNode
 ): Map<string, { stmt: LabeledStatementNode; remaining: StatementNode[] }> {
@@ -234,6 +280,15 @@ function collectLabelsFromNonTransparentBlock(
   return result
 }
 
+/**
+ * 从透明块中收集 label。
+ *
+ * 透明块（CompoundStatement/CaseStatement/WithStatement）内部的 label 可以被外部 goto 引用。
+ * 递归展开并收集其内部的 label。
+ *
+ * @param block 透明块语句
+ * @returns label 名到 { stmt, remaining } 的映射
+ */
 function collectLabelsFromTransparentBlock(
   block: StatementNode
 ): Map<string, { stmt: LabeledStatementNode; remaining: StatementNode[] }> {
@@ -286,6 +341,14 @@ function collectLabelsFromTransparentBlock(
 // 收集 goto
 // ---------------------------------------------------------------------------
 
+/**
+ * 在语句列表中收集所有 goto 语句。
+ *
+ * 递归遍历透明块内部的 goto 语句。
+ *
+ * @param stmts 语句列表
+ * @returns GotoInfo 列表
+ */
 function collectGotos(stmts: StatementNode[]): GotoInfo[] {
   const result: GotoInfo[] = []
   for (const stmt of stmts) {
@@ -320,6 +383,18 @@ function resetBlockIdCounter(): void {
   _blockIdCounter = 0
 }
 
+/**
+ * 分析单个 block 的 label 和 goto 信息。
+ *
+ * 递归处理子 block（函数/过程声明），收集本 block 的 label 和 goto，
+ * 分配 blockId、pcVar、loopLabel，构建分析树结构。
+ *
+ * @param block 待分析的 block
+ * @param parent 父 block 的分析结果（顶层 block 为 null）
+ * @param blockMap BlockNode 到 BlockLabelAnalysis 的映射（用于快速查找）
+ * @param isFunctionBlock 是否是函数/过程 block（决定 functionBlockId 的分配）
+ * @returns 该 block 的分析结果
+ */
 function analyzeBlock(
   block: BlockNode,
   parent: BlockLabelAnalysis | null,
@@ -391,6 +466,32 @@ function analyzeBlock(
   return analysis
 }
 
+/**
+ * 分析整个程序的 label 和 goto 关系，构建完整的 label analysis 树。
+ *
+ * 执行四遍遍历：
+ *
+ * 第一遍（递归）：构建分析树结构
+ * - 为每个 block 分配唯一的 blockId、pcVar、loopLabel
+ * - 收集每个 block 的 declaredLabels、labelInfo、gotos
+ * - 递归处理子 block（函数/过程声明）
+ *
+ * 第二遍：预计算每个 block 的 ownLabelCases
+ * - 为每个 block 的声明 label 分配 case 编号（从 1 开始）
+ * - 存储到 ownLabelCasesByBlock 供后续使用
+ *
+ * 第三遍：填充 visibleGotoTargets
+ * - 每个 block 可见的 goto 目标 = 自身声明的 label + 所有祖先声明的 label
+ * - 自身 label 优先遮蔽祖先同名 label
+ *
+ * 第四遍：标记函数逃逸和 try/catch 需求
+ * - 函数逃逸：goto 所在 block 和目标 label 所在 block 的 functionBlockId 不同
+ * - hasFunctionEscapingGoto：该 block 有 goto 跨函数/过程边界
+ * - needsTryCatch：该 block 有 label 被其他函数/过程的 goto 引用
+ *
+ * @param program 程序根节点
+ * @returns LabelAnalysisResult（包含分析树和 blockMap）
+ */
 export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
   resetBlockIdCounter()
   const blockMap = new WeakMap<BlockNode, BlockLabelAnalysis>()
@@ -453,7 +554,13 @@ export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
   return { root, blockMap }
 }
 
-/** 根据 blockId 查找 analysis */
+/**
+ * 根据 blockId 在分析树中查找对应的 BlockLabelAnalysis。
+ *
+ * @param root 分析树根节点
+ * @param blockId 目标 blockId
+ * @returns 对应的分析结果，未找到返回 null
+ */
 function findAnalysisById(root: BlockLabelAnalysis, blockId: number): BlockLabelAnalysis | null {
   for (const a of iterateAnalysesAll(root)) {
     if (a.blockId === blockId) return a
@@ -461,6 +568,12 @@ function findAnalysisById(root: BlockLabelAnalysis, blockId: number): BlockLabel
   return null
 }
 
+/**
+ * 遍历所有 BlockLabelAnalysis（深度优先）。
+ *
+ * @param root 分析树根节点
+ * @returns 迭代器，每次返回一个 BlockLabelAnalysis
+ */
 function* iterateAnalysesAll(root: BlockLabelAnalysis): Iterable<BlockLabelAnalysis> {
   const stack: BlockLabelAnalysis[] = [root]
   while (stack.length > 0) {
@@ -472,7 +585,12 @@ function* iterateAnalysesAll(root: BlockLabelAnalysis): Iterable<BlockLabelAnaly
   }
 }
 
-/** 遍历所有 block（深度优先） */
+/**
+ * 遍历所有 block（深度优先）。
+ *
+ * @param root 分析树根节点
+ * @returns 迭代器，每次返回 [BlockNode, BlockLabelAnalysis] 对
+ */
 function* iterateBlocks(root: BlockLabelAnalysis): Iterable<[BlockNode, BlockLabelAnalysis]> {
   const stack: BlockLabelAnalysis[] = [root]
   while (stack.length > 0) {
@@ -484,6 +602,13 @@ function* iterateBlocks(root: BlockLabelAnalysis): Iterable<[BlockNode, BlockLab
   }
 }
 
+/**
+ * 根据 BlockNode 获取其对应的 BlockLabelAnalysis。
+ *
+ * @param result LabelAnalysisResult（由 analyzeLabels 返回）
+ * @param block 目标 BlockNode
+ * @returns 对应的分析结果，未找到返回 undefined
+ */
 export function getAnalysisForBlock(
   result: LabelAnalysisResult,
   block: BlockNode
@@ -495,7 +620,15 @@ export function getAnalysisForBlock(
 // 工具：递归查找语句中包含的 label 集合（用于判断 goto 目标是否在同一循环体内）
 // ---------------------------------------------------------------------------
 
-/** 收集一个语句内部所有 LabeledStatement 的 label 值 */
+/**
+ * 收集一个语句内部所有 LabeledStatement 的 label 值。
+ *
+ * 递归遍历 CompoundStatement、IfStatement、WhileStatement、ForStatement、
+ * RepeatStatement、CaseStatement、WithStatement 的内部结构。
+ *
+ * @param stmt 待分析的语句
+ * @returns label 值的集合（字符串形式）
+ */
 export function collectLabelValuesInStmt(stmt: StatementNode): Set<string> {
   const result = new Set<string>()
   const recurse = (s: StatementNode): void => {
@@ -525,7 +658,15 @@ export function collectLabelValuesInStmt(stmt: StatementNode): Set<string> {
   return result
 }
 
-/** 收集一个语句内部所有 GotoStatement 的目标 label 值 */
+/**
+ * 收集一个语句内部所有 GotoStatement 的目标 label 值。
+ *
+ * 递归遍历 CompoundStatement、IfStatement、WhileStatement、ForStatement、
+ * RepeatStatement、CaseStatement、WithStatement 的内部结构。
+ *
+ * @param stmt 待分析的语句
+ * @returns goto 目标 label 值的集合（字符串形式）
+ */
 export function collectGotoTargetsInStmt(stmt: StatementNode): Set<string> {
   const result = new Set<string>()
   const recurse = (s: StatementNode): void => {

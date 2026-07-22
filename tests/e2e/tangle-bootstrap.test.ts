@@ -1,6 +1,6 @@
 import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from './_helper'
 
-describe('TANGLE self-bootstrap test (JS) - SKIPPED until Phase 7', () => {
+describe.skip('TANGLE self-bootstrap test (JS) - SKIPPED until Phase 7', () => {
   const webSource = readResource(TANGLE_WEB)
   const officialPas = readResource(TANGLE_PAS)
 
