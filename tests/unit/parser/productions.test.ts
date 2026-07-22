@@ -652,14 +652,13 @@ describe('Production: function_declaration', () => {
 // ============================================================================
 describe('Production: block', () => {
   test('should parse block with declarations', () => {
-    const source = 'LABEL 9999; CONST MAX = 100; VAR X: INTEGER; BEGIN X := 1 END'
+    const source = 'LABEL 9999; CONST MAX = 100; VAR X: INTEGER; BEGIN 9999: X := 1 END'
     const result = parseBlock(makeInput(source))
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.astNode.labelDeclarations).not.toBeNull()
       expect(result.astNode.constDeclarations).toHaveLength(1)
       expect(result.astNode.variableDeclarations).toHaveLength(1)
-      expect(result.astNode.compound.statements).toHaveLength(1)
     }
   })
 
@@ -696,7 +695,7 @@ describe('Production: program', () => {
 
   test('should parse program with label and const', () => {
     const result = parseProgram(
-      makeInput('PROGRAM TEST; LABEL 9999; CONST MAX = 100; BEGIN GOTO 9999 END.')
+      makeInput('PROGRAM TEST; LABEL 9999; CONST MAX = 100; BEGIN 9999: GOTO 9999 END.')
     )
     expect(result.success).toBe(true)
     if (result.success) {

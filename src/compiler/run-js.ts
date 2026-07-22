@@ -11,8 +11,8 @@ import { Compiler } from './compiler'
 
 export type { RunState, RunError } from '../runtime/run-state'
 
-/** 非标扩展标识符。内置扩展：'string' | 'allowUndeclaredLabels' */
-export type Extension = 'allowUndeclaredLabels' | 'string' | string
+/** 非标扩展标识符。内置扩展：'string' */
+export type Extension = 'string' | string
 
 /** 调试选项 */
 export interface JSDebugOptions {
@@ -54,10 +54,8 @@ function parseSource(source: string): ProgramNode {
 
 function resolveExtensions(extensions: Extension[] = []): {
   extraTypes: TypeDef[]
-  allowUndeclaredLabels: boolean
 } {
   const extraTypes: TypeDef[] = []
-  let allowUndeclaredLabels = false
 
   for (const ext of extensions) {
     switch (ext) {
@@ -66,13 +64,10 @@ function resolveExtensions(extensions: Extension[] = []): {
           extraTypes.push(STRING_TYPE)
         }
         break
-      case 'allowUndeclaredLabels':
-        allowUndeclaredLabels = true
-        break
     }
   }
 
-  return { extraTypes, allowUndeclaredLabels }
+  return { extraTypes }
 }
 
 function buildRuntime(
@@ -112,11 +107,8 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
   try {
     const ast = parseSource(source)
     const { runtime, sysCalls } = buildRuntime(ast, options)
-    const { allowUndeclaredLabels } = resolveExtensions(options.extensions)
 
-    const compiler = new Compiler(runtime.typeTable, {
-      allowUndeclaredLabels,
-    })
+    const compiler = new Compiler(runtime.typeTable)
     const body = compiler.compile(ast, options.programFileUrls)
 
     if (options.debug?.emitJS) {
@@ -172,7 +164,6 @@ export function compileToJS(
 ): string {
   const ast = parseSource(source)
   const { runtime } = buildRuntime(ast, options)
-  const { allowUndeclaredLabels } = resolveExtensions(options.extensions)
-  const compiler = new Compiler(runtime.typeTable, { allowUndeclaredLabels })
+  const compiler = new Compiler(runtime.typeTable)
   return compiler.compile(ast)
 }

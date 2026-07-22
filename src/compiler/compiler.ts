@@ -1,4 +1,4 @@
-import type { ProgramNode, StatementNode } from '../ast/types'
+import type { BlockNode, ProgramNode, StatementNode } from '../ast/types'
 import type { TypeTable } from '../types'
 import { ProcInfo, Scope } from './emit/utils'
 import {
@@ -11,6 +11,7 @@ import {
 } from './emit/declarations'
 import { collectTypes } from './emit/types'
 import { emitStmt as emitStmtImpl } from './emit/statements'
+import { analyzeLabels, type BlockLabelAnalysis, type LabelAnalysisResult } from './label-analysis'
 
 export class Compiler {
   procs = new Map<string, ProcInfo>()
@@ -24,15 +25,27 @@ export class Compiler {
   labelSwitchName: string | null = null
   gotoMode: 'continue' | 'break' | 'exception' | 'simple' | null = null
   gotoLabel: string | null = null
-  allowUndeclaredLabels: boolean
   withVarCounter = 0
+  labelAnalysis: LabelAnalysisResult | null = null
 
-  constructor(typeTable: TypeTable, options?: { allowUndeclaredLabels?: boolean }) {
+  constructor(typeTable: TypeTable) {
     this.typeTable = typeTable
-    this.allowUndeclaredLabels = options?.allowUndeclaredLabels ?? false
+  }
+
+  getLabelAnalysis(block: BlockNode): BlockLabelAnalysis {
+    if (!this.labelAnalysis) {
+      throw new Error('Label analysis not performed')
+    }
+    const result = this.labelAnalysis.blockMap.get(block)
+    if (!result) {
+      throw new Error('No label analysis for block')
+    }
+    return result
   }
 
   compile(program: ProgramNode, programFileUrls?: Record<string, string>): string {
+    this.labelAnalysis = analyzeLabels(program)
+
     collectTypes(this, program.block)
 
     collectConsts(this, program.block.constDeclarations)

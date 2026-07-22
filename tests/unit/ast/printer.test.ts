@@ -415,7 +415,7 @@ describe('Printer: Program & Block', () => {
 
   test('block with label declarations', () => {
     const out = parseAndPrint(
-      'LABEL 10, 20; BEGIN 10: writeln(1) END',
+      'LABEL 10, 20; BEGIN 10: writeln(1); 20: writeln(2) END',
       (input) => parseBlock(input)
     )
     expect(out).toContain('label')

@@ -368,7 +368,7 @@ end.`
       const r = await measureExecution(
         'tangle-compile-only',
         async () => {
-          const js = compileToJS(source, { extensions: ['allowUndeclaredLabels', 'string'] })
+          const js = compileToJS(source, { extensions: ['string'] })
           return { steps: 0, outputBuffer: [js.length.toString()] }
         },
         3

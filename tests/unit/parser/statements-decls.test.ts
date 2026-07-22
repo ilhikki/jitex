@@ -159,6 +159,7 @@ begin
   f := 0;
 end;
 begin
+  99:
   x := f;
 end.`
     const r = parse(source)

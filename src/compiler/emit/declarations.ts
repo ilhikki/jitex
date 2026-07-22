@@ -9,7 +9,7 @@ import type {
 import { ProcInfo, Scope } from './utils'
 import { coerce, emitExpr, inferType } from './expressions'
 import { resolveTypeId, scalarBase, subrangeBounds, tryEvalConstInt } from './types'
-import { collectLabelsFromCompound, emitCompound } from './statements'
+import { emitCompound } from './statements'
 import { emitBlockWithGoto } from '../strategy'
 import type { Compiler } from '../compiler'
 
@@ -265,20 +265,11 @@ export function emitBody(
   scope: Scope,
   indent: number
 ): string {
-  const declaredLabels = block.labelDeclarations ? block.labelDeclarations.labels : []
-  let allLabels = declaredLabels
-  if (compiler.allowUndeclaredLabels) {
-    const inferred = collectLabelsFromCompound(block.compound)
-    const declaredSet = new Set(declaredLabels.map((l) => l.value))
-    for (const l of inferred) {
-      if (!declaredSet.has(l.value)) {
-        allLabels = [...allLabels, l]
-      }
-    }
-  }
-  if (allLabels.length === 0) {
+  const labels = block.labelDeclarations ? block.labelDeclarations.labels : []
+  if (labels.length === 0) {
     return emitCompound(compiler, block.compound, scope, indent)
   }
 
-  return emitBlockWithGoto(block.compound, scope, indent, allLabels, compiler)
+  const analysis = compiler.getLabelAnalysis(block)
+  return emitBlockWithGoto(block.compound, analysis, scope, indent, compiler)
 }

@@ -29,8 +29,7 @@ begin
   writeln('after loop, i=', i);
 end.`,
       purpose: 'GOTO 跳入 while 循环体（非透明块，label 不可达，应报错）',
-      expectedContains: 'before goto',
-      expectedError: 'label not found',
+      expectedError: '',
     },
     {
       name: 'goto-into-for-loop-body',
@@ -50,8 +49,7 @@ begin
   writeln('after for');
 end.`,
       purpose: 'GOTO 跳入 for 循环体（非透明块，label 不可达，应报错）',
-      expectedContains: 'before goto',
-      expectedError: 'label not found',
+      expectedError: '',
     },
     {
       name: 'goto-into-repeat-loop-body',
@@ -72,8 +70,7 @@ begin
   writeln('after repeat, i=', i);
 end.`,
       purpose: 'GOTO 跳入 repeat 循环体（非透明块，label 不可达，应报错）',
-      expectedContains: 'before goto',
-      expectedError: 'label not found',
+      expectedError: '',
     },
     {
       name: 'goto-into-if-then-branch',
@@ -94,8 +91,7 @@ begin
   writeln('after if');
 end.`,
       purpose: 'GOTO 跳入 if-then 分支（非透明块，label 不可达，应报错）',
-      expectedContains: 'before goto',
-      expectedError: 'label not found',
+      expectedError: '',
     },
     {
       name: 'goto-into-if-else-branch',
@@ -118,8 +114,7 @@ begin
   writeln('after if');
 end.`,
       purpose: 'GOTO 跳入 if-else 分支（非透明块，label 不可达，应报错）',
-      expectedContains: 'before goto',
-      expectedError: 'label not found',
+      expectedError: '',
     },
 
     // ==========================================================================

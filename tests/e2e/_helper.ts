@@ -40,8 +40,8 @@ export async function runTangle(pasSource: string, webContent: string): Promise<
       PASCALFILE: 'PASCALFILE',
       POOL: 'POOL',
     },
-    maxSteps: 1e9,
-    extensions: ['allowUndeclaredLabels', 'string'],
+    maxSteps: undefined,
+    extensions: ['string'],
   })
 
   return {

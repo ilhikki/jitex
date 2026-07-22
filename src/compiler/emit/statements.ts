@@ -10,7 +10,6 @@ import type {
   GotoStatementNode,
   IdentifierNode,
   IfStatementNode,
-  IntegerLiteralNode,
   LabeledStatementNode,
   ProcedureCallNode,
   RepeatStatementNode,
@@ -38,16 +37,6 @@ import {
   typeKind,
 } from './types'
 import type { Compiler } from '../compiler'
-
-export function collectLabelsFromCompound(compound: CompoundStatementNode): IntegerLiteralNode[] {
-  const labels: IntegerLiteralNode[] = []
-  for (const s of compound.statements) {
-    if (s.kind === 'LabeledStatement') {
-      labels.push((s as LabeledStatementNode).label as IntegerLiteralNode)
-    }
-  }
-  return labels
-}
 
 export function emitCompound(
   compiler: Compiler,
