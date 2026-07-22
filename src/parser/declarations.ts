@@ -10,7 +10,6 @@ import {
   ParserInput,
   ProcedureDeclarationNode,
   ProgramNode,
-  StatementNode,
   TypeDeclarationNode,
   VariableDeclarationNode,
 } from '../ast/types'
@@ -379,10 +378,7 @@ export function parseFunctionDeclaration(
 // Block & Program Parsers
 // ============================================================================
 
-export function parseBlock(
-  input: ParserInput,
-  outerLabels?: Set<number>
-): ParseResult<BlockNode> {
+export function parseBlock(input: ParserInput, outerLabels?: Set<number>): ParseResult<BlockNode> {
   const startToken = peek(input)
   let pos = input.position
 
@@ -442,15 +438,6 @@ export function parseBlock(
   if (!compoundResult.success) return fail(compoundResult.error, compoundResult.position)
   pos = compoundResult.newPosition
 
-  // Pascal82 语义检查：label 在同一 block 内必须唯一
-  const labelCheck = checkDuplicateLabels(compoundResult.astNode)
-  if (!labelCheck.success) return fail(labelCheck.error, labelCheck.position)
-
-  // Pascal82 §6.2.1: 声明的 label 必须在 block 的 statement-part 中恰好出现一次
-  // §6.8.1: goto 只能跳转到同一 statement-sequence 或包含 goto 的 block 的 statement-part 中的标签
-  const gotoCheck = checkGotoTargets(labelDeclarations, compoundResult.astNode, outerLabels)
-  if (!gotoCheck.success) return fail(gotoCheck.error, gotoCheck.position)
-
   return ok(
     pos,
     withLoc(
@@ -470,228 +457,6 @@ export function parseBlock(
   )
 }
 
-// Pascal82 要求同一 block 内不能重复声明 label。跨 block（不同 procedure/function）允许同名 label。
-function checkDuplicateLabels(
-  stmt: StatementNode | null
-): { success: true } | { success: false; error: string; position: number } {
-  if (!stmt) return { success: true }
-  const seen = new Set<number>()
-  return walkForLabels(stmt, seen)
-}
-
-function walkForLabels(
-  stmt: StatementNode | null | undefined,
-  seen: Set<number>
-): { success: true } | { success: false; error: string; position: number } {
-  if (!stmt) return { success: true }
-  if ((stmt as any).kind === 'LabeledStatement') {
-    const ls = stmt as any
-    const value = ls.label.value
-    if (seen.has(value)) {
-      return { success: false, error: `Duplicate label ${value}`, position: 0 }
-    }
-    seen.add(value)
-    return walkForLabels(ls.statement, seen)
-  }
-  if ((stmt as any).kind === 'CompoundStatement') {
-    for (const s of (stmt as any).statements) {
-      const r = walkForLabels(s, seen)
-      if (!r.success) return r
-    }
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'IfStatement') {
-    const r = walkForLabels((stmt as any).thenBranch, seen)
-    if (!r.success) return r
-    if ((stmt as any).elseBranch) return walkForLabels((stmt as any).elseBranch, seen)
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'WhileStatement' || (stmt as any).kind === 'ForStatement') {
-    return walkForLabels((stmt as any).body, seen)
-  }
-  if ((stmt as any).kind === 'RepeatStatement') {
-    for (const s of (stmt as any).statements) {
-      const r = walkForLabels(s, seen)
-      if (!r.success) return r
-    }
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'CaseStatement') {
-    for (const branch of (stmt as any).branches) {
-      const r = walkForLabels(branch.statement, seen)
-      if (!r.success) return r
-    }
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'WithStatement') {
-    return walkForLabels((stmt as any).statement, seen)
-  }
-  return { success: true }
-}
-
-// Pascal82 §6.2.1: 声明的 label 必须在 block 的 statement-part 中恰好出现一次
-// §6.8.1: goto 只能跳转到同一 statement-sequence 或包含 goto 的 block 的 statement-part 中的标签
-// 非透明块（if/while/for/repeat）内部的标签对外部不可见，但对块内的 goto 可见
-function checkGotoTargets(
-  labelDecl: LabelDeclarationNode | null,
-  compound: StatementNode,
-  outerLabels?: Set<number>
-): { success: true } | { success: false; error: string; position: number } {
-  const allLabels = new Set<number>(outerLabels ?? [])
-  collectAllLabels(compound, allLabels)
-
-  if (labelDecl) {
-    for (const l of labelDecl.labels) {
-      if (!allLabels.has(l.value)) {
-        return {
-          success: false,
-          error: `label ${l.value} not found`,
-          position: 0,
-        }
-      }
-    }
-  }
-
-  const visibleLabels = new Set<number>(outerLabels ?? [])
-  collectTopLevelLabels(compound, visibleLabels)
-
-  return validateGotos(compound, visibleLabels)
-}
-
-function collectAllLabels(
-  stmt: StatementNode | null | undefined,
-  labels: Set<number>
-): void {
-  if (!stmt) return
-  if ((stmt as any).kind === 'LabeledStatement') {
-    labels.add((stmt as any).label.value)
-    collectAllLabels((stmt as any).statement, labels)
-    return
-  }
-  if ((stmt as any).kind === 'CompoundStatement') {
-    for (const s of (stmt as any).statements) collectAllLabels(s, labels)
-    return
-  }
-  if ((stmt as any).kind === 'CaseStatement') {
-    for (const branch of (stmt as any).branches) collectAllLabels(branch.statement, labels)
-    return
-  }
-  if ((stmt as any).kind === 'WithStatement') {
-    collectAllLabels((stmt as any).statement, labels)
-    return
-  }
-  if ((stmt as any).kind === 'IfStatement') {
-    collectAllLabels((stmt as any).thenBranch, labels)
-    if ((stmt as any).elseBranch) collectAllLabels((stmt as any).elseBranch, labels)
-    return
-  }
-  if ((stmt as any).kind === 'WhileStatement' || (stmt as any).kind === 'ForStatement') {
-    collectAllLabels((stmt as any).body, labels)
-    return
-  }
-  if ((stmt as any).kind === 'RepeatStatement') {
-    for (const s of (stmt as any).statements) collectAllLabels(s, labels)
-    return
-  }
-}
-
-function collectTopLevelLabels(
-  stmt: StatementNode | null | undefined,
-  labels: Set<number>
-): void {
-  if (!stmt) return
-  if ((stmt as any).kind === 'LabeledStatement') {
-    labels.add((stmt as any).label.value)
-    collectTopLevelLabels((stmt as any).statement, labels)
-    return
-  }
-  if ((stmt as any).kind === 'CompoundStatement') {
-    for (const s of (stmt as any).statements) collectTopLevelLabels(s, labels)
-    return
-  }
-  if ((stmt as any).kind === 'CaseStatement') {
-    for (const branch of (stmt as any).branches) collectTopLevelLabels(branch.statement, labels)
-    return
-  }
-  if ((stmt as any).kind === 'WithStatement') {
-    collectTopLevelLabels((stmt as any).statement, labels)
-    return
-  }
-}
-
-function validateGotos(
-  stmt: StatementNode | null | undefined,
-  validLabels: Set<number>
-): { success: true } | { success: false; error: string; position: number } {
-  if (!stmt) return { success: true }
-  if ((stmt as any).kind === 'GotoStatement') {
-    const value = (stmt as any).label.value
-    if (!validLabels.has(value)) {
-      return {
-        success: false,
-        error: `GOTO target label ${value} is not declared in this block`,
-        position: 0,
-      }
-    }
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'LabeledStatement') {
-    return validateGotos((stmt as any).statement, validLabels)
-  }
-  if ((stmt as any).kind === 'CompoundStatement') {
-    for (const s of (stmt as any).statements) {
-      const r = validateGotos(s, validLabels)
-      if (!r.success) return r
-    }
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'CaseStatement') {
-    for (const branch of (stmt as any).branches) {
-      const r = validateGotos(branch.statement, validLabels)
-      if (!r.success) return r
-    }
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'WithStatement') {
-    return validateGotos((stmt as any).statement, validLabels)
-  }
-  if ((stmt as any).kind === 'IfStatement') {
-    const thenLabels = new Set(validLabels)
-    collectTopLevelLabels((stmt as any).thenBranch, thenLabels)
-    let r = validateGotos((stmt as any).thenBranch, thenLabels)
-    if (!r.success) return r
-    if ((stmt as any).elseBranch) {
-      const elseLabels = new Set(validLabels)
-      collectTopLevelLabels((stmt as any).elseBranch, elseLabels)
-      return validateGotos((stmt as any).elseBranch, elseLabels)
-    }
-    return { success: true }
-  }
-  if ((stmt as any).kind === 'WhileStatement') {
-    const innerLabels = new Set(validLabels)
-    collectTopLevelLabels((stmt as any).body, innerLabels)
-    return validateGotos((stmt as any).body, innerLabels)
-  }
-  if ((stmt as any).kind === 'ForStatement') {
-    const innerLabels = new Set(validLabels)
-    collectTopLevelLabels((stmt as any).body, innerLabels)
-    return validateGotos((stmt as any).body, innerLabels)
-  }
-  if ((stmt as any).kind === 'RepeatStatement') {
-    const innerLabels = new Set(validLabels)
-    for (const s of (stmt as any).statements) {
-      collectTopLevelLabels(s, innerLabels)
-    }
-    for (const s of (stmt as any).statements) {
-      const r = validateGotos(s, innerLabels)
-      if (!r.success) return r
-    }
-    return { success: true }
-  }
-  return { success: true }
-}
-
-// PROGRAM identifier ( identifier_list ) ; block .
 export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
   const startToken = peek(input)
   let pos = input.position
