@@ -1,7 +1,7 @@
 // m4 过程和函数测试
 
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe, it, expect } from 'vitest'
+import { type PascalTest, runPascalTests } from '../_helper'
 
 describe('M5 JS Procedures and Functions', () => {
   const tests: PascalTest[] = [
@@ -68,14 +68,5 @@ describe('M5 JS Procedures and Functions', () => {
       expectedOutput: '120\n',
     },
   ]
-
-  it('should pass all procedure/function tests', async () => {
-    for (const test of tests) {
-      const result = await runPascalTest(test)
-      if (!result.passed) {
-        console.error(`FAIL: ${test.name}: ${result.message}`)
-      }
-      expect(result.passed).toBe(true)
-    }
-  })
+  runPascalTests(tests)
 })

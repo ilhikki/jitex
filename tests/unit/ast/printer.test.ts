@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@jest/globals'
+import { describe, test, expect } from 'vitest'
 import { lex } from '@/lexer/lexer'
 import { parseProgram, parseBlock } from '@/parser/declarations'
 import { parseExpression } from '@/parser/expressions'
@@ -185,9 +185,7 @@ describe('Printer: Statements', () => {
   })
 
   test('if-then statement', () => {
-    expect(parseAndPrint('IF x > 0 THEN y := 1', parseStatement)).toBe(
-      'if x > 0 then\n  y := 1'
-    )
+    expect(parseAndPrint('IF x > 0 THEN y := 1', parseStatement)).toBe('if x > 0 then\n  y := 1')
   })
 
   test('if-then-else statement', () => {
@@ -208,10 +206,7 @@ describe('Printer: Statements', () => {
   })
 
   test('while compound body', () => {
-    const out = parseAndPrint(
-      'WHILE x > 0 DO BEGIN x := x - 1; y := y + 1 END',
-      parseStatement
-    )
+    const out = parseAndPrint('WHILE x > 0 DO BEGIN x := x - 1; y := y + 1 END', parseStatement)
     expect(out).toBe('while x > 0 do\nbegin\n  x := x - 1;\n  y := y + 1\nend')
   })
 
@@ -222,9 +217,9 @@ describe('Printer: Statements', () => {
   })
 
   test('repeat multiple statements', () => {
-    expect(
-      parseAndPrint('REPEAT x := x + 1; y := y * 2 UNTIL x > 10', parseStatement)
-    ).toBe('repeat\n  x := x + 1;\n  y := y * 2\nuntil x > 10')
+    expect(parseAndPrint('REPEAT x := x + 1; y := y * 2 UNTIL x > 10', parseStatement)).toBe(
+      'repeat\n  x := x + 1;\n  y := y * 2\nuntil x > 10'
+    )
   })
 
   test('for-to statement', () => {
@@ -240,10 +235,7 @@ describe('Printer: Statements', () => {
   })
 
   test('for compound body', () => {
-    const out = parseAndPrint(
-      'FOR i := 1 TO 3 DO BEGIN writeln(i); x := x + i END',
-      parseStatement
-    )
+    const out = parseAndPrint('FOR i := 1 TO 3 DO BEGIN writeln(i); x := x + i END', parseStatement)
     expect(out).toBe('for i := 1 TO 3 do\nbegin\n  WRITELN(i);\n  x := x + i\nend')
   })
 
@@ -258,15 +250,13 @@ describe('Printer: Statements', () => {
       'CASE x OF 1: y := 10; 2: y := 20 OTHERWISE y := 0 END',
       parseStatement
     )
-    expect(out).toBe(
-      'case x of\n  1: y := 10;\n  2: y := 20;\n  otherwise y := 0\nend'
-    )
+    expect(out).toBe('case x of\n  1: y := 10;\n  2: y := 20;\n  otherwise y := 0\nend')
   })
 
   test('case statement multiple labels', () => {
-    expect(
-      parseAndPrint('CASE x OF 1, 3: y := 10; 2, 4: y := 20 END', parseStatement)
-    ).toBe('case x of\n  1, 3: y := 10;\n  2, 4: y := 20\nend')
+    expect(parseAndPrint('CASE x OF 1, 3: y := 10; 2, 4: y := 20 END', parseStatement)).toBe(
+      'case x of\n  1, 3: y := 10;\n  2, 4: y := 20\nend'
+    )
   })
 
   test('goto statement', () => {
@@ -325,9 +315,7 @@ describe('Printer: Types', () => {
   })
 
   test('array type', () => {
-    expect(parseAndPrint('ARRAY [1..10] OF INTEGER', parseType)).toBe(
-      'array[1..10] of INTEGER'
-    )
+    expect(parseAndPrint('ARRAY [1..10] OF INTEGER', parseType)).toBe('array[1..10] of INTEGER')
   })
 
   test('array type multi-dim', () => {
@@ -377,17 +365,15 @@ describe('Printer: Program & Block', () => {
   })
 
   test('program with parameters', () => {
-    const out = parseAndPrint(
-      'PROGRAM test(input, output); BEGIN END.',
-      (input) => parseProgram(input)
+    const out = parseAndPrint('PROGRAM test(input, output); BEGIN END.', (input) =>
+      parseProgram(input)
     )
     expect(out).toContain('program test(input, output);')
   })
 
   test('block with variable declarations', () => {
-    const out = parseAndPrint(
-      'VAR x: INTEGER; y: REAL; BEGIN x := 1 END',
-      (input) => parseBlock(input)
+    const out = parseAndPrint('VAR x: INTEGER; y: REAL; BEGIN x := 1 END', (input) =>
+      parseBlock(input)
     )
     expect(out).toContain('var')
     expect(out).toContain('x: INTEGER')
@@ -395,10 +381,7 @@ describe('Printer: Program & Block', () => {
   })
 
   test('block with const declarations', () => {
-    const out = parseAndPrint(
-      'CONST pi = 3.14; n = 10; BEGIN END',
-      (input) => parseBlock(input)
-    )
+    const out = parseAndPrint('CONST pi = 3.14; n = 10; BEGIN END', (input) => parseBlock(input))
     expect(out).toContain('const')
     expect(out).toContain('pi = 3.14')
     expect(out).toContain('n = 10')
@@ -414,26 +397,21 @@ describe('Printer: Program & Block', () => {
   })
 
   test('block with label declarations', () => {
-    const out = parseAndPrint(
-      'LABEL 10, 20; BEGIN 10: writeln(1); 20: writeln(2) END',
-      (input) => parseBlock(input)
+    const out = parseAndPrint('LABEL 10, 20; BEGIN 10: writeln(1); 20: writeln(2) END', (input) =>
+      parseBlock(input)
     )
     expect(out).toContain('label')
     expect(out).toContain('10, 20')
   })
 
   test('block with procedure declaration', () => {
-    const out = parseAndPrint(
-      'PROCEDURE foo; BEGIN END; BEGIN END',
-      (input) => parseBlock(input)
-    )
+    const out = parseAndPrint('PROCEDURE foo; BEGIN END; BEGIN END', (input) => parseBlock(input))
     expect(out).toContain('procedure foo;')
   })
 
   test('block with function declaration', () => {
-    const out = parseAndPrint(
-      'FUNCTION bar: INTEGER; BEGIN bar := 1 END; BEGIN END',
-      (input) => parseBlock(input)
+    const out = parseAndPrint('FUNCTION bar: INTEGER; BEGIN bar := 1 END; BEGIN END', (input) =>
+      parseBlock(input)
     )
     expect(out).toContain('function bar: INTEGER')
   })
@@ -463,9 +441,8 @@ describe('Printer: Program & Block', () => {
   })
 
   test('forward function', () => {
-    const out = parseAndPrint(
-      'FUNCTION bar: INTEGER; FORWARD; BEGIN END',
-      (input) => parseBlock(input)
+    const out = parseAndPrint('FUNCTION bar: INTEGER; FORWARD; BEGIN END', (input) =>
+      parseBlock(input)
     )
     expect(out).toContain('function bar: INTEGER; forward')
   })

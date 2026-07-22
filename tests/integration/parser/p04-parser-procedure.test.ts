@@ -1,5 +1,5 @@
 ﻿import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-
+import { describe, test, expect } from 'vitest'
 const tests: ConformanceTest[] = [
   // ==========================================================================
   // 1. 过程声明与调用（8个）

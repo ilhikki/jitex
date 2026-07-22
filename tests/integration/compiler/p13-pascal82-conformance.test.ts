@@ -2,8 +2,8 @@
 // 代码风格模仿 TANGLE.WEB 输出的 Pascal：紧凑、大写
 // 这些用例覆盖 ISO 7185 标准中容易出错的边界情况
 
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe, test, expect } from 'vitest'
+import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
 
 describe('M4.1 Pascal82 Conformance', () => {
   const tests: PascalTest[] = [
@@ -59,10 +59,5 @@ describe('M4.1 Pascal82 Conformance', () => {
     },
   ]
 
-  for (const t of tests) {
-    it(t.name, async () => {
-      const result = await runPascalTest(t)
-      expect(result.passed).toBe(true)
-    })
-  }
+  runPascalTests(tests)
 })

@@ -2,7 +2,7 @@ import { parse } from '@/index'
 import { runJS } from '@/index'
 import { loadTexResources, readResource, runTangle, TRIP_TEX } from './_helper'
 import { createExtendedSysCalls } from '@/runtime'
-
+import { describe, test, expect, beforeAll } from 'vitest'
 const extendedSysCalls = createExtendedSysCalls()
 
 describe.skip('TEX82 - TRIP test (JS) - SKIPPED until Phase 7', () => {

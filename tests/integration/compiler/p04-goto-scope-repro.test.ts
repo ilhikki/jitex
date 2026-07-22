@@ -1,5 +1,5 @@
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe, test, expect } from 'vitest'
+import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
 
 // 复现 tangle-official.pas DEBUGHELP 中 GOTO 888 的作用域问题
 // 关键结构：GOTO 888 和 888: 在同一个 CompoundStatement 中
@@ -68,13 +68,5 @@ end.`,
       expectedContains: 'done1',
     },
   ]
-  for (const t of tests) {
-    it(t.name, async () => {
-      const result = await runPascalTest(t)
-      if (!result.passed) {
-        console.error(`  [${t.name}] FAIL: ${result.message}`)
-      }
-      expect(result.passed).toBe(true)
-    })
-  }
+  runPascalTests(tests)
 })

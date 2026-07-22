@@ -1,5 +1,5 @@
 ﻿import { ConformanceTest, runParseTest, makeProgramWithVars } from './_helper'
-
+import { describe, test, expect } from 'vitest'
 const tests: ConformanceTest[] = [
   // =========================================================================
   // 1. 算术运算符优先级（8个）

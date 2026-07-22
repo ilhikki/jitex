@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import { parse } from '@/index'
 import { lex } from '@/lexer/lexer'
 import { resourcePath, TANGLE_PAS } from './_helper'
+import { describe, test, expect } from 'vitest'
 
 describe.skip('Tangle Official - SKIPPED until Phase 7', () => {
   const pasFile = resourcePath(TANGLE_PAS)

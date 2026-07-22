@@ -14,6 +14,7 @@ import {
   parseBlock,
   parseProgram,
 } from '@/parser/declarations'
+import { describe, test, expect } from 'vitest'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

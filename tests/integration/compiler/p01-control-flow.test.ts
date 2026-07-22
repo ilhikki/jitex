@@ -1,9 +1,8 @@
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from '../_helper'
 
 describe('Phase 1: Control Flow', () => {
-  // Original m36 tests
-  const m36Tests: PascalTest[] = [
+  const tests: PascalTest[] = [
     {
       name: 'if-then simple true',
       code: `program test;
@@ -849,15 +848,5 @@ end.`,
     },
   ]
 
-  const tests: PascalTest[] = [...m36Tests]
-
-  for (const t of tests) {
-    it(t.name, async () => {
-      const result = await runPascalTest(t)
-      if (!result.passed) {
-        console.error(`  [${t.name}] FAIL: ${result.message}`)
-      }
-      expect(result.passed).toBe(true)
-    })
-  }
+  runPascalTests(tests)
 })

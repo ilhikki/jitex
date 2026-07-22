@@ -1,5 +1,5 @@
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe, test, expect } from 'vitest'
+import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
 
 describe('Phase 4: Goto Fix - Strategy D should use break not continue', () => {
   const tests: PascalTest[] = [
@@ -23,7 +23,8 @@ begin
   writeln('label 100 reached');
 end.`,
       purpose: 'goto from nested loop should correctly break out of both loops',
-      expectedContains: 'i=1 j=1\ni=1 j=2\ni=1 j=3\ncompleted j loop for i=1\ni=2 j=1\ni=2 j=2\nlabel 100 reached',
+      expectedContains:
+        'i=1 j=1\ni=1 j=2\ni=1 j=3\ncompleted j loop for i=1\ni=2 j=1\ni=2 j=2\nlabel 100 reached',
       expectedNotContains: 'after outer loop',
     },
     {
@@ -110,13 +111,5 @@ end.`,
     },
   ]
 
-  for (const t of tests) {
-    it(t.name, async () => {
-      const result = await runPascalTest(t)
-      if (!result.passed) {
-        console.error(`  [${t.name}] FAIL: ${result.message}`)
-      }
-      expect(result.passed).toBe(true)
-    })
-  }
+  runPascalTests(tests)
 })

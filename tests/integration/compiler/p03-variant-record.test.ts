@@ -1,5 +1,5 @@
 import { parse } from '@/index'
-
+import { describe, test, expect } from 'vitest'
 describe('ISSUE-026: Variant record parsing', () => {
   test('simple variant record with tag', () => {
     const source = `

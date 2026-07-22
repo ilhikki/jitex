@@ -2,8 +2,8 @@
 // 这些特性是 UCSD/Turbo Pascal 扩展，被 Knuth 在 WEB 系统中使用
 // 代码风格模仿 tangle-official.pas（紧凑、大写关键字、OTHERS: 等）
 
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe, test, expect } from 'vitest'
+import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
 
 describe('M5 JS - Knuth Pascal Style', () => {
   const tests: PascalTest[] = [
@@ -321,13 +321,5 @@ END.`,
     },
   ]
 
-  it('should pass Knuth Pascal style tests', async () => {
-    for (const test of tests) {
-      const result = await runPascalTest(test)
-      if (!result.passed) {
-        console.error(`FAIL: ${test.name}: ${result.message}`)
-      }
-      expect(result.passed).toBe(true)
-    }
-  }, 30000)
+  runPascalTests(tests)
 })

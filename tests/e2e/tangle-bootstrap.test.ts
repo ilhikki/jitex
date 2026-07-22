@@ -1,4 +1,5 @@
 import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from './_helper'
+import { describe, test, expect } from 'vitest'
 
 describe.skip('TANGLE self-bootstrap test (JS) - SKIPPED until Phase 7', () => {
   const webSource = readResource(TANGLE_WEB)

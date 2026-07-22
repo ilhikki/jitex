@@ -1,6 +1,7 @@
 import { parse } from '@/index'
 import { compileToJS, runJS } from '@/index'
 import { loadTexResources, runTangle } from './_helper'
+import { describe, test, expect, beforeAll } from 'vitest'
 
 describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
   const resources = loadTexResources()

@@ -1,6 +1,7 @@
 import { parse } from '@/index'
 import { compileToJS } from '@/index'
 import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from './_helper'
+import { describe, test, expect } from 'vitest'
 
 describe.skip('Tangle Official - JS run - SKIPPED until Phase 7', () => {
   const source = readResource(TANGLE_PAS)

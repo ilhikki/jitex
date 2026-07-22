@@ -1,5 +1,6 @@
 import { runJS, compileToJS } from '@/index'
 import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from '../e2e/_helper'
+import { describe, test, expect, afterAll } from 'vitest'
 
 interface BenchmarkResult {
   name: string

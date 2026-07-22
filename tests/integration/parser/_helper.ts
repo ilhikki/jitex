@@ -1,4 +1,5 @@
 import { parse } from '@/index'
+import { expect } from 'vitest'
 
 export interface ConformanceTest {
   name: string

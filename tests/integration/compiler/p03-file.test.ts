@@ -2,8 +2,8 @@
 // 代码风格模仿 TANGLE.WEB 输出的 Pascal：紧凑、大写、TEXTFILE = PACKED FILE OF CHAR
 // 这些用例覆盖 RESET/REWRITE/GET/PUT/EOF/EOLN/READ/READLN/WRITE/WRITELN/F^/ASSIGN
 
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from '../_helper'
 
 function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)
@@ -189,24 +189,5 @@ describe('M5 JS - File Model (async)', () => {
     },
   ]
 
-  for (const t of tests) {
-    it(t.name, async () => {
-      const result = await runPascalTest(t)
-      if (!result.passed) {
-        console.error(`  [${t.name}] FAIL: ${result.message}`)
-        if (result.state?.error) {
-          console.error(`  [${t.name}] error:`, result.state.error.message)
-          console.error(`  [${t.name}] stack:`, result.state.error.stackTrace)
-        }
-        if (t.files) {
-          for (const [url, bytes] of t.files) {
-            console.error(
-              `  [${t.name}] file ${url}: ${JSON.stringify(new TextDecoder().decode(bytes))}`
-            )
-          }
-        }
-      }
-      expect(result.passed).toBe(true)
-    })
-  }
+  runPascalTests(tests)
 })

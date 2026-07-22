@@ -1,5 +1,5 @@
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe, test, expect } from 'vitest'
+import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
 
 describe('Phase 4: Goto Critical Edge Cases', () => {
   const tests: PascalTest[] = [
@@ -47,8 +47,8 @@ begin
 200:
   writeln('label 200, x=', x);
 end.`,
-      purpose: '从函数内 goto 到主程序 label（ISO 允许，但当前实现报错）',
-      expectedError: '',
+      purpose: '从函数内 goto 到主程序 label',
+      expectedOutput: 'in f\nlabel 200, x=0\n',
     },
     {
       name: 'goto-from-inner-proc-to-outer-proc-label-allowed',
@@ -207,7 +207,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'while 内 with 块末尾有 label，其后还有语句（label 不应被视为循环体末尾）',
-      expectedContains: 'label 10, i=1\nafter with, i=1\nlabel 10, i=2\nafter with, i=2\nlabel 10, i=3\nafter with, i=3\ndone',
+      expectedContains:
+        'label 10, i=1\nafter with, i=1\nlabel 10, i=2\nafter with, i=2\nlabel 10, i=3\nafter with, i=3\ndone',
       maxSteps: 10000,
     },
     {
@@ -229,7 +230,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'while 内复合语句末尾有 label，其后还有语句（label 不应被视为循环体末尾）',
-      expectedContains: 'label 20, i=1\nafter inner compound, i=1\nlabel 20, i=2\nafter inner compound, i=2\nlabel 20, i=3\nafter inner compound, i=3\ndone',
+      expectedContains:
+        'label 20, i=1\nafter inner compound, i=1\nlabel 20, i=2\nafter inner compound, i=2\nlabel 20, i=3\nafter inner compound, i=3\ndone',
       maxSteps: 10000,
     },
     {
@@ -254,7 +256,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'while 内 case 语句分支末尾有 label，其后还有语句（label 不应被视为循环体末尾）',
-      expectedContains: 'label 30, i=1\nafter case, i=1\nlabel 30, i=2\nafter case, i=2\nlabel 30, i=3\nafter case, i=3\ndone',
+      expectedContains:
+        'label 30, i=1\nafter case, i=1\nlabel 30, i=2\nafter case, i=2\nlabel 30, i=3\nafter case, i=3\ndone',
       maxSteps: 10000,
     },
     {
@@ -275,7 +278,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'for 内 with 块末尾有 label，其后还有语句（label 不应被视为循环体末尾）',
-      expectedContains: 'label 40, i=1\nafter with, i=1\nlabel 40, i=2\nafter with, i=2\nlabel 40, i=3\nafter with, i=3\ndone',
+      expectedContains:
+        'label 40, i=1\nafter with, i=1\nlabel 40, i=2\nafter with, i=2\nlabel 40, i=3\nafter with, i=3\ndone',
       maxSteps: 10000,
     },
     {
@@ -297,7 +301,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'repeat 内 with 块末尾有 label，其后还有语句（label 不应被视为循环体末尾）',
-      expectedContains: 'label 50, i=1\nafter with, i=1\nlabel 50, i=2\nafter with, i=2\nlabel 50, i=3\nafter with, i=3\ndone',
+      expectedContains:
+        'label 50, i=1\nafter with, i=1\nlabel 50, i=2\nafter with, i=2\nlabel 50, i=3\nafter with, i=3\ndone',
       maxSteps: 10000,
     },
 
@@ -329,7 +334,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'while 内嵌套两层 with，最内层末尾有 label，其后多层都有语句',
-      expectedContains: 'label 60, i=1\ninner with done\nouter with done\nlabel 60, i=2\ninner with done\nouter with done\ndone',
+      expectedContains:
+        'label 60, i=1\ninner with done\nouter with done\nlabel 60, i=2\ninner with done\nouter with done\ndone',
       maxSteps: 10000,
     },
 
@@ -359,7 +365,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'while 体内 goto 到 with 块末尾的 label（label 后还有语句）',
-      expectedContains: 'before with, i=1\nlabel 70, i=1\nafter with, i=1\nbefore with, i=2\nlabel 70, i=2\nafter with, i=2\nlabel 70, i=3\nafter with, i=3\nbefore with, i=4\nlabel 70, i=4\nafter with, i=4\nbefore with, i=5\nlabel 70, i=5\nafter with, i=5\ndone',
+      expectedContains:
+        'before with, i=1\nlabel 70, i=1\nafter with, i=1\nbefore with, i=2\nlabel 70, i=2\nafter with, i=2\nlabel 70, i=3\nafter with, i=3\nbefore with, i=4\nlabel 70, i=4\nafter with, i=4\nbefore with, i=5\nlabel 70, i=5\nafter with, i=5\ndone',
       maxSteps: 10000,
     },
 
@@ -528,7 +535,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'while 循环体末尾有多个连续 label',
-      expectedContains: 'label 10, i=1\nlabel 20\nlabel 10, i=2\nlabel 20\nlabel 10, i=3\nlabel 20\ndone',
+      expectedContains:
+        'label 10, i=1\nlabel 20\nlabel 10, i=2\nlabel 20\nlabel 10, i=3\nlabel 20\ndone',
       maxSteps: 10000,
     },
 
@@ -554,7 +562,8 @@ begin
   writeln('done');
 end.`,
       purpose: 'goto 到 while 循环体末尾的 label（tail label，可用 continue 优化）',
-      expectedContains: 'before label, i=1\nlabel 10, i=1\nbefore label, i=2\nlabel 10, i=2\nlabel 10, i=3\nbefore label, i=4\nlabel 10, i=4\nbefore label, i=5\nlabel 10, i=5\ndone',
+      expectedContains:
+        'before label, i=1\nlabel 10, i=1\nbefore label, i=2\nlabel 10, i=2\nlabel 10, i=3\nbefore label, i=4\nlabel 10, i=4\nbefore label, i=5\nlabel 10, i=5\ndone',
       maxSteps: 10000,
     },
 
@@ -622,13 +631,5 @@ end.`,
     },
   ]
 
-  for (const t of tests) {
-    it(t.name, async () => {
-      const result = await runPascalTest(t)
-      if (!result.passed) {
-        console.error(`  [${t.name}] FAIL: ${result.message}`)
-      }
-      expect(result.passed).toBe(true)
-    })
-  }
+  runPascalTests(tests)
 })

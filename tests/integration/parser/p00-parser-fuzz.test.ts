@@ -1,5 +1,5 @@
 import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-
+import { describe, test, expect } from 'vitest'
 function repeatStr(s: string, n: number): string {
   let result = ''
   for (let i = 0; i < n; i++) result += s

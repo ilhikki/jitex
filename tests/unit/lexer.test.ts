@@ -1,4 +1,5 @@
 import { lex } from '@/index'
+import { describe, test, expect } from 'vitest'
 
 describe('Lexer', () => {
   test('should tokenize identifiers and keywords', () => {

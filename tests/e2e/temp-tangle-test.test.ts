@@ -1,6 +1,5 @@
-import { describe, it, expect } from '@jest/globals'
 import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from './_helper'
-
+import { describe, it, expect } from 'vitest'
 describe.skip('temp: TANGLE output check', () => {
   it('tangle should produce non-empty pascal output', async () => {
     const source = readResource(TANGLE_PAS)

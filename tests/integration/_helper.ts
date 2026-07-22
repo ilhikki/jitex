@@ -12,7 +12,7 @@
 // 执行引擎实现见 src/compiler/run-js.ts。
 
 import { runJS, RunState, SysCallHandler, type Extension } from '@/index'
-
+import { test, expect } from 'vitest'
 /**
  * 单个 Pascal 测试用例。
  *
@@ -91,86 +91,51 @@ export function getOutput(state: RunState): string {
  *
  * @returns passed 是否通过；message 失败原因；state 执行后的状态
  */
-export async function runPascalTest(
-  test: PascalTest
-): Promise<{ passed: boolean; message: string; state: RunState }> {
-  try {
-    const state = await runPascal(test)
-    const output = getOutput(state)
+export function runPascalTests(tests: PascalTest[]) {
+  for (const testCase of tests) {
+    test(testCase.name, () => runPascalTest(testCase))
+  }
+}
 
-    // 1. 错误断言
-    if (test.expectedError !== undefined) {
-      if (state.status !== 'error' && !state.error) {
-        return {
-          passed: false,
-          message: `Expected error "${test.expectedError}", but no error occurred`,
-          state,
-        }
-      }
-      const actualError = state.error?.message || ''
-      if (test.expectedError.length > 0 && !actualError.includes(test.expectedError)) {
-        return {
-          passed: false,
-          message: `Expected error containing "${test.expectedError}", got "${actualError}"`,
-          state,
-        }
-      }
-      return { passed: true, message: 'OK', state }
+export async function runPascalTest(test: PascalTest): Promise<void> {
+  const state = await runPascal(test)
+  const output = getOutput(state)
+
+  if (test.expectedError !== undefined) {
+    if (state.status !== 'error' && !state.error) {
+      expect.fail(`Expected error "${test.expectedError}", but no error occurred`)
     }
-
-    // 2. 非预期错误
-    if (state.status === 'error') {
-      return { passed: false, message: `Unexpected error: ${state.error?.message}`, state }
+    const actualError = state.error?.message || ''
+    if (test.expectedError.length > 0) {
+      expect(actualError).toContain(test.expectedError)
     }
+    return
+  }
 
-    // 3. 输出断言
-    if (test.expectedOutput !== undefined) {
-      if (output !== test.expectedOutput) {
-        return {
-          passed: false,
-          message: `Expected output "${JSON.stringify(test.expectedOutput)}", got "${JSON.stringify(output)}"`,
-          state,
-        }
-      }
+  // 2. 非预期错误
+  if (state.status === 'error') {
+    expect.fail(`Unexpected error: ${state.error?.message}`)
+  }
+
+  // 3. 输出断言
+  if (test.expectedOutput !== undefined) {
+    expect(output).toBe(test.expectedOutput)
+  }
+
+  if (test.expectedContains !== undefined) {
+    expect(output).toContain(test.expectedContains)
+  }
+
+  if (test.expectedNotContains !== undefined) {
+    expect(output).not.toContain(test.expectedNotContains)
+  }
+
+  // 4. 文件内容断言
+  if (test.expectedFileContains && test.files) {
+    for (const exp of test.expectedFileContains) {
+      const bytes = test.files.get(exp.url)
+      const text = bytes ? new TextDecoder().decode(bytes) : ''
+      expect(text).toContain(exp.contains)
     }
-
-    if (test.expectedContains !== undefined) {
-      if (!output.includes(test.expectedContains)) {
-        return {
-          passed: false,
-          message: `Expected output to contain "${test.expectedContains}", got "${JSON.stringify(output)}"`,
-          state,
-        }
-      }
-    }
-
-    if (test.expectedNotContains !== undefined) {
-      if (output.includes(test.expectedNotContains)) {
-        return {
-          passed: false,
-          message: `Expected output to NOT contain "${test.expectedNotContains}", got "${JSON.stringify(output)}"`,
-          state,
-        }
-      }
-    }
-
-    // 4. 文件内容断言
-    if (test.expectedFileContains && test.files) {
-      for (const exp of test.expectedFileContains) {
-        const bytes = test.files.get(exp.url)
-        const text = bytes ? new TextDecoder().decode(bytes) : ''
-        if (!text.includes(exp.contains)) {
-          return {
-            passed: false,
-            message: `Expected file ${exp.url} to contain "${exp.contains}", got "${text}"`,
-            state,
-          }
-        }
-      }
-    }
-
-    return { passed: true, message: 'OK', state }
-  } catch (e: any) {
-    return { passed: false, message: `Exception: ${e.message}`, state: null as any }
   }
 }

@@ -1,5 +1,5 @@
 ﻿import { parse } from '@/index'
-import { ConformanceTest } from './_helper'
+import { describe, test, expect } from 'vitest'
 
 interface RobustnessTest {
   name: string

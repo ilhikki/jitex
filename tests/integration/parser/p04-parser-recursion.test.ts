@@ -1,5 +1,5 @@
 ﻿import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-
+import { describe, test, expect } from 'vitest'
 const tests: ConformanceTest[] = [
   // ==========================================================================
   // 1. 直接递归 - 过程（5个）

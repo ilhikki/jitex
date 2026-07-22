@@ -1,5 +1,5 @@
-import { describe, it, expect } from '@jest/globals'
-import { runPascalTest, type PascalTest } from '../_helper'
+import { describe, test, expect } from 'vitest'
+import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
 
 // 高级 goto 测试：非正常场景 + 嵌套非透明块多 label
 // 防死循环：每个可能导致死循环的测试都设置了 maxSteps
@@ -472,13 +472,5 @@ end.`,
     },
   ]
 
-  for (const t of tests) {
-    it(t.name, async () => {
-      const result = await runPascalTest(t)
-      if (!result.passed) {
-        console.error(`  [${t.name}] FAIL: ${result.message}`)
-      }
-      expect(result.passed).toBe(true)
-    })
-  }
+  runPascalTests(tests)
 })

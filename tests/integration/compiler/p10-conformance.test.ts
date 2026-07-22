@@ -1,5 +1,5 @@
-import { PascalTest, runPascalTest } from '../_helper'
-
+import { PascalTest, runPascalTest, runPascalTests } from '../_helper'
+import { describe, test, expect } from 'vitest'
 const tests: PascalTest[] = [
   // ==========================================================================
   // 从 m3.5 复制的测试用例 - 验证解析和执行
@@ -251,16 +251,5 @@ end.`,
 ]
 
 describe('M5 JS - M3.5 Conformance Tests', () => {
-  test.each(tests)('$name', async (t) => {
-    const result = await runPascalTest(t)
-    if (!result.passed) {
-      if (t.expectedError && result.message.includes(t.expectedError)) {
-        console.log(`Skipping (expected): ${t.name}`)
-        return
-      }
-      console.error(`Test failed: ${t.name}`)
-      console.error(`Message: ${result.message}`)
-    }
-    expect(result.passed).toBe(true)
-  })
+  runPascalTests(tests)
 })
