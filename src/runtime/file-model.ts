@@ -171,7 +171,10 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
       const s = getState(file)
       const content = currentContent(file)
       if (s.eof || s.offset >= content.length) return 0
-      return content[s.offset] & 0xff
+      // ISO Pascal: when EOLN is true, F^ yields a space character
+      const ch = content[s.offset] & 0xff
+      if (ch === 10 || ch === 13) return 32
+      return ch
     },
 
     async eof(file: PascalFile): Promise<boolean> {
@@ -182,7 +185,8 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
       const s = getState(file)
       const content = currentContent(file)
       if (s.eof || s.offset >= content.length) return true
-      return content[s.offset] === 10
+      const ch = content[s.offset]
+      return ch === 10 || ch === 13
     },
 
     async readln(file: PascalFile): Promise<void> {
@@ -192,7 +196,11 @@ export function createRecordFileOps(files: Map<string, Uint8Array>): PascalFileO
       while (s.offset < content.length) {
         const ch = content[s.offset]
         s.offset++
-        if (ch === 10) break
+        if (ch === 10 || ch === 13) break
+      }
+      // skip \n after \r for CRLF files
+      if (s.offset < content.length && content[s.offset] === 10) {
+        s.offset++
       }
       if (s.offset >= content.length) {
         s.eof = true

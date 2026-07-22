@@ -60,7 +60,7 @@ begin
     end else begin
       k := 1;
     end;
-    break;
+    goto 10;
   end;
   10: writeln('done', ddt);
 end.`,

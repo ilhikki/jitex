@@ -7,6 +7,12 @@ describe('TANGLE self-bootstrap test (JS) - SKIPPED until Phase 7', () => {
   test('pass 1: official tangle.pas + tangle.web → tangle.pas (v1)', async () => {
     const result = await runTangle(officialPas, webSource)
     console.log('Pass 1 status:', result.state.status)
+    if (result.state.error) {
+      console.log('Error:', result.state.error.message)
+    }
+    console.log('Output:', result.output.slice(0, 500))
+    console.log('PASCALFILE:', result.pascal.slice(0, 100))
+    console.log('PASCALFILE length:', result.pascal.length)
     expect(result.state.status).toBe('terminated')
     expect(result.pascal.length).toBeGreaterThan(1000)
     expect(result.pool.length).toBeGreaterThan(0)

@@ -37,6 +37,17 @@ import {
   typeKind,
 } from './types'
 import type { Compiler } from '../compiler'
+import {
+  collectLabelValuesInStmt,
+  collectGotoTargetsInStmt,
+  collectLabelsFlat,
+} from '../label-analysis'
+import {
+  nextLoopLabel,
+  loopNeedsLabel,
+  getLoopAnalysis,
+  emitLoopInnerStateMachine,
+} from '../strategy'
 
 export function emitCompound(
   compiler: Compiler,
@@ -82,36 +93,91 @@ export function emitStmt(
     case 'WhileStatement': {
       const w = node as WhileStatementNode
       const cond = emitExpr(compiler, w.condition, scope)
-      const body = emitStmt(compiler, w.body, scope, indent + 2)
-      const skipCheck =
-        compiler.gotoMode === 'exception'
-          ? `${pad}  if(__skipTo !== null) { if (${toBool(compiler, cond.code, cond.type)}) continue; else break; }\n`
-          : ''
-      return [
-        `${pad}while (${toBool(compiler, cond.code, cond.type)}) {`,
-        `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
-        skipCheck,
-        body,
-        `${pad}}`,
-      ].join('\n')
+      const loopAn = getLoopAnalysis(compiler, w.body)
+      const needsLabel = loopAn.innerLabels.size > 0 || loopAn.gotosInBody.size > 0
+      const loopJsLabel = needsLabel ? nextLoopLabel('while') : ''
+
+      if (needsLabel) {
+        compiler.loopStack.push({
+          jsLabel: loopJsLabel,
+          innerLabels: loopAn.innerLabels,
+          tailLabels: loopAn.tailLabels,
+        })
+      }
+
+      let body: string
+      if (loopAn.needsInner && w.body.kind === 'CompoundStatement') {
+        // 需要内层状态机：递归收集循环体内所有层级的 label
+        const cs = w.body as CompoundStatementNode
+        const allLabels = collectLabelsFlat(cs.statements)
+        const innerLabelInfo = new Map<string, { remaining: StatementNode[] }>()
+        for (const [name, info] of allLabels) {
+          innerLabelInfo.set(name, { remaining: info.remaining })
+        }
+        body = emitLoopInnerStateMachine(w.body, cs.statements, innerLabelInfo, compiler, scope, indent + 2)
+      } else {
+        body = emitStmt(compiler, w.body, scope, indent + 2)
+      }
+
+      if (needsLabel) {
+        compiler.loopStack.pop()
+      }
+
+      const labelPrefix = needsLabel ? `${loopJsLabel}: ` : ''
+      const lines: string[] = []
+      lines.push(`${pad}${labelPrefix}while (${toBool(compiler, cond.code, cond.type)}) {`)
+      lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+      lines.push(body)
+      lines.push(`${pad}}`)
+
+      // 循环后检查 __pc：如果 goto 跳到了循环外的 label，需要 break 出来后 dispatch
+      if (needsLabel && compiler.labelCases) {
+        lines.push(`${pad}if (__pc !== 0) continue ${compiler.labelSwitchName};`)
+      }
+
+      return lines.join('\n')
     }
     case 'RepeatStatement': {
       const r = node as RepeatStatementNode
+      const cond = emitExpr(compiler, r.untilCondition, scope)
+      // Repeat 的 body 是 statements 数组
+      const allInnerLabels = new Set(r.statements.flatMap((s) => [...collectLabelValuesInStmt(s)]))
+      const allGotos = new Set(r.statements.flatMap((s) => [...collectGotoTargetsInStmt(s)]))
+      const needsLabel = (compiler.labelCases != null) && (allInnerLabels.size > 0 || allGotos.size > 0)
+      const loopJsLabel = needsLabel ? nextLoopLabel('repeat') : ''
+
+      // 找末尾 label
+      const tailLabels = new Set<string>()
+      for (let i = r.statements.length - 1; i >= 0; i--) {
+        if (r.statements[i].kind === 'LabeledStatement') {
+          tailLabels.add(String((r.statements[i] as any).label.value))
+        } else break
+      }
+
+      if (needsLabel) {
+        compiler.loopStack.push({ jsLabel: loopJsLabel, innerLabels: allInnerLabels, tailLabels })
+      }
+
       const bodyStmts = r.statements
         .map((s) => emitStmt(compiler, s, scope, indent + 2))
         .filter((x) => x.length > 0)
-      const cond = emitExpr(compiler, r.untilCondition, scope)
-      const skipCheck =
-        compiler.gotoMode === 'exception'
-          ? `${pad}  if(__skipTo !== null) { if (!(${toBool(compiler, cond.code, cond.type)})) continue; }\n`
-          : ''
-      return [
-        `${pad}do {`,
-        `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
-        ...bodyStmts,
-        skipCheck,
-        `${pad}} while (!(${toBool(compiler, cond.code, cond.type)}));`,
-      ].join('\n')
+
+      if (needsLabel) {
+        compiler.loopStack.pop()
+      }
+
+      const labelPrefix = needsLabel ? `${loopJsLabel}: ` : ''
+      const lines: string[] = []
+      lines.push(`${pad}${labelPrefix}do {`)
+      lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+      lines.push(...bodyStmts)
+      lines.push(`${pad}} while (!(${toBool(compiler, cond.code, cond.type)}));`)
+
+      if (needsLabel && compiler.labelCases) {
+        lines.push(`${pad}if (__pc !== 0) continue ${compiler.labelSwitchName};`)
+      }
+
+      return lines.join('\n')
     }
     case 'ForStatement': {
       const f = node as ForStatementNode
@@ -119,32 +185,44 @@ export function emitStmt(
       const vName = vi ? vi.jsName : f.variable.name
       const init = emitExpr(compiler, f.initial, scope)
       const final = emitExpr(compiler, f.final, scope)
-      const body = emitStmt(compiler, f.body, scope, indent + 2)
-      if (f.direction === 'TO') {
-        const skipCheck =
-          compiler.gotoMode === 'exception'
-            ? `${pad}  if(__skipTo !== null) { if (${vName} <= ${toInt(compiler, final.code, final.type)}) continue; else break; }\n`
-            : ''
-        return [
-          `${pad}for (${vName} = ${toInt(compiler, init.code, init.type)}; ${vName} <= ${toInt(compiler, final.code, final.type)}; ${vName} = (${vName} + 1) | 0) {`,
-          `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
-          skipCheck,
-          body,
-          `${pad}}`,
-        ].join('\n')
-      } else {
-        const skipCheck =
-          compiler.gotoMode === 'exception'
-            ? `${pad}  if(__skipTo !== null) { if (${vName} >= ${toInt(compiler, final.code, final.type)}) continue; else break; }\n`
-            : ''
-        return [
-          `${pad}for (${vName} = ${toInt(compiler, init.code, init.type)}; ${vName} >= ${toInt(compiler, final.code, final.type)}; ${vName} = (${vName} - 1) | 0) {`,
-          `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`,
-          skipCheck,
-          body,
-          `${pad}}`,
-        ].join('\n')
+      const loopAn = getLoopAnalysis(compiler, f.body)
+      const needsLabel = loopAn.innerLabels.size > 0 || loopAn.gotosInBody.size > 0
+      const loopJsLabel = needsLabel ? nextLoopLabel('for') : ''
+
+      if (needsLabel) {
+        compiler.loopStack.push({
+          jsLabel: loopJsLabel,
+          innerLabels: loopAn.innerLabels,
+          tailLabels: loopAn.tailLabels,
+        })
       }
+
+      const body = emitStmt(compiler, f.body, scope, indent + 2)
+
+      if (needsLabel) {
+        compiler.loopStack.pop()
+      }
+
+      const labelPrefix = needsLabel ? `${loopJsLabel}: ` : ''
+      const lines: string[] = []
+      if (f.direction === 'TO') {
+        lines.push(
+          `${pad}${labelPrefix}for (${vName} = ${toInt(compiler, init.code, init.type)}; ${vName} <= ${toInt(compiler, final.code, final.type)}; ${vName} = (${vName} + 1) | 0) {`
+        )
+      } else {
+        lines.push(
+          `${pad}${labelPrefix}for (${vName} = ${toInt(compiler, init.code, init.type)}; ${vName} >= ${toInt(compiler, final.code, final.type)}; ${vName} = (${vName} - 1) | 0) {`
+        )
+      }
+      lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+      lines.push(body)
+      lines.push(`${pad}}`)
+
+      if (needsLabel && compiler.labelCases) {
+        lines.push(`${pad}if (__pc !== 0) continue ${compiler.labelSwitchName};`)
+      }
+
+      return lines.join('\n')
     }
     case 'ProcedureCall': {
       const pc = node as ProcedureCallNode
@@ -153,36 +231,45 @@ export function emitStmt(
     case 'GotoStatement': {
       const gs = node as GotoStatementNode
       const lblName = String((gs.label as any).value)
-      if (compiler.gotoMode === 'continue') {
-        return `${pad}continue ${compiler.gotoLabel}`
-      }
-      if (compiler.gotoMode === 'break') {
-        return `${pad}break ${compiler.gotoLabel}`
-      }
-      if (compiler.gotoMode === 'exception') {
-        return `${pad}throw Object.assign(new Error('goto'), { __goto: ${JSON.stringify(lblName)} })`
-      }
-      if (compiler.gotoMode === 'simple') {
-        return `${pad}throw new Error('JS VM: goto ${lblName} - not supported in simple mode')`
-      }
-      if (compiler.labelCases) {
+
+      // 如果在状态机内
+      if (compiler.labelCases && compiler.labelSwitchName) {
         const caseNum = compiler.labelCases.get(lblName)
         if (caseNum === undefined) {
-          throw new Error(`JS VM: goto ${lblName} - label not found`)
+          // 目标 label 不在本块的状态机中
+          return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in current scope')`
         }
-        const continueLabel = compiler.labelSwitchName ? ` ${compiler.labelSwitchName}` : ''
-        return `${pad}__pc = ${caseNum}; continue${continueLabel}`
+
+        // 检查是否在循环内
+        if (compiler.insideLoop) {
+          if (compiler.isLabelAtLoopTail(lblName)) {
+            // 目标 label 在当前循环体末尾：用 continue 让循环继续迭代
+            const loop = compiler.currentLoop!
+            return `${pad}continue ${loop.jsLabel}`
+          }
+
+          if (compiler.isLabelInCurrentLoop(lblName)) {
+            // 目标 label 在循环体内但不在末尾：由内层状态机处理
+            return `${pad}${compiler.currentPcVar} = ${caseNum}; continue ${compiler.labelSwitchName!}`
+          }
+
+          // 目标 label 在循环外：设置 __pc，break 循环，让外层状态机 dispatch
+          const loop = compiler.currentLoop!
+          return `${pad}__pc = ${caseNum}; break ${loop.jsLabel}`
+        }
+
+        // 不在循环中：直接状态机跳转
+        return `${pad}${compiler.currentPcVar} = ${caseNum}; continue ${compiler.labelSwitchName}`
       }
-      return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in current scope')`
+
+      // 不在状态机中（不应发生：有 goto 的块一定有 label 声明，会走状态机路径）
+      return `${pad}throw new Error('JS VM: goto ${lblName} - no state machine context')`
     }
     case 'LabeledStatement': {
       const ls = node as LabeledStatementNode
-      const lblName = String((ls.label as any).value)
-      const innerCode = emitStmt(compiler, ls.statement, scope, indent)
-      if (compiler.gotoMode === 'exception' && compiler.labelCases?.has(lblName)) {
-        return `${pad}if (__skipTo === ${JSON.stringify(lblName)}) { __skipTo = null; }\n${innerCode}`
-      }
-      return innerCode
+      // LabeledStatement 只需发射其内部语句
+      // 状态机的 case 分支已经处理了 label 定位
+      return emitStmt(compiler, ls.statement, scope, indent)
     }
     case 'CaseStatement': {
       const cs = node as CaseStatementNode

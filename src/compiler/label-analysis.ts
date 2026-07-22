@@ -8,11 +8,14 @@ import type {
   StatementNode,
 } from '../ast/types'
 
-export type GotoStrategy = 'simpleForward' | 'simpleBackward' | 'flagVariable' | 'stateMachine'
+/** ISO 7185 6.1.6: label 范围 0..9999 */
+export const LABEL_MIN = 0
+export const LABEL_MAX = 9999
 
 export interface LabelInfo {
   stmt: LabeledStatementNode
   value: number
+  /** 从该 label 语句体开始到块结束的所有语句 */
   remaining: StatementNode[]
 }
 
@@ -24,10 +27,10 @@ export interface GotoInfo {
 export interface BlockLabelAnalysis {
   block: BlockNode
   declaredLabels: Set<number>
+  /** 本块顶层 compound 直接包含的 label（含透明块内部） */
   labelInfo: Map<string, LabelInfo>
   gotos: GotoInfo[]
   gotoCount: number
-  strategy: GotoStrategy
   parent: BlockLabelAnalysis | null
   children: BlockLabelAnalysis[]
 }
@@ -37,6 +40,10 @@ export interface LabelAnalysisResult {
   blockMap: WeakMap<BlockNode, BlockLabelAnalysis>
 }
 
+// ---------------------------------------------------------------------------
+// 透明块 / 非透明块
+// ---------------------------------------------------------------------------
+
 function isTransparentBlock(stmt: StatementNode): boolean {
   return (
     stmt.kind === 'CompoundStatement' ||
@@ -45,6 +52,7 @@ function isTransparentBlock(stmt: StatementNode): boolean {
   )
 }
 
+/** 把透明块展开成平铺语句列表 */
 function flattenTransparentBlock(block: StatementNode): StatementNode[] {
   if (block.kind === 'CompoundStatement') {
     const cs = block as CompoundStatementNode
@@ -60,6 +68,10 @@ function flattenTransparentBlock(block: StatementNode): StatementNode[] {
   }
   return [block]
 }
+
+// ---------------------------------------------------------------------------
+// 收集 label 的 remaining 语句
+// ---------------------------------------------------------------------------
 
 function getRemainingStatements(stmts: StatementNode[], startIndex: number): StatementNode[] {
   const result: StatementNode[] = []
@@ -83,7 +95,11 @@ function getRemainingStatements(stmts: StatementNode[], startIndex: number): Sta
   return result
 }
 
-function collectLabelsFlat(
+// ---------------------------------------------------------------------------
+// 收集 label
+// ---------------------------------------------------------------------------
+
+export function collectLabelsFlat(
   stmts: StatementNode[]
 ): Map<string, { stmt: LabeledStatementNode; remaining: StatementNode[] }> {
   const result = new Map<string, { stmt: LabeledStatementNode; remaining: StatementNode[] }>()
@@ -227,6 +243,10 @@ function collectLabelsFromTransparentBlock(
   return result
 }
 
+// ---------------------------------------------------------------------------
+// 收集 goto
+// ---------------------------------------------------------------------------
+
 function collectGotos(stmts: StatementNode[]): GotoInfo[] {
   const result: GotoInfo[] = []
   for (const stmt of stmts) {
@@ -247,67 +267,9 @@ function collectGotos(stmts: StatementNode[]): GotoInfo[] {
   return result
 }
 
-function determineStrategy(
-  stmts: StatementNode[],
-  labelInfo: Map<string, LabelInfo>,
-  gotoCount: number
-): GotoStrategy {
-  const labelCount = labelInfo.size
-
-  if (labelCount === 0) return 'simpleForward'
-
-  const flatStmts = flattenTransparentBlock({
-    kind: 'CompoundStatement',
-    statements: stmts,
-  } as CompoundStatementNode)
-
-  if (labelCount === 1 && gotoCount <= 2) {
-    const [name, info] = [...labelInfo.entries()][0]
-    let isInTransparentBlock = false
-
-    for (let i = 0; i < stmts.length; i++) {
-      const stmt = stmts[i]
-      if (stmt === info.stmt) {
-        isInTransparentBlock = false
-      } else if (isTransparentBlock(stmt)) {
-        const innerStmts = flattenTransparentBlock(stmt)
-        if (innerStmts.includes(info.stmt)) {
-          isInTransparentBlock = true
-        }
-      }
-    }
-
-    if (!isInTransparentBlock) {
-      let hasForwardGoto = false
-      let hasBackwardGoto = false
-
-      const targetIndex = flatStmts.findIndex(
-        (ss) => ss === info.stmt
-      )
-
-      for (const s of flatStmts) {
-        if (s.kind === 'GotoStatement') {
-          const gs = s as GotoStatementNode
-          const target = String((gs.label as any).value)
-          if (target === name) {
-            const gotoIndex = flatStmts.indexOf(s)
-            if (gotoIndex < targetIndex) {
-              hasBackwardGoto = true
-            } else {
-              hasForwardGoto = true
-            }
-          }
-        }
-      }
-
-      if (hasForwardGoto && !hasBackwardGoto) return 'simpleForward'
-      if (hasBackwardGoto && !hasForwardGoto) return 'simpleBackward'
-      return 'flagVariable'
-    }
-  }
-
-  return 'stateMachine'
-}
+// ---------------------------------------------------------------------------
+// 分析整个 block
+// ---------------------------------------------------------------------------
 
 function analyzeBlock(
   block: BlockNode,
@@ -333,7 +295,6 @@ function analyzeBlock(
   }
 
   const gotos = collectGotos(block.compound.statements)
-  const strategy = determineStrategy(block.compound.statements, labelInfo, gotos.length)
 
   const analysis: BlockLabelAnalysis = {
     block,
@@ -341,7 +302,6 @@ function analyzeBlock(
     labelInfo,
     gotos,
     gotoCount: gotos.length,
-    strategy,
     parent,
     children: [],
   }
@@ -375,4 +335,69 @@ export function getAnalysisForBlock(
   block: BlockNode
 ): BlockLabelAnalysis | undefined {
   return result.blockMap.get(block)
+}
+
+// ---------------------------------------------------------------------------
+// 工具：递归查找语句中包含的 label 集合（用于判断 goto 目标是否在同一循环体内）
+// ---------------------------------------------------------------------------
+
+/** 收集一个语句内部所有 LabeledStatement 的 label 值 */
+export function collectLabelValuesInStmt(stmt: StatementNode): Set<string> {
+  const result = new Set<string>()
+  const recurse = (s: StatementNode): void => {
+    if (s.kind === 'LabeledStatement') {
+      const ls = s as LabeledStatementNode
+      result.add(String((ls.label as IntegerLiteralNode).value))
+      recurse(ls.statement)
+    } else if (s.kind === 'CompoundStatement') {
+      for (const c of (s as CompoundStatementNode).statements) recurse(c)
+    } else if (s.kind === 'IfStatement') {
+      const is = s as any
+      recurse(is.thenBranch)
+      if (is.elseBranch) recurse(is.elseBranch)
+    } else if (s.kind === 'WhileStatement' || s.kind === 'ForStatement') {
+      recurse((s as any).body)
+    } else if (s.kind === 'RepeatStatement') {
+      for (const c of (s as any).statements) recurse(c)
+    } else if (s.kind === 'CaseStatement') {
+      const cs = s as any
+      for (const b of cs.branches) recurse(b.statement)
+      if (cs.otherwise) recurse(cs.otherwise)
+    } else if (s.kind === 'WithStatement') {
+      recurse((s as any).body)
+    }
+  }
+  recurse(stmt)
+  return result
+}
+
+/** 收集一个语句内部所有 GotoStatement 的目标 label 值 */
+export function collectGotoTargetsInStmt(stmt: StatementNode): Set<string> {
+  const result = new Set<string>()
+  const recurse = (s: StatementNode): void => {
+    if (s.kind === 'GotoStatement') {
+      const gs = s as GotoStatementNode
+      result.add(String((gs.label as IntegerLiteralNode).value))
+    } else if (s.kind === 'LabeledStatement') {
+      recurse((s as LabeledStatementNode).statement)
+    } else if (s.kind === 'CompoundStatement') {
+      for (const c of (s as CompoundStatementNode).statements) recurse(c)
+    } else if (s.kind === 'IfStatement') {
+      const is = s as any
+      recurse(is.thenBranch)
+      if (is.elseBranch) recurse(is.elseBranch)
+    } else if (s.kind === 'WhileStatement' || s.kind === 'ForStatement') {
+      recurse((s as any).body)
+    } else if (s.kind === 'RepeatStatement') {
+      for (const c of (s as any).statements) recurse(c)
+    } else if (s.kind === 'CaseStatement') {
+      const cs = s as any
+      for (const b of cs.branches) recurse(b.statement)
+      if (cs.otherwise) recurse(cs.otherwise)
+    } else if (s.kind === 'WithStatement') {
+      recurse((s as any).body)
+    }
+  }
+  recurse(stmt)
+  return result
 }
