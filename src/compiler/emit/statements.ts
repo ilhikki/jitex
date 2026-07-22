@@ -130,9 +130,9 @@ export function emitStmt(
       lines.push(body)
       lines.push(`${pad}}`)
 
-      // 循环后检查 __pc：如果 goto 跳到了循环外的 label，需要 break 出来后 dispatch
-      if (needsLabel && compiler.labelCases) {
-        lines.push(`${pad}if (__pc !== 0) continue ${compiler.labelSwitchName};`)
+      // 循环后检查 pc：如果 goto 跳到了循环外的 label，需要 break 出来后 dispatch
+      if (needsLabel && compiler.labelCases && compiler.currentPcVar) {
+        lines.push(`${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`)
       }
 
       return lines.join('\n')
@@ -173,8 +173,8 @@ export function emitStmt(
       lines.push(...bodyStmts)
       lines.push(`${pad}} while (!(${toBool(compiler, cond.code, cond.type)}));`)
 
-      if (needsLabel && compiler.labelCases) {
-        lines.push(`${pad}if (__pc !== 0) continue ${compiler.labelSwitchName};`)
+      if (needsLabel && compiler.labelCases && compiler.currentPcVar) {
+        lines.push(`${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`)
       }
 
       return lines.join('\n')
@@ -218,8 +218,8 @@ export function emitStmt(
       lines.push(body)
       lines.push(`${pad}}`)
 
-      if (needsLabel && compiler.labelCases) {
-        lines.push(`${pad}if (__pc !== 0) continue ${compiler.labelSwitchName};`)
+      if (needsLabel && compiler.labelCases && compiler.currentPcVar) {
+        lines.push(`${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`)
       }
 
       return lines.join('\n')
@@ -232,38 +232,61 @@ export function emitStmt(
       const gs = node as GotoStatementNode
       const lblName = String((gs.label as any).value)
 
-      // 如果在状态机内
-      if (compiler.labelCases && compiler.labelSwitchName) {
-        const caseNum = compiler.labelCases.get(lblName)
-        if (caseNum === undefined) {
-          // 目标 label 不在本块的状态机中
-          return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in current scope')`
-        }
-
-        // 检查是否在循环内
-        if (compiler.insideLoop) {
-          if (compiler.isLabelAtLoopTail(lblName)) {
-            // 目标 label 在当前循环体末尾：用 continue 让循环继续迭代
-            const loop = compiler.currentLoop!
-            return `${pad}continue ${loop.jsLabel}`
-          }
-
-          if (compiler.isLabelInCurrentLoop(lblName)) {
-            // 目标 label 在循环体内但不在末尾：由内层状态机处理
-            return `${pad}${compiler.currentPcVar} = ${caseNum}; continue ${compiler.labelSwitchName!}`
-          }
-
-          // 目标 label 在循环外：设置 __pc，break 循环，让外层状态机 dispatch
-          const loop = compiler.currentLoop!
-          return `${pad}__pc = ${caseNum}; break ${loop.jsLabel}`
-        }
-
-        // 不在循环中：直接状态机跳转
-        return `${pad}${compiler.currentPcVar} = ${caseNum}; continue ${compiler.labelSwitchName}`
+      const currentAnalysis = compiler.currentBlockAnalysis
+      if (!currentAnalysis) {
+        return `${pad}throw new Error('JS VM: goto ${lblName} - no block analysis context')`
+      }
+      const target = currentAnalysis.visibleGotoTargets.get(lblName)
+      if (!target) {
+        return `${pad}throw new Error('JS VM: goto ${lblName} - label not found in any visible block (ISO 7185 6.1.6)')`
       }
 
-      // 不在状态机中（不应发生：有 goto 的块一定有 label 声明，会走状态机路径）
-      return `${pad}throw new Error('JS VM: goto ${lblName} - no state machine context')`
+      // 在循环内的情况
+      if (compiler.insideLoop) {
+        // 循环体末尾 label：用 continue（适用于本 block）
+        if (compiler.isLabelAtLoopTail(lblName) && target.blockId === currentAnalysis.blockId) {
+          const loop = compiler.currentLoop!
+          return `${pad}continue ${loop.jsLabel}`
+        }
+
+        // 目标在当前 block 内（即 target 块等于 currentBlockAnalysis）：
+        // 如果当前状态机就是 currentBlockAnalysis 的状态机（同 block，outer sm），
+        // 设 currentPcVar + continue labelSwitchName
+        if (target.blockId === currentAnalysis.blockId
+            && compiler.labelSwitchName === currentAnalysis.loopLabel
+            && compiler.currentPcVar === currentAnalysis.pcVar) {
+          return `${pad}${compiler.currentPcVar} = ${target.caseNum}; continue ${compiler.labelSwitchName!}`
+        }
+
+        // 目标在循环外 / 内层状态机无法处理：
+        // break 当前循环（最内层 JS labeled while），让外层状态机 dispatch
+        // 注意：如果当前状态机是内层 sm（loopLabel != currentAnalysis.loopLabel），
+        // 也要先 break 出内层 sm 的 while 循环
+        const loop = compiler.currentLoop!
+        const targetAnalysis = findAnalysisByBlockId(compiler, target.blockId)
+        const targetPcVar = targetAnalysis?.pcVar ?? currentAnalysis.pcVar
+        return `${pad}${targetPcVar} = ${target.caseNum}; break ${loop.jsLabel}`
+      }
+
+      // 不在循环中：状态机跳转
+      if (target.blockId === currentAnalysis.blockId) {
+        // 跨 block goto 在 GotoStatement 中需要 break 出当前状态机循环。
+        // 但 JS continue label 不能跨 labeled while —— 必须 break。
+        // 同 block 时：__pc_<self> = caseNum; continue __goto_loop_<self>
+        return `${pad}${currentAnalysis.pcVar} = ${target.caseNum}; continue ${currentAnalysis.loopLabel}`
+      }
+
+      // 跨 block goto：目标是外层 block X
+      // 函数逃逸（跨函数/过程 block）：抛出 __GotoSignal，由目标的 try/catch 捕获并 dispatch
+      // 循环逃逸（同函数内跨 block）：写外层 pc + continue 外层 while
+      const targetAnalysis = findAnalysisByBlockId(compiler, target.blockId)
+      if (targetAnalysis
+          && targetAnalysis.functionBlockId !== currentAnalysis.functionBlockId) {
+        // 函数逃逸：抛信号（targetPc = 外层 pc 变量名，targetCase = 外层 caseNum）
+        return `${pad}throw new __GotoSignal(${JSON.stringify(targetAnalysis.pcVar)}, ${target.caseNum})`
+      }
+      // 同函数内（循环逃逸）：写外层 pc + continue 外层 while
+      return `${pad}${targetAnalysis!.pcVar} = ${target.caseNum}; continue ${targetAnalysis!.loopLabel}`
     }
     case 'LabeledStatement': {
       const ls = node as LabeledStatementNode
@@ -281,6 +304,31 @@ export function emitStmt(
     }
     default:
       throw new Error(`JS VM: unsupported statement ${(node as any).kind}`)
+  }
+}
+
+/** 在 GotoStatement 中通过 blockId 查 block analysis */
+function findAnalysisByBlockId(
+  compiler: Compiler,
+  blockId: number
+): import('../label-analysis').BlockLabelAnalysis | null {
+  if (!compiler.labelAnalysis) return null
+  for (const [, a] of iterateAnalyses(compiler.labelAnalysis.root)) {
+    if (a.blockId === blockId) return a
+  }
+  return null
+}
+
+function* iterateAnalyses(
+  root: import('../label-analysis').BlockLabelAnalysis
+): Iterable<[import('../../ast/types').BlockNode, import('../label-analysis').BlockLabelAnalysis]> {
+  const stack: import('../label-analysis').BlockLabelAnalysis[] = [root]
+  while (stack.length > 0) {
+    const a = stack.pop()!
+    yield [a.block, a]
+    for (const child of a.children) {
+      stack.push(child)
+    }
   }
 }
 

@@ -24,13 +24,52 @@ export interface GotoInfo {
   target: number
 }
 
+/**
+ * 跨 block goto 的目标信息：目标 label 在哪个 block 的状态机中、caseNum 是多少。
+ */
+export interface GotoTarget {
+  /** 目标 label 所在 block 的 ID（用于生成 __pc_<blockId>） */
+  blockId: number
+  /** 目标 label 在该 block 状态机中的 case 编号 */
+  caseNum: number
+}
+
 export interface BlockLabelAnalysis {
   block: BlockNode
+  /** 每个 block 唯一 ID，用于生成 __pc_<id> 变量名 */
+  blockId: number
+  /** 该 block 的 pc 变量名（如 __pc_0） */
+  pcVar: string
+  /** 该 block 的 while 循环 JS 标签（如 __goto_loop_0） */
+  loopLabel: string
+  /**
+   * 所在函数/过程 block 的 blockId。
+   * 函数/过程 block = procedure-declaration/function-declaration 的 block，
+   * 或 program block（顶层 block 也是函数 block）。
+   * 用于判断 goto 是否"函数逃逸"：goto 所在 block 和 label 所在 block 的
+   * functionBlockId 不同 = 跨函数逃逸。
+   */
+  functionBlockId: number
   declaredLabels: Set<number>
   /** 本块顶层 compound 直接包含的 label（含透明块内部） */
   labelInfo: Map<string, LabelInfo>
   gotos: GotoInfo[]
   gotoCount: number
+  /**
+   * 跨 block goto 目标表：name → {blockId, caseNum}
+   * 包含自身 + 所有祖先的 label（自身优先遮蔽）
+   */
+  visibleGotoTargets: Map<string, GotoTarget>
+  /**
+   * 本 block 是否有"函数逃逸"goto（goto 目标在另一个函数/过程 block 中）。
+   * 决定该 block 的状态机是否需要 try/catch 包裹。
+   */
+  hasFunctionEscapingGoto: boolean
+  /**
+   * 本 block 是否有"来自其他函数/过程"的 goto 目标（被外层函数逃逸）。
+   * 决定本 block 状态机是否需要 try/catch 捕获函数逃逸。
+   */
+  needsTryCatch: boolean
   parent: BlockLabelAnalysis | null
   children: BlockLabelAnalysis[]
 }
@@ -271,10 +310,21 @@ function collectGotos(stmts: StatementNode[]): GotoInfo[] {
 // 分析整个 block
 // ---------------------------------------------------------------------------
 
+// blockId 计数器（顶层调用前可重置）
+let _blockIdCounter = 0
+
+/**
+ * 重置 blockId 计数器（在 analyzeLabels 入口处调用，确保每次编译从 0 开始）
+ */
+function resetBlockIdCounter(): void {
+  _blockIdCounter = 0
+}
+
 function analyzeBlock(
   block: BlockNode,
   parent: BlockLabelAnalysis | null,
-  blockMap: WeakMap<BlockNode, BlockLabelAnalysis>
+  blockMap: WeakMap<BlockNode, BlockLabelAnalysis>,
+  isFunctionBlock: boolean
 ): BlockLabelAnalysis {
   const declaredLabels = new Set<number>()
   if (block.labelDeclarations) {
@@ -296,27 +346,44 @@ function analyzeBlock(
 
   const gotos = collectGotos(block.compound.statements)
 
+  // 分配 blockId 和对应的 pc 变量名 / loop 标签名
+  const blockId = _blockIdCounter++
+  const pcVar = `__pc_${blockId}`
+  const loopLabel = `__goto_loop_${blockId}`
+
+  // functionBlockId：自己如果是函数/过程 block，就是自己的 blockId；
+  // 否则继承父 block 的 functionBlockId
+  const functionBlockId = isFunctionBlock ? blockId : (parent?.functionBlockId ?? blockId)
+
   const analysis: BlockLabelAnalysis = {
     block,
+    blockId,
+    pcVar,
+    loopLabel,
+    functionBlockId,
     declaredLabels,
     labelInfo,
     gotos,
     gotoCount: gotos.length,
+    visibleGotoTargets: new Map(),
+    hasFunctionEscapingGoto: false,  // 第四遍填充
+    needsTryCatch: false,  // 第四遍填充
     parent,
     children: [],
   }
 
   blockMap.set(block, analysis)
 
+  // 先递归处理子 block（子 block 是函数/过程 block，isFunctionBlock=true）
   for (const proc of block.procedureDeclarations) {
     if (proc.block) {
-      const child = analyzeBlock(proc.block, analysis, blockMap)
+      const child = analyzeBlock(proc.block, analysis, blockMap, true)
       analysis.children.push(child)
     }
   }
   for (const func of block.functionDeclarations) {
     if (func.block) {
-      const child = analyzeBlock(func.block, analysis, blockMap)
+      const child = analyzeBlock(func.block, analysis, blockMap, true)
       analysis.children.push(child)
     }
   }
@@ -325,9 +392,96 @@ function analyzeBlock(
 }
 
 export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
+  resetBlockIdCounter()
   const blockMap = new WeakMap<BlockNode, BlockLabelAnalysis>()
-  const root = analyzeBlock(program.block, null, blockMap)
+  // program block 顶层是函数/过程 block
+  const root = analyzeBlock(program.block, null, blockMap, true)
+
+  // 第二遍：预计算每个 block 的 ownLabelCases（按声明顺序从 1 开始）
+  // 并计算所有祖先的 ownLabelCases
+  // 收集所有 block 的 ownLabelCases 到一个 Map<blockId, Map<labelName, caseNum>>
+  const ownLabelCasesByBlock = new Map<number, Map<string, number>>()
+  for (const [block, analysis] of iterateBlocks(root)) {
+    const cases = new Map<string, number>()
+    let cn = 1
+    for (const lbl of analysis.declaredLabels) {
+      cases.set(String(lbl), cn)
+      cn++
+    }
+    ownLabelCasesByBlock.set(analysis.blockId, cases)
+  }
+
+  // 第三遍：为每个 block 的 visibleGotoTargets 填充完整信息
+  for (const [block, analysis] of iterateBlocks(root)) {
+    // 自身 label
+    let cn = 1
+    for (const lbl of analysis.declaredLabels) {
+      analysis.visibleGotoTargets.set(String(lbl), { blockId: analysis.blockId, caseNum: cn })
+      cn++
+    }
+    // 祖先 label（自身优先遮蔽）
+    let p: BlockLabelAnalysis | null = analysis.parent
+    while (p) {
+      const parentCases = ownLabelCasesByBlock.get(p.blockId)!
+      for (const lbl of p.declaredLabels) {
+        const name = String(lbl)
+        if (!analysis.visibleGotoTargets.has(name)) {
+          analysis.visibleGotoTargets.set(name, { blockId: p.blockId, caseNum: parentCases.get(name)! })
+        }
+      }
+      p = p.parent
+    }
+  }
+
+  // 第四遍：标记函数逃逸和需要 try/catch 的 block
+  // 函数逃逸 = goto 所在 block 的 functionBlockId 与目标 label 所在 block 的 functionBlockId 不同
+  // 被函数逃逸到达 = 某个 block 的 label 被来自其他函数/过程 block 的 goto 引用
+  for (const [block, analysis] of iterateBlocks(root)) {
+    for (const g of analysis.gotos) {
+      const target = analysis.visibleGotoTargets.get(String(g.target))
+      if (!target) continue
+      const targetAnalysis = findAnalysisById(root, target.blockId)
+      if (!targetAnalysis) continue
+      // 函数逃逸：源和目标在不同函数/过程 block
+      if (analysis.functionBlockId !== targetAnalysis.functionBlockId) {
+        analysis.hasFunctionEscapingGoto = true
+        targetAnalysis.needsTryCatch = true
+      }
+    }
+  }
+
   return { root, blockMap }
+}
+
+/** 根据 blockId 查找 analysis */
+function findAnalysisById(root: BlockLabelAnalysis, blockId: number): BlockLabelAnalysis | null {
+  for (const a of iterateAnalysesAll(root)) {
+    if (a.blockId === blockId) return a
+  }
+  return null
+}
+
+function* iterateAnalysesAll(root: BlockLabelAnalysis): Iterable<BlockLabelAnalysis> {
+  const stack: BlockLabelAnalysis[] = [root]
+  while (stack.length > 0) {
+    const a = stack.pop()!
+    yield a
+    for (const child of a.children) {
+      stack.push(child)
+    }
+  }
+}
+
+/** 遍历所有 block（深度优先） */
+function* iterateBlocks(root: BlockLabelAnalysis): Iterable<[BlockNode, BlockLabelAnalysis]> {
+  const stack: BlockLabelAnalysis[] = [root]
+  while (stack.length > 0) {
+    const a = stack.pop()!
+    yield [a.block, a]
+    for (const child of a.children) {
+      stack.push(child)
+    }
+  }
 }
 
 export function getAnalysisForBlock(

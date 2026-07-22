@@ -1,6 +1,7 @@
 import type {
   StatementNode,
   CompoundStatementNode,
+  BlockNode,
 } from '../ast/types'
 import { Scope } from './emit/utils'
 import type { Compiler, LoopContext } from './compiler'
@@ -196,56 +197,114 @@ function emitStateMachine(
   const pad = ' '.repeat(indent)
   const lines: string[] = []
 
+  // 判断本 block 状态机是否需要 try/catch 包裹
+  // 条件：本 block 的某个 label 被来自其他函数/过程的 goto 引用（needsTryCatch）
+  let needsTryCatch = false
+  if (compiler.labelAnalysis) {
+    for (const [, a] of iterateAnalyses(compiler.labelAnalysis.root)) {
+      if (a.pcVar === pcVar && a.needsTryCatch) {
+        needsTryCatch = true
+        break
+      }
+    }
+  }
+
   lines.push(`${pad}let ${pcVar} = 0`)
   lines.push(`${pad}${loopLabel}: while (true) {`)
-  lines.push(
-    `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
-  )
-  lines.push(`${pad}  switch (${pcVar}) {`)
+
+  // try/catch 必须放在状态机循环里面、switch 外面（用户要求）
+  // 仅在该 block 有来自其他函数/过程的 goto 目标时添加
+  if (needsTryCatch) {
+    lines.push(`${pad}  try {`)
+  }
+
+  const padSwitch = needsTryCatch ? `${pad}    ` : `${pad}  `
+  lines.push(`${padSwitch}if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+  lines.push(`${padSwitch}switch (${pcVar}) {`)
 
   const savedLabelCases = compiler.labelCases
   const savedSwitchName = compiler.labelSwitchName
   const savedPcVar = compiler.currentPcVar
+  const savedBlockAnalysis: BlockLabelAnalysis | null = compiler.currentBlockAnalysis
 
+  // 查找对应的 analysis
+  let activeBlockAnalysis: BlockLabelAnalysis | null = null
+  if (compiler.labelAnalysis) {
+    for (const [, a] of iterateAnalyses(compiler.labelAnalysis.root)) {
+      if (a.pcVar === pcVar) {
+        activeBlockAnalysis = a
+        break
+      }
+    }
+  }
+  compiler.currentBlockAnalysis = activeBlockAnalysis
   compiler.labelCases = labelCases
   compiler.labelSwitchName = loopLabel
   compiler.currentPcVar = pcVar
 
+  const padCase = needsTryCatch ? `${pad}      ` : `${pad}    `
+
   // case 0：入口，执行所有语句
-  lines.push(`${pad}    case 0: {`)
+  lines.push(`${padCase}case 0: {`)
   for (const stmt of fullStmts) {
-    const code = compiler.emitStmt(stmt, scope, indent + 6)
+    const code = compiler.emitStmt(stmt, scope, indent + (needsTryCatch ? 8 : 6))
     if (code) lines.push(code)
   }
-  lines.push(`${pad}      ${pcVar} = -1; continue ${loopLabel};`)
-  lines.push(`${pad}    }`)
+  lines.push(`${padCase}  ${pcVar} = -1; continue ${loopLabel};`)
+  lines.push(`${padCase}}`)
 
   // case 1..n：每个 label 的剩余代码
   for (const [labelName, caseNum] of labelCases) {
     const stmts = labelStmts.get(labelName) || []
-    lines.push(`${pad}    case ${caseNum}: {`)
+    lines.push(`${padCase}case ${caseNum}: {`)
     for (const stmt of stmts) {
-      const code = compiler.emitStmt(stmt, scope, indent + 6)
+      const code = compiler.emitStmt(stmt, scope, indent + (needsTryCatch ? 8 : 6))
       if (code) lines.push(code)
     }
-    lines.push(`${pad}      ${pcVar} = -1; continue ${loopLabel};`)
-    lines.push(`${pad}    }`)
+    lines.push(`${padCase}  ${pcVar} = -1; continue ${loopLabel};`)
+    lines.push(`${padCase}}`)
   }
 
   // case -1：正常退出
-  lines.push(`${pad}    case -1: break ${loopLabel};`)
+  lines.push(`${padCase}case -1: break ${loopLabel};`)
 
   // default：快速失败
-  lines.push(`${pad}    default: throw new Error('JS VM: invalid ${pcVar} value ' + ${pcVar});`)
+  lines.push(`${padCase}default: throw new Error('JS VM: invalid ${pcVar} value ' + ${pcVar});`)
 
-  lines.push(`${pad}  }`)
+  lines.push(`${padSwitch}}`)
+
+  if (needsTryCatch) {
+    // catch：处理 __GotoSignal 异常
+    // 只接受目标是当前状态机（targetPc === pcVar）的信号；
+    // 其他 __GotoSignal（如从更内层函数 throw 上来但目标是其他 block）重新抛出
+    lines.push(`${pad}  } catch (__e) {`)
+    lines.push(`${pad}    if (__e instanceof __GotoSignal && __e.targetPc === ${JSON.stringify(pcVar)}) {`)
+    lines.push(`${pad}      ${pcVar} = __e.targetCase; continue ${loopLabel};`)
+    lines.push(`${pad}    }`)
+    lines.push(`${pad}    throw __e;`)
+    lines.push(`${pad}  }`)
+  }
+
   lines.push(`${pad}}`)
 
   compiler.labelCases = savedLabelCases
   compiler.labelSwitchName = savedSwitchName
   compiler.currentPcVar = savedPcVar
+  compiler.currentBlockAnalysis = savedBlockAnalysis
 
   return lines.join('\n')
+}
+
+/** 遍历所有 block analysis（深度优先） */
+function* iterateAnalyses(root: BlockLabelAnalysis): Iterable<[BlockNode, BlockLabelAnalysis]> {
+  const stack: BlockLabelAnalysis[] = [root]
+  while (stack.length > 0) {
+    const a = stack.pop()!
+    yield [a.block, a]
+    for (const child of a.children) {
+      stack.push(child)
+    }
+  }
 }
 
 export function emitBlockWithGoto(
@@ -255,6 +314,8 @@ export function emitBlockWithGoto(
   indent: number,
   compiler: Compiler
 ): string {
+  // 只为本 block 自己的 declared label 生成 case。
+  // 跨 block goto 在 GotoStatement 编译时通过 visibleGotoTargets 处理。
   const declaredLabels = analysis.block.labelDeclarations?.labels ?? []
   const labelCases = new Map<string, number>()
   const labelStmts = new Map<string, StatementNode[]>()
@@ -270,8 +331,8 @@ export function emitBlockWithGoto(
   }
 
   return emitStateMachine(
-    '__pc',
-    '__goto_loop',
+    analysis.pcVar,
+    analysis.loopLabel,
     labelCases,
     compound.statements,
     labelStmts,

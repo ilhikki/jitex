@@ -374,7 +374,7 @@ end.`,
       expectedContains: 'done',
     },
     {
-      name: 'goto across procedures should error',
+      name: 'goto from procedure to outer block label',
       code: `program test;
 label 10;
 procedure proc;
@@ -387,7 +387,7 @@ begin
   writeln('end');
 end.`,
       purpose:
-        'goto across procedures only errors at runtime when proc is called (Pascal82: GOTO 目标跨 block，proc 未调用则不触发)',
+        'ISO 7185 6.8.1 c) + 6.8.2.4: goto from nested block to label in containing block is permitted; terminates intervening activations',
       expectedContains: 'start\nend',
     },
     {

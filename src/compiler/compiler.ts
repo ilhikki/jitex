@@ -48,6 +48,29 @@ export class Compiler {
   withVarCounter = 0
   labelAnalysis: LabelAnalysisResult | null = null
 
+  /** 当前正在编译的 block 的 analysis（用于 GotoStatement 编译时查 visibleGotoTargets） */
+  currentBlockAnalysis: BlockLabelAnalysis | null = null
+
+  /** 程序中是否存在任何函数逃逸 goto（跨函数/过程 block 的 goto） */
+  hasFunctionEscapingGoto(): boolean {
+    if (!this.labelAnalysis) return false
+    for (const a of this.iterateAllAnalyses(this.labelAnalysis.root)) {
+      if (a.hasFunctionEscapingGoto) return true
+    }
+    return false
+  }
+
+  private *iterateAllAnalyses(root: BlockLabelAnalysis): IterableIterator<BlockLabelAnalysis> {
+    const stack: BlockLabelAnalysis[] = [root]
+    while (stack.length > 0) {
+      const a = stack.pop()!
+      yield a
+      for (const child of a.children) {
+        stack.push(child)
+      }
+    }
+  }
+
   constructor(typeTable: TypeTable) {
     this.typeTable = typeTable
   }
@@ -94,6 +117,10 @@ export class Compiler {
 
     const parts: string[] = []
     parts.push("'use strict'")
+    // 仅在有函数逃逸 goto 时注入 __GotoSignal 类（分析阶段预判）
+    if (this.hasFunctionEscapingGoto()) {
+      parts.push('class __GotoSignal extends Error { constructor(targetPc, targetCase) { super("goto escape"); this.targetPc = targetPc; this.targetCase = targetCase; } }')
+    }
     parts.push(globalDecls)
     parts.push(procDefs.join('\n'))
     if (assignLines.length > 0) {
