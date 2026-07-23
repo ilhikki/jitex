@@ -198,8 +198,6 @@ export class TypeTableBuilder {
           baseTypeId = 'char'
         } else if (range.start.kind === 'BooleanLiteral') {
           baseTypeId = 'boolean'
-        } else if (range.start.kind === 'Identifier') {
-          const name = (range.start as IdentifierNode).name.toUpperCase()
         }
         const id = `subrange-${min}-${max}-of-${baseTypeId}`
         const existing = this.typeTable.get(id)

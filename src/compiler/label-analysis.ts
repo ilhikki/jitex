@@ -574,7 +574,7 @@ export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
   // 并计算所有祖先的 ownLabelCases
   // 收集所有 block 的 ownLabelCases 到一个 Map<blockId, Map<labelName, caseNum>>
   const ownLabelCasesByBlock = new Map<number, Map<string, number>>()
-  for (const [block, analysis] of iterateBlocks(root)) {
+  for (const [_block, analysis] of iterateBlocks(root)) {
     const cases = new Map<string, number>()
     let cn = 1
     for (const lbl of analysis.declaredLabels) {
@@ -585,7 +585,7 @@ export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
   }
 
   // 第三遍：为每个 block 的 visibleGotoTargets 填充完整信息
-  for (const [block, analysis] of iterateBlocks(root)) {
+  for (const [_block, analysis] of iterateBlocks(root)) {
     // 自身 label
     let cn = 1
     for (const lbl of analysis.declaredLabels) {
@@ -612,7 +612,7 @@ export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
   // 第四遍：标记函数逃逸和需要 try/catch 的 block
   // 函数逃逸 = goto 所在 block 的 functionBlockId 与目标 label 所在 block 的 functionBlockId 不同
   // 被函数逃逸到达 = 某个 block 的 label 被来自其他函数/过程 block 的 goto 引用
-  for (const [block, analysis] of iterateBlocks(root)) {
+  for (const [_block, analysis] of iterateBlocks(root)) {
     for (const g of analysis.gotos) {
       const target = analysis.visibleGotoTargets.get(String(g.target))
       if (!target) continue
@@ -689,20 +689,6 @@ function* iterateBlocks(root: BlockLabelAnalysis): Iterable<[BlockNode, BlockLab
       stack.push(child)
     }
   }
-}
-
-/**
- * 根据 BlockNode 获取其对应的 BlockLabelAnalysis。
- *
- * @param result LabelAnalysisResult（由 analyzeLabels 返回）
- * @param block 目标 BlockNode
- * @returns 对应的分析结果，未找到返回 undefined
- */
-export function getAnalysisForBlock(
-  result: LabelAnalysisResult,
-  block: BlockNode
-): BlockLabelAnalysis | undefined {
-  return result.blockMap.get(block)
 }
 
 // ---------------------------------------------------------------------------

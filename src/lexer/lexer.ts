@@ -313,9 +313,6 @@ export function tokenize(input: LexerInput): Token[] {
       case ',':
         type = 'COMMA'
         break
-      case '.':
-        type = 'DOT'
-        break
       case '^':
         type = 'CARET'
         break

@@ -198,52 +198,6 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
     }
 
     case 'LBRACKET': {
-      // Set constructor: [ expr, expr..expr, ... ]
-      const startPos = input.position
-      const afterBracket = { tokens: input.tokens, position: startPos + 1 }
-      const elements: [ExpressionNode, ExpressionNode | null][] = []
-
-      if (peek(afterBracket).type !== 'RBRACKET') {
-        const firstResult = parseExpression(afterBracket)
-        if (!firstResult.success) return fail(firstResult.error, firstResult.position)
-
-        let pos = firstResult.newPosition
-        let element: [ExpressionNode, ExpressionNode | null] = [firstResult.astNode, null]
-
-        // Check for range: expr .. expr
-        if (peek({ tokens: input.tokens, position: pos }).type === 'DOTDOT') {
-          pos++
-          const endResult = parseExpression({ tokens: input.tokens, position: pos })
-          if (!endResult.success) return fail(endResult.error, endResult.position)
-          pos = endResult.newPosition
-          element = [firstResult.astNode, endResult.astNode]
-        }
-        elements.push(element)
-
-        // More elements
-        while (peek({ tokens: input.tokens, position: pos }).type === 'COMMA') {
-          pos++
-          const r = parseExpression({ tokens: input.tokens, position: pos })
-          if (!r.success) return fail(r.error, r.position)
-          pos = r.newPosition
-          let el: [ExpressionNode, ExpressionNode | null] = [r.astNode, null]
-          if (peek({ tokens: input.tokens, position: pos }).type === 'DOTDOT') {
-            pos++
-            const endR = parseExpression({ tokens: input.tokens, position: pos })
-            if (!endR.success) return fail(endR.error, endR.position)
-            pos = endR.newPosition
-            el = [r.astNode, endR.astNode]
-          }
-          elements.push(el)
-        }
-      }
-
-      let pos2 = input.position + 1
-      // Find the position after all elements
-      // Actually we need to track pos properly
-      // Let me redo this more carefully
-
-      // Re-parse with proper tracking
       return parseSetConstructor(input)
     }
 
@@ -531,7 +485,6 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
       startPos,
       endToken.end
     )
-    hasLeadingSign = true
   } else {
     const termResult = parseTerm({ tokens: input.tokens, position: pos })
     if (!termResult.success) return fail(termResult.error, termResult.position)

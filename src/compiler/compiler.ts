@@ -1,4 +1,4 @@
-import type { BlockNode, ProgramNode, StatementNode } from '../ast/types'
+import type { BlockNode, ProgramNode, StatementNode } from '@/ast/types'
 import type { TypeTable } from '@/types'
 import { ProcInfo, Scope } from './emit/utils'
 import {
@@ -35,7 +35,6 @@ export interface LoopContext {
 export class Compiler {
   procs = new Map<string, ProcInfo>()
   globalScope = new Scope()
-  procBodies: string[] = []
   typeTable: TypeTable
   aliasMap = new Map<string, string>()
   enumConstants = new Map<string, number>()
@@ -59,26 +58,6 @@ export class Compiler {
 
   /** 当前正在编译的函数/过程 block 的 id（用于判断 goto 是否跨函数） */
   currentFunctionBlockId: number = -1
-
-  /** 程序中是否存在任何函数逃逸 goto（跨函数/过程 block 的 goto） */
-  hasFunctionEscapingGoto(): boolean {
-    if (!this.labelAnalysis) return false
-    for (const a of this.iterateAllAnalyses(this.labelAnalysis.root)) {
-      if (a.hasFunctionEscapingGoto) return true
-    }
-    return false
-  }
-
-  private *iterateAllAnalyses(root: BlockLabelAnalysis): IterableIterator<BlockLabelAnalysis> {
-    const stack: BlockLabelAnalysis[] = [root]
-    while (stack.length > 0) {
-      const a = stack.pop()!
-      yield a
-      for (const child of a.children) {
-        stack.push(child)
-      }
-    }
-  }
 
   constructor(typeTable: TypeTable) {
     this.typeTable = typeTable
@@ -117,7 +96,7 @@ export class Compiler {
     collectProcs(this, program.block.procedureDeclarations, program.block.functionDeclarations)
 
     const procDefs: string[] = []
-    for (const [name, info] of this.procs) {
+    for (const [_name, info] of this.procs) {
       if (info.block || info.forwardDef) {
         procDefs.push(emitProc(this, info))
       }
@@ -163,13 +142,6 @@ export class Compiler {
   /** 获取当前最内层循环上下文 */
   get currentLoop(): LoopContext | undefined {
     return this.loopStack[this.loopStack.length - 1]
-  }
-
-  /** 判断 goto 目标 label 是否在当前最内层循环体内 */
-  isLabelInCurrentLoop(labelName: string): boolean {
-    const loop = this.currentLoop
-    if (!loop) return false
-    return loop.innerLabels.has(labelName)
   }
 
   /** 判断 goto 目标 label 是否在当前最内层循环体的末尾 */

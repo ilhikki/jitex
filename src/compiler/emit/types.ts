@@ -68,6 +68,8 @@ export function evalConstInt(compiler: Compiler, node: ExpressionNode): number {
           return Math.trunc(l / r)
         case 'MOD':
           return l - Math.trunc(l / r) * r
+        default:
+          throw new Error(`${b.operator} not defined`)
       }
     }
     case 'ParenthesizedExpression':
@@ -296,20 +298,4 @@ export function arrayElementAfterNIndices(
     }
   }
   return t
-}
-
-export function arrayElementType(compiler: Compiler, arrayTypeId: string): string | null {
-  const td = compiler.typeTable.get(arrayTypeId) as any
-  if (!td || td.kind !== 'array') return null
-  return td.elementTypeId
-}
-
-export function arrayDims(
-  compiler: Compiler,
-  arrayTypeId: string
-): { low: number; high: number }[] {
-  const td = compiler.typeTable.get(arrayTypeId) as any
-  if (!td || td.kind !== 'array') return []
-  const dims = td.dimensions || []
-  return dims.map((d: any) => ({ low: d.low, high: d.high }))
 }

@@ -50,7 +50,6 @@ export function emitCompound(
   scope: Scope,
   indent: number
 ): string {
-  const pad = ' '.repeat(indent)
   const lines = node.statements
     .map((s) => emitStmt(compiler, s, scope, indent))
     .filter((x) => x.length > 0)

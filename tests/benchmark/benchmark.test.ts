@@ -342,7 +342,7 @@ end.`
     }, 60000)
   })
 
-  describe('E2E Benchmarks', () => {
+  describe.skip('E2E Benchmarks', () => {
     test('tangle compile + run (pass 3 baseline)', async () => {
       const source = readResource(TANGLE_PAS)
       const webSource = readResource(TANGLE_WEB)

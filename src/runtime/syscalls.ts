@@ -301,11 +301,11 @@ const bufferCharHandler: SysCallHandler = async (args, _state, runtime) => {
   return { typeId: 'char', raw: String.fromCharCode(code) }
 }
 
-const breakHandler: SysCallHandler = async (_args, _state, runtime) => {}
+const breakHandler: SysCallHandler = async () => {}
 
-const breakinHandler: SysCallHandler = async (_args, _state, _runtime) => {}
+const breakinHandler: SysCallHandler = async () => {}
 
-const erstatHandler: SysCallHandler = async (_args, _state, _runtime) => {
+const erstatHandler: SysCallHandler = async () => {
   return { typeId: 'integer', raw: 0 }
 }
 
@@ -458,7 +458,7 @@ function getValue(arg: PascalValue | { value: PascalValue } | unknown): PascalVa
   return arg as PascalValue
 }
 
-function extractFileName(val: PascalValue, typeTable: TypeTable | null): string {
+function extractFileName(val: PascalValue): string {
   const raw = val.raw
   if (typeof raw === 'string') return raw
   if (Array.isArray(raw)) {
@@ -479,7 +479,7 @@ const extendedResetHandler: SysCallHandler = async (args, _state, runtime) => {
   if (!file) throw new Error('RESET: argument is not a file')
   if (args.length >= 2) {
     const nameVal = getValue(args[1])
-    const name = extractFileName(nameVal, typeTable)
+    const name = extractFileName(nameVal)
     await io.file.assign(file, name)
   }
   await io.file.reset(file)
@@ -494,7 +494,7 @@ const extendedRewriteHandler: SysCallHandler = async (args, _state, runtime) => 
   if (!file) throw new Error('REWRITE: argument is not a file')
   if (args.length >= 2) {
     const nameVal = getValue(args[1])
-    const name = extractFileName(nameVal, typeTable)
+    const name = extractFileName(nameVal)
     await io.file.assign(file, name)
   }
   await io.file.rewrite(file)
