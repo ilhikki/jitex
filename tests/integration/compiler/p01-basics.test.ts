@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest'
-import { runPascalTests, type PascalTest } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from './_helper'
 
 describe('Phase 1: Basics and Operations', () => {
   const tests: PascalTest[] = [

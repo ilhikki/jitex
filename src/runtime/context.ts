@@ -1,4 +1,4 @@
-import type { PascalValue, RuntimeCtx, SysCallHandler } from '../types'
+import type { PascalValue, RuntimeCtx, SysCallHandler } from '@/types'
 import type { RunState } from './run-state'
 import { createEmptyFile, type PascalIO } from './file-model'
 

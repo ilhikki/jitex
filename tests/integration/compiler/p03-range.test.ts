@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest'
-import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from './_helper'
 
 /**
  * Q10: Subrange (range) 类型专项测试

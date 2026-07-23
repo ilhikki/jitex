@@ -18,7 +18,7 @@ import {
   StatementNode,
   WhileStatementNode,
   WithStatementNode,
-} from '../ast/types'
+} from '@/ast/types'
 import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
 import { parseExpression, parseIdentifier, parsePrimary } from './expressions'
 
@@ -128,7 +128,10 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   const labelToken = peek(input)
   const labelValue = parseInt(labelToken.content, 10)
   if (labelValue < 0 || labelValue > 9999) {
-    return fail(`Label ${labelValue} out of range (0..9999) at line ${labelToken.start.line}`, input.position)
+    return fail(
+      `Label ${labelValue} out of range (0..9999) at line ${labelToken.start.line}`,
+      input.position
+    )
   }
   let pos = input.position + 1
 

@@ -1,5 +1,6 @@
-﻿import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-import { describe, test, expect } from 'vitest'
+﻿import { ConformanceTest, makeProgram, makeProgramWithVars, runParseTests } from './_helper'
+import { describe } from 'vitest'
+
 const tests: ConformanceTest[] = [
   // ==========================================================================
   // 1. 直接递归 - 过程（5个）
@@ -601,9 +602,5 @@ end;
 ]
 
 describe('M3.5 Recursion Conformance', () => {
-  tests.forEach((t) => {
-    test(t.name, () => {
-      runParseTest(t)
-    })
-  })
+  runParseTests(tests)
 })

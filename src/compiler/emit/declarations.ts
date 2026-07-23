@@ -5,13 +5,13 @@ import type {
   ParameterDeclarationNode,
   ProcedureDeclarationNode,
   VariableDeclarationNode,
-} from '../../ast/types'
+} from '@/ast/types'
 import { ProcInfo, Scope } from './utils'
 import { coerce, emitExpr, inferType } from './expressions'
 import { resolveTypeId, scalarBase, subrangeBounds, tryEvalConstInt } from './types'
 import { emitCompound } from './statements'
 import { emitBlockWithGoto } from '../strategy'
-import type { Compiler } from '../compiler'
+import type { Compiler } from '@/compiler'
 
 export function collectConsts(compiler: Compiler, consts: ConstDeclarationNode[]) {
   for (const c of consts) {
@@ -266,19 +266,19 @@ export function emitBody(
   indent: number
 ): string {
   const labels = block.labelDeclarations ? block.labelDeclarations.labels : []
-  
+
   // 保存并设置当前函数/过程 block 的 id
   const savedFunctionBlockId = compiler.currentFunctionBlockId
   const analysis = compiler.getLabelAnalysis(block)
   compiler.currentFunctionBlockId = analysis.functionBlockId
-  
+
   let result: string
   if (labels.length === 0) {
     result = emitCompound(compiler, block.compound, scope, indent)
   } else {
     result = emitBlockWithGoto(block.compound, analysis, scope, indent, compiler)
   }
-  
+
   compiler.currentFunctionBlockId = savedFunctionBlockId
   return result
 }

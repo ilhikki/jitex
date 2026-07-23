@@ -6,7 +6,7 @@ import type {
   LabeledStatementNode,
   ProgramNode,
   StatementNode,
-} from '../ast/types'
+} from '@/ast/types'
 
 /** ISO 7185 6.1.6: label 范围 0..9999 */
 export const LABEL_MIN = 0
@@ -513,8 +513,8 @@ function analyzeBlock(
     gotos,
     gotoCount: gotos.length,
     visibleGotoTargets: new Map(),
-    hasFunctionEscapingGoto: false,  // 第四遍填充
-    needsTryCatch: false,  // 第四遍填充
+    hasFunctionEscapingGoto: false, // 第四遍填充
+    needsTryCatch: false, // 第四遍填充
     parent,
     children: [],
   }
@@ -599,7 +599,10 @@ export function analyzeLabels(program: ProgramNode): LabelAnalysisResult {
       for (const lbl of p.declaredLabels) {
         const name = String(lbl)
         if (!analysis.visibleGotoTargets.has(name)) {
-          analysis.visibleGotoTargets.set(name, { blockId: p.blockId, caseNum: parentCases.get(name)! })
+          analysis.visibleGotoTargets.set(name, {
+            blockId: p.blockId,
+            caseNum: parentCases.get(name)!,
+          })
         }
       }
       p = p.parent

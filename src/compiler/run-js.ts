@@ -1,13 +1,19 @@
-import { lex } from '../lexer/lexer'
-import { parseProgram } from '../parser/declarations'
-import type { ProgramNode, ParserInput } from '../ast/types'
-import { createJSCtx, ctxToRunState } from '../runtime/context'
+import { lex } from '@/lexer'
+import { parseProgram } from '@/parser'
+import type { ParserInput, ProgramNode } from '@/ast/types'
+import type { RunError, RunState } from '@/runtime'
+import {
+  createDefaultIO,
+  createExtendedSysCalls,
+  createJSCtx,
+  createRecordFileOps,
+  ctxToRunState,
+  type PascalIO,
+} from '@/runtime'
 import { buildTypeTable } from './type-table-builder'
-import { createExtendedSysCalls } from '../runtime/syscalls'
-import { createDefaultIO, createRecordFileOps, type PascalIO } from '../runtime/file-model'
-import type { RuntimeCtx, SysCallHandler, TypeDef } from '../types/types'
-import type { RunState, RunError } from '../runtime/run-state'
+import type { RuntimeCtx, SysCallHandler, TypeDef } from '@/types'
 import { Compiler } from './compiler'
+import { STRING_TYPE } from '@/types'
 
 export type { RunState, RunError } from '../runtime/run-state'
 
@@ -39,8 +45,6 @@ export interface JSRunOptions {
   /** 调试选项 */
   debug?: JSDebugOptions
 }
-
-import { STRING_TYPE } from '../types/types'
 
 function parseSource(source: string): ProgramNode {
   const tokens = lex(source)
@@ -158,10 +162,7 @@ export async function runJS(source: string, options: JSRunOptions = {}): Promise
  * @param options - 编译选项
  * @returns 生成的 JavaScript 代码
  */
-export function compileToJS(
-  source: string,
-  options: JSRunOptions = {}
-): string {
+export function compileToJS(source: string, options: JSRunOptions = {}): string {
   const ast = parseSource(source)
   const { runtime } = buildRuntime(ast, options)
   const compiler = new Compiler(runtime.typeTable)

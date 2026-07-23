@@ -12,8 +12,8 @@ import type {
   SimpleTypeNode,
   TypeNode,
   UnaryExpressionNode,
-} from '../../ast/types'
-import type { Compiler } from '../compiler'
+} from '@/ast/types'
+import type { Compiler } from '@/compiler'
 
 export function collectTypes(compiler: Compiler, block: BlockNode) {
   for (const c of block.constDeclarations) {

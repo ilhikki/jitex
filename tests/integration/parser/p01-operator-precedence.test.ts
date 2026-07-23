@@ -1,5 +1,6 @@
-﻿import { ConformanceTest, runParseTest, makeProgramWithVars } from './_helper'
-import { describe, test, expect } from 'vitest'
+﻿import { ConformanceTest, makeProgramWithVars, runParseTests } from './_helper'
+import { describe } from 'vitest'
+
 const tests: ConformanceTest[] = [
   // =========================================================================
   // 1. 算术运算符优先级（8个）
@@ -407,9 +408,5 @@ const tests: ConformanceTest[] = [
 ]
 
 describe('M3.5 Operator Precedence Conformance', () => {
-  tests.forEach((t) => {
-    test(t.name, () => {
-      runParseTest(t)
-    })
-  })
+  runParseTests(tests)
 })

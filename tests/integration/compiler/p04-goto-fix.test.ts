@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest'
-import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from './_helper'
 
 describe('Phase 4: Goto Fix - Strategy D should use break not continue', () => {
   const tests: PascalTest[] = [

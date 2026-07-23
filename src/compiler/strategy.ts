@@ -1,15 +1,8 @@
-import type {
-  StatementNode,
-  CompoundStatementNode,
-  BlockNode,
-} from '../ast/types'
+import type { BlockNode, CompoundStatementNode, StatementNode } from '@/ast/types'
 import { Scope } from './emit/utils'
-import type { Compiler, LoopContext } from './compiler'
+import type { Compiler } from './compiler'
 import type { BlockLabelAnalysis } from './label-analysis'
-import {
-  collectLabelValuesInStmt,
-  collectGotoTargetsInStmt,
-} from './label-analysis'
+import { collectGotoTargetsInStmt, collectLabelValuesInStmt } from './label-analysis'
 
 /**
  * 分析一个循环体内有哪些 label 和 goto，决定是否需要内层状态机。
@@ -45,9 +38,9 @@ function analyzeLoopBody(
 
   // 找出循环体末尾的 label
   const tailLabels = new Set<string>()
-  const stmts = allBodyStmts ?? (body.kind === 'CompoundStatement'
-    ? (body as CompoundStatementNode).statements
-    : [body])
+  const stmts =
+    allBodyStmts ??
+    (body.kind === 'CompoundStatement' ? (body as CompoundStatementNode).statements : [body])
 
   // 从后往前找末尾的 label
   for (let i = stmts.length - 1; i >= 0; i--) {
@@ -58,7 +51,7 @@ function analyzeLoopBody(
       // 继续看 LabeledStatement 的内部是否也是末尾 label
       // 但这里只看顶层：最后一个语句如果是 label，它就是末尾 label
     } else {
-      break  // 遇到非 label 语句就停
+      break // 遇到非 label 语句就停
     }
   }
 
@@ -257,7 +250,9 @@ function emitStateMachine(
   }
 
   const padSwitch = needsTryCatch ? `${pad}    ` : `${pad}  `
-  lines.push(`${padSwitch}if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+  lines.push(
+    `${padSwitch}if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
+  )
   lines.push(`${padSwitch}switch (${pcVar}) {`)
 
   const savedLabelCases = compiler.labelCases
@@ -306,7 +301,9 @@ function emitStateMachine(
     // 只接受目标是当前状态机（targetPc === pcVar）的信号；
     // 其他 __GotoSignal（如从更内层函数 throw 上来但目标是其他 block）重新抛出
     lines.push(`${pad}  } catch (__e) {`)
-    lines.push(`${pad}    if (__e instanceof __GotoSignal && __e.targetPc === ${JSON.stringify(pcVar)}) {`)
+    lines.push(
+      `${pad}    if (__e instanceof __GotoSignal && __e.targetPc === ${JSON.stringify(pcVar)}) {`
+    )
     lines.push(`${pad}      ${pcVar} = __e.targetCase; continue ${loopLabel};`)
     lines.push(`${pad}    }`)
     lines.push(`${pad}    throw __e;`)

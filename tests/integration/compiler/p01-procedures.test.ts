@@ -1,7 +1,7 @@
 // m4 过程和函数测试
 
-import { describe, it, expect } from 'vitest'
-import { type PascalTest, runPascalTests } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from './_helper'
 
 describe('M5 JS Procedures and Functions', () => {
   const tests: PascalTest[] = [

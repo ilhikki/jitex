@@ -14,7 +14,7 @@ import {
   SetConstructorNode,
   StringLiteralNode,
   UnaryExpressionNode,
-} from '../ast/types'
+} from '@/ast/types'
 import { expectType, fail, ok, parseList, peek, withLoc } from './helpers'
 
 // ============================================================================

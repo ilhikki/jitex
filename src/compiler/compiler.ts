@@ -1,5 +1,5 @@
 import type { BlockNode, ProgramNode, StatementNode } from '../ast/types'
-import type { TypeTable } from '../types'
+import type { TypeTable } from '@/types'
 import { ProcInfo, Scope } from './emit/utils'
 import {
   collectConsts,
@@ -11,8 +11,13 @@ import {
 } from './emit/declarations'
 import { collectTypes } from './emit/types'
 import { emitStmt as emitStmtImpl } from './emit/statements'
-import { analyzeLabels, type BlockLabelAnalysis, type LabelAnalysisResult, type GotoTarget } from './label-analysis'
-import type { GotoStatementNode } from '../ast/types'
+import {
+  analyzeLabels,
+  type BlockLabelAnalysis,
+  type LabelAnalysisResult,
+  type GotoTarget,
+} from './label-analysis'
+import type { GotoStatementNode } from '@/ast/types'
 
 /**
  * 循环上下文：当 goto 在循环内部时，需要知道循环的 JS 标签
@@ -134,7 +139,9 @@ export class Compiler {
     const parts: string[] = []
     parts.push("'use strict'")
     // 总是注入 __GotoSignal 类，因为所有 goto 都统一抛出异常
-    parts.push('class __GotoSignal extends Error { constructor(targetPc, targetCase) { super("goto escape"); this.targetPc = targetPc; this.targetCase = targetCase; } }')
+    parts.push(
+      'class __GotoSignal extends Error { constructor(targetPc, targetCase) { super("goto escape"); this.targetPc = targetPc; this.targetCase = targetCase; } }'
+    )
     parts.push(globalDecls)
     parts.push(procDefs.join('\n'))
     if (assignLines.length > 0) {

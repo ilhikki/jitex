@@ -1,4 +1,4 @@
-import { Token, Position, LexerInput } from '../ast/types'
+import { LexerInput, Position, Token } from '@/ast/types'
 
 // ============================================================================
 // Position helpers

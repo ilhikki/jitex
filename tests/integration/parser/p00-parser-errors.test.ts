@@ -1,5 +1,6 @@
-﻿import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-import { describe, test, expect } from 'vitest'
+﻿import { ConformanceTest, makeProgramWithVars, runParseTests } from './_helper'
+import { describe } from 'vitest'
+
 const tests: ConformanceTest[] = [
   // ==========================================================================
   // 1. 程序结构错误（5个）
@@ -242,9 +243,5 @@ const tests: ConformanceTest[] = [
 ]
 
 describe('M3.5 Error Handling Conformance', () => {
-  tests.forEach((t) => {
-    test(t.name, () => {
-      runParseTest(t)
-    })
-  })
+  runParseTests(tests)
 })

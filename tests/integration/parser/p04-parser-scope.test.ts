@@ -1,5 +1,6 @@
-﻿import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-import { describe, test, expect } from 'vitest'
+﻿import { ConformanceTest, makeProgram, makeProgramWithVars, runParseTests } from './_helper'
+import { describe } from 'vitest'
+
 const tests: ConformanceTest[] = [
   // ==========================================================================
   // 1. 全局变量作用域（4个）
@@ -416,9 +417,5 @@ const tests: ConformanceTest[] = [
 ]
 
 describe('M3.5 Scope Conformance', () => {
-  tests.forEach((t) => {
-    test(t.name, () => {
-      runParseTest(t)
-    })
-  })
+  runParseTests(tests)
 })

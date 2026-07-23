@@ -12,7 +12,7 @@ import {
   ProgramNode,
   TypeDeclarationNode,
   VariableDeclarationNode,
-} from '../ast/types'
+} from '@/ast/types'
 import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
 import { parseExpression, parseIdentifier } from './expressions'
 import { parseType, parseVariableDeclaration } from './types'

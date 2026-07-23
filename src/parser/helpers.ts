@@ -1,4 +1,4 @@
-import { AstNode, ParseResult, ParserInput, Position, SourceLocation, Token } from '../ast/types'
+import { AstNode, ParseResult, ParserInput, Position, SourceLocation, Token } from '@/ast/types'
 
 // ============================================================================
 // Parser helpers — pure functions operating on {tokens, position}

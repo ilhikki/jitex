@@ -8,7 +8,7 @@ import type {
   InExpressionNode,
   SetConstructorNode,
   UnaryExpressionNode,
-} from '../../ast/types'
+} from '@/ast/types'
 import { BUILTIN_NO_ARG, BUILTIN_SYSCALLS, builtinReturnType, isScalar, Scope } from './utils'
 import {
   arrayDimAt,
@@ -18,7 +18,7 @@ import {
   scalarBase,
   typeKind,
 } from './types'
-import type { Compiler } from '../compiler'
+import type { Compiler } from '@/compiler'
 
 export interface EmitExprResult {
   code: string

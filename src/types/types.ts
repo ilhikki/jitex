@@ -137,7 +137,7 @@ export function createTypeTable(): TypeTable {
   }
 }
 
-import type { PascalIO } from '../runtime/file-model'
+import type { PascalIO } from '@/runtime'
 
 export interface RuntimeCtx {
   typeTable: TypeTable

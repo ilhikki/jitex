@@ -16,7 +16,7 @@ import type {
   StatementNode,
   WhileStatementNode,
   WithStatementNode,
-} from '../../ast/types'
+} from '@/ast/types'
 import { BUILTIN_SYSCALLS, Scope } from './utils'
 import {
   coerce,
@@ -36,18 +36,13 @@ import {
   subrangeBounds,
   typeKind,
 } from './types'
-import type { Compiler } from '../compiler'
+import type { Compiler } from '@/compiler'
 import {
-  collectLabelValuesInStmt,
   collectGotoTargetsInStmt,
   collectLabelsFlat,
+  collectLabelValuesInStmt,
 } from '../label-analysis'
-import {
-  nextLoopLabel,
-  loopNeedsLabel,
-  getLoopAnalysis,
-  emitLoopInnerStateMachine,
-} from '../strategy'
+import { emitLoopInnerStateMachine, getLoopAnalysis, nextLoopLabel } from '../strategy'
 
 export function emitCompound(
   compiler: Compiler,
@@ -114,7 +109,14 @@ export function emitStmt(
         for (const [name, info] of allLabels) {
           innerLabelInfo.set(name, { remaining: info.remaining })
         }
-        body = emitLoopInnerStateMachine(w.body, cs.statements, innerLabelInfo, compiler, scope, indent + 2)
+        body = emitLoopInnerStateMachine(
+          w.body,
+          cs.statements,
+          innerLabelInfo,
+          compiler,
+          scope,
+          indent + 2
+        )
       } else {
         body = emitStmt(compiler, w.body, scope, indent + 2)
       }
@@ -126,13 +128,17 @@ export function emitStmt(
       const labelPrefix = needsLabel ? `${loopJsLabel}: ` : ''
       const lines: string[] = []
       lines.push(`${pad}${labelPrefix}while (${toBool(compiler, cond.code, cond.type)}) {`)
-      lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+      lines.push(
+        `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
+      )
       lines.push(body)
       lines.push(`${pad}}`)
 
       // 循环后检查 pc：如果 goto 跳到了循环外的 label，需要 break 出来后 dispatch
       if (needsLabel && compiler.labelCases && compiler.currentPcVar) {
-        lines.push(`${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`)
+        lines.push(
+          `${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`
+        )
       }
 
       return lines.join('\n')
@@ -143,7 +149,8 @@ export function emitStmt(
       // Repeat 的 body 是 statements 数组
       const allInnerLabels = new Set(r.statements.flatMap((s) => [...collectLabelValuesInStmt(s)]))
       const allGotos = new Set(r.statements.flatMap((s) => [...collectGotoTargetsInStmt(s)]))
-      const needsLabel = (compiler.labelCases != null) && (allInnerLabels.size > 0 || allGotos.size > 0)
+      const needsLabel =
+        compiler.labelCases != null && (allInnerLabels.size > 0 || allGotos.size > 0)
       const loopJsLabel = needsLabel ? nextLoopLabel('repeat') : ''
 
       // 找末尾 label
@@ -169,12 +176,16 @@ export function emitStmt(
       const labelPrefix = needsLabel ? `${loopJsLabel}: ` : ''
       const lines: string[] = []
       lines.push(`${pad}${labelPrefix}do {`)
-      lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+      lines.push(
+        `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
+      )
       lines.push(...bodyStmts)
       lines.push(`${pad}} while (!(${toBool(compiler, cond.code, cond.type)}));`)
 
       if (needsLabel && compiler.labelCases && compiler.currentPcVar) {
-        lines.push(`${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`)
+        lines.push(
+          `${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`
+        )
       }
 
       return lines.join('\n')
@@ -214,12 +225,16 @@ export function emitStmt(
           `${pad}${labelPrefix}for (${vName} = ${toInt(compiler, init.code, init.type)}; ${vName} >= ${toInt(compiler, final.code, final.type)}; ${vName} = (${vName} - 1) | 0) {`
         )
       }
-      lines.push(`${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`)
+      lines.push(
+        `${pad}  if (++ctx.steps > ctx.maxSteps) { throw new Error('JS VM: step limit exceeded') }`
+      )
       lines.push(body)
       lines.push(`${pad}}`)
 
       if (needsLabel && compiler.labelCases && compiler.currentPcVar) {
-        lines.push(`${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`)
+        lines.push(
+          `${pad}if (${compiler.currentPcVar} !== 0) continue ${compiler.labelSwitchName};`
+        )
       }
 
       return lines.join('\n')
@@ -264,9 +279,11 @@ export function emitStmt(
         // 目标在当前 block 内（即 target 块等于 currentBlockAnalysis）：
         // 如果当前状态机就是 currentBlockAnalysis 的状态机（同 block，outer sm），
         // 设 currentPcVar + continue labelSwitchName
-        if (target.blockId === currentAnalysis.blockId
-            && compiler.labelSwitchName === currentAnalysis.loopLabel
-            && compiler.currentPcVar === currentAnalysis.pcVar) {
+        if (
+          target.blockId === currentAnalysis.blockId &&
+          compiler.labelSwitchName === currentAnalysis.loopLabel &&
+          compiler.currentPcVar === currentAnalysis.pcVar
+        ) {
           return `${pad}${compiler.currentPcVar} = ${target.caseNum}; continue ${compiler.labelSwitchName!}`
         }
 

@@ -1,14 +1,10 @@
 import { lex } from '@/lexer/lexer'
-import { ParserInput, ProgramNode, CaseStatementNode } from '@/ast/types'
+import { CaseStatementNode, ParserInput, ProgramNode } from '@/ast/types'
 import { parseStatement } from '@/parser/statements'
-import {
-  parseProgram,
-  parseProcedureDeclaration,
-  parseFunctionDeclaration,
-  parseBlock,
-} from '@/parser/declarations'
+import { parseFunctionDeclaration, parseProcedureDeclaration } from '@/parser/declarations'
 import { parse } from '@/index'
-import { describe, test, expect } from 'vitest'
+import { describe, expect, test } from 'vitest'
+
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }
 }

@@ -1,5 +1,6 @@
-import { PascalTest, runPascalTest, runPascalTests } from '../_helper'
-import { describe, test, expect } from 'vitest'
+import { PascalTest, runPascalTests } from './_helper'
+import { describe } from 'vitest'
+
 const tests: PascalTest[] = [
   // ==========================================================================
   // 从 m3.5 复制的测试用例 - 验证解析和执行

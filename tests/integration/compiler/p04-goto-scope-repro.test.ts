@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest'
-import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from './_helper'
 
 // 复现 tangle-official.pas DEBUGHELP 中 GOTO 888 的作用域问题
 // 关键结构：GOTO 888 和 888: 在同一个 CompoundStatement 中

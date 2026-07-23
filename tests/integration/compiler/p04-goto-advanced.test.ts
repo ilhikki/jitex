@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest'
-import { runPascalTest, type PascalTest, runPascalTests } from '../_helper'
+import { describe } from 'vitest'
+import { type PascalTest, runPascalTests } from './_helper'
 
 // 高级 goto 测试：非正常场景 + 嵌套非透明块多 label
 // 防死循环：每个可能导致死循环的测试都设置了 maxSteps

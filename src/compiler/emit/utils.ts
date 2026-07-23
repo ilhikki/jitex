@@ -1,4 +1,4 @@
-import type { BlockNode } from '../../ast/types'
+import type { BlockNode } from '@/ast/types'
 
 export const BUILTIN_SYSCALLS = new Set([
   'WRITE',

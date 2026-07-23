@@ -1,5 +1,6 @@
-﻿import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-import { describe, test, expect } from 'vitest'
+﻿import { ConformanceTest, makeProgram, makeProgramWithVars, runParseTests } from './_helper'
+import { describe } from 'vitest'
+
 const tests: ConformanceTest[] = [
   // ==========================================================================
   // 1. 空程序与最小程序（5个）
@@ -340,9 +341,5 @@ const tests: ConformanceTest[] = [
 ]
 
 describe('M3.5 Parser Boundary Conformance', () => {
-  tests.forEach((t) => {
-    test(t.name, () => {
-      runParseTest(t)
-    })
-  })
+  runParseTests(tests)
 })

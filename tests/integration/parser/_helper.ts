@@ -1,11 +1,14 @@
 import { parse } from '@/index'
-import { expect } from 'vitest'
+import { expect, test } from 'vitest'
 
 export interface ConformanceTest {
   name: string
   code: string
   purpose: string
   shouldParse: boolean
+}
+export function runParseTests(t: ConformanceTest[]) {
+  t.forEach((testCase) => test(testCase.name, () => runParseTest(testCase)))
 }
 
 export function runParseTest(t: ConformanceTest) {
@@ -14,7 +17,7 @@ export function runParseTest(t: ConformanceTest) {
     result = parse(t.code) as any
   } catch (e: any) {
     if (t.shouldParse) {
-      throw new Error(
+      expect.fail(
         `Expected parse to succeed but it threw:\n` +
           `  Test: ${t.name}\n` +
           `  Purpose: ${t.purpose}\n` +
@@ -27,9 +30,10 @@ export function runParseTest(t: ConformanceTest) {
     }
     return
   }
+
   if (t.shouldParse) {
     if (!result.success) {
-      throw new Error(
+      expect.fail(
         `Expected parse to succeed but it failed:\n` +
           `  Test: ${t.name}\n` +
           `  Purpose: ${t.purpose}\n` +
@@ -43,7 +47,7 @@ export function runParseTest(t: ConformanceTest) {
     expect(result.astNode).toBeDefined()
   } else {
     if (result.success) {
-      throw new Error(
+      expect.fail(
         `Expected parse to fail but it succeeded:\n` +
           `  Test: ${t.name}\n` +
           `  Purpose: ${t.purpose}\n` +

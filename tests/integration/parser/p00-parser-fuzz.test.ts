@@ -1,5 +1,6 @@
-import { ConformanceTest, runParseTest, makeProgram, makeProgramWithVars } from './_helper'
-import { describe, test, expect } from 'vitest'
+import { ConformanceTest, makeProgram, makeProgramWithVars, runParseTests } from './_helper'
+import { describe } from 'vitest'
+
 function repeatStr(s: string, n: number): string {
   let result = ''
   for (let i = 0; i < n; i++) result += s
@@ -1218,9 +1219,5 @@ end.`,
 ]
 
 describe('M3.5 Fuzz Tests', () => {
-  tests.forEach((t) => {
-    test(t.name, () => {
-      runParseTest(t)
-    })
-  })
+  runParseTests(tests)
 })

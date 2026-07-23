@@ -1,4 +1,4 @@
-import type { PascalValue, SysCallHandler, TypeTable, RuntimeCtx } from '../types/types'
+import type { PascalValue, SysCallHandler, TypeTable } from '@/types'
 import type { PascalFile } from './file-model'
 
 function formatValueWithTable(
