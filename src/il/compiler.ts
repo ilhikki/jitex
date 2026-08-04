@@ -708,6 +708,9 @@ function compileProcedureCall(
       return [evalStmt(syscall('file.put', node.arguments.map((x) => compileExpr(x, a, ws))))]
     case 'break':
       return [evalStmt(syscall('io.break', []))]
+    case 'break_in':
+      // UCSD/Borland 扩展：清除终端输入缓冲区。模拟环境中为空操作。
+      return [evalStmt(syscall('io.break', []))]
     case 'page':
       return [evalStmt(syscall('io.page', node.arguments.map((x) => compileExpr(x, a, ws))))]
     case 'new':
