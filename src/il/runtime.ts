@@ -51,8 +51,7 @@ export interface RuntimeContext {
   steps: number
   maxSteps: number
   programFileUrls: Record<string, string>
-  /**
-   * 非标特性扩展列表（见 AGENTS.md 原则 A 标准锚定）。
+  /** 非标特性扩展列表（见 AGENTS.md 原则 A 标准锚定）。
    * 默认未启用的非标特性遇到即抛错。
    */
   extensions: Set<string>
@@ -123,6 +122,8 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
     case 'rec.set':
       args[0][args[1]] = args[2]
       return undefined
+    case 'rec.copy':
+      return deepCopyValue(args[0])
 
     // ---------- mem.default（变量初始化）----------
     // type 字面量由 literalToJs 直接作为 JS 对象字面量返回，无需 JSON.parse
@@ -317,15 +318,20 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
     case 'file.create':
       return { url: '', offset: 0 } as PascalFile
     case 'file.reset':
+      if (!args[0]) throw new Error(`file.reset: file is undefined`)
       resetFile(ctx, args[0])
       return undefined
     case 'file.rewrite':
+      if (!args[0]) throw new Error(`file.rewrite: file is undefined`)
       rewriteFile(ctx, args[0])
       return undefined
     case 'file.close':
       closeFile(ctx, args[0])
       return undefined
     case 'file.assign':
+      if (args[0] === undefined) {
+        throw new Error(`file.assign: file var is undefined (url=${args[1]})`)
+      }
       args[0].url = args[1]
       ctx.fileStates.delete(args[0] as PascalFile)
       return undefined
@@ -342,6 +348,7 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
     case 'file.peek':
       return peekFile(ctx, args[0])
     case 'file.eof':
+      if (!args[0]) throw new Error(`file.eof: file is undefined (typeof=${typeof args[0]})`)
       return isFileEof(ctx, args[0])
     case 'file.eoln':
       return isFileEoln(ctx, args[0])
@@ -396,6 +403,35 @@ function formatField(text: string, width: number): string {
 // ============================================================
 // 辅助函数：数组
 // ============================================================
+
+/**
+ * 深拷贝 Pascal 值（record 赋值语义）。
+ * Pascal 中 record/array 赋值是值拷贝，但 JS 对象赋值是引用。
+ * 此函数用于 `rec.copy` syscall，确保 record 赋值时产生独立副本。
+ *
+ * 规则：
+ *   - 标量（number/string/boolean）：直接返回
+ *   - Set：返回新 Set（元素是标量，无需递归）
+ *   - Uint8Array：返回新 Uint8Array
+ *   - Array：递归深拷贝每个元素
+ *   - PascalFile（含 url 属性）：共享引用（文件是引用语义）
+ *   - record（plain object）：递归深拷贝每个字段
+ */
+function deepCopyValue(v: any): any {
+  if (v === null || v === undefined) return v
+  if (typeof v !== 'object') return v
+  if (v instanceof Set) return new Set(v)
+  if (v instanceof Uint8Array) return new Uint8Array(v)
+  if (Array.isArray(v)) return v.map(deepCopyValue)
+  // PascalFile：文件是引用语义，共享引用
+  if (typeof v.url === 'string' && typeof v.offset === 'number') return v
+  // record：递归深拷贝每个字段
+  const copy: Record<string, any> = {}
+  for (const k of Object.keys(v)) {
+    copy[k] = deepCopyValue(v[k])
+  }
+  return copy
+}
 
 function getArrayElement(arr: any, indices: any[]): any {
   let cur = arr

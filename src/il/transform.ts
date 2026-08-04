@@ -43,6 +43,8 @@ export interface TransformOptions {
   programFileUrls?: Record<string, string>
   /** 非标特性扩展（传递给 analysis 做语义检查） */
   extensions?: string[]
+  /** 调试模式：生成带可读变量名的 JS 代码（v{id}_{name}） */
+  debug?: boolean
 }
 
 // ============================================================
@@ -94,9 +96,9 @@ function applyProgramFileUrls(
   // bug 22 修复：file.assign 必须在变量初始化之后执行，
   // 否则文件变量还未被 mem.default/file.create 初始化（为 undefined），
   // 导致 args[0].url = ... 报 "Cannot set properties of undefined"。
-  // 变量初始化语句数量 = locals.length + (retval ? 1 : 0)
-  const info = a.funcInfo(fn.id)
-  const initCount = info.locals.length + (info.retval ? 1 : 0)
+  // 使用 compileBlock 记录的 initCount，而非 info.locals.length，
+  // 因为编译阶段 allocTempLocal 会向 info.locals 追加 cell 临时变量。
+  const initCount = fn.initCount ?? 0
 
   return {
     ...fn,
@@ -257,7 +259,10 @@ export function transform(source: string, options: TransformOptions = {}): strin
 
   // 5. toJs
   const semantic = new PascalSemanticCompiler()
-  const jsBody = toJs(jsonCode, { semantic })
+  const jsBody = toJs(jsonCode, {
+    semantic,
+    debugNames: options.debug ? analysis.debugNames() : undefined,
+  })
 
   // 6. 包装：返回可执行的 JS 代码
   //    __sys 通过闭包在生成的函数内部可见
@@ -299,7 +304,7 @@ export function run(source: string, options: RunOptions = {}): RunState {
     // 编译或执行出错：保留已产生的输出
     const error: RunError = {
       message: e?.message || String(e),
-      stackTrace: [],
+      stackTrace: e?.stack ? String(e.stack).split('\n').slice(0, 10) : [],
     }
     return toRunState(ctx, 'error', error)
   }

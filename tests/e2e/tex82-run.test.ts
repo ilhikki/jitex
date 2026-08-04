@@ -1,27 +1,27 @@
 import { parse } from '@/index'
-import { compileToJS, runJS } from '@/index'
+import { transform, run as runIL } from '@/il/transform'
 import { loadTexResources, runTangle } from './_helper'
 import { describe, test, expect, beforeAll } from 'vitest'
 
-describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
+describe('TEX82 - run tex.pas on IL', () => {
   const resources = loadTexResources()
 
   let texPas: string = ''
 
-  beforeAll(async () => {
-    const result = await runTangle(resources.tanglePas, resources.texWeb)
+  beforeAll(() => {
+    const result = runTangle(resources.tanglePas, resources.texWeb)
     texPas = result.pascal
     console.log('tex.pas size:', texPas.length, 'chars')
   }, 600000)
 
-  test('run tex.pas (initialization)', async () => {
+  test('run tex.pas (initialization)', () => {
     const result = parse(texPas)
     expect(result.success).toBe(true)
     if (!result.success) return
 
     let jsCode: string
     expect(() => {
-      jsCode = compileToJS(texPas)
+      jsCode = transform(texPas, { extensions: ['string'] })
     }).not.toThrow()
     expect(jsCode!.length).toBeGreaterThan(0)
 
@@ -31,7 +31,7 @@ describe.skip('TEX82 - run tex.pas on JS - SKIPPED until Phase 7', () => {
     files.set('TEXLOG', new Uint8Array())
     files.set('TEXDVI', new Uint8Array())
 
-    const state = await runJS(texPas, {
+    const state = runIL(texPas, {
       input: [],
       files,
       extensions: ['string'],

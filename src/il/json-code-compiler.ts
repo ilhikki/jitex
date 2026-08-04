@@ -2,6 +2,8 @@ import { JsonCode } from '@/il/json-code'
 
 export interface ToJsOptions {
   semantic?: SemanticCompiler
+  /** id → 可读名字映射。提供时，生成的变量/函数名变为 v{id}_{name}，便于调试。 */
+  debugNames?: Map<number, string>
 }
 
 export interface SemanticCompiler {
@@ -161,6 +163,10 @@ class JsCompilerImpl implements JsCompiler {
   }
 
   compileId(id: number): string {
+    const name = this.options.debugNames?.get(id)
+    if (name) {
+      return `v${id}_${name}`
+    }
     return `v${id}`
   }
 

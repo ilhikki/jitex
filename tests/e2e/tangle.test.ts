@@ -4,7 +4,7 @@ import { lex } from '@/lexer/lexer'
 import { resourcePath, TANGLE_PAS } from './_helper'
 import { describe, test, expect } from 'vitest'
 
-describe.skip('Tangle Official - SKIPPED until Phase 7', () => {
+describe('Tangle Official - parse', () => {
   const pasFile = resourcePath(TANGLE_PAS)
 
   test('should parse tangle-official.pas without error', () => {

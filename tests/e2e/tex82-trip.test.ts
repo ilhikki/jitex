@@ -1,19 +1,17 @@
 import { parse } from '@/index'
-import { runJS } from '@/index'
+import { run as runIL } from '@/il/transform'
 import { loadTexResources, readResource, runTangle, TRIP_TEX } from './_helper'
-import { createExtendedSysCalls } from '@/runtime'
 import { describe, test, expect, beforeAll } from 'vitest'
-const extendedSysCalls = createExtendedSysCalls()
 
-describe.skip('TEX82 - TRIP test (JS) - SKIPPED until Phase 7', () => {
+describe('TEX82 - TRIP test (IL)', () => {
   const resources = loadTexResources()
   const tripTex = readResource(TRIP_TEX)
 
   let texPas: string = ''
   let texPool: string = ''
 
-  beforeAll(async () => {
-    const result = await runTangle(resources.tanglePas, resources.texWeb)
+  beforeAll(() => {
+    const result = runTangle(resources.tanglePas, resources.texWeb)
     texPas = result.pascal
     texPool = result.pool
     console.log('tex.pas size:', texPas.length, 'chars')
@@ -21,7 +19,7 @@ describe.skip('TEX82 - TRIP test (JS) - SKIPPED until Phase 7', () => {
     console.log('tex.pool first 200 chars:', JSON.stringify(texPool.slice(0, 200)))
   }, 600000)
 
-  test('compile trip.tex with TEX82', async () => {
+  test('compile trip.tex with TEX82', () => {
     const result = parse(texPas)
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -37,11 +35,10 @@ describe.skip('TEX82 - TRIP test (JS) - SKIPPED until Phase 7', () => {
     files.set('trip.dvi', new Uint8Array())
     files.set('trip.tfm', new Uint8Array())
 
-    const state = await runJS(texPas, {
+    const state = runIL(texPas, {
       input: [],
       files,
       extensions: ['string'],
-      sysCalls: extendedSysCalls,
       maxSteps: 1e9,
     })
 
@@ -63,5 +60,5 @@ describe.skip('TEX82 - TRIP test (JS) - SKIPPED until Phase 7', () => {
     console.log('trip.dvi size:', dviContent.length, 'bytes')
 
     expect(['terminated', 'error']).toContain(state.status)
-  })
+  }, 600000)
 })

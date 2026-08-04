@@ -164,6 +164,8 @@ export class Analyzer {
   private typeNodeInfo = new Map<TypeNode, TypeInfo>()
   private typeAliases = new Map<string, TypeInfo>()
   private globalBindings = new Map<string, Symbol>()
+  /** id → 可读名字（调试用，仅 json-code-compiler 读取） */
+  private idNames = new Map<number, string>()
   /** 非标特性扩展（AGENTS.md 原则 A） */
   private extensions: Set<string> = new Set()
   /** 非透明块深度（while/for/if/repeat/case/with 体内部） */
@@ -227,6 +229,13 @@ export class Analyzer {
     return this.nextId_++
   }
 
+  /** 记录 id 对应的可读名字（仅调试用） */
+  private recordName(id: number, name: string): void {
+    // 名字清理：只保留字母数字下划线，转小写
+    const cleaned = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+    if (cleaned) this.idNames.set(id, cleaned)
+  }
+
   // --------------------------------------------------------
   // 作用域
   // --------------------------------------------------------
@@ -276,6 +285,11 @@ export class Analyzer {
     parentFuncId: number | null
   ): number {
     const funcId = this.allocId()
+    if (decl) {
+      this.recordName(funcId, decl.name.name)
+    } else {
+      this.recordName(funcId, 'main')
+    }
     const info: FuncInfo = {
       funcId,
       parentFuncId,
@@ -313,7 +327,9 @@ export class Analyzer {
         if (funcLabels.has(lit.value)) {
           throw new Error(`Duplicate label declaration: ${lit.value}`)
         }
-        funcLabels.set(lit.value, { labelId: this.allocId(), funcId })
+        const labelId = this.allocId()
+        this.recordName(labelId, `label_${lit.value}`)
+        funcLabels.set(lit.value, { labelId, funcId })
       }
     }
 
@@ -340,18 +356,27 @@ export class Analyzer {
           throw new Error(`Identifier '${name.name}' already declared in this scope`)
         }
         const varId = this.allocId()
+        this.recordName(varId, name.name)
         const sym: VarSymbol = { kind: 'var', varId, typeInfo: ti, isVarParam: false }
         info.locals.push(sym)
         this.bind(name.name, sym)
       }
     }
 
-    // PROCEDURE / FUNCTION
+    // PROCEDURE / FUNCTION — 两遍分析：
+    // 第一遍：bind 所有 proc/func 名字（Pascal 中同 block 的兄弟函数互可见）
+    // 第二遍：分析函数体（此时所有兄弟函数的名字都已绑定）
     for (const p of block.procedureDeclarations) {
-      this.analyzeProcDecl(p)
+      this.declareProcName(p)
     }
     for (const f of block.functionDeclarations) {
-      this.analyzeFuncDecl(f)
+      this.declareFuncName(f)
+    }
+    for (const p of block.procedureDeclarations) {
+      this.analyzeProcBody(p)
+    }
+    for (const f of block.functionDeclarations) {
+      this.analyzeFuncBody(f)
     }
 
     // COMPOUND
@@ -616,7 +641,7 @@ export class Analyzer {
     return false
   }
 
-  private analyzeProcDecl(decl: ProcedureDeclarationNode): void {
+  private declareProcName(decl: ProcedureDeclarationNode): void {
     const parentFuncId = this.currentScope().funcId
     const declNameLower = decl.name.name.toLowerCase()
     let funcId = this.forwardFuncs.get(declNameLower)
@@ -634,17 +659,19 @@ export class Analyzer {
     if (decl.isForward) {
       this.forwardFuncs.set(declNameLower, funcId)
     }
-
-    if (decl.block) {
-      this.funcInfos.get(funcId)!.hasBody = true
-      this.pushScope(funcId)
-      this.analyzeParams(funcId, decl.parameters, false)
-      this.analyzeBlock(decl.block, funcId)
-      this.popScope()
-    }
   }
 
-  private analyzeFuncDecl(decl: FunctionDeclarationNode): void {
+  private analyzeProcBody(decl: ProcedureDeclarationNode): void {
+    if (!decl.block) return
+    const funcId = this.declFunc.get(decl)!
+    this.funcInfos.get(funcId)!.hasBody = true
+    this.pushScope(funcId)
+    this.analyzeParams(funcId, decl.parameters, false)
+    this.analyzeBlock(decl.block, funcId)
+    this.popScope()
+  }
+
+  private declareFuncName(decl: FunctionDeclarationNode): void {
     const parentFuncId = this.currentScope().funcId
     const declNameLower = decl.name.name.toLowerCase()
     let funcId = this.forwardFuncs.get(declNameLower)
@@ -666,30 +693,34 @@ export class Analyzer {
     if (decl.isForward) {
       this.forwardFuncs.set(declNameLower, funcId)
     }
+  }
 
-    if (decl.block) {
-      this.funcInfos.get(funcId)!.hasBody = true
-      this.pushScope(funcId)
+  private analyzeFuncBody(decl: FunctionDeclarationNode): void {
+    if (!decl.block) return
+    const funcId = this.declFunc.get(decl)!
+    const retTypeInfo = this.resolveTypeInfo(decl.returnType)
+    this.funcInfos.get(funcId)!.hasBody = true
+    this.pushScope(funcId)
 
-      this.analyzeParams(funcId, decl.parameters, false)
+    this.analyzeParams(funcId, decl.parameters, false)
 
-      // retval 变量
-      const retvalId = this.allocId()
-      const retvalSym: VarSymbol = {
-        kind: 'var',
-        varId: retvalId,
-        typeInfo: retTypeInfo,
-        isVarParam: false,
-      }
-      const info = this.funcInfos.get(funcId)!
-      info.retval = retvalSym
-      // 注意：不在内层作用域绑定函数名为 var（retval）。
-      // 函数名在外层已绑定为 func，函数体内递归调用需要找到 func 符号。
-      // compiler 在处理 funcName := expr 时通过 funcInfo(funcId).retval 获取 retval varId。
-
-      this.analyzeBlock(decl.block, funcId)
-      this.popScope()
+    // retval 变量
+    const retvalId = this.allocId()
+    this.recordName(retvalId, `${decl.name.name}_retval`)
+    const retvalSym: VarSymbol = {
+      kind: 'var',
+      varId: retvalId,
+      typeInfo: retTypeInfo,
+      isVarParam: false,
     }
+    const info = this.funcInfos.get(funcId)!
+    info.retval = retvalSym
+    // 注意：不在内层作用域绑定函数名为 var（retval）。
+    // 函数名在外层已绑定为 func，函数体内递归调用需要找到 func 符号。
+    // compiler 在处理 funcName := expr 时通过 funcInfo(funcId).retval 获取 retval varId。
+
+    this.analyzeBlock(decl.block, funcId)
+    this.popScope()
   }
 
   private analyzeParams(
@@ -702,11 +733,15 @@ export class Analyzer {
       const ti = this.resolveTypeInfo(p.type)
       for (const name of p.names) {
         const varId = this.allocId()
+        this.recordName(varId, name.name)
         const sym: VarSymbol = {
           kind: 'param',
           varId,
           typeInfo: ti,
-          isVarParam: p.isVar,
+          // ISO 7185: 文件类型本身就是引用语义（隐式按引用传递），
+          // 不需要 cell 包装。文件变量赋值在 Pascal 中非法，
+          // 所以无需通过 cell 支持写回。
+          isVarParam: p.isVar && ti.tag !== 'file',
         }
         info.params.push(sym)
         this.bind(name.name, sym)
@@ -816,9 +851,11 @@ export class Analyzer {
         const newEntries: { fields: Map<string, TypeInfo> }[] = []
         for (const r of node.records) {
           const ti = this.analyzeExpr(r)
+          const withId = this.allocId()
+          this.recordName(withId, 'with_temp')
           temps.push({
             kind: 'var',
-            varId: this.allocId(),
+            varId: withId,
             typeInfo: ti,
             isVarParam: false,
           })
@@ -992,6 +1029,9 @@ export class Analyzer {
         const objType = this.analyzeExpr(node.object)
         if (objType.tag === 'rec' && objType.fields) {
           info = objType.fields.get(node.field.name.toLowerCase()) ?? { tag: 'unknown' }
+        } else if (node.field.name === '^' && objType.tag === 'file') {
+          // 文件缓冲区访问 F^：返回文件元素类型（text 文件为 char）
+          info = objType.fileElem ?? { tag: 'char' }
         } else {
           info = { tag: 'unknown' }
         }
@@ -1120,6 +1160,9 @@ export class Analyzer {
       globalSymbolOf(name) {
         return self.globalBindings.get(name.toLowerCase())
       },
+      debugNames() {
+        return new Map(self.idNames)
+      },
     }
   }
 }
@@ -1143,6 +1186,8 @@ export interface Analysis {
   typeTagOfTypeNode(node: TypeNode): TypeInfo
   evalConstInt(node: ExpressionNode): number | undefined
   globalSymbolOf(name: string): Symbol | undefined
+  /** id → 可读名字映射（调试用，仅 json-code-compiler 读取） */
+  debugNames(): Map<number, string>
 }
 
 // ============================================================

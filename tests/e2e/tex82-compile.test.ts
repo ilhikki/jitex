@@ -1,14 +1,14 @@
 import { parse } from '@/index'
-import { compileToJS } from '@/index'
+import { transform } from '@/il/transform'
 import { loadTexResources, runTangle } from './_helper'
 import { describe, test, beforeAll, expect } from 'vitest'
-describe.skip('TEX82 - compile and analyze tex.pas (JS) - SKIPPED until Phase 7', () => {
+describe('TEX82 - compile and analyze tex.pas (IL)', () => {
   const resources = loadTexResources()
 
   let texPas: string = ''
 
-  beforeAll(async () => {
-    const result = await runTangle(resources.tanglePas, resources.texWeb)
+  beforeAll(() => {
+    const result = runTangle(resources.tanglePas, resources.texWeb)
     expect(result.state.status).toBe('terminated')
     texPas = result.pascal
     console.log('tex.pas size:', texPas.length, 'chars')
@@ -22,20 +22,19 @@ describe.skip('TEX82 - compile and analyze tex.pas (JS) - SKIPPED until Phase 7'
     expect(result.success).toBe(true)
   })
 
-  test('compile tex.pas to JS succeeds', () => {
+  test('compile tex.pas to JS succeeds (IL)', () => {
     const parseResult = parse(texPas)
     expect(parseResult.success).toBe(true)
     if (!parseResult.success) return
 
     let jsCode: string
     expect(() => {
-      jsCode = compileToJS(texPas)
+      jsCode = transform(texPas, { extensions: ['string'] })
     }).not.toThrow()
     if (!jsCode!) return
 
     expect(jsCode.length).toBeGreaterThan(0)
-    expect(jsCode).toContain('async function')
 
-    console.log('TEX compiled OK, JS code size:', jsCode!.length, 'chars')
+    console.log('TEX compiled OK (IL), JS code size:', jsCode!.length, 'chars')
   })
 })

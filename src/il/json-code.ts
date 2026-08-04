@@ -95,6 +95,10 @@ export namespace JsonCode {
     locals: VarId[]
     children: Function[]
     body: Statement[]
+    /** body 中变量初始化语句的数量（compileBlock 填充）。
+     *  applyProgramFileUrls 用此值确定 file.assign 的插入位置。
+     *  不能用 info.locals.length，因为编译阶段 allocTempLocal 会修改 info.locals。 */
+    initCount?: number
   }
 
   // ------------------------------------------------------------

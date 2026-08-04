@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { runJS } from '@/index'
+import { run as runIL } from '@/il/transform'
 
 export function readResource(name: string): string {
   return fs.readFileSync(path.join(__dirname, 'resources', name), 'utf-8')
@@ -24,14 +24,14 @@ export interface TangleResult {
   files: Map<string, Uint8Array>
 }
 
-export async function runTangle(pasSource: string, webContent: string): Promise<TangleResult> {
+export function runTangle(pasSource: string, webContent: string): TangleResult {
   const files = new Map<string, Uint8Array>()
   files.set('WEBFILE', new Uint8Array(Buffer.from(webContent, 'utf-8')))
   files.set('CHANGEFILE', new Uint8Array())
   files.set('PASCALFILE', new Uint8Array())
   files.set('POOL', new Uint8Array())
 
-  const state = await runJS(pasSource, {
+  const state = runIL(pasSource, {
     input: [],
     files,
     programFileUrls: {
@@ -40,7 +40,7 @@ export async function runTangle(pasSource: string, webContent: string): Promise<
       PASCALFILE: 'PASCALFILE',
       POOL: 'POOL',
     },
-    maxSteps: undefined,
+    maxSteps: 1e9,
     extensions: ['string'],
   })
 
@@ -65,10 +65,10 @@ export function loadTexResources(): TexResources {
   }
 }
 
-export async function compileTexPas(
+export function compileTexPas(
   resources: TexResources
-): Promise<{ pas: string; pool: string }> {
-  const result = await runTangle(resources.tanglePas, resources.texWeb)
+): { pas: string; pool: string } {
+  const result = runTangle(resources.tanglePas, resources.texWeb)
   if (result.state.status !== 'terminated') {
     throw new Error(`TANGLE failed: ${result.state.status} - ${result.state.error?.message}`)
   }

@@ -1,10 +1,10 @@
 import { loadTexResources, runTangle } from './_helper'
 import { describe, test, expect } from 'vitest'
-describe.skip('TEX82 - TANGLE compile tex.web (JS) - SKIPPED until Phase 7', () => {
+describe('TEX82 - TANGLE compile tex.web (IL)', () => {
   const resources = loadTexResources()
 
-  test('tangle compiles tex.web → tex.pas', async () => {
-    const result = await runTangle(resources.tanglePas, resources.texWeb)
+  test('tangle compiles tex.web → tex.pas', () => {
+    const result = runTangle(resources.tanglePas, resources.texWeb)
     console.log('Status:', result.state.status)
     if (result.state.error) {
       console.log('Error:', result.state.error.message)

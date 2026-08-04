@@ -1,4 +1,5 @@
 import { runJS, compileToJS } from '@/index'
+import { run as runIL } from '@/il/transform'
 import { readResource, runTangle, TANGLE_PAS, TANGLE_WEB } from '../e2e/_helper'
 import { describe, test, expect, afterAll } from 'vitest'
 
@@ -334,6 +335,187 @@ end.`
         'record-access-100k',
         async () => {
           return await runJS(code)
+        },
+        5
+      )
+      results.push(r)
+      expect(r.status).toBe('success')
+    }, 60000)
+  })
+
+  describe('IL Benchmarks (new compiler)', () => {
+    test('arithmetic-heavy loop (IL)', async () => {
+      const code = `program bench;
+var i, x, y: integer;
+begin
+  x := 0;
+  y := 1;
+  for i := 1 to 100000 do
+    begin
+      x := x + i;
+      y := y * 2;
+      x := x - y;
+    end;
+  writeln('x=', x, ' y=', y);
+end.`
+
+      const r = await measureExecution(
+        'IL: arithmetic-loop-100k',
+        async () => {
+          return await runIL(code, { maxSteps: 1e9 })
+        },
+        5
+      )
+      results.push(r)
+      expect(r.status).toBe('success')
+    }, 60000)
+
+    test('array access loop (IL)', async () => {
+      const code = `program bench;
+const N = 10000;
+var arr: array[1..N] of integer;
+var i, sum: integer;
+begin
+  for i := 1 to N do
+    arr[i] := i * i;
+  sum := 0;
+  for i := 1 to N do
+    sum := sum + arr[i];
+  writeln('sum=', sum);
+end.`
+
+      const r = await measureExecution(
+        'IL: array-access-10k',
+        async () => {
+          return await runIL(code, { maxSteps: 1e9 })
+        },
+        5
+      )
+      results.push(r)
+      expect(r.status).toBe('success')
+    }, 60000)
+
+    test('string operations (IL)', async () => {
+      const code = `program bench;
+var s: string;
+var i: integer;
+begin
+  s := '';
+  for i := 1 to 10000 do
+    s := s + 'a';
+  writeln('len=', length(s));
+end.`
+
+      const r = await measureExecution(
+        'IL: string-concat-10k',
+        async () => {
+          return await runIL(code, { extensions: ['string'], maxSteps: 1e9 })
+        },
+        5
+      )
+      results.push(r)
+      expect(r.status).toBe('success')
+    }, 60000)
+
+    test('nested loops (IL)', async () => {
+      const code = `program bench;
+var i, j, k, sum: integer;
+begin
+  sum := 0;
+  for i := 1 to 100 do
+    for j := 1 to 100 do
+      for k := 1 to 100 do
+        sum := sum + i + j + k;
+  writeln('sum=', sum);
+end.`
+
+      const r = await measureExecution(
+        'IL: nested-loops-100x100x100',
+        async () => {
+          return await runIL(code, { maxSteps: 1e9 })
+        },
+        3
+      )
+      results.push(r)
+      expect(r.status).toBe('success')
+    }, 60000)
+
+    test('goto backward loop (IL)', async () => {
+      const code = `program bench;
+label 10;
+var i, sum: integer;
+begin
+  i := 0;
+  sum := 0;
+10:
+  i := i + 1;
+  sum := sum + i;
+  if i < 100000 then goto 10;
+  writeln('sum=', sum);
+end.`
+
+      const r = await measureExecution(
+        'IL: goto-backward-100k',
+        async () => {
+          return await runIL(code, { maxSteps: 1e9 })
+        },
+        5
+      )
+      results.push(r)
+      expect(r.status).toBe('success')
+    }, 60000)
+
+    test('procedure calls (IL)', async () => {
+      const code = `program bench;
+var sum: integer;
+
+procedure add(var x: integer; n: integer);
+begin
+  x := x + n;
+end;
+
+begin
+  sum := 0;
+  add(sum, 1);
+  add(sum, 2);
+  add(sum, 4);
+  add(sum, 8);
+  writeln('sum=', sum);
+end.`
+
+      const r = await measureExecution(
+        'IL: procedure-calls-4',
+        async () => {
+          return await runIL(code, { maxSteps: 1e9 })
+        },
+        10
+      )
+      results.push(r)
+      expect(r.status).toBe('success')
+    }, 60000)
+
+    test('record operations (IL)', async () => {
+      const code = `program bench;
+type
+  Point = record
+    x, y: integer;
+  end;
+
+var p: Point;
+var i: integer;
+begin
+  for i := 1 to 100000 do
+    begin
+      p.x := i;
+      p.y := i * 2;
+    end;
+  writeln('p.x=', p.x, ' p.y=', p.y);
+end.`
+
+      const r = await measureExecution(
+        'IL: record-access-100k',
+        async () => {
+          return await runIL(code, { maxSteps: 1e9 })
         },
         5
       )

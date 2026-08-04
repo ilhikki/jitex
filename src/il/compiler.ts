@@ -258,6 +258,10 @@ function compileBlock(
   const body: JsonCode.Statement[] = []
 
   // 变量初始化
+  // 注意：记录此时 info.locals.length，因为编译 compound 语句时
+  // allocTempLocal 会向 info.locals 追加 cell 临时变量，
+  // 导致 applyProgramFileUrls 中 initCount 计算偏大。
+  const initCount = info.locals.length + (info.retval ? 1 : 0)
   for (const local of info.locals) {
     body.push(assignStmt(ref(local.varId), defaultExpr(local.typeInfo)))
   }
@@ -283,6 +287,7 @@ function compileBlock(
     locals,
     children,
     body,
+    initCount,
   }
 }
 
@@ -345,7 +350,14 @@ function compileAssignment(
   funcId: number,
   ws: WithBinding[]
 ): JsonCode.Statement[] {
-  const value = compileExpr(node.right, a, ws)
+  // Pascal record 赋值是值拷贝语义（ISO 7185），JS 对象赋值是引用。
+  // 若左值类型为 record，用 rec.copy 深拷贝右值，避免别名共享。
+  const lvalueType = a.typeOf(node.left)
+  const needRecCopy = lvalueType.tag === 'rec'
+  let value = compileExpr(node.right, a, ws)
+  if (needRecCopy) {
+    value = syscall('rec.copy', [value])
+  }
 
   // 简单变量
   if (node.left.kind === 'Identifier') {
@@ -394,7 +406,14 @@ function compileAssignment(
   if (node.left.kind === 'ArrayAccess') {
     const arr = node.left as ArrayAccessNode
     const arrExpr = compileExpr(arr.array, a, ws)
-    const idxExprs = arr.indices.map((i) => compileExpr(i, a, ws))
+    const idxExprs = arr.indices.map((i) => {
+      const expr = compileExpr(i, a, ws)
+      const ti = a.typeOf(i)
+      if (ti.tag === 'char') {
+        return syscall('cast.char.to.i64', [expr])
+      }
+      return expr
+    })
     return [evalStmt(syscall('array.set', [arrExpr, ...idxExprs, value]))]
   }
 
@@ -734,7 +753,12 @@ function compileUserCallStmt(
         }
       }
     } else {
-      argExprs.push(compileExpr(args[i], a, ws))
+      // Pascal value 参数传递是值拷贝语义（ISO 7185），record 类型需深拷贝
+      let argExpr = compileExpr(args[i], a, ws)
+      if (param.typeInfo.tag === 'rec') {
+        argExpr = syscall('rec.copy', [argExpr])
+      }
+      argExprs.push(argExpr)
     }
   }
 
@@ -1181,7 +1205,16 @@ function compileArrayAccess(
   ws: WithBinding[]
 ): JsonCode.Expr {
   const arr = compileExpr(node.array, a, ws)
-  const indices = node.indices.map((i) => compileExpr(i, a, ws))
+  const indices = node.indices.map((i) => {
+    const expr = compileExpr(i, a, ws)
+    // Pascal CHAR 作为数组索引时，需转成 ord（charCodeAt），
+    // 否则 JS 中 arr['A'] 访问属性而非 arr[65]
+    const ti = a.typeOf(i)
+    if (ti.tag === 'char') {
+      return syscall('cast.char.to.i64', [expr])
+    }
+    return expr
+  })
   return syscall('array.get', [arr, ...indices])
 }
 

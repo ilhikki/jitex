@@ -1,7 +1,7 @@
 import { BlockNode, parse, ProgramNode } from '@/index'
 import { readResource, TANGLE_PAS } from './_helper'
 import { describe, test, expect } from 'vitest'
-describe.skip('Tangle Official Verification - SKIPPED until Phase 7', () => {
+describe('Tangle Official Verification', () => {
   const source = readResource(TANGLE_PAS)
   const result = parse(source)
 
