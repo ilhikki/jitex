@@ -593,7 +593,10 @@ function compileGoto(
   // 决策 13：goto 跳转前插入 steps.check，防止 goto 死循环（steps.check 只在循环回边
   // 插入，goto 跳转不触发回边检查，需单独兜底）
   const check = evalStmt(syscall('steps.check', []))
-  if (info.funcId === funcId) {
+  // label 使用位置的 funcId：label 可能在祖先函数声明，但在后代函数使用。
+  // longJump 需跳到使用位置（有 labelStmt 的函数），而非声明位置。
+  const useFuncId = a.labelUseFuncOf(info.labelId) ?? info.funcId
+  if (useFuncId === funcId) {
     return [check, jumpStmt(info.labelId)]
   }
   return [
@@ -601,7 +604,7 @@ function compileGoto(
     {
       kind: 'longJump',
       labelId: info.labelId,
-      functionId: info.funcId,
+      functionId: useFuncId,
     },
   ]
 }

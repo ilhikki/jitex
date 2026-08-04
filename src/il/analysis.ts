@@ -164,12 +164,27 @@ export class Analyzer {
   private typeNodeInfo = new Map<TypeNode, TypeInfo>()
   private typeAliases = new Map<string, TypeInfo>()
   private globalBindings = new Map<string, Symbol>()
+  /** 非标特性扩展（AGENTS.md 原则 A） */
+  private extensions: Set<string> = new Set()
+  /** 非透明块深度（while/for/if/repeat/case/with 体内部） */
+  private nonTransparentDepth = 0
+  /** label 出现的非透明块深度（key: labelId，全局唯一） */
+  private labelDepth = new Map<number, number>()
+  /** 延迟检查的 goto 列表（goto 可能先于 label 出现，需等所有 labelDepth 收集完再检查） */
+  private gotosToCheck: { labelVal: number; fromDepth: number; fromFuncId: number }[] = []
+  /** 已使用的 label（key: labelId，检测重复使用） */
+  private usedLabels = new Set<number>()
+  /** label 使用位置的 funcId（key: labelId）。
+   *  label 可能在祖先函数声明，但在后代函数使用（label 30 在 main 声明，在 level2 使用）。
+   *  longJump 需跳到使用位置，而非声明位置。 */
+  private labelUseFunc = new Map<number, number>()
 
   // --------------------------------------------------------
   // 分析入口
   // --------------------------------------------------------
 
-  analyze(program: ProgramNode): Analysis {
+  analyze(program: ProgramNode, extensions?: string[]): Analysis {
+    if (extensions) this.extensions = new Set(extensions)
     const topFuncId = this.allocFunc(program.block, null, false, null)
 
     this.pushScope(topFuncId)
@@ -177,7 +192,31 @@ export class Analyzer {
     this.globalBindings = this.currentScope().bindings
     this.popScope()
 
+    // post-check：所有 labelDepth 已收集完毕，现在检查 goto 规则
+    this.checkGotos()
+
     return this.freeze()
+  }
+
+  /** goto 规则检查（ISO 7185 6.8.1, 6.8.2.4） */
+  private checkGotos(): void {
+    for (const g of this.gotosToCheck) {
+      const labelInfo = this.findLabel(g.fromFuncId, g.labelVal)
+      if (!labelInfo) {
+        throw new Error(`Goto to undeclared label: ${g.labelVal}`)
+      }
+      // 跨过程 goto：仅允许跳到祖先函数的 label
+      if (labelInfo.funcId !== g.fromFuncId) {
+        if (!this.isAncestorFunc(labelInfo.funcId, g.fromFuncId)) {
+          throw new Error(`Goto to label ${g.labelVal} in another procedure is forbidden (ISO 7185 6.8.2.4)`)
+        }
+      }
+      // 跳入非透明块检查：label 深度 > goto 深度 → 跳入结构体内部
+      const targetDepth = this.labelDepth.get(labelInfo.labelId)
+      if (targetDepth !== undefined && targetDepth > g.fromDepth) {
+        throw new Error(`Goto into structured statement body is forbidden (ISO 7185 6.8.2.4): label ${g.labelVal}`)
+      }
+    }
   }
 
   // --------------------------------------------------------
@@ -270,9 +309,11 @@ export class Analyzer {
         this.labels.set(funcId, funcLabels)
       }
       for (const lit of block.labelDeclarations.labels) {
-        if (!funcLabels.has(lit.value)) {
-          funcLabels.set(lit.value, { labelId: this.allocId(), funcId })
+        // 重复 label 声明检查（ISO 7185 6.2.2: 同一作用域内 label 唯一）
+        if (funcLabels.has(lit.value)) {
+          throw new Error(`Duplicate label declaration: ${lit.value}`)
         }
+        funcLabels.set(lit.value, { labelId: this.allocId(), funcId })
       }
     }
 
@@ -293,6 +334,11 @@ export class Analyzer {
     for (const v of block.variableDeclarations) {
       const ti = this.resolveTypeInfo(v.type)
       for (const name of v.names) {
+        // 参数名与局部变量同名检查（ISO 7185 6.2.2: 同一作用域内标识符唯一）
+        const existing = this.currentScope().bindings.get(name.name.toLowerCase())
+        if (existing && (existing.kind === 'var' || existing.kind === 'param')) {
+          throw new Error(`Identifier '${name.name}' already declared in this scope`)
+        }
         const varId = this.allocId()
         const sym: VarSymbol = { kind: 'var', varId, typeInfo: ti, isVarParam: false }
         info.locals.push(sym)
@@ -370,6 +416,10 @@ export class Analyzer {
     switch (node.kind) {
       case 'SimpleType': {
         const name = node.name.name.toLowerCase()
+        // 非标特性检查（AGENTS.md 原则 A.6）：string 类型未启用 extension 时报错
+        if (name === 'string' && !this.extensions.has('string')) {
+          throw new Error(`Non-standard type 'string' used without extension 'string' (ISO 7185 has no string type)`)
+        }
         const builtin = SIMPLE_TYPES[name]
         if (builtin) {
           info = builtin
@@ -422,12 +472,19 @@ export class Analyzer {
             else if (name === 'boolean') dims.push({ low: 0, high: 1 })
             else if (name === 'integer') dims.push({ low: 0, high: 2147483647 })
             else {
-              // 枚举类型
-              const sym = this.lookup(idx.name.name)
-              if (sym?.kind === 'type' && sym.typeInfo.tag === 'enum') {
-                dims.push({ low: 0, high: (sym.typeInfo.enumCount ?? 1) - 1 })
+              // 类型别名（可能是 subrange 或枚举）
+              const alias = this.typeAliases.get(name)
+              if (alias?.tag === 'subrange' && alias.low !== undefined && alias.high !== undefined) {
+                dims.push({ low: alias.low, high: alias.high })
               } else {
-                dims.push({ low: 0, high: 0 })
+                const sym = this.lookup(idx.name.name)
+                if (sym?.kind === 'type' && sym.typeInfo.tag === 'enum') {
+                  dims.push({ low: 0, high: (sym.typeInfo.enumCount ?? 1) - 1 })
+                } else if (sym?.kind === 'type' && sym.typeInfo.tag === 'subrange' && sym.typeInfo.low !== undefined && sym.typeInfo.high !== undefined) {
+                  dims.push({ low: sym.typeInfo.low, high: sym.typeInfo.high })
+                } else {
+                  dims.push({ low: 0, high: 0 })
+                }
               }
             }
           }
@@ -523,9 +580,41 @@ export class Analyzer {
     }
   }
 
+  private evalConstChar(node: ExpressionNode): string | undefined {
+    if (node.kind === 'CharLiteral') return node.value
+    if (node.kind === 'StringLiteral' && node.value.length === 1) return node.value
+    return undefined
+  }
+
   // --------------------------------------------------------
-  // Procedure / Function 声明
+  // Goto 语义检查辅助
   // --------------------------------------------------------
+
+  /** 沿 parentFuncId 链查找 label */
+  private findLabel(funcId: number, labelVal: number): { labelId: number; funcId: number } | undefined {
+    let fid: number | null = funcId
+    while (fid !== null) {
+      const funcLabels = this.labels.get(fid)
+      if (funcLabels) {
+        const info = funcLabels.get(labelVal)
+        if (info) return info
+      }
+      const finfo = this.funcInfos.get(fid)
+      fid = finfo ? finfo.parentFuncId : null
+    }
+    return undefined
+  }
+
+  /** 检查 ancestorFuncId 是否是 descFuncId 的祖先（含自身） */
+  private isAncestorFunc(ancestorFuncId: number, descFuncId: number): boolean {
+    let fid: number | null = descFuncId
+    while (fid !== null) {
+      if (fid === ancestorFuncId) return true
+      const finfo = this.funcInfos.get(fid)
+      fid = finfo ? finfo.parentFuncId : null
+    }
+    return false
+  }
 
   private analyzeProcDecl(decl: ProcedureDeclarationNode): void {
     const parentFuncId = this.currentScope().funcId
@@ -634,42 +723,94 @@ export class Analyzer {
       case 'CompoundStatement':
         for (const s of node.statements) this.analyzeStatement(s)
         return
-      case 'Assignment':
-        this.analyzeExpr(node.left)
-        this.analyzeExpr(node.right)
+      case 'Assignment': {
+        const lt = this.analyzeExpr(node.left)
+        const rt = this.analyzeExpr(node.right)
+        // 编译期 subrange 边界检查（ISO 7185 6.4.3.1）
+        if (lt.tag === 'subrange' && lt.low !== undefined && lt.high !== undefined) {
+          const constVal = this.evalConstInt(node.right)
+          if (constVal !== undefined && (constVal < lt.low || constVal > lt.high)) {
+            throw new Error(`Subrange assignment out of bounds: ${constVal} not in ${lt.low}..${lt.high}`)
+          }
+          // char subrange 检查
+          if (lt.baseTag === 'char') {
+            const constChar = this.evalConstChar(node.right)
+            if (constChar !== undefined) {
+              const code = constChar.charCodeAt(0)
+              if (code < lt.low || code > lt.high) {
+                throw new Error(`Subrange assignment out of bounds: '${constChar}' (code ${code}) not in ${lt.low}..${lt.high}`)
+              }
+            }
+          }
+        }
         return
+      }
       case 'IfStatement':
         this.analyzeExpr(node.condition)
+        this.nonTransparentDepth++
         this.analyzeStatement(node.thenBranch)
         if (node.elseBranch) this.analyzeStatement(node.elseBranch)
+        this.nonTransparentDepth--
         return
       case 'WhileStatement':
         this.analyzeExpr(node.condition)
+        this.nonTransparentDepth++
         this.analyzeStatement(node.body)
+        this.nonTransparentDepth--
         return
       case 'RepeatStatement':
+        this.nonTransparentDepth++
         for (const s of node.statements) this.analyzeStatement(s)
         this.analyzeExpr(node.untilCondition)
+        this.nonTransparentDepth--
         return
       case 'ForStatement':
         this.analyzeExpr(node.variable)
         this.analyzeExpr(node.initial)
         this.analyzeExpr(node.final)
+        this.nonTransparentDepth++
         this.analyzeStatement(node.body)
+        this.nonTransparentDepth--
         return
       case 'CaseStatement':
         this.analyzeExpr(node.expression)
+        this.nonTransparentDepth++
         for (const br of node.branches) {
           for (const lbl of br.labels) this.analyzeExpr(lbl)
           this.analyzeStatement(br.statement)
         }
         if (node.otherwise) this.analyzeStatement(node.otherwise)
+        this.nonTransparentDepth--
         return
-      case 'GotoStatement':
+      case 'GotoStatement': {
+        // 延迟检查：goto 可能先于 label 出现，记录信息等 post-check 处理
+        const labelVal = node.label.value
+        const scope = this.currentScope()
+        this.gotosToCheck.push({
+          labelVal,
+          fromDepth: this.nonTransparentDepth,
+          fromFuncId: scope.funcId,
+        })
         return
-      case 'LabeledStatement':
+      }
+      case 'LabeledStatement': {
+        // 记录 label 出现的非透明块深度（用 labelId 作为 key，全局唯一）
+        const lblVal = node.label.value
+        const scope = this.currentScope()
+        const labelInfo = this.findLabel(scope.funcId, lblVal)
+        if (labelInfo) {
+          // 重复 label 使用检查（ISO 7185 6.2.2: 同一 label 在代码中只能出现一次）
+          if (this.usedLabels.has(labelInfo.labelId)) {
+            throw new Error(`Duplicate label usage: ${lblVal}`)
+          }
+          this.usedLabels.add(labelInfo.labelId)
+          this.labelDepth.set(labelInfo.labelId, this.nonTransparentDepth)
+          // 记录使用位置 funcId（label 可能在祖先函数声明，但在本函数使用）
+          this.labelUseFunc.set(labelInfo.labelId, scope.funcId)
+        }
         this.analyzeStatement(node.statement)
         return
+      }
       case 'WithStatement': {
         const temps: VarSymbol[] = []
         const newEntries: { fields: Map<string, TypeInfo> }[] = []
@@ -692,7 +833,9 @@ export class Analyzer {
         for (const e of newEntries) {
           this.withStack.push(e)
         }
+        this.nonTransparentDepth++
         this.analyzeStatement(node.body)
+        this.nonTransparentDepth--
         // 弹出 withStack
         for (let i = 0; i < newEntries.length; i++) {
           this.withStack.pop()
@@ -827,6 +970,18 @@ export class Analyzer {
 
       case 'ArrayAccess': {
         const arrType = this.analyzeExpr(node.array)
+        // 编译期数组索引越界检查（ISO 7185 6.4.3.2）
+        if (arrType.tag === 'array' && arrType.dims) {
+          for (let i = 0; i < node.indices.length && i < arrType.dims.length; i++) {
+            const constIdx = this.evalConstInt(node.indices[i])
+            if (constIdx !== undefined) {
+              const dim = arrType.dims[i]
+              if (constIdx < dim.low || constIdx > dim.high) {
+                throw new Error(`Array index out of bounds: ${constIdx} not in ${dim.low}..${dim.high}`)
+              }
+            }
+          }
+        }
         for (const idx of node.indices) this.analyzeExpr(idx)
         // 递归取元素类型
         info = this.arrayElemType(arrType, node.indices.length)
@@ -932,6 +1087,9 @@ export class Analyzer {
         }
         return undefined
       },
+      labelUseFuncOf(labelId) {
+        return self.labelUseFunc.get(labelId)
+      },
       funcOfBlock(block) {
         const r = self.blockFunc.get(block)
         if (r === undefined) throw new Error('funcOfBlock: not found')
@@ -975,6 +1133,8 @@ export interface Analysis {
   allocTempLocal(funcId: number, typeInfo: TypeInfo): number
   symbolOf(node: IdentifierNode): Symbol | undefined
   labelInfo(funcId: number, labelNum: number): { labelId: number; funcId: number } | undefined
+  /** label 使用位置的 funcId（longJump 目标）。label 可能在祖先函数声明但在后代函数使用 */
+  labelUseFuncOf(labelId: number): number | undefined
   funcOfBlock(block: BlockNode): number
   funcOfDecl(decl: ProcedureDeclarationNode | FunctionDeclarationNode): number
   funcInfo(funcId: number): FuncInfo
@@ -989,6 +1149,6 @@ export interface Analysis {
 // 入口
 // ============================================================
 
-export function analyzeProgram(program: ProgramNode): Analysis {
-  return new Analyzer().analyze(program)
+export function analyzeProgram(program: ProgramNode, extensions?: string[]): Analysis {
+  return new Analyzer().analyze(program, extensions)
 }

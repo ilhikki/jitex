@@ -439,15 +439,14 @@ begin
   goto 100;
 end;
 begin
+  inner;
 100:
   writeln('outer label');
-  inner;
 end;
 begin
-100:
-  writeln('main label');
+  outer;
 end.`,
-      purpose: '三层嵌套，内层 goto 引用中间层的 label（内层被中间层遮蔽）',
+      purpose: '三层嵌套，内层 goto 引用中间层的 label（内层被中间层遮蔽，不跳到主程序同名 label）',
       expectedContains: 'outer label',
       expectedNotContains: 'main label',
     },

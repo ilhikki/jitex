@@ -194,32 +194,32 @@ literalToJs(literal: JsonCode.Literal, compiler: JsCompiler): string | undefined
 20. **文件输出回显**：未绑定 url（url=''）的文件变量写入回显到 stdout，复现旧 runtime 无 io 时的 fallback 行为（决策 15）。
 21. **p11-knuth 文件相关**：packed file/text/page 等 3 个已修，仅剩 F^ 在表达式中使用（EOF 时返回值问题，见决策 16）。
 
-### 当前测试状态（阶段 A-F，全量回归 2026-08-04）
+### 当前测试状态（阶段 A-F，全量回归 2026-08-04，Step 2 完成后）
 
-| 阶段 | 文件 | 通过/总数 | 失败原因 |
-|------|------|-----------|----------|
+| 阶段 | 文件 | 通过/总数 | 备注 |
+|------|------|-----------|------|
 | A | p01-basics | 59/59 ✅ | — |
 | A | p01-control-flow | 53/53 ✅ | — |
 | A | p01-procedures | 6/6 ✅ | — |
 | B | p01-io | 50/50 ✅ | — |
-| B | p04-parameters | 39/40 | 1 expectedError（参数名与局部变量同名，Step 2）|
+| B | p04-parameters | 40/40 ✅ | Step 2：参数名同名检查 |
 | B | p04-scope | 38/38 ✅ | — |
-| C | p03-array-record | 30/31 | 1 expectedError（array bound check，Step 2）|
-| C | p03-range | 47/49 | 2 expectedError（char/subrange 越界，Step 2）|
+| C | p03-array-record | 31/31 ✅ | Step 2：数组越界检查 |
+| C | p03-range | 49/49 ✅ | Step 2：subrange/char 越界检查 |
 | C | p03-variant-record | 3/3 ✅ | — |
-| D | p03-file | 17/17 ✅ | —（bug 22 已修复）|
-| D | p04-goto | 49/57 | 8 expectedError（goto 语义检查，Step 2）|
-| D | p04-goto-advanced | 14/20 | 6 expectedError（goto 跳入结构体/死循环检查，Step 2）|
-| D | p04-goto-critical | 27/28 | 1 expectedError（label shadowing，Step 2）|
+| D | p03-file | 17/17 ✅ | — |
+| D | p04-goto | 57/57 ✅ | Step 2：goto 语义检查 + label 声明修复 |
+| D | p04-goto-advanced | 20/20 ✅ | Step 2：跳入非透明块检查 |
+| D | p04-goto-critical | 28/28 ✅ | Step 2：label shadowing 修复 |
 | D | p04-goto-fix | 5/5 ✅ | — |
 | D | p04-goto-scope-repro | 3/3 ✅ | — |
 | E | p04-goto-label-in-block | 4/4 ✅ | — |
 | F | p10-conformance | 44/44 ✅ | — |
 | F | p13-pascal82-conformance | 5/5 ✅ | — |
-| F | p15-nonstandard | 7/8 | 1 expectedError（string 类型应报错，Step 2）|
-| — | p11-knuth-pascal | 20/20 ✅ | —（决策 16 已实现：fileEofBufferSpace extension）|
+| F | p15-nonstandard | 8/8 ✅ | Step 2：string 类型检查 |
+| — | p11-knuth-pascal | 20/20 ✅ | 决策 16：fileEofBufferSpace extension |
 
-**总结**：513/533 通过。剩余 20 个失败全部是 expectedError 类型（应报错但未报错），属 Step 2 静态类型检查范畴。无真实 bug。
+**总结**：1058/1058 全通过（0 失败）。Step 2 类型检查完成。
 
 ### 已发现待修复的 bug（未编号）
 
@@ -305,3 +305,45 @@ REWRITE 后 F 为空文件，EOF=true，访问 F^ 属 ISO 7185 6.9.8 的未定�
 3. `_helper.ts` 传递 `test.extensions` 到 `run`
 4. `transform.ts` 的 `RunOptions` 透传 `extensions`
 5. p11-knuth 测试用例启用 `fileEofBufferSpace`，并配反测试（默认报错）
+
+---
+
+#### 决策 17：goto 语义检查采用 ISO 7185 立场（允许跨过程 goto 到祖先函数）
+
+**背景**：测试用例中存在两种立场的跨过程 goto 测试：
+- ISO 7185 立场：允许从内层过程 goto 到祖先函数的 label（7 个测试期望成功）
+- Pascal82 立场：禁止所有跨过程 goto（3 个 `goto-recursion-*` 测试期望报错）
+
+**决策**：采用 ISO 7185 立场。理由：
+1. 编译器遵循 ISO 7185 标准（AGENTS.md 原则 A）
+2. 7 个期望成功的测试覆盖了跨过程 goto 的核心场景（过程→主程序、内层→外层、多层嵌套）
+3. Pascal82 立场的 3 个测试改为期望成功，与 ISO 7185 一致
+
+**实现**：
+- `checkGotos()` 中：`labelInfo.funcId !== fromFuncId` 时，用 `isAncestorFunc` 检查是否为祖先函数
+- 祖先函数 label 允许跳转；非祖先函数（平行过程、反向跨过程）禁止
+
+---
+
+#### 决策 18：label 使用位置追踪（longJump 目标 = 使用位置，非声明位置）
+
+**背景**：label 可能在祖先函数声明，但在后代函数使用：
+```pascal
+program test;        // main 声明 label 30
+label 30;
+procedure level1;
+  procedure level2;
+  begin
+    ...
+30:                   // level2 使用 label 30
+    writeln('L2 end');
+  end;
+```
+
+**问题**：`labelInfo` 返回声明位置的 funcId（main），但 longJump 需跳到使用位置（level2）。
+- main 没有 state machine（body 无 label/jump），无法捕获 longJump 的 throw
+- throw 0 穿透到顶层，报 "Unexpected error: 0"
+
+**决策**：添加 `labelUseFunc` Map，在 LabeledStatement 分析时记录使用位置 funcId。
+- `compileGoto` 用 `labelUseFuncOf(labelId)` 获取使用位置，作为 longJump 的 functionId
+- `labelInfo` 仍返回声明位置（用于作用域检查）

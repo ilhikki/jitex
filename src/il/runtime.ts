@@ -349,7 +349,7 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
     // ---------- steps.check（循环步数限制）----------
     case 'steps.check':
       if (++ctx.steps > ctx.maxSteps) {
-        throw new Error('Step limit exceeded')
+        throw new Error('step limit exceeded')
       }
       return undefined
 

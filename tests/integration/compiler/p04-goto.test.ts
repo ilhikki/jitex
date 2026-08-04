@@ -520,8 +520,8 @@ begin
 99:
   writeln('Exit');
 end.`,
-      purpose: 'GOTO from procedure to main program label should error (Pascal82: 禁止跨过程 GOTO)',
-      expectedError: '',
+      purpose: 'GOTO from recursive procedure to main program label (ISO 7185: 允许跨过程 GOTO 到外层 block)',
+      expectedContains: 'Exit',
     },
     {
       name: 'goto-recursion-mutual',
@@ -547,8 +547,8 @@ begin
 20:
   b;
 end.`,
-      purpose: 'GOTO from procedure to main program label should error (Pascal82: 禁止跨过程 GOTO)',
-      expectedError: '',
+      purpose: 'GOTO between mutually recursive procedures to main program label (ISO 7185: 允许跨过程 GOTO 到外层 block)',
+      expectedContains: 'A:1',
     },
     {
       name: 'goto-recursion-deep-nested',
@@ -576,8 +576,8 @@ end;
 begin
   level1;
 end.`,
-      purpose: 'GOTO in deeply nested procedures should error (Pascal82: GOTO 不能跨 block)',
-      expectedError: '',
+      purpose: 'GOTO from deeply nested procedure to outer procedure label (ISO 7185: 允许跨过程 GOTO 到外层 block)',
+      expectedContains: 'L2 end',
     },
     {
       name: 'goto-recursion-before-call',
@@ -912,7 +912,7 @@ end.`,
     {
       name: 'goto-label-inside-case-branch-compound',
       code: `program test;
-label 50;
+label 20, 50;
 var x: integer;
 begin
   x := 1;
@@ -937,7 +937,7 @@ end.`,
     {
       name: 'goto-label-directly-in-case-branch',
       code: `program test;
-label 60;
+label 30, 60;
 var x: integer;
 begin
   x := 2;
@@ -960,7 +960,7 @@ end.`,
     {
       name: 'goto-label-in-case-otherwise-compound',
       code: `program test;
-label 70;
+label 40, 70;
 var x: integer;
 begin
   x := 99;
@@ -987,7 +987,7 @@ end.`,
     {
       name: 'goto-label-in-with-body-compound',
       code: `program test;
-label 80;
+label 55, 80;
 type
   r = record
     x: integer;
@@ -1016,7 +1016,7 @@ end.`,
     {
       name: 'goto-label-directly-in-with-body',
       code: `program test;
-label 90;
+label 66, 90;
 type
   r = record
     x: integer;

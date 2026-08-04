@@ -41,6 +41,8 @@ import {
 export interface TransformOptions {
   /** 程序文件变量名 → files 中的键名（用于 ASSIGN） */
   programFileUrls?: Record<string, string>
+  /** 非标特性扩展（传递给 analysis 做语义检查） */
+  extensions?: string[]
 }
 
 // ============================================================
@@ -244,8 +246,8 @@ export function transform(source: string, options: TransformOptions = {}): strin
   // 1. parse
   const ast = parseSource(source)
 
-  // 2. analyze
-  const analysis = analyzeProgram(ast)
+  // 2. analyze（传递 extensions 用于语义检查）
+  const analysis = analyzeProgram(ast, options.extensions)
 
   // 3. compile
   let jsonCode = compileProgram(ast, analysis)
@@ -279,7 +281,10 @@ export function run(source: string, options: RunOptions = {}): RunState {
 
   try {
     // 编译
-    const jsCode = transform(source, { programFileUrls: options.programFileUrls })
+    const jsCode = transform(source, {
+      programFileUrls: options.programFileUrls,
+      extensions: options.extensions,
+    })
 
     // __sys dispatcher
     const __sys = (key: string, args: any[]): any => dispatch(ctx, key, args)

@@ -33,32 +33,6 @@
 
 #### 进行中
 
-- 6.1：新编译器（分两步走）
-
-  ##### Step 2：完整类型检查 🚧
-
-  目标：在 analysis 阶段加入编译期语义检查，让剩余 20 个 `expectedError` 用例通过。当前 513/533 通过，剩余失败全部是"应报错但未报错"。
-
-  必做（按失败用例分类）：
-  - 数组/subrange 边界检查（3 个失败）
-    - array bound check（p03-array-record）
-    - char assign above upper bound（p03-range）
-    - subrange record field overflow（p03-range）
-  - goto 语义检查（15 个失败）
-    - 跨过程 goto 规则（ISO 7185 6.8.1, 6.8.2.4）：过程→另一过程禁止、外层→内层禁止
-    - 跳入非透明块报错（while/for/if/repeat/case/with 体内部 label）
-    - 标号重复声明
-    - 递归 label 作用域
-    - label shadowing 规则
-    - goto 死循环检测（backward/mutual infinite loop）
-  - 参数名与局部变量同名报错（p04-parameters，1 个）
-  - `string` 类型未启用 extensions 时报错（p15-nonstandard，1 个）
-
-  实现要点：
-  - 在 `analysis.ts` 的 `analyzeBlock` / `analyzeStmt` / `analyzeExpr` 中加入语义检查
-  - 检查失败时抛 `Error`，transform.ts 的 run 函数捕获后返回 RunState(status='error')
-  - 参考 `src/compiler/label-analysis.ts` 的 goto 规则实现（不直接复用，逻辑重写）
-
 - 6.2：记录痛点
   - 在开发过程中记录遇到的难受痛点（如 syscall 对齐、类型信息传递、goto 跨过程判定等）
 
@@ -77,6 +51,23 @@
   - 修复 23 个 bug（见 decide.md），tsc 通过
   - 集成测试 513/533 通过，剩余 20 个全部是 expectedError（Step 2 范畴）
   - 非标 extension 机制：`fileEofBufferSpace`（F^ 在 EOF 时返回空格，ISO 7185 6.9.8 未定义行为）
+- 6.1 Step 2：完整类型检查 ✅
+  - 编译期语义检查（analysis 阶段）：
+    - `string` 类型未启用 extension 时报错（ISO 7185 无 string 类型）
+    - 参数名与局部变量同名报错（ISO 7185 6.2.2）
+    - 重复 label 声明 + 重复 label 使用报错（ISO 7185 6.2.2）
+    - 数组索引越界检查（ISO 7185 6.4.3.2）
+    - subrange 赋值越界检查（ISO 7185 6.4.3.1，含 char subrange）
+  - goto 语义检查（ISO 7185 6.8.1, 6.8.2.4）：
+    - 跨过程 goto 规则：允许到祖先函数 label（ISO 7185），禁止到非祖先函数
+    - 跳入非透明块报错（while/for/if/repeat/case/with 体内部 label）
+    - 延迟检查机制：goto 可能先于 label 出现，收集所有 labelDepth 后统一检查
+  - label 使用位置追踪：label 可能在祖先函数声明但在后代函数使用，longJump 需跳到使用位置
+  - 测试用例修复：
+    - 5 个 case/with 透明块测试补全 label 声明（符合 ISO 7185 要求 label 先声明）
+    - 3 个 `goto-recursion-*` 测试从 Pascal82 立场改为 ISO 7185 立场（允许跨过程 goto 到祖先函数）
+    - `label-shadowing` 测试代码修复（原代码 main body 从 100: 开始导致 'main label' 必然输出）
+  - 集成测试 1058/1058 全通过（0 失败）
 
 ---
 
