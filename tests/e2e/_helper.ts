@@ -14,7 +14,6 @@ export const TANGLE_PAS = 'tangle-official.pas'
 export const TANGLE_WEB = 'tangle.web'
 export const TEX_WEB = 'tex.web'
 export const TRIP_TEX = 'trip.tex'
-export const TRIP_TYP = 'trip.typ'
 
 export interface TangleResult {
   state: any
@@ -51,39 +50,4 @@ export function runTangle(pasSource: string, webContent: string): TangleResult {
     output: state.outputBuffer.join(''),
     files,
   }
-}
-
-export interface TexResources {
-  tanglePas: string
-  texWeb: string
-}
-
-export function loadTexResources(): TexResources {
-  return {
-    tanglePas: readResource(TANGLE_PAS),
-    texWeb: readResource(TEX_WEB),
-  }
-}
-
-export function compileTexPas(
-  resources: TexResources
-): { pas: string; pool: string } {
-  const result = runTangle(resources.tanglePas, resources.texWeb)
-  if (result.state.status !== 'terminated') {
-    throw new Error(`TANGLE failed: ${result.state.status} - ${result.state.error?.message}`)
-  }
-  return {
-    pas: result.pascal,
-    pool: result.pool,
-  }
-}
-
-export function printResultSummary(result: TangleResult): void {
-  console.log('Status:', result.state.status)
-  if (result.state.error) {
-    console.log('Error:', result.state.error.message)
-  }
-  console.log('Output (first 500 chars):', result.output.slice(0, 500))
-  console.log('PASCALFILE size:', result.pascal.length, 'chars')
-  console.log('POOL size:', result.pool.length, 'chars')
 }

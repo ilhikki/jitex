@@ -233,6 +233,39 @@ class PascalSemanticCompiler implements SemanticCompiler {
       case 'str.length':
         return `(${args[0]}.length)`
 
+      // ---------- 数组/记录/cell（inline，符合 JS 语义）----------
+      // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...
+      case 'array.get': {
+        if (args.length < 2) return args[0]
+        return `(${args[0]}${args.slice(1).map((i) => `[${i}]`).join('')})`
+      }
+      // array.set: args = [arr, idx1, idx2, ..., val] → arr[idx1][idx2]... = val
+      case 'array.set': {
+        if (args.length < 3) return args[0]
+        const val = args[args.length - 1]
+        const indices = args.slice(1, -1)
+        return `(${args[0]}${indices.map((i) => `[${i}]`).join('')} = ${val})`
+      }
+      // rec.field: args = [obj, fieldName] → obj[fieldName]
+      case 'rec.field':
+        return `(${args[0]}[${args[1]}])`
+      // rec.set: args = [obj, fieldName, val] → obj[fieldName] = val
+      case 'rec.set':
+        return `(${args[0]}[${args[1]}] = ${args[2]})`
+      // cell.create: args = [val] → {v: val}
+      case 'cell.create':
+        return `({v: ${args[0]}})`
+      // cell.get: args = [cell] → cell.v
+      case 'cell.get':
+        return `(${args[0]}.v)`
+      // cell.set: args = [cell, val] → cell.v = val
+      case 'cell.set':
+        return `(${args[0]}.v = ${args[1]})`
+
+      // io.break: 空操作
+      case 'io.break':
+        return `undefined`
+
       default:
         // 走 dispatcher
         return `__sys(${JSON.stringify(key)}, [${args.join(', ')}])`
