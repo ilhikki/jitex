@@ -9,10 +9,14 @@
 // - getOutput: 从 RunState 提取输出字符串
 //
 // 测试原则见 ../README.md；
-// 执行引擎实现见 src/compiler/run-js.ts。
+// 执行引擎实现见 src/il/transform.ts（新管线）。
 
-import { runJS, RunState, SysCallHandler, type Extension } from '@/index'
+import { run } from '@/il/transform'
+import type { RunState } from '@/runtime/run-state'
+import type { SysCallHandler } from '@/types'
+import type { Extension } from '@/compiler'
 import { test, expect } from 'vitest'
+
 /**
  * 单个 Pascal 测试用例。
  *
@@ -62,22 +66,21 @@ export interface PascalTest {
   /** 断言文件内容包含指定子串 */
   expectedFileContains?: { url: string; contains: string }[]
 
-  /** 自定义系统调用处理器 */
+  /** 自定义系统调用处理器（新管线暂不支持，保留接口兼容） */
   sysCalls?: Map<string, SysCallHandler>
 
   /** 最大执行步数（覆盖默认 1e9，用于测试死循环场景） */
   maxSteps?: number
 }
 
-/** 执行单个测试用例，返回 runJS 原始结果 */
-export async function runPascal(test: PascalTest): Promise<RunState> {
-  return await runJS(test.code, {
+/** 执行单个测试用例，返回 RunState */
+export function runPascal(test: PascalTest): RunState {
+  return run(test.code, {
     input: test.input,
-    extensions: test.extensions,
-    sysCalls: test.sysCalls,
     files: test.files,
     programFileUrls: test.programFileUrls,
     maxSteps: test.maxSteps ?? 1e5,
+    extensions: test.extensions,
   })
 }
 
@@ -88,8 +91,6 @@ export function getOutput(state: RunState): string {
 
 /**
  * 执行单个测试用例并返回断言结果。
- *
- * @returns passed 是否通过；message 失败原因；state 执行后的状态
  */
 export function runPascalTests(tests: PascalTest[]) {
   for (const testCase of tests) {
@@ -97,8 +98,8 @@ export function runPascalTests(tests: PascalTest[]) {
   }
 }
 
-export async function runPascalTest(test: PascalTest): Promise<void> {
-  const state = await runPascal(test)
+export function runPascalTest(test: PascalTest): void {
+  const state = runPascal(test)
   const output = getOutput(state)
 
   if (test.expectedError !== undefined) {

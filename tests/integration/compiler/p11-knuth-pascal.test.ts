@@ -183,7 +183,7 @@ END.`,
     // ==========================================================================
 
     {
-      name: 'F^ 文件缓冲区访问',
+      name: 'F^ 文件缓冲区访问（启用 fileEofBufferSpace 扩展）',
       code: `PROGRAM TANGLE;
 VAR F: FILE OF CHAR;
     CH: CHAR;
@@ -192,12 +192,13 @@ BEGIN
   CH := F^;
   WRITELN('ch=', CH);
 END.`,
-      purpose: 'Knuth 风格：F^ 访问文件缓冲区（tangle-official.pas 中 INPUTLN 等过程使用）',
+      purpose: 'Knuth 风格：F^ 访问文件缓冲区（tangle-official.pas 中 INPUTLN 等过程使用）；REWRITE 后 EOF=true，启用 fileEofBufferSpace 扩展',
+      extensions: ['fileEofBufferSpace'],
       expectedContains: 'ch=',
     },
 
     {
-      name: 'F^ 赋值给变量',
+      name: 'F^ 赋值给变量（启用 fileEofBufferSpace 扩展）',
       code: `PROGRAM TANGLE;
 VAR F: FILE OF CHAR;
     X: CHAR;
@@ -206,20 +207,34 @@ BEGIN
   X := F^;
   WRITELN('x=', X);
 END.`,
-      purpose: 'F^ 赋值给 char 变量',
+      purpose: 'F^ 赋值给 char 变量；REWRITE 后 EOF=true，启用 fileEofBufferSpace 扩展',
+      extensions: ['fileEofBufferSpace'],
       expectedContains: 'x=',
     },
 
     {
-      name: 'F^ 在表达式中使用',
+      name: 'F^ 在表达式中使用（启用 fileEofBufferSpace 扩展）',
       code: `PROGRAM TANGLE;
 VAR F: FILE OF CHAR;
 BEGIN
   REWRITE(F);
   IF F^ = ' ' THEN WRITELN('space') ELSE WRITELN('other');
 END.`,
-      purpose: 'F^ 在 if 表达式中使用',
+      purpose: 'F^ 在 if 表达式中使用；REWRITE 后 EOF=true，访问 F^ 属 ISO 7185 6.9.8 未定义行为，启用 fileEofBufferSpace 扩展返回空格',
+      extensions: ['fileEofBufferSpace'],
       expectedContains: 'space',
+    },
+
+    {
+      name: 'F^ 在 EOF 时默认报错（未启用扩展）',
+      code: `PROGRAM TANGLE;
+VAR F: FILE OF CHAR;
+BEGIN
+  REWRITE(F);
+  IF F^ = ' ' THEN WRITELN('space') ELSE WRITELN('other');
+END.`,
+      purpose: '反测试：默认配置下 F^ 在 EOF 时访问应报错（ISO 7185 6.9.8 未定义行为）',
+      expectedError: 'fileEofBufferSpace',
     },
 
     // ==========================================================================
