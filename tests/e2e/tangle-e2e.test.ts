@@ -7,9 +7,14 @@
  *   3. run tangle on tangle.web → tangle.pas (v1)
  *   4. parse tangle.pas (v1)
  *   5. bootstrap: run tangle.pas (v1) on tangle.web → tangle.pas (v2)
- *   6. verify v1 === v2 (自举稳定性)
- *   7. run tangle on tex.web → tex.pas
- *   8. parse tex.pas
+ *   6. bootstrap: run tangle.pas (v2) on tangle.web → tangle.pas (v3)
+ *   7. verify v2 === v3 (自举稳定性)
+ *   8. run tangle on tex.web → tex.pas
+ *   9. parse tex.pas
+ *
+ * 注：tangle-official.pas 是手工翻译的旧版本（Version 2.8），
+ * 缺少 Version 4.5 的 modno-comments 修复，因此 v1 !== v2 是正常的。
+ * 自举稳定性从 v1（TANGLE 从 tangle.web v4.6 生成）开始验证：v2 === v3。
  */
 import { parse } from '@/index'
 import { transform } from '@/il/transform'
@@ -26,6 +31,7 @@ describe('TANGLE / TEX82 E2E', () => {
     v1: null as null | { pascal: string; pool: string; output: string; status: string; error?: string },
     v1ParseOk: false,
     v2: null as null | { pascal: string; pool: string; output: string; status: string; error?: string },
+    v3: null as null | { pascal: string; pool: string; output: string; status: string; error?: string },
     tex: null as null | { pascal: string; pool: string; output: string; status: string; error?: string },
     texParseOk: false,
     /** 前置阶段是否失败。失败后后续阶段全部跳过。 */
@@ -103,11 +109,31 @@ describe('TANGLE / TEX82 E2E', () => {
         status: r.state.status,
         error: r.state.error?.message,
       }
+      if (r.state.status !== 'terminated') {
+        ctx.failedAt = '5.bootstrap-v2'
+        return
+      }
     } catch (e: any) {
       ctx.v2 = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
+      ctx.failedAt = '5.bootstrap-v2'
+      return
     }
 
-    // ---- 阶段 7: run tangle on tex.web → tex.pas ----
+    // ---- 阶段 6: bootstrap: run tangle.pas (v2) on tangle.web → v3 ----
+    try {
+      const r = runTangle(ctx.v2!.pascal, ctx.tangleWeb)
+      ctx.v3 = {
+        pascal: r.pascal,
+        pool: r.pool,
+        output: r.output,
+        status: r.state.status,
+        error: r.state.error?.message,
+      }
+    } catch (e: any) {
+      ctx.v3 = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
+    }
+
+    // ---- 阶段 8: run tangle on tex.web → tex.pas ----
     try {
       const r = runTangle(ctx.tanglePas, ctx.texWeb)
       ctx.tex = {
@@ -121,7 +147,7 @@ describe('TANGLE / TEX82 E2E', () => {
       ctx.tex = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
     }
 
-    // ---- 阶段 8: parse tex.pas ----
+    // ---- 阶段 9: parse tex.pas ----
     if (ctx.tex && ctx.tex.status === 'terminated') {
       try {
         const result = parse(ctx.tex.pascal)
@@ -165,13 +191,20 @@ describe('TANGLE / TEX82 E2E', () => {
   })
 
   // ---- 阶段 6 ----
-  test('6. verify v1 === v2 (自举稳定性)', () => {
+  test('6. bootstrap: run tangle.pas (v2) on tangle.web → tangle.pas (v3)', () => {
     if (ctx.failedAt) return
-    expect(ctx.v2!.pascal).toBe(ctx.v1!.pascal)
+    expect(ctx.v3).not.toBeNull()
+    expect(ctx.v3!.status).toBe('terminated')
   })
 
   // ---- 阶段 7 ----
-  test('7. run tangle on tex.web → tex.pas', () => {
+  test('7. verify v2 === v3 (自举稳定性)', () => {
+    if (ctx.failedAt) return
+    expect(ctx.v3!.pascal).toBe(ctx.v2!.pascal)
+  })
+
+  // ---- 阶段 8 ----
+  test('8. run tangle on tex.web → tex.pas', () => {
     if (ctx.failedAt) return
     expect(ctx.tex).not.toBeNull()
     expect(ctx.tex!.status).toBe('terminated')
@@ -179,8 +212,8 @@ describe('TANGLE / TEX82 E2E', () => {
     expect(ctx.tex!.pascal).toContain('PROGRAM TEX')
   })
 
-  // ---- 阶段 8 ----
-  test('8. parse tex.pas', () => {
+  // ---- 阶段 9 ----
+  test('9. parse tex.pas', () => {
     if (ctx.failedAt) return
     expect(ctx.texParseOk).toBe(true)
   })
