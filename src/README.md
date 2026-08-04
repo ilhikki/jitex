@@ -5,14 +5,13 @@
 ## 原则
 
 - **Frozen Layers**：`ast/`、`lexer/`、`parser/` 不可修改，除非明确是重构任务。
-- **唯一引擎**：`js-compiler/` 是唯一的执行引擎，无 fallback。
-- **编译策略**：
-  - integer/boolean/char 用裸 JS 值（V8 JIT 可优化）
-  - array/record/set/file 用 PascalValue + plugin.invoke
-  - 异步操作用 async/await 原生处理
-- **TypePlugin 系统**：每种类型一个插件，实现 `can`/`invoke` 方法。
-- **标准 plugins**（默认加载）：integer, boolean, char, real, array, record, enum, subrange, set, file。
-- **非标 plugins**（需用户注入）：string。
+- **唯一引擎**：`il/` 是唯一的执行引擎（IL 管线），无 fallback。
+- **两阶段流水线**：
+  1. Analysis（`il/analysis.ts`）：AST → 符号表 + 类型信息 + id 到名字映射
+  2. Compile（`il/compiler.ts` + `il/json-code-compiler.ts`）：AST + Analysis → JsonCode → JS 代码
+- **同步运行时**：`il/runtime.ts` 提供同步 syscall dispatcher（`__sys(key, args)`），无 async/await。
+- **语义编译器**：`il/transform.ts` 中的 `PascalSemanticCompiler` 决定哪些 syscall inline（算术/比较），哪些走 dispatcher（IO/file/cell/mem/set）。
+- **非标扩展**：默认未启用的非标特性遇到即抛错（如 `string` 类型需显式启用）。
 
 ## 如何更新本文档
 

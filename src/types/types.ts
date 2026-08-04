@@ -1,8 +1,3 @@
-export interface PascalValue {
-  typeId: string
-  raw: unknown
-}
-
 export type TypeDef =
   | IntegerType
   | RealType
@@ -104,18 +99,6 @@ export interface EnumType extends TypeBase {
   values: string[]
 }
 
-export interface SysCallArg {
-  value: PascalValue
-  width?: number
-  precision?: number
-}
-
-export type SysCallHandler = (
-  args: (PascalValue | SysCallArg)[],
-  state: unknown,
-  runtime?: RuntimeCtx
-) => Promise<PascalValue | void> | PascalValue | void
-
 export interface TypeTable {
   get(id: string): TypeDef | undefined
   has(id: string): boolean
@@ -135,14 +118,6 @@ export function createTypeTable(): TypeTable {
       types.set(def.id, def)
     },
   }
-}
-
-import type { PascalIO } from '@/runtime'
-
-export interface RuntimeCtx {
-  typeTable: TypeTable
-  sysCalls: Map<string, SysCallHandler>
-  io?: PascalIO
 }
 
 export const INTEGER_TYPE: IntegerType = { id: 'integer', kind: 'integer', size: 32, signed: true }

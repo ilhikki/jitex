@@ -13,9 +13,10 @@
 
 import { run } from '@/il/transform'
 import type { RunState } from '@/runtime/run-state'
-import type { SysCallHandler } from '@/types'
-import type { Extension } from '@/compiler'
 import { test, expect } from 'vitest'
+
+/** 非标扩展标识符（保留用于类型标注，实际为 string） */
+type Extension = string
 
 /**
  * 单个 Pascal 测试用例。
@@ -65,9 +66,6 @@ export interface PascalTest {
 
   /** 断言文件内容包含指定子串 */
   expectedFileContains?: { url: string; contains: string }[]
-
-  /** 自定义系统调用处理器（新管线暂不支持，保留接口兼容） */
-  sysCalls?: Map<string, SysCallHandler>
 
   /** 最大执行步数（覆盖默认 1e9，用于测试死循环场景） */
   maxSteps?: number

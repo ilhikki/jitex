@@ -4,7 +4,7 @@
 
 ## 这是什么项目
 
-Pascal82（ISO 7185）到 JS 的编译器。将 Pascal 源码编译为 JS 代码字符串，用 `new AsyncFunction()` 执行。
+Pascal82（ISO 7185）到 JS 的编译器。将 Pascal 源码编译为 JS 代码字符串，用 `new Function()` 同步执行。
 
 **终极目标**：让 TEX82 在合理时间内跑完。
 
@@ -30,7 +30,7 @@ Pascal82（ISO 7185）到 JS 的编译器。将 Pascal 源码编译为 JS 代码
 
 1. **任务开始先规划**：每次执行任务时，需思考——需要更新哪些文档？什么时候提交代码？更新哪些文档？
 2. **积极提交**：每个逻辑单元完成后立即提交，不等用户催促。
-3. **回归测试**：修改代码后必须运行 `npx jest tests/m5 --no-coverage`。
+3. **回归测试**：修改代码后必须运行 `npx vitest run tests/integration`。
 4. **TypeScript 检查**：修改 src/ 后运行 `npx tsc --noEmit`。
 
 ### 标准锚定（原则 A）
@@ -47,7 +47,7 @@ Pascal82（ISO 7185）到 JS 的编译器。将 Pascal 源码编译为 JS 代码
 ### 架构约束
 
 11. **Frozen Layers**：不修改 `src/ast/`、`src/lexer/`、`src/parser/`，除非明确是重构任务。
-12. **唯一引擎**：`src/js-compiler/` 是唯一执行引擎，无 fallback。
+12. **唯一引擎**：`src/il/` 是唯一执行引擎（IL 管线），无 fallback。
 13. **代码即文档**：文件列表、API 签名、实现细节不写进本文档，写进代码注释。
 14. **最新原则**：本文档只保留当前有效信息，历史进 git。
 
@@ -57,7 +57,7 @@ Pascal82（ISO 7185）到 JS 的编译器。将 Pascal 源码编译为 JS 代码
 
 | 目录 | 说明 | 文档 |
 |------|------|------|
-| `src/` | 源码（lexer/parser/js-compiler） | [src/README.md](src/README.md) |
+| `src/` | 源码（lexer/parser/il） | [src/README.md](src/README.md) |
 | `tests/` | 标准测试（unit/integration/e2e） | [tests/README.md](tests/README.md) |
 | `tests/e2e/` | TEX82 端到端测试 | — |
 | `docs/` | 稳定设计文档 | [docs/README.md](docs/README.md) |

@@ -28,17 +28,12 @@ export type * from './ast/types'
 export { nodeToCode } from './ast/printer'
 
 // ==========================================================================
-// 编译与执行（主入口）
+// 编译与执行（IL 管线）
 // ==========================================================================
 
-export { runJS, compileToJS } from './compiler'
-export type { RunState, RunError, JSRunOptions, JSDebugOptions, Extension } from './compiler'
-
-// ==========================================================================
-// 类型与系统调用
-// ==========================================================================
-
-export type { SysCallHandler } from './types'
+export { transform, run } from './il/transform'
+export type { TransformOptions, RunOptions } from './il/transform'
+export type { RunState, RunError } from './runtime/run-state'
 
 // ==========================================================================
 // 便捷函数
@@ -52,7 +47,7 @@ import { ParserInput, ParseResult, ProgramNode } from './ast/types'
  * 将 Pascal 源码解析为 AST。
  *
  * @param source - Pascal 源码字符串
- * @returns ParseResult&lt;ProgramNode&gt; - 解析结果，成功时包含 AST 节点
+ * @returns ParseResult<ProgramNode> - 解析结果，成功时包含 AST 节点
  */
 export function parse(source: string): ParseResult<ProgramNode> {
   const tokens = lex(source)

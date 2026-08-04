@@ -12,7 +12,8 @@
 
 | 文档 | 用途 |
 |------|------|
-| design-goto-strategy.md | goto 编译策略（稳定设计） |
+| iso7185.md | ISO 7185 Pascal 标准参考 |
+| iso7185-goto-label-rules.md | ISO 7185 goto/label 规则汇总 |
 | productions.md | Pascal 语法产生式参考 |
 
 ## 如何更新本文档
