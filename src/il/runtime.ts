@@ -319,10 +319,20 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
       return { url: '', offset: 0 } as PascalFile
     case 'file.reset':
       if (!args[0]) throw new Error(`file.reset: file is undefined`)
+      // Pascal reset(f, name, ...) — 先设置文件名再打开
+      if (args[1] !== undefined && args[1] !== '') {
+        args[0].url = args[1]
+        ctx.fileStates.delete(args[0] as PascalFile)
+      }
       resetFile(ctx, args[0])
       return undefined
     case 'file.rewrite':
       if (!args[0]) throw new Error(`file.rewrite: file is undefined`)
+      // Pascal rewrite(f, name, ...) — 先设置文件名再打开
+      if (args[1] !== undefined && args[1] !== '') {
+        args[0].url = args[1]
+        ctx.fileStates.delete(args[0] as PascalFile)
+      }
       rewriteFile(ctx, args[0])
       return undefined
     case 'file.close':
@@ -566,7 +576,11 @@ function resetFile(ctx: RuntimeContext, file: PascalFile): void {
 
 function rewriteFile(ctx: RuntimeContext, file: PascalFile): void {
   const s = getFileState(ctx, file)
-  ctx.files.set(file.url, new Uint8Array(0))
+  // 终端文件（TTY:）不清空输入内容：term_in 和 term_out 共享 url='TTY:'，
+  // 但 term_out 的写入已重定向到 outputBuffer，不影响 term_in 读取
+  if (!isTtyFile(file)) {
+    ctx.files.set(file.url, new Uint8Array(0))
+  }
   s.offset = 0
   s.eof = true
   s.writable = true
@@ -580,7 +594,10 @@ function closeFile(ctx: RuntimeContext, file: PascalFile): void {
     s.lines.push(s.currentLine)
     s.currentLine = ''
   }
-  writeBackFile(ctx, file)
+  // 终端文件不写回 ctx.files，避免覆盖 term_in 的输入内容
+  if (!isTtyFile(file)) {
+    writeBackFile(ctx, file)
+  }
 }
 
 function getFile(ctx: RuntimeContext, file: PascalFile): void {
@@ -623,10 +640,16 @@ function isFileEoln(ctx: RuntimeContext, file: PascalFile): boolean {
   return ch === 10 || ch === 13
 }
 
+/** 终端文件 url：写入重定向到 outputBuffer，读取从 ctx.files 查找 */
+const TTY_URL = 'TTY:'
+
+function isTtyFile(file: PascalFile): boolean {
+  return file.url === TTY_URL
+}
+
 function writeToFile(ctx: RuntimeContext, file: PascalFile, text: string): void {
-  // 决策 15：未绑定 url 的文件变量（url=''）回显到 stdout，
-  // 复现旧 runtime 无 io 时的 fallback 行为（WRITELN(F,'x') 退化成 WRITELN('x')）
-  if (!file.url) {
+  // 决策 15：未绑定 url 或终端文件（url='TTY:'）回显到 stdout
+  if (!file.url || isTtyFile(file)) {
     ctx.outputBuffer.push(text)
     return
   }
@@ -641,8 +664,8 @@ function writeToFile(ctx: RuntimeContext, file: PascalFile, text: string): void 
 }
 
 function writelnToFile(ctx: RuntimeContext, file: PascalFile): void {
-  // 决策 15：未绑定 url 的文件变量回显到 stdout
-  if (!file.url) {
+  // 决策 15：未绑定 url 或终端文件回显到 stdout
+  if (!file.url || isTtyFile(file)) {
     ctx.outputBuffer.push('\n')
     return
   }
