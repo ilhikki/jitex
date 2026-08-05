@@ -737,28 +737,49 @@ const stages: StageDef[] = [
       }
 
       const duration = now() - t0
+      const output = ctx.hello?.output ?? ''
       const ok = ctx.hello?.status === 'terminated'
-      const hasBanner = ctx.hello?.output.includes('This is TeX') ?? false
+      const hasBanner = output.includes('This is TeX') ?? false
+      const hasEmergencyStop = output.includes('! Emergency stop.')
+      const hasNoPages = output.includes('No pages of output')
+      // hello.tex 应该正常输出，不能有 Emergency stop
+      const outputOk = ok && !hasEmergencyStop && !hasNoPages
       const metrics = {
         inputFile: 'hello.tex',
         inputSize: formatBytes(ctx.helloTex.length),
         status: ctx.hello?.status ?? 'unknown',
         steps: ctx.hello?.steps ?? 0,
-        outputSize: formatBytes(ctx.hello?.output.length ?? 0),
-        banner: firstLine(ctx.hello?.output ?? ''),
+        outputSize: formatBytes(output.length),
+        banner: firstLine(output),
+        hasEmergencyStop,
+        hasNoPages,
       }
       const assertions = [
         assert('run ok', ok, ctx.hello?.status, 'terminated'),
         assert('output has This is TeX', hasBanner, undefined, 'contains'),
+        assert('no Emergency stop', !hasEmergencyStop, undefined, 'no emergency stop'),
+        assert('has pages of output', !hasNoPages, undefined, 'has pages'),
       ]
-      const outputLines = (ctx.hello?.output ?? '').split('\n')
+      const outputLines = output.split('\n').filter((l) => l.length > 0)
+      // 诊断行
+      const diagLines: string[] = []
+      if (hasEmergencyStop) diagLines.push('diag: Emergency stop detected - TeX aborted prematurely')
+      if (hasNoPages) diagLines.push('diag: No pages of output - TeX did not produce DVI')
+      // 检查输入文件名是否被错误读取（字符偏移问题）
+      const hasHelloTex = output.includes('hello.tex') || output.includes('hello')
+      const hasEeXformat = output.includes('eXformat')
+      if (!hasHelloTex && hasEeXformat) {
+        diagLines.push('diag: output contains "eXformat" instead of "hello" - input filename first char dropped (char offset bug)')
+      }
 
-      if (!ok) {
-        return failedStage('11', 'run TeX on hello.tex', duration, ctx.hello?.error ?? 'unknown', {
+      if (!ok || !outputOk) {
+        return failedStage('11', 'run TeX on hello.tex', duration,
+          ctx.hello?.error ?? (hasEmergencyStop ? 'Emergency stop' : 'unknown output issue'), {
           metrics,
-          artifacts: ctx.hello?.output ? [artifact('hello.log', ctx.hello.output)] : [],
+          artifacts: output ? [artifact('hello.log', output)] : [],
           logs: [
             ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
+            ...diagLines,
             ...(ctx.hello?.error ? [`error: ${ctx.hello.error}`] : []),
           ],
           assertions, debugLogs: debugLog, stackTrace,
@@ -766,8 +787,11 @@ const stages: StageDef[] = [
       }
       return successStage('11', 'run TeX on hello.tex', duration, {
         metrics,
-        artifacts: [artifact('hello.log', ctx.hello!.output)],
-        logs: outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
+        artifacts: [artifact('hello.log', output)],
+        logs: [
+          ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
+          ...diagLines,
+        ],
         assertions, debugLogs: debugLog,
       })
     },
