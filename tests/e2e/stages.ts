@@ -1027,8 +1027,11 @@ const stages: StageDef[] = [
         debugLog.push(`[pass1] status=${r1.state.status} steps=${r1.state.steps} fmtFound=${!!tripFmt} fmtSize=${tripFmt?.length ?? 0}`)
 
         // ---- Pass 2: 用 trip.fmt 运行 trip.tex，生成 trip.fot 输出 ----
-        // 注意：word_file (file of memory_word) 的二进制 record 读写尚未完整实现，
-        // pass 2 可能因 "Fatal format file error" 失败。此时回退到 pass 1 的输出。
+        // trip.fot 是 pass 2 的期望输出（&trip 加载格式文件后运行 trip.tex）。
+        // trip.tex 第 11 行 \ifx\initex\undefined 会在格式文件已加载时跳过 INITEX 初始化块，
+        // 因此 pass 2 输出比 pass 1 短是正常的（不能按长度比较）。
+        // 接受标准：pass 2 状态为 terminated 且未出现 "Fatal format file error"。
+        // 失败时回退到 pass 1 输出（格式文件加载未实现时）。
         if (tripFmt) {
           const r2 = runTeXCompiled(ctx.texCompiledJs, {
             input: ['&trip  trip'],
@@ -1043,19 +1046,20 @@ const stages: StageDef[] = [
           })
           debugLog.push(...(r2.debugLog ?? []))
           if (r2.state.error?.stackTrace) stackTrace = r2.state.error.stackTrace
-          debugLog.push(`[pass2] status=${r2.state.status} steps=${r2.state.steps} outLen=${r2.output.length} err=${r2.state.error?.message ?? '(none)'}`)
-          // 如果 pass 2 成功（输出比 pass 1 更长），使用 pass 2 的结果
-          if (r2.output.length > r1.output.length && !r2.output.includes('Fatal format file error')) {
+          const pass2Fatal = r2.output.includes('Fatal format file error')
+          debugLog.push(`[pass2] status=${r2.state.status} steps=${r2.state.steps} outLen=${r2.output.length} fatal=${pass2Fatal} err=${r2.state.error?.message ?? '(none)'}`)
+          // pass 2 成功（状态 terminated 且无 fatal format error）→ 使用 pass 2
+          if (r2.state.status === 'terminated' && !pass2Fatal) {
             output = r2.output
             tripStatus = r2.state.status
             tripError = r2.state.error?.message
             tripSteps = r1.state.steps + r2.state.steps
             resultFiles = r2.files
-            debugLog.push(`[pass2] accepted (output longer than pass1)`)
+            debugLog.push(`[pass2] accepted (status=terminated, no fatal format error)`)
           } else {
-            // pass 2 失败（格式文件加载未实现），回退到 pass 1
-            debugLog.push(`[pass2] rejected (outLen=${r2.output.length} <= pass1=${r1.output.length} or fatal error), falling back to pass 1`)
-            // 保存 pass 2 输出前 5 行用于诊断
+            // pass 2 失败（格式文件加载未实现或 fatal error），回退到 pass 1
+            debugLog.push(`[pass2] rejected (status=${r2.state.status}, fatal=${pass2Fatal}), falling back to pass 1`)
+            // 保存 pass 2 输出前 10 行用于诊断
             const r2Lines = r2.output.split('\n').filter((l) => l.length > 0).slice(0, 10)
             debugLog.push(`[pass2] first lines: ${JSON.stringify(r2Lines)}`)
             output = r1.output
