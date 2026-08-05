@@ -28,6 +28,36 @@ interface FileState {
   writable: boolean
   lines: string[]
   currentLine: string
+  /**
+   * Pascal-H 文件模型：RESET 后 F^ 未定义，需要 GET 预读第一个字符。
+   * 标准 Pascal (ISO 7185 6.9.8.1) 中 RESET 后 F^ 已指向第一个字符。
+   * 启用 extension 'pascalHFileModel' 后，RESET 设置此标记为 true。
+   * GET 时若此标记为 true，清除标记不推进 offset（模拟"预读"语义）。
+   * F^/EOF/EOLN 在此标记为 true 时返回未定义/空值。
+   */
+  pascalHPreread?: boolean
+  /**
+   * 二进制字节文件标记（file of byte / file of eight_bits，elem 为 subrange）。
+   * writeBackFile 时用 Latin-1 编码（每字符一字节），不加末尾换行，
+   * 避免 UTF-8 多字节编码破坏 DVI/TFM 等二进制产物。
+   */
+  binary?: boolean
+  /**
+   * file of record: 文件元素类型 tag（'rec'/'array' 等）。
+   * 由 file.rec.reset / file.rec.rewrite 设置，closeFile 据此选择序列化方式。
+   */
+  fileElemTag?: string
+  /**
+   * file of record: 记录列表（文件内容）。
+   * rewrite 时清空，put 时追加，reset 时从文件内容反序列化。
+   */
+  recList?: any[]
+  /** file of record: 当前读取位置（index into recList） */
+  recPos?: number
+  /** file of record: 当前缓冲区 (f^) */
+  recBuffer?: any
+  /** file of record: 元素类型描述（用于创建默认记录，由 compiler 传入） */
+  recTypeDesc?: any
 }
 
 // ============================================================
@@ -148,6 +178,25 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
       return createDefaultArray(args[0])
     case 'mem.default.rec':
       return createDefaultRec(args[0])
+
+    // ---------- str.to.char.array ----------
+    // Pascal `packed array[low..high] of char` 赋值为字符串字面量时，
+    // 必须展开为 1-based（按 low 起）的字符数组对象，否则后续 `arr[k]`
+    // 在 JS 中变成 0-based 字符串索引，导致首字符丢失。
+    // args = [low, high, str]；返回对象 {low:ch1, low+1:ch2, ..., high:' '}
+    // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历。
+    case 'str.to.char.array': {
+      const low: number = args[0] | 0
+      const high: number = args[1] | 0
+      const str: string = typeof args[2] === 'string' ? args[2] : String(args[2] ?? '')
+      const out: Record<number | string, string | number> = {}
+      for (let i = low; i <= high; i++) {
+        const idx = i - low
+        out[i] = idx < str.length ? str.charAt(idx) : ' '
+      }
+      out.length = high - low + 1
+      return out
+    }
 
     // ---------- set ----------
     case 'set.empty':
@@ -341,7 +390,18 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
         args[0].url = fileUrlToString(args[1])
         ctx.fileStates.delete(args[0] as PascalFile)
       }
-      resetFile(ctx, args[0])
+      ctx.debugLog.push(`[file.reset] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${ctx.files.get(args[0].url)?.length ?? -1}`)
+      resetFile(ctx, args[0], false)
+      return undefined
+    case 'file.reset.binary':
+      // 二进制字节文件（file of byte/eight_bits）：不把 10/13 当作行结束符
+      if (!args[0]) throw new Error(`file.reset.binary: file is undefined`)
+      if (args[1] !== undefined && args[1] !== '') {
+        args[0].url = fileUrlToString(args[1])
+        ctx.fileStates.delete(args[0] as PascalFile)
+      }
+      ctx.debugLog.push(`[file.reset.binary] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${ctx.files.get(args[0].url)?.length ?? -1}`)
+      resetFile(ctx, args[0], true)
       return undefined
     case 'file.rewrite':
       if (!args[0]) throw new Error(`file.rewrite: file is undefined`)
@@ -350,7 +410,16 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
         args[0].url = fileUrlToString(args[1])
         ctx.fileStates.delete(args[0] as PascalFile)
       }
-      rewriteFile(ctx, args[0])
+      rewriteFile(ctx, args[0], false)
+      return undefined
+    case 'file.rewrite.binary':
+      // 二进制字节文件（file of byte/eight_bits）：Latin-1 编码写入
+      if (!args[0]) throw new Error(`file.rewrite.binary: file is undefined`)
+      if (args[1] !== undefined && args[1] !== '') {
+        args[0].url = fileUrlToString(args[1])
+        ctx.fileStates.delete(args[0] as PascalFile)
+      }
+      rewriteFile(ctx, args[0], true)
       return undefined
     case 'file.close':
       closeFile(ctx, args[0])
@@ -365,13 +434,20 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
     case 'file.get':
       getFile(ctx, args[0])
       return undefined
-    case 'file.put':
+    case 'file.put': {
       // put(f) 或 put(f, value)
+      // ISO 7185 6.6.5.2 put(f) pre-assertion: f0.M = Generation (i.e., after rewrite)
+      // 违反 pre-assertion 应报错
+      const s = getFileState(ctx, args[0] as PascalFile)
+      if (!s.writable) {
+        throw new Error('put(f) before rewrite: pre-assertion violated (ISO 7185 6.6.5.2: f0.M must be Generation)')
+      }
       if (args.length >= 2) {
         // f^ := x 的语义：直接写入文件
         writeToFile(ctx, args[0], typeof args[1] === 'number' ? String(args[1]) : args[1])
       }
       return undefined
+    }
     case 'file.peek':
       return peekFile(ctx, args[0])
     case 'file.eof':
@@ -379,6 +455,62 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
       return isFileEof(ctx, args[0])
     case 'file.eoln':
       return isFileEoln(ctx, args[0])
+
+    // ---------- file of record（ISO 7185 6.4.3.5）----------
+    // record 文件以 JS 对象数组形式存储，序列化为 JSON（带 magic prefix）。
+    // TeX 格式文件 word_file = file of memory_word 依赖此功能。
+    case 'file.rec.reset': {
+      if (!args[0]) throw new Error(`file.rec.reset: file is undefined`)
+      // 参数布局：[file, name?, typeDesc?] 或 [file, typeDesc]（无 name 时）
+      // name 是 string/数组，typeDesc 是 plain object（含 tag/fields）
+      let name: any = undefined
+      let typeDesc: any = undefined
+      if (args.length >= 3) {
+        name = args[1]
+        typeDesc = args[2]
+      } else if (args.length === 2) {
+        typeDesc = args[1]
+      }
+      if (name !== undefined && name !== '') {
+        args[0].url = fileUrlToString(name)
+        ctx.fileStates.delete(args[0] as PascalFile)
+      }
+      ctx.debugLog.push(`[file.rec.reset] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${ctx.files.get(args[0].url)?.length ?? -1}`)
+      resetRecFile(ctx, args[0], typeDesc)
+      return undefined
+    }
+    case 'file.rec.rewrite': {
+      if (!args[0]) throw new Error(`file.rec.rewrite: file is undefined`)
+      let name: any = undefined
+      let typeDesc: any = undefined
+      if (args.length >= 3) {
+        name = args[1]
+        typeDesc = args[2]
+      } else if (args.length === 2) {
+        typeDesc = args[1]
+      }
+      if (name !== undefined && name !== '') {
+        args[0].url = fileUrlToString(name)
+        ctx.fileStates.delete(args[0] as PascalFile)
+      }
+      rewriteRecFile(ctx, args[0], typeDesc)
+      return undefined
+    }
+    case 'file.rec.setbuf':
+      // f^ := r：设置缓冲区（ISO 7185 6.5.5.2 file-buffer-variable 赋值）
+      setRecBuffer(ctx, args[0], args[1])
+      return undefined
+    case 'file.rec.peek':
+      // r := f^：返回缓冲区的深拷贝（record 赋值是值拷贝语义）
+      return peekRecFile(ctx, args[0])
+    case 'file.rec.put':
+      putRecFile(ctx, args[0])
+      return undefined
+    case 'file.rec.get':
+      getRecFile(ctx, args[0])
+      return undefined
+    case 'file.rec.eof':
+      return isRecFileEof(ctx, args[0])
 
     // ---------- steps.check（循环步数限制）----------
     case 'steps.check':
@@ -600,41 +732,85 @@ function getCurrentContent(ctx: RuntimeContext, file: PascalFile): Uint8Array {
 
 function writeBackFile(ctx: RuntimeContext, file: PascalFile): void {
   const s = getFileState(ctx, file)
-  const text = s.lines.join('\n') + (s.lines.length > 0 ? '\n' : '')
-  ctx.files.set(file.url, new TextEncoder().encode(text))
+  // file of record：序列化为 JSON（带 magic prefix），不写文本/二进制字节
+  if (s.fileElemTag === 'rec' && s.recList) {
+    ctx.files.set(file.url, serializeRecList(s.recList))
+    return
+  }
+  if (s.binary) {
+    // 二进制字节文件：Latin-1 编码（每字符一字节），不加行分隔符和末尾换行。
+    // 避免 UTF-8 多字节编码破坏 DVI/TFM 等二进制产物（0xF7 → c3 b7 的问题）。
+    const text = s.lines.join('')
+    const bytes = new Uint8Array(text.length)
+    for (let i = 0; i < text.length; i++) {
+      bytes[i] = text.charCodeAt(i) & 0xff
+    }
+    ctx.files.set(file.url, bytes)
+  } else {
+    // 文本文件：UTF-8 编码，行间加 \n，末尾加 \n
+    const text = s.lines.join('\n') + (s.lines.length > 0 ? '\n' : '')
+    ctx.files.set(file.url, new TextEncoder().encode(text))
+  }
 }
 
-function resetFile(ctx: RuntimeContext, file: PascalFile): void {
+function resetFile(ctx: RuntimeContext, file: PascalFile, binary?: boolean): void {
   const s = getFileState(ctx, file)
   const content = ctx.files.get(file.url) || new Uint8Array(0)
   s.offset = 0
   s.eof = content.length === 0
   s.writable = false
   s.currentLine = ''
+  s.binary = binary === true
+  // Pascal-H 文件模型（违反 ISO 7185 6.9.8.1：RESET 后 F^ 应指向第一个组件）：
+  // RESET 后 F^ 未定义，需要 GET 预读第一个字符。
+  // Knuth WEB 系统的 input_ln 依赖此行为（bypass_eoln=true 时 GET 是预读而非跳过）。
+  // 但二进制文件（byte_file）不走 input_ln，TeX 直接访问 F^ 期望标准 RESET 语义，
+  // 因此二进制文件不启用 Pascal-H 预读。
+  if (ctx.extensions.has('pascalHFileModel') && !s.binary) {
+    s.pascalHPreread = true
+  }
 }
 
 /**
  * 把文件名参数转换为字符串。
  * Pascal 中文件名通常是 `packed array[1..N] of char`（运行时为 char 数组或 JS 字符串），
  * 需要连接为字符串并去除尾部填充（空格或 null）。
+ *
+ * 兼容三种运行时表示：
+ *   1. JS 字符串（直接返回，去尾部空白）
+ *   2. JS 数组（0-based 或 1-based，按 length 遍历，遇 undefined 跳过）
+ *   3. 1-based 字符数组对象（str.to.char.array 生成，键为 1..N，含 length 属性）
  */
 function fileUrlToString(url: any): string {
   if (typeof url === 'string') return url.replace(/[\s\x00]+$/, '')
-  if (url && typeof url === 'object' && typeof url.length === 'number') {
+  if (url && typeof url === 'object') {
     const chars: string[] = []
-    for (let i = 0; i < url.length; i++) {
+    // 优先用 length 属性确定边界；start 取首个非 undefined 索引（兼容 0/1-based）
+    const len = typeof url.length === 'number' ? url.length : 0
+    const start = url[0] !== undefined ? 0 : 1
+    for (let i = start; i < start + len; i++) {
       const ch = url[i]
-      if (ch === undefined || ch === null) break
+      if (ch === undefined || ch === null) continue
       if (typeof ch === 'string') chars.push(ch)
       else if (typeof ch === 'number') chars.push(String.fromCharCode(ch))
-      else break
+    }
+    if (chars.length > 0) return chars.join('').replace(/[\s\x00]+$/, '')
+    // 兜底：遍历数字键
+    const keys = Object.keys(url)
+      .map((k) => Number(k))
+      .filter((k) => Number.isInteger(k))
+      .sort((a, b) => a - b)
+    for (const k of keys) {
+      const ch = url[k]
+      if (typeof ch === 'string') chars.push(ch)
+      else if (typeof ch === 'number') chars.push(String.fromCharCode(ch))
     }
     return chars.join('').replace(/[\s\x00]+$/, '')
   }
   return String(url ?? '')
 }
 
-function rewriteFile(ctx: RuntimeContext, file: PascalFile): void {
+function rewriteFile(ctx: RuntimeContext, file: PascalFile, binary?: boolean): void {
   const s = getFileState(ctx, file)
   // 终端文件（TTY:）不清空输入内容：term_in 和 term_out 共享 url='TTY:'，
   // 但 term_out 的写入已重定向到 outputBuffer，不影响 term_in 读取
@@ -646,6 +822,7 @@ function rewriteFile(ctx: RuntimeContext, file: PascalFile): void {
   s.writable = true
   s.lines = []
   s.currentLine = ''
+  s.binary = binary === true
 }
 
 function closeFile(ctx: RuntimeContext, file: PascalFile): void {
@@ -654,15 +831,26 @@ function closeFile(ctx: RuntimeContext, file: PascalFile): void {
     s.lines.push(s.currentLine)
     s.currentLine = ''
   }
-  // 终端文件不写回 ctx.files，避免覆盖 term_in 的输入内容
-  if (!isTtyFile(file)) {
+  // 只对可写文件（rewrite 过的文件）写回内容，避免清空只读文件（reset 过的文件）。
+  // 终端文件也不写回，避免覆盖 term_in 的输入内容。
+  if (!isTtyFile(file) && s.writable) {
     writeBackFile(ctx, file)
   }
 }
 
 function getFile(ctx: RuntimeContext, file: PascalFile): void {
   const s = getFileState(ctx, file)
-  if (s.eof) return
+  // Pascal-H 文件模型：RESET 后第一次 GET 是预读（不推进 offset，只清除标记）
+  if (s.pascalHPreread) {
+    s.pascalHPreread = false
+    return
+  }
+  // ISO 7185 6.6.5.2 get(f) pre-assertion: f0.R is not S() (i.e., not EOF)
+  // 违反 pre-assertion 应报错（"It shall be an error if the stated pre-assertion does not hold"）
+  if (s.eof) {
+    ctx.debugLog.push(`[getFile] EOF url="${file.url}" offset=${s.offset} fileElemTag=${s.fileElemTag ?? '(none)'}`)
+    throw new Error(`get(f) at EOF: pre-assertion violated (ISO 7185 6.6.5.2: f0.R must not be empty) [url=${file.url}]`)
+  }
   const content = getCurrentContent(ctx, file)
   s.offset++
   if (s.offset >= content.length) {
@@ -673,6 +861,10 @@ function getFile(ctx: RuntimeContext, file: PascalFile): void {
 function peekFile(ctx: RuntimeContext, file: PascalFile): string {
   const s = getFileState(ctx, file)
   const content = getCurrentContent(ctx, file)
+  // Pascal-H 文件模型：RESET 后 F^ 未定义，返回空格
+  if (s.pascalHPreread) {
+    return ' '
+  }
   if (s.eof || s.offset >= content.length) {
     // ISO 7185 6.9.8: "After EOF(f) becomes true, the file-buffer-variable f^ is undefined."
     // 默认未定义行为报错（AGENTS.md 原则 A.5/A.6）。
@@ -683,21 +875,165 @@ function peekFile(ctx: RuntimeContext, file: PascalFile): string {
     return ' '
   }
   const ch = content[s.offset] & 0xff
-  // ISO Pascal: EOLN 时 F^ 返回空格
+  // 二进制字节文件：直接返回字节值对应的字符，不把 10/13 当作行结束符
+  // （TFM/DVI 等二进制文件中 10/13 是正常数据字节，不能转为空格）
+  if (s.binary) {
+    return String.fromCharCode(ch)
+  }
+  // 文本文件：ISO Pascal EOLN 时 F^ 返回空格
   if (ch === 10 || ch === 13) return ' '
   return String.fromCharCode(ch)
 }
 
 function isFileEof(ctx: RuntimeContext, file: PascalFile): boolean {
-  return getFileState(ctx, file).eof
+  const s = getFileState(ctx, file)
+  // Pascal-H 文件模型：RESET 后 F^ 未定义，但 EOF 仍可检查文件是否为空
+  if (s.pascalHPreread) {
+    const content = getCurrentContent(ctx, file)
+    return content.length === 0
+  }
+  return s.eof
 }
 
 function isFileEoln(ctx: RuntimeContext, file: PascalFile): boolean {
   const s = getFileState(ctx, file)
+  // Pascal-H 文件模型：RESET 后 F^ 未定义，EOLN 返回 false
+  if (s.pascalHPreread) {
+    return false
+  }
   const content = getCurrentContent(ctx, file)
   if (s.eof || s.offset >= content.length) return true
   const ch = content[s.offset]
   return ch === 10 || ch === 13
+}
+
+// ============================================================
+// file of record 辅助函数（ISO 7185 6.4.3.5 / 6.6.5.2）
+// ============================================================
+
+/** record 文件序列化的 magic prefix，用于区分文本/二进制/record 文件 */
+const REC_FILE_MAGIC = '\x00PASCAL_TS_REC\x00'
+
+/**
+ * 把记录列表序列化为 Uint8Array（magic prefix + UTF-8 JSON）。
+ */
+function serializeRecList(recList: any[]): Uint8Array {
+  const json = JSON.stringify(recList)
+  const text = REC_FILE_MAGIC + json
+  return new TextEncoder().encode(text)
+}
+
+/**
+ * 从 Uint8Array 反序列化记录列表。
+ * 若内容不以 magic prefix 开头，返回空数组（兼容空文件或旧格式）。
+ */
+function deserializeRecList(content: Uint8Array): any[] {
+  if (content.length === 0) return []
+  const text = new TextDecoder().decode(content)
+  if (!text.startsWith(REC_FILE_MAGIC)) {
+    // 不是 record 文件格式，返回空（避免误解析文本文件）
+    return []
+  }
+  const json = text.slice(REC_FILE_MAGIC.length)
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function resetRecFile(ctx: RuntimeContext, file: PascalFile, typeDesc?: any): void {
+  const s = getFileState(ctx, file)
+  const content = ctx.files.get(file.url) || new Uint8Array(0)
+  s.fileElemTag = 'rec'
+  s.recTypeDesc = typeDesc
+  s.recList = deserializeRecList(content)
+  s.recPos = 0
+  s.writable = false
+  s.eof = s.recList.length === 0
+  // ISO 7185 6.6.5.2 reset: f^ 指向第一个组件（若有）。
+  // 深拷贝 recList[0] 到缓冲区，使 f^.field := x 修改缓冲区而非文件内容。
+  if (s.recList.length > 0) {
+    s.recBuffer = deepCopyValue(s.recList[0])
+  } else {
+    s.recBuffer = typeDesc ? createDefaultRec(typeDesc) : {}
+  }
+}
+
+function rewriteRecFile(ctx: RuntimeContext, file: PascalFile, typeDesc?: any): void {
+  const s = getFileState(ctx, file)
+  if (!isTtyFile(file)) {
+    ctx.files.set(file.url, new Uint8Array(0))
+  }
+  s.fileElemTag = 'rec'
+  s.recTypeDesc = typeDesc
+  s.recList = []
+  s.recPos = 0
+  // 初始化缓冲区为默认记录，使 f^.field := x 能直接设置字段。
+  // （ISO 7185 中 rewrite 后 f^ 未定义；实际实现给默认值以便字段级赋值。）
+  s.recBuffer = typeDesc ? createDefaultRec(typeDesc) : {}
+  s.writable = true
+  s.eof = true
+}
+
+function setRecBuffer(ctx: RuntimeContext, file: PascalFile, value: any): void {
+  const s = getFileState(ctx, file)
+  if (!s.writable) {
+    throw new Error('f^ := r before rewrite: pre-assertion violated (ISO 7185 6.6.5.2)')
+  }
+  // record 赋值是值拷贝语义（ISO 7185），避免别名共享
+  s.recBuffer = deepCopyValue(value)
+}
+
+function peekRecFile(ctx: RuntimeContext, file: PascalFile): any {
+  const s = getFileState(ctx, file)
+  // 不检查 eof：rewrite 后 eof=true 但 f^ 应可写（缓冲区为默认记录）。
+  // reset 空文件后 eof=true，f^ 返回默认记录（ISO "undefined" 由默认值体现，不抛错）。
+  // recBuffer 始终被初始化（rewrite/reset/get/put 均设置），不会为 undefined。
+  if (s.recBuffer === undefined) {
+    // 兜底：若缓冲区确实未初始化，返回空对象
+    s.recBuffer = s.recTypeDesc ? createDefaultRec(s.recTypeDesc) : {}
+  }
+  // 返回缓冲区本身（非拷贝），使 f^.field := x 能修改缓冲区。
+  // 整记录读 r := f^ 的值拷贝语义由 compiler 的 rec.copy 包装保证。
+  return s.recBuffer
+}
+
+function putRecFile(ctx: RuntimeContext, file: PascalFile): void {
+  const s = getFileState(ctx, file)
+  // ISO 7185 6.6.5.2 put(f) pre-assertion: f0.M = Generation (i.e., after rewrite)
+  if (!s.writable) {
+    throw new Error('put(f) before rewrite: pre-assertion violated (ISO 7185 6.6.5.2)')
+  }
+  if (s.recBuffer === undefined) {
+    throw new Error('put(f) with undefined f^: pre-assertion violated (ISO 7185 6.6.5.2)')
+  }
+  // 推入缓冲区的拷贝（避免后续 put 修改同一对象）
+  s.recList!.push(deepCopyValue(s.recBuffer))
+  // 重置缓冲区为默认记录，便于下一轮 f^.field := x
+  s.recBuffer = s.recTypeDesc ? createDefaultRec(s.recTypeDesc) : {}
+}
+
+function getRecFile(ctx: RuntimeContext, file: PascalFile): void {
+  const s = getFileState(ctx, file)
+  // ISO 7185 6.6.5.2 get(f) pre-assertion: f0.R is not S() (i.e., not EOF)
+  if (s.eof) {
+    throw new Error('get(f) at EOF: pre-assertion violated (ISO 7185 6.6.5.2)')
+  }
+  s.recPos!++
+  if (s.recPos! < s.recList!.length) {
+    // 深拷贝到缓冲区，使 f^.field := x 修改缓冲区而非文件内容
+    s.recBuffer = deepCopyValue(s.recList![s.recPos!])
+  } else {
+    s.eof = true
+    s.recBuffer = s.recTypeDesc ? createDefaultRec(s.recTypeDesc) : {}
+  }
+}
+
+function isRecFileEof(ctx: RuntimeContext, file: PascalFile): boolean {
+  const s = getFileState(ctx, file)
+  return s.eof
 }
 
 /** 终端文件 url：写入重定向到 outputBuffer，读取从 ctx.files 查找 */

@@ -169,6 +169,7 @@ export type TypeNode =
   | FileTypeNode
   | SetTypeNode
   | EnumerationTypeNode
+  | PointerTypeNode
 
 export interface SimpleTypeNode extends AstNode {
   kind: 'SimpleType'
@@ -222,6 +223,13 @@ export interface SetTypeNode extends AstNode {
 export interface EnumerationTypeNode extends AstNode {
   kind: 'EnumerationType'
   values: IdentifierNode[]
+}
+
+// ISO 7185 6.4.4 Pointer-types: new-pointer-type = '↑' domain-type
+// 实际源码中使用 '^' 代替 '↑'。
+export interface PointerTypeNode extends AstNode {
+  kind: 'PointerType'
+  domainType: TypeNode
 }
 
 // --- Statements ---

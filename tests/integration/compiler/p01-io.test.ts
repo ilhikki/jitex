@@ -207,7 +207,7 @@ end.`,
       expectedContains: 'ab',
     },
     {
-      name: 'new dispose procedures (unsupported, expect friendly error)',
+      name: 'new dispose procedures (ISO 7185 6.6.5.3 pointer support)',
       code: `program test;
 type P = ^integer;
 var p: P;
@@ -218,8 +218,8 @@ begin
   dispose(p);
 end.`,
       purpose:
-        'Pascal82 standard feature not yet implemented; must report friendly error, not crash',
-      expectedError: '',
+        'ISO 7185 6.6.5.3 new/dispose + 6.4.4 pointer-types + 6.5.4 identified-variable',
+      expectedContains: '10',
     },
     {
       name: 'file does not exist (mock IO does not simulate file errors)',

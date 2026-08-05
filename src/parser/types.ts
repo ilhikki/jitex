@@ -6,6 +6,7 @@ import {
   ParseResult,
   ParserInput,
   Position,
+  PointerTypeNode,
   RangeTypeNode,
   RecordTypeNode,
   RecordVariantNode,
@@ -44,6 +45,10 @@ export function parseType(input: ParserInput): ParseResult<TypeNode> {
 
     case 'LPAREN':
       return parseEnumerationType(input)
+
+    case 'CARET':
+      // ISO 7185 6.4.4: new-pointer-type = '↑' domain-type
+      return parsePointerType(input)
 
     case 'MINUS':
     case 'PLUS':
@@ -341,6 +346,25 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
     pos,
     withLoc(
       { kind: 'RecordVariant', caseLabels: caseLabelsResult.astNode, fields, variant },
+      start,
+      input.tokens[pos - 1].end
+    )
+  )
+}
+
+// ISO 7185 6.4.4: '^' domain-type  (domain-type = type-identifier)
+function parsePointerType(input: ParserInput): ParseResult<PointerTypeNode> {
+  const start = peek(input).start
+  let pos = input.position + 1 // skip '^'
+
+  const domainResult = parseType({ tokens: input.tokens, position: pos })
+  if (!domainResult.success) return fail(domainResult.error, domainResult.position)
+  pos = domainResult.newPosition
+
+  return ok(
+    pos,
+    withLoc(
+      { kind: 'PointerType', domainType: domainResult.astNode } as PointerTypeNode,
       start,
       input.tokens[pos - 1].end
     )

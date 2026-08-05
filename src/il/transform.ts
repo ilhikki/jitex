@@ -130,6 +130,9 @@ class PascalSemanticCompiler implements SemanticCompiler {
         return JSON.stringify(literal.arg)
       case 'char':
         return JSON.stringify(literal.arg)
+      case 'null':
+        // ISO 7185 6.4.4: nil-value → JS null
+        return 'null'
       case 'type':
         // 类型描述字面量：arg 已经是 JSON 字符串，直接作为 JS 对象字面量返回。
         // JSON 是 JS 对象字面量的子集，所以直接嵌入 JS 代码即可。
@@ -184,7 +187,9 @@ class PascalSemanticCompiler implements SemanticCompiler {
       case 'f64.abs':
         return `Math.abs(${args[0]})`
       case 'f64.sqrt':
-        return `Math.sqrt(${args[0]})`
+        // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
+        // sqrt(x) for x < 0 is undefined → must throw
+        return `(() => { const __x = ${args[0]}; if (!(__x >= 0)) throw new Error('sqrt: domain error (x < 0)'); return Math.sqrt(__x); })()`
       case 'f64.sin':
         return `Math.sin(${args[0]})`
       case 'f64.cos':
@@ -192,7 +197,9 @@ class PascalSemanticCompiler implements SemanticCompiler {
       case 'f64.exp':
         return `Math.exp(${args[0]})`
       case 'f64.ln':
-        return `Math.log(${args[0]})`
+        // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
+        // ln(x) for x <= 0 is undefined → must throw
+        return `(() => { const __x = ${args[0]}; if (!(__x > 0)) throw new Error('ln: domain error (x <= 0)'); return Math.log(__x); })()`
       case 'f64.arctan':
         return `Math.atan(${args[0]})`
 
@@ -222,7 +229,9 @@ class PascalSemanticCompiler implements SemanticCompiler {
       case 'cast.f64.to.i64':
         return `Math.trunc(${args[0]})`
       case 'cast.f64.to.i64.round':
-        return `Math.round(${args[0]})`
+        // ISO 7185 6.6.6.3: round(x) = trunc(x+0.5) if x>=0, trunc(x-0.5) if x<0
+        // JS Math.round 对 -3.5 返回 -3（向 +∞ 舍入），不符合 ISO（ISO 要求 -4）
+        return `(Math.trunc(${args[0]} >= 0 ? ${args[0]} + 0.5 : ${args[0]} - 0.5) | 0)`
       case 'cast.char.to.i64':
         return `(${args[0]}.charCodeAt(0))`
       case 'cast.bool.to.i64':
@@ -235,6 +244,12 @@ class PascalSemanticCompiler implements SemanticCompiler {
         return `(${args[0]} + ${args[1]})`
       case 'str.length':
         return `(${args[0]}.length)`
+
+      // str.to.char.array: args = [low, high, str]
+      // 生成 IIFE 返回 1-based 字符数组对象，避免字符串作为数组索引时 0-based 偏移
+      // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历
+      case 'str.to.char.array':
+        return `(() => { const __low=${args[0]}|0, __high=${args[1]}|0, __s=${args[2]}; const __o={}; for(let __i=__low;__i<=__high;__i++){const __k=__i-__low; __o[__i]=__k<__s.length?__s.charAt(__k):' ';} __o.length=__high-__low+1; return __o; })()`
 
       // ---------- 数组/记录/cell（inline，符合 JS 语义）----------
       // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...
@@ -264,6 +279,15 @@ class PascalSemanticCompiler implements SemanticCompiler {
       // cell.set: args = [cell, val] → cell.v = val
       case 'cell.set':
         return `(${args[0]}.v = ${args[1]})`
+      // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
+      case 'ptr.deref':
+        return `(() => { const __p = ${args[0]}; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); return __p.v; })()`
+      // p^ := x — nil 解引用是 error
+      case 'ptr.assign':
+        return `(() => { const __p = ${args[0]}; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.v = ${args[1]}; })()`
+      // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
+      case 'ptr.dispose.check':
+        return `(() => { if (${args[0]} === null) throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)'); })()`
 
       // io.break: 空操作
       case 'io.break':

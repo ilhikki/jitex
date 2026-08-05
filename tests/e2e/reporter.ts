@@ -39,11 +39,13 @@ export type StageStatus = 'success' | 'failed' | 'skipped'
 export interface StageArtifact {
   /** 文件名（如 "tangle.pas"） */
   name: string
-  /** 文件内容（运行时写入磁盘） */
+  /** 文件内容（运行时写入磁盘，文本文件用 content，二进制文件用 binary） */
   content: string
+  /** 二进制内容（可选，dvi/tfm 等二进制产物用此字段；设置后 content 被忽略） */
+  binary?: Uint8Array
   /** 字节大小 */
   size: number
-  /** 行数 */
+  /** 行数（二进制文件为 0） */
   lines: number
 }
 
@@ -142,9 +144,11 @@ export function writeReport(report: TestReport): void {
     if (!fs.existsSync(stageDir)) {
       fs.mkdirSync(stageDir, { recursive: true })
     }
-    // 产物文件
+    // 产物文件（文本用 content，二进制用 binary）
     for (const art of stage.artifacts) {
-      if (art.content) {
+      if (art.binary) {
+        fs.writeFileSync(path.join(stageDir, art.name), Buffer.from(art.binary))
+      } else if (art.content) {
         fs.writeFileSync(path.join(stageDir, art.name), art.content, 'utf-8')
       }
     }

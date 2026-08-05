@@ -94,6 +94,11 @@ function litBool(v: boolean): JsonCode.Literal {
   return { kind: 'literal', key: 'bool', arg: v ? 'true' : 'false' }
 }
 
+function litNull(): JsonCode.Literal {
+  // ISO 7185 6.4.4: nil-value，JS 中用 null 表示
+  return { kind: 'literal', key: 'null', arg: 'null' }
+}
+
 function syscall(key: string, args: JsonCode.Expr[]): JsonCode.Syscall {
   return { kind: 'syscall', key, args }
 }
@@ -156,6 +161,16 @@ function typeSuffix(ti: TypeInfo): string {
   }
 }
 
+/**
+ * 判断文件类型是否为 file of record（elem.tag === 'rec'）。
+ * 用于在 reset/rewrite/get/put/eof/f^ 等操作中分派到 file.rec.* syscall。
+ * ISO 7185 6.4.3.5: file-type = 'file' 'of' component-type
+ */
+function isRecordFile(fileType: TypeInfo): boolean {
+  const elemTi = fileType.fileElem ?? null
+  return elemTi !== null && elemTi.tag === 'rec'
+}
+
 // ============================================================
 // 变量默认值
 // ============================================================
@@ -184,6 +199,9 @@ function defaultExpr(ti: TypeInfo): JsonCode.Expr {
       return syscall('set.empty', [])
     case 'file':
       return syscall('file.create', [])
+    case 'pointer':
+      // ISO 7185 6.4.4: 指针变量默认为 nil-value
+      return litNull()
     default:
       return litInt(0)
   }
@@ -365,6 +383,27 @@ function compileAssignment(
     value = syscall('rec.copy', [value])
   }
 
+  // Pascal `packed array[low..high] of char` 赋值为字符串字面量或 str 类型时，
+  // 必须转成 1-based 字符数组对象，否则后续 arr[k] 在 JS 中是 0-based 字符串索引，
+  // 导致首字符丢失（Knuth TeX 的 NAMEOFFILE := POOLNAME 即此问题）。
+  if (
+    lvalueType.tag === 'array' &&
+    lvalueType.dims &&
+    lvalueType.dims.length === 1 &&
+    lvalueType.elem &&
+    lvalueType.elem.tag === 'char'
+  ) {
+    const rvalueType = a.typeOf(node.right)
+    if (rvalueType.tag === 'str' || node.right.kind === 'StringLiteral') {
+      const dim = lvalueType.dims[0]
+      value = syscall('str.to.char.array', [
+        litInt(dim.low),
+        litInt(dim.high),
+        value,
+      ])
+    }
+  }
+
   // 简单变量
   if (node.left.kind === 'Identifier') {
     // with 字段优先（ISO 7185 6.8.3.10）
@@ -427,8 +466,28 @@ function compileAssignment(
   if (node.left.kind === 'FieldAccess') {
     const fa = node.left as FieldAccessNode
     if (fa.field.name === '^') {
+      const objType = a.typeOf(fa.object)
+      if (objType.tag === 'pointer') {
+        // ISO 7185 6.5.4: 指针解引用赋值 p^ := x → cell.set(p, x)
+        const ptrExpr = compileExpr(fa.object, a, ws)
+        return [evalStmt(syscall('ptr.assign', [ptrExpr, value]))]
+      }
       // 文件缓冲区赋值 f^ := x → file.put
+      // 二进制字节文件（file of byte / file of eight_bits，elem 为 subrange）：
+      // x 是 0..255 的 byte 值，需转成单字符写入，否则 file.put 会把 number
+      // 转成十进制字符串污染 DVI/TFM 等二进制产物。
+      // 注意：file of integer（elem.tag === 'i64'）不走此路径，仍按文本写入。
       const fExpr = compileExpr(fa.object, a, ws)
+      const elemTi = objType.fileElem ?? null
+      const isBinaryByteFile = elemTi !== null && elemTi.tag === 'subrange'
+      if (isBinaryByteFile) {
+        const charVal = syscall('cast.i64.to.char', [value])
+        return [evalStmt(syscall('file.put', [fExpr, charVal]))]
+      }
+      // file of record: f^ := r 设置记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
+      if (isRecordFile(objType)) {
+        return [evalStmt(syscall('file.rec.setbuf', [fExpr, value]))]
+      }
       return [evalStmt(syscall('file.put', [fExpr, value]))]
     }
     const objExpr = compileExpr(fa.object, a, ws)
@@ -700,24 +759,109 @@ function compileProcedureCall(
       return compileReadln(node.arguments, a, ws, false)
     case 'read':
       return compileReadln(node.arguments, a, ws, true)
-    case 'reset':
-      return [evalStmt(syscall('file.reset', node.arguments.map((x) => compileExpr(x, a, ws))))]
-    case 'rewrite':
-      return [evalStmt(syscall('file.rewrite', node.arguments.map((x) => compileExpr(x, a, ws))))]
+    case 'reset': {
+      // 对二进制字节文件（file of byte/eight_bits，elem 为 subrange）用 file.reset.binary，
+      // 使 runtime 读取时不把 10/13 当作行结束符，正确处理 TFM/DVI 等二进制文件。
+      const resetArgs = node.arguments.map((x) => compileExpr(x, a, ws))
+      if (node.arguments.length > 0) {
+        const fileType = a.typeOf(node.arguments[0])
+        if (isRecordFile(fileType)) {
+          // 传元素类型描述，用于 reset 后创建默认缓冲区记录
+          const elemTi = fileType.fileElem!
+          resetArgs.push(typeDescLiteral(elemTi))
+          return [evalStmt(syscall('file.rec.reset', resetArgs))]
+        }
+        const elemTi = fileType.fileElem ?? null
+        if (elemTi !== null && elemTi.tag === 'subrange') {
+          return [evalStmt(syscall('file.reset.binary', resetArgs))]
+        }
+      }
+      return [evalStmt(syscall('file.reset', resetArgs))]
+    }
+    case 'rewrite': {
+      // 对二进制字节文件（file of byte/eight_bits，elem 为 subrange）用 file.rewrite.binary，
+      // 使 runtime 用 Latin-1 编码写入，避免 UTF-8 破坏 DVI/TFM 等二进制产物。
+      const rewriteArgs = node.arguments.map((x) => compileExpr(x, a, ws))
+      if (node.arguments.length > 0) {
+        const fileType = a.typeOf(node.arguments[0])
+        if (isRecordFile(fileType)) {
+          // 传元素类型描述，用于 rewrite 后创建默认缓冲区记录
+          const elemTi = fileType.fileElem!
+          rewriteArgs.push(typeDescLiteral(elemTi))
+          return [evalStmt(syscall('file.rec.rewrite', rewriteArgs))]
+        }
+        const elemTi = fileType.fileElem ?? null
+        if (elemTi !== null && elemTi.tag === 'subrange') {
+          return [evalStmt(syscall('file.rewrite.binary', rewriteArgs))]
+        }
+      }
+      return [evalStmt(syscall('file.rewrite', rewriteArgs))]
+    }
     case 'close':
       return [evalStmt(syscall('file.close', node.arguments.map((x) => compileExpr(x, a, ws))))]
     case 'assign':
       return [evalStmt(syscall('file.assign', node.arguments.map((x) => compileExpr(x, a, ws))))]
-    case 'get':
-      return [evalStmt(syscall('file.get', node.arguments.map((x) => compileExpr(x, a, ws))))]
-    case 'put':
-      return [evalStmt(syscall('file.put', node.arguments.map((x) => compileExpr(x, a, ws))))]
+    case 'get': {
+      const getArgs = node.arguments.map((x) => compileExpr(x, a, ws))
+      if (node.arguments.length > 0) {
+        const fileType = a.typeOf(node.arguments[0])
+        if (isRecordFile(fileType)) {
+          return [evalStmt(syscall('file.rec.get', getArgs))]
+        }
+      }
+      return [evalStmt(syscall('file.get', getArgs))]
+    }
+    case 'put': {
+      const putArgs = node.arguments.map((x) => compileExpr(x, a, ws))
+      if (node.arguments.length > 0) {
+        const fileType = a.typeOf(node.arguments[0])
+        if (isRecordFile(fileType)) {
+          return [evalStmt(syscall('file.rec.put', putArgs))]
+        }
+      }
+      return [evalStmt(syscall('file.put', putArgs))]
+    }
     case 'page':
       return [evalStmt(syscall('io.page', node.arguments.map((x) => compileExpr(x, a, ws))))]
-    case 'new':
-      throw new Error('new/dispose not supported')
-    case 'dispose':
-      throw new Error('new/dispose not supported')
+    case 'new': {
+      // ISO 7185 6.6.5.3: new(p) 创建新变量，p 指向它
+      const argNode = node.arguments[0]
+      if (argNode.kind !== 'Identifier') {
+        throw new Error('new: argument must be a pointer variable')
+      }
+      const sym = resolveSymbol(argNode as IdentifierNode, a, ws)
+      if (!sym || (sym.kind !== 'var' && sym.kind !== 'param')) {
+        throw new Error('new: argument is not a variable')
+      }
+      const ptrType = a.typeOf(argNode)
+      if (ptrType.tag !== 'pointer' || !ptrType.domainType) {
+        throw new Error('new: argument must be a pointer-type variable')
+      }
+      const defaultVal = defaultExpr(ptrType.domainType)
+      const cell = syscall('cell.create', [defaultVal])
+      if (sym.isVarParam) {
+        return [evalStmt(syscall('cell.set', [ref(sym.varId), cell]))]
+      }
+      return [assignStmt(ref(sym.varId), cell)]
+    }
+    case 'dispose': {
+      // ISO 7185 6.6.5.3: dispose(p) 释放标识值，p 置 nil
+      const argNode = node.arguments[0]
+      if (argNode.kind !== 'Identifier') {
+        throw new Error('dispose: argument must be a pointer variable')
+      }
+      const sym = resolveSymbol(argNode as IdentifierNode, a, ws)
+      if (!sym || (sym.kind !== 'var' && sym.kind !== 'param')) {
+        throw new Error('dispose: argument is not a variable')
+      }
+      // 先检查 p 不是 nil（解引用前检查），然后置 nil
+      const ptrExpr = compileExpr(argNode, a, ws)
+      const checkStmt = evalStmt(syscall('ptr.dispose.check', [ptrExpr]))
+      if (sym.isVarParam) {
+        return [checkStmt, evalStmt(syscall('cell.set', [ref(sym.varId), litNull()]))]
+      }
+      return [checkStmt, assignStmt(ref(sym.varId), litNull())]
+    }
     default: {
       // 插件注入的非标过程（AGENTS.md 原则 A.7）
       const found = findProcedurePlugin(a.plugins(), name)
@@ -806,13 +950,20 @@ function compileWriteln(
   // 检查第一个参数是否是文件
   let fileExpr: JsonCode.Expr | null = null
   let argStart = 0
+  let fileElemTi: TypeInfo | null = null
   if (args.length > 0) {
     const firstTi = a.typeOf(args[0])
     if (firstTi.tag === 'file') {
       fileExpr = compileExpr(args[0], a, ws)
+      fileElemTi = firstTi.fileElem ?? null
       argStart = 1
     }
   }
+  // 二进制文件（file of byte / file of eight_bits，elem 为 subrange）：
+  // write(f, x) 应写入单字节（String.fromCharCode(x & 0xff)），
+  // 而非十进制字符串。Knuth TeX 的 DVIFILE: BYTEFILE 即此模式。
+  // file of integer（elem.tag === 'i64'）和 text 文件不在此列，仍按文本写入。
+  const isBinaryByteFile = fileElemTi !== null && fileElemTi.tag === 'subrange'
 
   for (let i = argStart; i < args.length; i++) {
     const arg = args[i]
@@ -842,7 +993,15 @@ function compileWriteln(
     }
 
     const ti = a.typeOf(valueNode)
-    const valExpr = compileExpr(valueNode, a, ws)
+    let valExpr = compileExpr(valueNode, a, ws)
+    // 二进制字节文件：把 byte 值转成单字符（String.fromCharCode），
+    // 走 io.write.char.file 写入单字节，避免十进制字符串污染 DVI/TFM 等二进制产物。
+    if (isBinaryByteFile && widthExpr === null && (ti.tag === 'i64' || ti.tag === 'subrange' || ti.tag === 'enum')) {
+      valExpr = syscall('cast.i64.to.char', [valExpr])
+      out.push(evalStmt(syscall('io.write.char.file', [fileExpr!, valExpr])))
+      continue
+    }
+
     const suffix = typeSuffix(ti)
 
     if (widthExpr !== null) {
@@ -885,13 +1044,20 @@ function compileReadln(
   // 检查第一个参数是否是文件
   let fileExpr: JsonCode.Expr | null = null
   let argStart = 0
+  let fileElemTi: TypeInfo | null = null
   if (args.length > 0) {
     const firstTi = a.typeOf(args[0])
     if (firstTi.tag === 'file') {
       fileExpr = compileExpr(args[0], a, ws)
+      fileElemTi = firstTi.fileElem ?? null
       argStart = 1
     }
   }
+  // 二进制字节文件（file of byte / file of eight_bits，elem 为 subrange）：
+  // read(f, x) 应读取单字节并按 byte 值赋给 x，
+  // 而非按十进制 token 解析。Knuth TeX 的 TFMFILE/DVIFILE 即此模式。
+  // file of integer（elem.tag === 'i64'）不在此列，仍按文本解析。
+  const isBinaryByteFile = fileElemTi !== null && fileElemTi.tag === 'subrange'
 
   for (let i = argStart; i < args.length; i++) {
     const argNode = args[i]
@@ -903,6 +1069,17 @@ function compileReadln(
       throw new Error(`readln/read: variable ${argNode.name} not found`)
     }
     const ti = sym.typeInfo
+    // 二进制字节文件：read(f, byte) → 读单字符再转 ord（0..255）
+    if (isBinaryByteFile && (ti.tag === 'i64' || ti.tag === 'subrange' || ti.tag === 'enum')) {
+      const chExpr = syscall('io.read.char.file', [fileExpr!])
+      const valExpr = syscall('cast.char.to.i64', [chExpr])
+      if (sym.isVarParam) {
+        out.push(evalStmt(syscall('cell.set', [ref(sym.varId), valExpr])))
+      } else {
+        out.push(assignStmt(ref(sym.varId), valExpr))
+      }
+      continue
+    }
     const suffix = typeSuffix(ti)
     const key = fileExpr ? `io.read.${suffix}.file` : `io.read.${suffix}`
     const readArgs = fileExpr ? [fileExpr] : []
@@ -1019,6 +1196,7 @@ function compileIdentifier(
   if (name === 'true') return litBool(true)
   if (name === 'false') return litBool(false)
   if (name === 'maxint') return litInt(2147483647)
+  if (name === 'nil') return litNull()
   // 内置无参函数（parser 将无括号调用解析为 Identifier）
   if (name === 'eof') return syscall('io.eof', [])
   if (name === 'eoln') return syscall('io.eoln', [])
@@ -1187,11 +1365,45 @@ function compileFunctionCall(
       return syscall('cast.i64.to.char', argExprs)
     case 'pred': {
       const ti = a.typeOf(args[0])
+      // ISO 7185 6.6.6.4: pred(x) = value whose ordinal number is one less than x
+      // "error if none" — 对枚举首值/子界下界必须报错
+      // char 类型需先转 ord 再运算再转回 char
+      if (ti.tag === 'char') {
+        return syscall('cast.i64.to.char', [
+          syscall('i64.sub', [syscall('cast.char.to.i64', argExprs), litInt(1)]),
+        ])
+      }
+      if (ti.tag === 'enum' && ti.enumCount !== undefined) {
+        // 枚举范围 0..enumCount-1，pred 后检查 < 0
+        const result = syscall('i64.sub', [argExprs[0], litInt(1)])
+        return syscall('range.check', [result, litInt(0), litInt(ti.enumCount - 1)])
+      }
+      if (ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined) {
+        const result = syscall('i64.sub', [argExprs[0], litInt(1)])
+        return syscall('range.check', [result, litInt(ti.low), litInt(ti.high)])
+      }
       const prefix = typeSuffix(ti)
       return syscall(`${prefix}.sub`, [argExprs[0], litInt(1)])
     }
     case 'succ': {
       const ti = a.typeOf(args[0])
+      // ISO 7185 6.6.6.4: succ(x) = value whose ordinal number is one greater than x
+      // "error if none" — 对枚举末值/子界上界必须报错
+      // char 类型需先转 ord 再运算再转回 char
+      if (ti.tag === 'char') {
+        return syscall('cast.i64.to.char', [
+          syscall('i64.add', [syscall('cast.char.to.i64', argExprs), litInt(1)]),
+        ])
+      }
+      if (ti.tag === 'enum' && ti.enumCount !== undefined) {
+        // 枚举范围 0..enumCount-1，succ 后检查 > enumCount-1
+        const result = syscall('i64.add', [argExprs[0], litInt(1)])
+        return syscall('range.check', [result, litInt(0), litInt(ti.enumCount - 1)])
+      }
+      if (ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined) {
+        const result = syscall('i64.add', [argExprs[0], litInt(1)])
+        return syscall('range.check', [result, litInt(ti.low), litInt(ti.high)])
+      }
       const prefix = typeSuffix(ti)
       return syscall(`${prefix}.add`, [argExprs[0], litInt(1)])
     }
@@ -1200,7 +1412,13 @@ function compileFunctionCall(
     case 'length':
       return syscall('str.length', argExprs)
     case 'eof':
-      if (args.length > 0) return syscall('file.eof', argExprs)
+      if (args.length > 0) {
+        // file of record 用 file.rec.eof（ISO 7185 6.4.3.5）
+        if (isRecordFile(a.typeOf(args[0]))) {
+          return syscall('file.rec.eof', argExprs)
+        }
+        return syscall('file.eof', argExprs)
+      }
       return syscall('io.eof', [])
     case 'eoln':
       if (args.length > 0) return syscall('file.eoln', argExprs)
@@ -1241,8 +1459,27 @@ function compileFieldAccess(
   ws: WithBinding[]
 ): JsonCode.Expr {
   if (node.field.name === '^') {
+    const objType = a.typeOf(node.object)
+    if (objType.tag === 'pointer') {
+      // ISO 7185 6.5.4: 指针解引用 p^ → cell.get(p)
+      return syscall('ptr.deref', [compileExpr(node.object, a, ws)])
+    }
     // 文件缓冲区访问 f^
-    return syscall('file.peek', [compileExpr(node.object, a, ws)])
+    // 二进制字节文件（file of byte/eight_bits，elem 为 subrange）：f^ 返回 byte 值
+    // （0..255 的 integer），而非字符。Knuth TeX 的 TFMFILE^ 即此模式
+    // （`LF := TFMFILE^` 后做 `LF > 127` 比较）。
+    // file of integer（elem.tag === 'i64'）和 text 文件仍返回字符/文本。
+    const peekExpr = syscall('file.peek', [compileExpr(node.object, a, ws)])
+    const elemTi = objType.fileElem ?? null
+    const isBinaryByteFile = elemTi !== null && elemTi.tag === 'subrange'
+    if (isBinaryByteFile) {
+      return syscall('cast.char.to.i64', [peekExpr])
+    }
+    // file of record: f^ 返回记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
+    if (isRecordFile(objType)) {
+      return syscall('file.rec.peek', [compileExpr(node.object, a, ws)])
+    }
+    return peekExpr
   }
   const obj = compileExpr(node.object, a, ws)
   return syscall('rec.field', [obj, litStr(node.field.name.toLowerCase())])

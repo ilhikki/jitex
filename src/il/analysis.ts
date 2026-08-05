@@ -50,6 +50,7 @@ export type TypeTag =
   | 'file'
   | 'enum'
   | 'subrange'
+  | 'pointer'
   | 'unknown'
 
 export interface TypeInfo {
@@ -69,6 +70,8 @@ export interface TypeInfo {
   fileElem?: TypeInfo | null
   // enum
   enumCount?: number
+  // pointer (ISO 7185 6.4.4)
+  domainType?: TypeInfo
 }
 
 const SIMPLE_TYPES: Record<string, TypeInfo> = {
@@ -343,11 +346,33 @@ export class Analyzer {
       this.analyzeConst(c)
     }
 
-    // TYPE
+    // TYPE — 两遍处理，支持 ISO 7185 6.4.4 指针前向引用
+    // （指针类型的 domain-type 允许引用同一段中后定义的类型标识符）
+    // 第一遍：注册所有类型名（placeholder，保持对象引用稳定）
+    const typePlaceholders = new Map<string, TypeInfo>()
     for (const t of block.typeDeclarations) {
+      const lower = t.name.name.toLowerCase()
+      const placeholder: TypeInfo = { tag: 'unknown' }
+      this.typeAliases.set(lower, placeholder)
+      this.bind(t.name.name, { kind: 'type', typeInfo: placeholder })
+      typePlaceholders.set(lower, placeholder)
+    }
+    // 第二遍：解析每个类型定义，回填到 placeholder（保持引用不变）
+    for (const t of block.typeDeclarations) {
+      const lower = t.name.name.toLowerCase()
       const info = this.resolveTypeInfo(t.typeDef)
-      this.typeAliases.set(t.name.name.toLowerCase(), info)
-      this.bind(t.name.name, { kind: 'type', typeInfo: info })
+      const placeholder = typePlaceholders.get(lower)!
+      Object.assign(placeholder, info)
+    }
+    // 第三遍：指针类型重新解析 domainType（此时所有类型已定义）
+    for (const t of block.typeDeclarations) {
+      if (t.typeDef.kind === 'PointerType') {
+        const lower = t.name.name.toLowerCase()
+        this.typeNodeInfo.delete(t.typeDef)
+        const info = this.resolveTypeInfo(t.typeDef)
+        const placeholder = typePlaceholders.get(lower)!
+        Object.assign(placeholder, info)
+      }
     }
 
     // VAR
@@ -559,6 +584,11 @@ export class Analyzer {
             typeInfo: { tag: 'i64' },
           })
         }
+        break
+      }
+      case 'PointerType': {
+        // ISO 7185 6.4.4: new-pointer-type = '↑' domain-type
+        info = { tag: 'pointer', domainType: this.resolveTypeInfo(node.domainType) }
         break
       }
       default:
@@ -977,6 +1007,9 @@ export class Analyzer {
           const lower = node.name.toLowerCase()
           if (lower === 'eof' || lower === 'eoln') {
             info = { tag: 'bool' }
+          } else if (lower === 'nil') {
+            // ISO 7185 6.4.4: nil 是所有 pointer-type 的值
+            info = { tag: 'pointer' }
           } else {
             info = { tag: 'unknown' }
           }
@@ -1060,6 +1093,9 @@ export class Analyzer {
         const objType = this.analyzeExpr(node.object)
         if (objType.tag === 'rec' && objType.fields) {
           info = objType.fields.get(node.field.name.toLowerCase()) ?? { tag: 'unknown' }
+        } else if (node.field.name === '^' && objType.tag === 'pointer') {
+          // ISO 7185 6.4.4 / 6.5.4: 指针解引用 p^ → 域类型
+          info = objType.domainType ?? { tag: 'unknown' }
         } else if (node.field.name === '^' && objType.tag === 'file') {
           // 文件缓冲区访问 F^：返回文件元素类型（text 文件为 char）
           info = objType.fileElem ?? { tag: 'char' }

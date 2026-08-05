@@ -2,6 +2,7 @@ node_modules/
 dist/
 .idea/
 *.log
+!/knuth/**
 *.iml
 /coverage
 /temp

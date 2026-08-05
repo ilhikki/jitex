@@ -73,12 +73,22 @@ export const pascalHPlugin: IlPlugin = {
     /**
      * erstat(f)：返回文件 f 最近一次 reset/rewrite 的错误状态。
      *
-     * 注意：插件无法直接 hook runtime 的 reset/rewrite syscall，
-     * 故此实现返回 0（成功）。真实场景需配合文件系统错误检测。
-     * 当前用于让 TeX 编译通过；TRIP 测试的文件打开检查由
-     * runTeXCompiled 预先注入所有输入文件来满足。
+     * Pascal-H 语义：reset(f, name) 后若文件不存在，erstat 返回非 0。
+     * TeX 的 BOPENIN/AOPENIN/WOPENIN 用 erstat(f)=0 判断文件是否成功打开。
+     *
+     * 实现方式：检查 ctx.files 中是否存在 file.url。
+     * - rewrite 后文件一定存在（rewriteFile 会创建空文件），故 erstat=0
+     * - reset 后若文件不存在，erstat 返回 1
+     * - TTY 等特殊文件总是成功
      */
-    erstat: (_ctx: RuntimeContext, _args: any[]) => 0,
+    erstat: (ctx: RuntimeContext, args: any[]) => {
+      const file = args[0] as PascalFile
+      if (!file) return 0
+      // TTY 等特殊文件总是成功
+      if (file.url === 'TTY:' || file.url === '') return 0
+      // 检查文件是否存在
+      return ctx.files.has(file.url) ? 0 : 1
+    },
   },
 }
 

@@ -212,7 +212,7 @@ export function runTeXCompiled(
     input: options.input,
     files,
     maxSteps: options.maxSteps ?? 2e9,
-    extensions: options.extensions ?? ['string', 'fileEofBufferSpace'],
+    extensions: options.extensions ?? ['string', 'fileEofBufferSpace', 'pascalHFileModel'],
     plugins: options.plugins ?? [],
     debugLog,
   })

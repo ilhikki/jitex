@@ -194,6 +194,27 @@ describe('Phase 3: Array and Record', () => {
       purpose: '测试数组记录作为参数（Pascal82 标准：单个 type 段）',
       expectedOutput: '10\n20\n',
     },
+    // packed array of char 字符串赋值（Knuth TeX NAMEOFFILE := POOLNAME 即此模式）
+    // 反例：若直接把字符串赋给数组变量，arr[1] 在 JS 中会变成 0-based 字符串索引，
+    // 首字符丢失。str.to.char.array syscall 把字符串展开为 1-based 字符数组对象。
+    {
+      name: 'packed array of char := string literal: 正向 - 首字符不丢失',
+      code: `program test; var name: packed array[1..10] of char; i: integer; begin name := 'TeXformat'; for i := 1 to 9 do write(name[i]); end.`,
+      purpose: 'ISO 7185 6.4.3.3: packed array of char 接受字符串赋值，逐字符访问首字符必须保留',
+      expectedContains: 'TeXformat',
+    },
+    {
+      name: 'packed array of char := string literal: 正向 - 首字符单独可读',
+      code: `program test; var name: packed array[1..10] of char; begin name := 'hello'; write(name[1]); write(name[5]); end.`,
+      purpose: '验证 str.to.char.array 后 name[1]="h" name[5]="o"（1-based 索引）',
+      expectedContains: 'ho',
+    },
+    {
+      name: 'packed array of char := const string: 正向 - 首字符不丢失',
+      code: `program test; const POOLNAME = 'TeXformats:TEX.POOL'; var name: packed array[1..20] of char; i: integer; begin name := POOLNAME; for i := 1 to 19 do write(name[i]); end.`,
+      purpose: 'Knuth TeX NAMEOFFILE := POOLNAME 模式：const 字符串赋给 packed array of char',
+      expectedContains: 'TeXformats:TEX.POOL',
+    },
   ]
 
   runPascalTests(tests)

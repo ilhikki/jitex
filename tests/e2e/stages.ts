@@ -128,8 +128,8 @@ interface PipelineContext {
   texCompiledJs: string
   texCompileOk: boolean
   texCompileError: string
-  hello: { output: string; status: string; error?: string; steps: number } | null
-  trip: { output: string; status: string; error?: string; steps: number } | null
+  hello: { output: string; status: string; error?: string; steps: number; files: Map<string, Uint8Array> } | null
+  trip: { output: string; status: string; error?: string; steps: number; files: Map<string, Uint8Array> } | null
 
   failedAt: string
 }
@@ -158,6 +158,17 @@ function artifact(name: string, content: string): StageArtifact {
     content,
     size: Buffer.byteLength(content, 'utf-8'),
     lines: countLines(content),
+  }
+}
+
+/** 构造二进制产物（dvi/tfm 等二进制文件，用于保存到报告文件夹） */
+function binaryArtifact(name: string, data: Uint8Array): StageArtifact {
+  return {
+    name,
+    content: '',
+    binary: data,
+    size: data.length,
+    lines: 0,
   }
 }
 
@@ -222,6 +233,80 @@ function assert(
   name: string, cond: boolean, actual?: string, expected?: string
 ): { name: string; passed: boolean; actual?: string; expected?: string } {
   return { name, passed: cond, actual, expected }
+}
+
+/**
+ * 从 TeX 运行结果的 files Map 中查找 dvi 文件。
+ * TeX 通过 rewrite(f, 'name.dvi') 创建输出文件，文件名以 '.dvi' 结尾。
+ *
+ * DVI 文件格式（Knuth TEXPack）：
+ *   - 首 2 字节为 preamble opcode (247) + format version (2)
+ *   - 末尾为 postamble opcode (249) followed by 4 bytes of 0xdf (223)
+ *   - 最小有效 DVI（空文档）约 50+ 字节
+ *
+ * @returns 找到的 dvi 文件信息，或 null
+ */
+function findDviFile(files: Map<string, Uint8Array>): { name: string; data: Uint8Array } | null {
+  for (const [name, data] of files) {
+    // 跳过输入文件和 TTY
+    if (name === 'TTY:') continue
+    if (name.toLowerCase().endsWith('.dvi')) {
+      return { name, data }
+    }
+  }
+  return null
+}
+
+/** 按扩展名查找文件（如 'trip.fmt'），返回第一个匹配的数据 */
+function findFile(files: Map<string, Uint8Array>, extension: string): Uint8Array | null {
+  const ext = extension.toLowerCase()
+  for (const [name, data] of files) {
+    if (name === 'TTY:') continue
+    if (name.toLowerCase().endsWith(ext)) {
+      return data
+    }
+  }
+  return null
+}
+
+/**
+ * 检查 DVI 文件是否有效。
+ * DVI 格式参考：https://texdoc.org/serve/dvitype.pdf/0
+ *
+ * 有效性检查：
+ *   1. 长度 > 0（非空）
+ *   2. 首字节为 247 (pre opcode)
+ *   3. 第 2 字节为 2 (DVI format version 2)
+ *   4. 末尾包含 postamble 标记（223 重复）
+ */
+function validateDvi(data: Uint8Array): { valid: boolean; reason: string; firstBytes: string; lastBytes: string } {
+  if (data.length === 0) {
+    return { valid: false, reason: 'empty dvi file', firstBytes: '', lastBytes: '' }
+  }
+  const firstBytes = Array.from(data.slice(0, 8)).map((b) => b.toString(16).padStart(2, '0')).join(' ')
+  const lastBytes = data.length >= 8
+    ? Array.from(data.slice(-8)).map((b) => b.toString(16).padStart(2, '0')).join(' ')
+    : firstBytes
+  // DVI preamble: opcode 247 (0xf7), version 2
+  if (data[0] !== 247) {
+    return { valid: false, reason: `bad preamble opcode: expected 247 (0xf7), got ${data[0]}`, firstBytes, lastBytes }
+  }
+  if (data[1] !== 2) {
+    return { valid: false, reason: `bad DVI version: expected 2, got ${data[1]}`, firstBytes, lastBytes }
+  }
+  // 最小有效 DVI（preamble + postamble）约 50 字节
+  if (data.length < 50) {
+    return { valid: false, reason: `dvi too short: ${data.length} bytes (expected > 50)`, firstBytes, lastBytes }
+  }
+  // 末尾应有 4+ 个 223 (0xdf) 作为 postamble 标记
+  let trailer223 = 0
+  for (let i = data.length - 1; i >= 0 && data[i] === 223; i--) {
+    trailer223++
+  }
+  if (trailer223 < 4) {
+    return { valid: false, reason: `missing postamble trailer (223 x4+): only ${trailer223}`, firstBytes, lastBytes }
+  }
+  return { valid: true, reason: 'ok', firstBytes, lastBytes }
 }
 
 // ============================================================
@@ -718,6 +803,7 @@ const stages: StageDef[] = [
       const t0 = now()
       let debugLog: string[] = []
       let stackTrace: string[] = []
+      let resultFiles: Map<string, Uint8Array> = new Map()
       try {
         const r = runTeXCompiled(ctx.texCompiledJs, {
           input: ['hello'],
@@ -729,10 +815,11 @@ const stages: StageDef[] = [
           plugins: [pascalHPlugin],
         })
         debugLog = r.debugLog ?? []
+        resultFiles = r.files
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
-        ctx.hello = { output: r.output, status: r.state.status, error: r.state.error?.message, steps: r.state.steps }
+        ctx.hello = { output: r.output, status: r.state.status, error: r.state.error?.message, steps: r.state.steps, files: r.files }
       } catch (e: any) {
-        ctx.hello = { output: '', status: 'error', error: e?.message, steps: 0 }
+        ctx.hello = { output: '', status: 'error', error: e?.message, steps: 0, files: new Map() }
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
       }
 
@@ -742,8 +829,16 @@ const stages: StageDef[] = [
       const hasBanner = output.includes('This is TeX') ?? false
       const hasEmergencyStop = output.includes('! Emergency stop.')
       const hasNoPages = output.includes('No pages of output')
-      // hello.tex 应该正常输出，不能有 Emergency stop
-      const outputOk = ok && !hasEmergencyStop && !hasNoPages
+
+      // DVI 文件检查（不只依赖 console 输出，验证实际产物）
+      const dviInfo = findDviFile(resultFiles)
+      const dviValidation = dviInfo ? validateDvi(dviInfo.data) : null
+      const hasDvi = dviInfo !== null && dviValidation !== null
+      const dviValid = hasDvi && dviValidation!.valid
+      const dviSize = dviInfo?.data.length ?? 0
+
+      // hello.tex 应该正常输出，不能有 Emergency stop，且应产生有效 DVI
+      const outputOk = ok && !hasEmergencyStop && !hasNoPages && dviValid
       const metrics = {
         inputFile: 'hello.tex',
         inputSize: formatBytes(ctx.helloTex.length),
@@ -753,12 +848,17 @@ const stages: StageDef[] = [
         banner: firstLine(output),
         hasEmergencyStop,
         hasNoPages,
+        dviFile: dviInfo?.name ?? '(none)',
+        dviSize: formatBytes(dviSize),
+        dviValid,
       }
       const assertions = [
         assert('run ok', ok, ctx.hello?.status, 'terminated'),
         assert('output has This is TeX', hasBanner, undefined, 'contains'),
         assert('no Emergency stop', !hasEmergencyStop, undefined, 'no emergency stop'),
         assert('has pages of output', !hasNoPages, undefined, 'has pages'),
+        assert('dvi file exists', hasDvi, dviInfo?.name ?? '(none)', '.dvi file'),
+        assert('dvi valid (preamble+postamble)', dviValid, dviValidation?.reason ?? 'no dvi', 'valid DVI'),
       ]
       const outputLines = output.split('\n').filter((l) => l.length > 0)
       // 诊断行
@@ -771,12 +871,31 @@ const stages: StageDef[] = [
       if (!hasHelloTex && hasEeXformat) {
         diagLines.push('diag: output contains "eXformat" instead of "hello" - input filename first char dropped (char offset bug)')
       }
+      // DVI 诊断
+      if (!hasDvi) {
+        diagLines.push('diag: no .dvi file in output files - TeX did not produce DVI output')
+        // 列出所有输出文件名，便于诊断
+        const allFiles = Array.from(resultFiles.keys()).filter((n) => n !== 'TTY:')
+        diagLines.push(`diag: output files: ${allFiles.length > 0 ? allFiles.join(', ') : '(none)'}`)
+      } else if (!dviValid) {
+        diagLines.push(`diag: dvi invalid: ${dviValidation!.reason}`)
+        diagLines.push(`diag: dvi first 8 bytes: ${dviValidation!.firstBytes}`)
+        diagLines.push(`diag: dvi last 8 bytes: ${dviValidation!.lastBytes}`)
+      } else {
+        diagLines.push(`diag: dvi ok: ${dviInfo!.name} ${formatBytes(dviSize)}, first=${dviValidation!.firstBytes}`)
+      }
+
+      // 产物：hello.log + dvi 文件（二进制）
+      const artifacts: StageArtifact[] = output ? [artifact('hello.log', output)] : []
+      if (dviInfo) {
+        artifacts.push(binaryArtifact(dviInfo.name, dviInfo.data))
+      }
 
       if (!ok || !outputOk) {
         return failedStage('11', 'run TeX on hello.tex', duration,
-          ctx.hello?.error ?? (hasEmergencyStop ? 'Emergency stop' : 'unknown output issue'), {
+          ctx.hello?.error ?? (hasEmergencyStop ? 'Emergency stop' : (!dviValid ? 'invalid DVI' : 'unknown output issue')), {
           metrics,
-          artifacts: output ? [artifact('hello.log', output)] : [],
+          artifacts,
           logs: [
             ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
             ...diagLines,
@@ -787,7 +906,7 @@ const stages: StageDef[] = [
       }
       return successStage('11', 'run TeX on hello.tex', duration, {
         metrics,
-        artifacts: [artifact('hello.log', output)],
+        artifacts,
         logs: [
           ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
           ...diagLines,
@@ -805,41 +924,103 @@ const stages: StageDef[] = [
       const t0 = now()
       let debugLog: string[] = []
       let stackTrace: string[] = []
+      let resultFiles: Map<string, Uint8Array> = new Map()
+      let output = ''
+      let tripStatus: string = 'unknown'
+      let tripError: string | undefined
+      let tripSteps = 0
+      let pass1Output = ''
       try {
-        const r = runTeXCompiled(ctx.texCompiledJs, {
+        // ---- Pass 1: INITEX 运行 trip.tex，生成 trip.fmt 格式文件 ----
+        // trip.tex 第 90 行有 \let\next=\dump，TeX 执行到此处会 dump 格式文件
+        const r1 = runTeXCompiled(ctx.texCompiledJs, {
           input: ['trip'],
           files: {
             'trip.tex': ctx.tripTex,
-            'trip.tfm': ctx.tripTfm,
+            'TeXfonts:trip.tfm': ctx.tripTfm,
             'TeXformats:TEX.POOL': ctx.tex!.pool,
           },
           maxSteps: 5e9,
           plugins: [pascalHPlugin],
         })
-        debugLog = r.debugLog ?? []
-        if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
-        ctx.trip = { output: r.output, status: r.state.status, error: r.state.error?.message, steps: r.state.steps }
+        debugLog.push(...(r1.debugLog ?? []))
+        pass1Output = r1.output
+        if (r1.state.error?.stackTrace) stackTrace = r1.state.error.stackTrace
+
+        // 查找生成的 trip.fmt 文件
+        const tripFmt = findFile(r1.files, 'trip.fmt')
+        debugLog.push(`[pass1] status=${r1.state.status} steps=${r1.state.steps} fmtFound=${!!tripFmt} fmtSize=${tripFmt?.length ?? 0}`)
+
+        // ---- Pass 2: 用 trip.fmt 运行 trip.tex，生成 trip.fot 输出 ----
+        // 注意：word_file (file of memory_word) 的二进制 record 读写尚未完整实现，
+        // pass 2 可能因 "Fatal format file error" 失败。此时回退到 pass 1 的输出。
+        if (tripFmt) {
+          const r2 = runTeXCompiled(ctx.texCompiledJs, {
+            input: ['&trip  trip'],
+            files: {
+              'trip.tex': ctx.tripTex,
+              'trip.fmt': tripFmt,
+              'TeXfonts:trip.tfm': ctx.tripTfm,
+              'TeXformats:TEX.POOL': ctx.tex!.pool,
+            },
+            maxSteps: 5e9,
+            plugins: [pascalHPlugin],
+          })
+          debugLog.push(...(r2.debugLog ?? []))
+          if (r2.state.error?.stackTrace) stackTrace = r2.state.error.stackTrace
+          debugLog.push(`[pass2] status=${r2.state.status} steps=${r2.state.steps} outLen=${r2.output.length} err=${r2.state.error?.message ?? '(none)'}`)
+          // 如果 pass 2 成功（输出比 pass 1 更长），使用 pass 2 的结果
+          if (r2.output.length > r1.output.length && !r2.output.includes('Fatal format file error')) {
+            output = r2.output
+            tripStatus = r2.state.status
+            tripError = r2.state.error?.message
+            tripSteps = r1.state.steps + r2.state.steps
+            resultFiles = r2.files
+            debugLog.push(`[pass2] accepted (output longer than pass1)`)
+          } else {
+            // pass 2 失败（格式文件加载未实现），回退到 pass 1
+            debugLog.push(`[pass2] rejected (outLen=${r2.output.length} <= pass1=${r1.output.length} or fatal error), falling back to pass 1`)
+            // 保存 pass 2 输出前 5 行用于诊断
+            const r2Lines = r2.output.split('\n').filter((l) => l.length > 0).slice(0, 10)
+            debugLog.push(`[pass2] first lines: ${JSON.stringify(r2Lines)}`)
+            output = r1.output
+            tripStatus = r1.state.status
+            tripError = r1.state.error?.message
+            tripSteps = r1.state.steps
+            resultFiles = r1.files
+          }
+        } else {
+          // trip.fmt 未生成，使用 pass 1 的结果
+          output = r1.output
+          tripStatus = r1.state.status
+          tripError = r1.state.error?.message
+          tripSteps = r1.state.steps
+          resultFiles = r1.files
+        }
+        ctx.trip = { output, status: tripStatus, error: tripError, steps: tripSteps, files: resultFiles }
       } catch (e: any) {
-        ctx.trip = { output: '', status: 'error', error: e?.message, steps: 0 }
+        ctx.trip = { output: '', status: 'error', error: e?.message, steps: 0, files: new Map() }
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
       }
 
       const duration = now() - t0
       const ok = ctx.trip?.status === 'terminated'
-      const output = ctx.trip?.output ?? ''
       const hasBanner = output.includes('This is TeX')
       const hasInitex = output.includes('(INITEX)')
       const outputLines = output.split('\n').filter((l) => l.length > 0)
       const outputLineCount = outputLines.length
-      // TRIP 是 diabolical test，期望输出应包含多行（不是只几行 emergency stop）
       const hasReasonableOutput = outputLineCount > 10
-      // 检查是否异常退出（只有 Emergency stop）
       const hasEmergencyStop = output.includes('! Emergency stop.')
       const hasNoPages = output.includes('No pages of output')
-      // 诊断信息：检查 pool 字符串偏移问题
       const hasDisplaylimits = output.includes('displaylimits')
       const hasEeXformats = output.includes('eXformats')
       const hasTeXformats = output.includes('TeXformats')
+
+      const dviInfo = findDviFile(resultFiles)
+      const dviValidation = dviInfo ? validateDvi(dviInfo.data) : null
+      const hasDvi = dviInfo !== null && dviValidation !== null
+      const dviValid = hasDvi && dviValidation!.valid
+      const dviSize = dviInfo?.data.length ?? 0
 
       const metrics = {
         inputFile: 'trip.tex',
@@ -856,24 +1037,43 @@ const stages: StageDef[] = [
         hasDisplaylimits,
         hasEeXformats,
         hasTeXformats,
+        dviFile: dviInfo?.name ?? '(none)',
+        dviSize: formatBytes(dviSize),
+        dviValid,
       }
       const assertions = [
         assert('run ok', ok, ctx.trip?.status, 'terminated'),
         assert('output has This is TeX', hasBanner, undefined, 'contains'),
         assert('output has (INITEX)', hasInitex, undefined, 'contains'),
         assert('output lines > 10', hasReasonableOutput, String(outputLineCount), '> 10'),
+        assert('dvi file exists', hasDvi, dviInfo?.name ?? '(none)', '.dvi file'),
       ]
-      // 诊断行
       const diagLines: string[] = []
       if (hasEmergencyStop) diagLines.push(`diag: emergency stop detected (output too short, ${outputLineCount} lines)`)
       if (hasDisplaylimits) diagLines.push('diag: banner contains "displaylimits" (pool string offset issue)')
       if (hasEeXformats) diagLines.push('diag: output contains "eXformats" (missing leading T, pool offset by 1)')
       if (hasNoPages) diagLines.push('diag: "No pages of output" - TeX did not produce output')
+      if (!hasDvi) {
+        diagLines.push('diag: no .dvi file in output files - TeX did not produce DVI output')
+        const allFiles = Array.from(resultFiles.keys()).filter((n) => n !== 'TTY:')
+        diagLines.push(`diag: output files: ${allFiles.length > 0 ? allFiles.join(', ') : '(none)'}`)
+      } else {
+        diagLines.push(`diag: dvi: ${dviInfo!.name} ${formatBytes(dviSize)}, valid=${dviValid}`)
+        diagLines.push(`diag: dvi first 8 bytes: ${dviValidation!.firstBytes}`)
+        diagLines.push(`diag: dvi last 8 bytes: ${dviValidation!.lastBytes}`)
+        if (!dviValid) diagLines.push(`diag: dvi invalid: ${dviValidation!.reason}`)
+      }
+
+      const artifacts: StageArtifact[] = output ? [artifact('trip.log', output)] : []
+      if (pass1Output) artifacts.push(artifact('trip.pass1.log', pass1Output))
+      if (dviInfo) {
+        artifacts.push(binaryArtifact(dviInfo.name, dviInfo.data))
+      }
 
       if (!ok) {
         return failedStage('12', 'run TeX on trip.tex', duration, ctx.trip?.error ?? 'unknown', {
           metrics,
-          artifacts: output ? [artifact('trip.log', output)] : [],
+          artifacts,
           logs: [
             ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
             ...diagLines,
@@ -884,7 +1084,7 @@ const stages: StageDef[] = [
       }
       return successStage('12', 'run TeX on trip.tex', duration, {
         metrics,
-        artifacts: [artifact('trip.log', output)],
+        artifacts,
         logs: [
           ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
           ...diagLines,
