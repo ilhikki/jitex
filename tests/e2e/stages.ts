@@ -27,6 +27,7 @@ import * as os from 'os'
 import { parse } from '@/index'
 import { transform } from '@/il/transform'
 import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
+import { extractDviText } from './dvi-extract'
 import {
   readResource,
   readResourceBytes,
@@ -278,10 +279,21 @@ function findFile(files: Map<string, Uint8Array>, extension: string): Uint8Array
  *   2. 首字节为 247 (pre opcode)
  *   3. 第 2 字节为 2 (DVI format version 2)
  *   4. 末尾包含 postamble 标记（223 重复）
+ *
+ * 内容检查（hasContent）：
+ *   解析 pre 后扫描所有 bop..eop 段，若任一页在 bop header（45 字节）
+ *   与 eop 之间存在字节，则视为有内容。空 DVI（仅 pre/bop/eop/post）
+ *   会被识别为 hasContent=false，便于上层断言"TeX 是否真的排出了字符"。
  */
-function validateDvi(data: Uint8Array): { valid: boolean; reason: string; firstBytes: string; lastBytes: string } {
+function validateDvi(data: Uint8Array): {
+  valid: boolean
+  hasContent: boolean
+  reason: string
+  firstBytes: string
+  lastBytes: string
+} {
   if (data.length === 0) {
-    return { valid: false, reason: 'empty dvi file', firstBytes: '', lastBytes: '' }
+    return { valid: false, hasContent: false, reason: 'empty dvi file', firstBytes: '', lastBytes: '' }
   }
   const firstBytes = Array.from(data.slice(0, 8)).map((b) => b.toString(16).padStart(2, '0')).join(' ')
   const lastBytes = data.length >= 8
@@ -289,14 +301,14 @@ function validateDvi(data: Uint8Array): { valid: boolean; reason: string; firstB
     : firstBytes
   // DVI preamble: opcode 247 (0xf7), version 2
   if (data[0] !== 247) {
-    return { valid: false, reason: `bad preamble opcode: expected 247 (0xf7), got ${data[0]}`, firstBytes, lastBytes }
+    return { valid: false, hasContent: false, reason: `bad preamble opcode: expected 247 (0xf7), got ${data[0]}`, firstBytes, lastBytes }
   }
   if (data[1] !== 2) {
-    return { valid: false, reason: `bad DVI version: expected 2, got ${data[1]}`, firstBytes, lastBytes }
+    return { valid: false, hasContent: false, reason: `bad DVI version: expected 2, got ${data[1]}`, firstBytes, lastBytes }
   }
   // 最小有效 DVI（preamble + postamble）约 50 字节
   if (data.length < 50) {
-    return { valid: false, reason: `dvi too short: ${data.length} bytes (expected > 50)`, firstBytes, lastBytes }
+    return { valid: false, hasContent: false, reason: `dvi too short: ${data.length} bytes (expected > 50)`, firstBytes, lastBytes }
   }
   // 末尾应有 4+ 个 223 (0xdf) 作为 postamble 标记
   let trailer223 = 0
@@ -304,9 +316,41 @@ function validateDvi(data: Uint8Array): { valid: boolean; reason: string; firstB
     trailer223++
   }
   if (trailer223 < 4) {
-    return { valid: false, reason: `missing postamble trailer (223 x4+): only ${trailer223}`, firstBytes, lastBytes }
+    return { valid: false, hasContent: false, reason: `missing postamble trailer (223 x4+): only ${trailer223}`, firstBytes, lastBytes }
   }
-  return { valid: true, reason: 'ok', firstBytes, lastBytes }
+
+  // 内容检查：扫描 bop..eop 段，看是否有字符/规则等内容
+  // pre 结构: 247, ver, num[4], den[4], mag[4], k, x[k] = 15 + k 字节
+  // bop 结构: 139, c0..c9[40], p[4] = 45 字节
+  // eop 结构: 140 = 1 字节
+  let hasContent = false
+  try {
+    const k = data[14]
+    let pos = 15 + k // 跳过 pre
+    while (pos < data.length && data[pos] !== 248 /* post */) {
+      if (data[pos] === 139 /* bop */) {
+        const bopHeaderEnd = pos + 45
+        // 在 bop header 之后查找 eop
+        let p = bopHeaderEnd
+        while (p < data.length && data[p] !== 140 /* eop */ && data[p] !== 139 /* bop */) {
+          p++
+        }
+        if (p > bopHeaderEnd) {
+          // bop header 与 eop 之间存在字节 → 有内容
+          hasContent = true
+          break
+        }
+        // eop 紧跟 bop header，本页为空，继续扫描下一页
+        pos = p + 1 // 跳过 eop
+      } else {
+        pos++
+      }
+    }
+  } catch {
+    // 解析失败，保持 hasContent=false
+  }
+
+  return { valid: true, hasContent, reason: 'ok', firstBytes, lastBytes }
 }
 
 // ============================================================
@@ -809,6 +853,7 @@ const stages: StageDef[] = [
           input: ['hello'],
           files: {
             'hello.tex': ctx.helloTex,
+            'TeXfonts:trip.tfm': ctx.tripTfm,
             'TeXformats:TEX.POOL': ctx.tex!.pool,
           },
           maxSteps: 2e9,
@@ -835,10 +880,12 @@ const stages: StageDef[] = [
       const dviValidation = dviInfo ? validateDvi(dviInfo.data) : null
       const hasDvi = dviInfo !== null && dviValidation !== null
       const dviValid = hasDvi && dviValidation!.valid
+      const dviHasContent = hasDvi && dviValidation!.hasContent
       const dviSize = dviInfo?.data.length ?? 0
 
-      // hello.tex 应该正常输出，不能有 Emergency stop，且应产生有效 DVI
-      const outputOk = ok && !hasEmergencyStop && !hasNoPages && dviValid
+      // hello.tex 应该正常输出，不能有 Emergency stop，且应产生有效且非空的 DVI
+      // （空 DVI = bop 紧跟 eop，没有任何字符操作，说明 TeX 没把文本排到页面上）
+      const outputOk = ok && !hasEmergencyStop && !hasNoPages && dviValid && dviHasContent
       const metrics = {
         inputFile: 'hello.tex',
         inputSize: formatBytes(ctx.helloTex.length),
@@ -851,6 +898,7 @@ const stages: StageDef[] = [
         dviFile: dviInfo?.name ?? '(none)',
         dviSize: formatBytes(dviSize),
         dviValid,
+        dviHasContent,
       }
       const assertions = [
         assert('run ok', ok, ctx.hello?.status, 'terminated'),
@@ -859,6 +907,9 @@ const stages: StageDef[] = [
         assert('has pages of output', !hasNoPages, undefined, 'has pages'),
         assert('dvi file exists', hasDvi, dviInfo?.name ?? '(none)', '.dvi file'),
         assert('dvi valid (preamble+postamble)', dviValid, dviValidation?.reason ?? 'no dvi', 'valid DVI'),
+        assert('dvi has content (chars between bop and eop)', dviHasContent,
+          dviHasContent ? 'has content' : (hasDvi ? 'empty page (bop immediately followed by eop)' : 'no dvi'),
+          'page with character operations'),
       ]
       const outputLines = output.split('\n').filter((l) => l.length > 0)
       // 诊断行
@@ -881,19 +932,43 @@ const stages: StageDef[] = [
         diagLines.push(`diag: dvi invalid: ${dviValidation!.reason}`)
         diagLines.push(`diag: dvi first 8 bytes: ${dviValidation!.firstBytes}`)
         diagLines.push(`diag: dvi last 8 bytes: ${dviValidation!.lastBytes}`)
+      } else if (!dviHasContent) {
+        diagLines.push(`diag: dvi empty - bop immediately followed by eop (no character ops), size=${dviSize}`)
+        diagLines.push(`diag: dvi first 8 bytes: ${dviValidation!.firstBytes}`)
+        diagLines.push(`diag: dvi last 8 bytes: ${dviValidation!.lastBytes}`)
+        diagLines.push('diag: TeX shipped out a page but no characters were typeset (likely nullfont/no font loaded, or \\end before any text was processed)')
       } else {
         diagLines.push(`diag: dvi ok: ${dviInfo!.name} ${formatBytes(dviSize)}, first=${dviValidation!.firstBytes}`)
       }
 
-      // 产物：hello.log + dvi 文件（二进制）
+      // 产物：hello.log + dvi 文件（二进制）+ plain-dvi.txt（DVI 文字提取）
       const artifacts: StageArtifact[] = output ? [artifact('hello.log', output)] : []
       if (dviInfo) {
         artifacts.push(binaryArtifact(dviInfo.name, dviInfo.data))
+        // 提取 DVI 中的文字内容，输出为 plain-dvi.txt 便于人工核对
+        const dviText = extractDviText(dviInfo.data)
+        artifacts.push(artifact('plain-dvi.txt', dviText.text))
+        // 把 DVI 文字提取的关键信息也加入 metrics 和诊断日志
+        metrics.dviPages = dviText.pages.length
+        metrics.dviFonts = dviText.fonts.size
+        metrics.dviTextLen = dviText.pages.reduce((sum, p) => sum + p.length, 0)
+        if (dviText.errors.length > 0) {
+          metrics.dviParseErrors = dviText.errors.length
+          for (const err of dviText.errors.slice(0, 5)) {
+            diagLines.push(`diag: dvi parse: ${err}`)
+          }
+        }
+        // 如果 DVI 有内容，把提取的文字预览加到诊断日志
+        if (dviText.pages.length > 0) {
+          const firstPage = dviText.pages[0]
+          const preview = firstPage.length > 0 ? firstPage.slice(0, 80) : '(empty)'
+          diagLines.push(`diag: dvi page 1 text preview: ${JSON.stringify(preview)}`)
+        }
       }
 
       if (!ok || !outputOk) {
         return failedStage('11', 'run TeX on hello.tex', duration,
-          ctx.hello?.error ?? (hasEmergencyStop ? 'Emergency stop' : (!dviValid ? 'invalid DVI' : 'unknown output issue')), {
+          ctx.hello?.error ?? (hasEmergencyStop ? 'Emergency stop' : (!dviValid ? 'invalid DVI' : (!dviHasContent ? 'empty DVI (no character operations)' : 'unknown output issue'))), {
           metrics,
           artifacts,
           logs: [
@@ -1068,6 +1143,23 @@ const stages: StageDef[] = [
       if (pass1Output) artifacts.push(artifact('trip.pass1.log', pass1Output))
       if (dviInfo) {
         artifacts.push(binaryArtifact(dviInfo.name, dviInfo.data))
+        // 提取 DVI 中的文字内容，输出为 plain-dvi.txt 便于人工核对
+        const dviText = extractDviText(dviInfo.data)
+        artifacts.push(artifact('plain-dvi.txt', dviText.text))
+        metrics.dviPages = dviText.pages.length
+        metrics.dviFonts = dviText.fonts.size
+        metrics.dviTextLen = dviText.pages.reduce((sum, p) => sum + p.length, 0)
+        if (dviText.errors.length > 0) {
+          metrics.dviParseErrors = dviText.errors.length
+          for (const err of dviText.errors.slice(0, 5)) {
+            diagLines.push(`diag: dvi parse: ${err}`)
+          }
+        }
+        // 预览前两页的文字内容
+        for (let i = 0; i < Math.min(2, dviText.pages.length); i++) {
+          const preview = dviText.pages[i].slice(0, 80)
+          diagLines.push(`diag: dvi page ${i + 1} text preview: ${JSON.stringify(preview)}`)
+        }
       }
 
       if (!ok) {
