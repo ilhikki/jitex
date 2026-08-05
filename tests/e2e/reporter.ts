@@ -3,19 +3,29 @@
  *
  * 报告目录结构（位于项目根目录 `reports/`）：
  *   reports/
- *     index.html                  顶级导航（可提交到 git）
+ *     index.html                  顶级导航（列出所有历史测试）
  *     {timestamp-id}/             每次测试一个文件夹
- *       overview.json             测试概览 + 中间文件清单
- *       index.html                本次测试详情页
- *       tangle-official.pas       中间文件
- *       tangle.js
- *       ...
+ *       index.html                本次测试详情页（overview）
+ *       overview.json             完整数据（含所有日志/堆栈）
+ *       logs.txt                  所有 stage 普通日志（合并）
+ *       console.txt               所有 stage 控制台输出（合并）
+ *       debug.txt                 所有 stage 调试日志（合并）
+ *       stack.txt                 所有 stage 错误堆栈（合并）
+ *       stages/                   每个阶段一个子目录
+ *         1/
+ *           tangle-official.pas
+ *           logs.txt              该阶段独立日志
+ *         8/
+ *           tex.pas
+ *           tex.pool
+ *           ...
  *
  * 设计原则：
- *   - HTML 极简：只用 div/span/h1-h6/p，分栏用 inline style 的 flex
- *   - metrics key 使用普通 JS 变量名（非中文、非用户可见英语）
- *   - 保留所有历史测试文件夹，顶级 index.html 列出全部
- *   - 对比：选两个测试，左右 iframe 分栏显示
+ *   - HTML 纯原生标签（h1-h6/p/ul/li/a/code/pre），无任何样式/CSS/inline style。
+ *   - 报告生成与测试内容解耦：HTML 中的文件链接通过遍历 stages/ 目录生成，
+ *     不写死任何文件名。
+ *   - 保留所有历史测试文件夹，顶级 index.html 列出全部。
+ *   - 错误堆栈/控制台输出/调试日志全部写入文本文件和 overview.json。
  */
 import * as fs from 'fs'
 import * as path from 'path'
@@ -50,9 +60,16 @@ export interface StageReport {
   status: StageStatus
   duration: number
   /** key 必须是合法 JS 变量名（如 inputSize, lineCount） */
-  metrics: Record<string, string | number>
+  metrics: Record<string, string | number | boolean>
   artifacts: StageArtifact[]
+  /** 普通日志（运行过程的高层信息，如 banner、产物首行） */
   logs: string[]
+  /** 控制台输出（运行期 console.log/error 等，原样保留） */
+  consoleLogs: string[]
+  /** 调试日志（运行期诊断信息，如 pool 文件读取追踪） */
+  debugLogs: string[]
+  /** 错误堆栈（异常时保存，便于离线排查） */
+  stackTrace: string[]
   error?: string
   assertions: Assertion[]
 }
@@ -80,7 +97,6 @@ function makeReportId(timestamp: string): string {
   const pad = (n: number, w = 2) => String(n).padStart(w, '0')
   const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   const time = `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
-  // 序号：同秒内递增
   let seq = 1
   let id = `${date}_${time}_${String(seq).padStart(3, '0')}`
   while (fs.existsSync(path.join(REPORT_DIR, id))) {
@@ -95,7 +111,16 @@ function makeReportId(timestamp: string): string {
 // ============================================================
 
 /**
- * 写入报告：创建子文件夹，保存中间文件，生成 HTML。
+ * 写入报告：创建子文件夹，per-stage 子目录保存产物，生成极简 HTML。
+ *
+ * 文件结构：
+ *   {dir}/index.html       overview 页（关键信息 + 文件链接）
+ *   {dir}/overview.json    完整数据
+ *   {dir}/logs.txt         所有 stage 日志合并
+ *   {dir}/console.txt      所有 stage 控制台合并
+ *   {dir}/debug.txt        所有 stage 调试日志合并
+ *   {dir}/stack.txt        所有 stage 堆栈合并
+ *   {dir}/stages/{id}/     每个阶段一个子目录，存放该阶段产物 + 独立日志
  */
 export function writeReport(report: TestReport): void {
   if (!fs.existsSync(REPORT_DIR)) {
@@ -109,16 +134,53 @@ export function writeReport(report: TestReport): void {
     fs.mkdirSync(dir, { recursive: true })
   }
 
-  // 1. 保存中间文件
+  const stagesDir = path.join(dir, 'stages')
+
+  // 1. per-stage 子目录：保存产物 + 该阶段独立日志
   for (const stage of report.stages) {
+    const stageDir = path.join(stagesDir, stage.id)
+    if (!fs.existsSync(stageDir)) {
+      fs.mkdirSync(stageDir, { recursive: true })
+    }
+    // 产物文件
     for (const art of stage.artifacts) {
       if (art.content) {
-        fs.writeFileSync(path.join(dir, art.name), art.content, 'utf-8')
+        fs.writeFileSync(path.join(stageDir, art.name), art.content, 'utf-8')
       }
+    }
+    // 该阶段独立日志
+    if (stage.logs.length > 0) {
+      fs.writeFileSync(path.join(stageDir, 'logs.txt'), stage.logs.join('\n') + '\n', 'utf-8')
+    }
+    if (stage.consoleLogs.length > 0) {
+      fs.writeFileSync(path.join(stageDir, 'console.txt'), stage.consoleLogs.join('\n') + '\n', 'utf-8')
+    }
+    if (stage.debugLogs.length > 0) {
+      fs.writeFileSync(path.join(stageDir, 'debug.txt'), stage.debugLogs.join('\n') + '\n', 'utf-8')
+    }
+    if (stage.stackTrace.length > 0) {
+      fs.writeFileSync(path.join(stageDir, 'stack.txt'), stage.stackTrace.join('\n') + '\n', 'utf-8')
     }
   }
 
-  // 2. 写入 overview.json（不包含 content 以减小体积）
+  // 2. 合并各 stage 的日志为顶级文本文件
+  const sections = (selector: (s: StageReport) => string[]) => report.stages
+    .map((s) => {
+      const lines = selector(s)
+      if (lines.length === 0) return null
+      return `=== [stage ${s.id}] ${s.title} (${s.status}) ===\n${lines.join('\n')}`
+    })
+    .filter((x): x is string => x !== null)
+  const logsTxt = sections((s) => s.logs)
+  const consoleTxt = sections((s) => s.consoleLogs)
+  const debugTxt = sections((s) => s.debugLogs)
+  const stackTxt = sections((s) => s.stackTrace)
+  if (logsTxt.length) fs.writeFileSync(path.join(dir, 'logs.txt'), logsTxt.join('\n\n') + '\n', 'utf-8')
+  if (consoleTxt.length) fs.writeFileSync(path.join(dir, 'console.txt'), consoleTxt.join('\n\n') + '\n', 'utf-8')
+  if (debugTxt.length) fs.writeFileSync(path.join(dir, 'debug.txt'), debugTxt.join('\n\n') + '\n', 'utf-8')
+  if (stackTxt.length) fs.writeFileSync(path.join(dir, 'stack.txt'), stackTxt.join('\n\n') + '\n', 'utf-8')
+
+  // 3. 写入 overview.json（完整数据）
   const overview = {
     id,
     timestamp: report.timestamp,
@@ -134,16 +196,19 @@ export function writeReport(report: TestReport): void {
       metrics: s.metrics,
       artifacts: s.artifacts.map((a) => ({ name: a.name, size: a.size, lines: a.lines })),
       logs: s.logs,
+      consoleLogs: s.consoleLogs,
+      debugLogs: s.debugLogs,
+      stackTrace: s.stackTrace,
       error: s.error,
       assertions: s.assertions,
     })),
   }
   fs.writeFileSync(path.join(dir, 'overview.json'), JSON.stringify(overview, null, 2), 'utf-8')
 
-  // 3. 生成子文件夹的 index.html（本次测试详情）
-  fs.writeFileSync(path.join(dir, 'index.html'), generateRunHtml(overview, id), 'utf-8')
+  // 4. 生成子文件夹的 index.html（通过遍历目录发现文件，与测试内容解耦）
+  fs.writeFileSync(path.join(dir, 'index.html'), generateRunHtml(dir, id, overview), 'utf-8')
 
-  // 4. 更新顶级 index.html
+  // 5. 更新顶级 index.html
   fs.writeFileSync(path.join(REPORT_DIR, 'index.html'), generateIndexHtml(), 'utf-8')
 }
 
@@ -198,13 +263,83 @@ function scanRuns(): RunSummary[] {
       // 跳过损坏的 overview.json
     }
   }
-  // 按时间戳降序（最新在前）
   runs.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
   return runs
 }
 
 // ============================================================
-// HTML 生成（极简：div/span/h/p，flex 用 inline style）
+// 目录遍历：发现实际文件（与测试内容解耦）
+// ============================================================
+
+interface DiscoveredFile {
+  /** 相对于 run dir 的路径（用于 href），如 "stages/8/tex.pas" */
+  href: string
+  /** 文件名 */
+  name: string
+  /** 字节大小 */
+  size: number
+}
+
+interface DiscoveredStage {
+  /** stage id（目录名） */
+  id: string
+  /** 该 stage 目录下的文件 */
+  files: DiscoveredFile[]
+}
+
+/**
+ * 遍历 stages/ 目录，发现所有 stage 子目录及其文件。
+ * 报告 HTML 基于此结果生成链接，不依赖测试内容。
+ */
+function discoverStageFiles(runDir: string): DiscoveredStage[] {
+  const stagesDir = path.join(runDir, 'stages')
+  if (!fs.existsSync(stagesDir)) return []
+  const result: DiscoveredStage[] = []
+  const entries = fs.readdirSync(stagesDir, { withFileTypes: true })
+  for (const e of entries) {
+    if (!e.isDirectory()) continue
+    const stageDir = path.join(stagesDir, e.name)
+    const files: DiscoveredFile[] = []
+    const fileEntries = fs.readdirSync(stageDir, { withFileTypes: true })
+    for (const fe of fileEntries) {
+      if (!fe.isFile()) continue
+      const fullPath = path.join(stageDir, fe.name)
+      const stat = fs.statSync(fullPath)
+      files.push({
+        href: `stages/${e.name}/${fe.name}`,
+        name: fe.name,
+        size: stat.size,
+      })
+    }
+    files.sort((a, b) => a.name.localeCompare(b.name))
+    result.push({ id: e.name, files })
+  }
+  result.sort((a, b) => {
+    const an = parseInt(a.id, 10)
+    const bn = parseInt(b.id, 10)
+    if (isNaN(an) || isNaN(bn)) return a.id.localeCompare(b.id)
+    return an - bn
+  })
+  return result
+}
+
+/** 发现 run dir 顶级的文本文件（logs.txt 等） */
+function discoverTopFiles(runDir: string): DiscoveredFile[] {
+  const result: DiscoveredFile[] = []
+  const entries = fs.readdirSync(runDir, { withFileTypes: true })
+  for (const e of entries) {
+    if (!e.isFile()) continue
+    if (e.name === 'index.html') continue
+    const fullPath = path.join(runDir, e.name)
+    const stat = fs.statSync(fullPath)
+    result.push({ href: e.name, name: e.name, size: stat.size })
+  }
+  result.sort((a, b) => a.name.localeCompare(b.name))
+  return result
+}
+
+// ============================================================
+// HTML 生成（纯原生标签，无任何样式/CSS）
 // ============================================================
 
 function esc(s: string): string {
@@ -227,133 +362,90 @@ function fmtBytes(n: number): string {
 }
 
 /**
- * 顶级 index.html：列出所有测试结果，支持选两个对比。
- * 极简：只用 div/span/h/p，flex 用 inline style。
+ * 顶级 index.html：列出所有测试结果。
+ * 纯原生标签，每行只展示：时间、耗时、结果、链接。
  */
 function generateIndexHtml(): string {
   const runs = scanRuns()
-  const runsJson = JSON.stringify(runs)
 
-  const listItems = runs
+  const items = runs
     .map((r) => {
       const statusText = r.success ? 'SUCCESS' : 'FAILED'
-      const stageSummary = r.stages
-        .map((s) => {
-          const ch = s.status === 'success' ? 'ok' : s.status === 'failed' ? 'X' : '-'
-          return `<span> ${esc(s.id)}:${ch}</span>`
-        })
-        .join('')
-      return `<div>
-        <span onclick="nav('${esc(r.id)}')" style="cursor:pointer">${esc(r.id)}</span>
-        <span onclick="toggle('${esc(r.id)}')" style="cursor:pointer"> [选]</span>
-        <span> ${esc(r.timestamp)}</span>
-        <span> ${statusText}</span>
-        <span> ${fmtDur(r.duration)}</span>
-        <div>${stageSummary}</div>
-      </div>`
+      return `<li><a href="${esc(r.id)}/index.html">${esc(r.id)}</a> - ${esc(r.timestamp)} - ${statusText} - ${fmtDur(r.duration)}</li>`
     })
-    .join('')
+    .join('\n')
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head><meta charset="UTF-8"><title>E2E</title></head>
 <body>
-<h1>E2E 测试报告</h1>
-<p>共 ${runs.length} 次测试。点击 ID 进入详情，点击 [选] 选择两个对比。</p>
-<div id="list">${listItems}</div>
-<div id="cmp" style="display:none">
-  <h2>对比</h2>
-  <div style="display:flex">
-    <div id="cmpL" style="flex:1"></div>
-    <div id="cmpR" style="flex:1"></div>
-  </div>
-</div>
-<script>
-var runs = ${runsJson};
-var sel = [];
-function nav(id) { location.href = id + '/index.html'; }
-function toggle(id) {
-  var i = sel.indexOf(id);
-  if (i >= 0) { sel.splice(i, 1); }
-  else { sel.push(id); if (sel.length > 2) sel.shift(); }
-  showCmp();
-}
-function renderRun(id) {
-  var r = runs.find(function(x) { return x.id === id; });
-  if (!r) return '<p>not found</p>';
-  var h = '<h3>' + r.id + '</h3>';
-  h += '<p>' + r.timestamp + ' ' + (r.success ? 'SUCCESS' : 'FAILED') + ' ' + r.duration + 'ms</p>';
-  r.stages.forEach(function(s) {
-    h += '<div><span>[' + s.id + ']</span> <span>' + s.title + '</span> <span>' + s.status + '</span></div>';
-  });
-  return h;
-}
-function showCmp() {
-  var el = document.getElementById('cmp');
-  if (sel.length === 2) {
-    el.style.display = 'block';
-    document.getElementById('cmpL').innerHTML = renderRun(sel[0]);
-    document.getElementById('cmpR').innerHTML = renderRun(sel[1]);
-  } else {
-    el.style.display = 'none';
-  }
-}
-</script>
+<h1>E2E</h1>
+<p>${runs.length} runs</p>
+<ul>
+${items}
+</ul>
 </body>
 </html>`
 }
 
 /**
- * 单次测试的 index.html：显示详情，链接到中间文件。
- * 极简：只用 div/span/h/p，flex 用 inline style。
+ * 单次测试的 index.html（overview 页）。
+ * 通过遍历 stages/ 目录发现文件生成链接，与测试内容解耦。
+ * 只展示关键信息：时间、耗时、结果、产物链接。
  */
-function generateRunHtml(overview: any, runId: string): string {
-  const meta = `<div>
-    <p>时间: ${esc(overview.timestamp)}</p>
-    <p>结果: ${overview.success ? 'SUCCESS' : 'FAILED'}</p>
-    <p>耗时: ${fmtDur(overview.duration)}</p>
-    <p>环境: ${esc(overview.env.node)} / ${esc(overview.env.platform)} / ${esc(overview.env.arch)}</p>
-    <p>参数: ${esc((overview.args || []).join(' ') || '(无)')}</p>
-    <p onclick="location.href='../index.html'" style="cursor:pointer">返回列表</p>
-  </div>`
+function generateRunHtml(runDir: string, runId: string, overview: any): string {
+  // 顶部信息
+  const header = `<h1>${esc(runId)}</h1>
+<p>${esc(overview.timestamp)}</p>
+<p>${overview.success ? 'SUCCESS' : 'FAILED'} - ${fmtDur(overview.duration)}</p>
+<p>${esc(overview.env.node)} / ${esc(overview.env.platform)} / ${esc(overview.env.arch)}</p>
+<p>Args: ${esc((overview.args || []).join(' ') || '(none)')}</p>`
 
-  const stages = (overview.stages || [])
-    .map((s: any) => {
-      const metrics = Object.entries(s.metrics || {})
-        .map(([k, v]) => `<span> ${esc(k)}: ${esc(String(v))}</span>`)
-        .join('')
-      const artifacts = (s.artifacts || [])
-        .map((a: any) => `<span onclick="location.href='${esc(a.name)}'" style="cursor:pointer"> ${esc(a.name)}</span>`)
-        .join('')
-      const assertions = (s.assertions || [])
-        .map((a: any) => {
-          const ch = a.passed ? 'ok' : 'X'
-          return `<div><span>${ch}</span> <span>${esc(a.name)}</span>${a.expected ? ' <span>exp: ' + esc(a.expected) + '</span>' : ''}${a.actual ? ' <span>act: ' + esc(a.actual) + '</span>' : ''}</div>`
-        })
-        .join('')
-      const logs = (s.logs || [])
-        .map((l: string) => `<div>${esc(l)}</div>`)
-        .join('')
-      return `<div>
-        <h3>[${esc(s.id)}] ${esc(s.title)}</h3>
-        <p>${esc(s.status)} ${fmtDur(s.duration)}</p>
-        ${metrics ? `<p>${metrics}</p>` : ''}
-        ${artifacts ? `<p>文件:${artifacts}</p>` : ''}
-        ${s.error ? `<p>${esc(s.error)}</p>` : ''}
-        ${assertions ? `<div>${assertions}</div>` : ''}
-        ${logs ? `<div>${logs}</div>` : ''}
-      </div>`
+  // 顶级文件链接（overview.json, logs.txt, ...）通过遍历目录发现
+  const topFiles = discoverTopFiles(runDir)
+  const topFileItems = topFiles
+    .map((f) => `<li><a href="${esc(f.href)}">${esc(f.name)}</a> - ${fmtBytes(f.size)}</li>`)
+    .join('\n')
+  const topFileSection = topFiles.length > 0
+    ? `<h2>Files</h2>\n<ul>\n${topFileItems}\n</ul>`
+    : ''
+
+  // stage 列表：从 overview 拿状态信息，从目录遍历拿文件链接
+  const discoveredStages = discoverStageFiles(runDir)
+  const stageMap = new Map<string, any>()
+  for (const s of (overview.stages || [])) {
+    stageMap.set(String(s.id), s)
+  }
+
+  const stageRows = discoveredStages
+    .map((ds) => {
+      const s = stageMap.get(ds.id)
+      const status = s?.status ?? 'unknown'
+      const title = s?.title ?? ''
+      const duration = s?.duration ?? 0
+      const error = s?.error
+      const statusMark = status === 'success' ? '[ok]' : status === 'failed' ? '[X]' : '[-]'
+      const errorLine = error ? ` - <code>! ${esc(String(error).slice(0, 120))}</code>` : ''
+      // 文件链接（遍历目录发现，不写死）
+      const fileLinks = ds.files
+        .map((f) => `<a href="${esc(f.href)}">${esc(f.name)}</a>`)
+        .join(' ')
+      const fileList = fileLinks ? `<ul><li>${fileLinks}</li></ul>` : ''
+      return `<li>${statusMark} [${esc(ds.id)}] ${esc(title)} - ${fmtDur(duration)}${errorLine}</li>${fileList}`
     })
-    .join('')
+    .join('\n')
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head><meta charset="UTF-8"><title>${esc(runId)}</title></head>
 <body>
-<h1>${esc(runId)}</h1>
-${meta}
-<h2>阶段</h2>
-${stages}
+${header}
+<p><a href="../index.html">Back</a></p>
+${topFileSection}
+<h2>Stages</h2>
+<ul>
+${stageRows}
+</ul>
 </body>
 </html>`
 }

@@ -47,6 +47,15 @@ export function firstLine(text: string): string {
   return idx < 0 ? text : text.slice(0, idx)
 }
 
+/** 提取文本的最后 N 行（用于报告 TANGLE/TeX 输出的尾部诊断信息） */
+export function tailLines(text: string, n = 10): string[] {
+  if (!text) return []
+  const lines = text.split('\n')
+  // 过滤掉末尾空行（由 trailing \n 产生）
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+  return lines.slice(-n)
+}
+
 export function previewLine(text: string, maxLen = 120): string {
   const line = firstLine(text)
   if (line.length <= maxLen) return line
@@ -80,6 +89,8 @@ export interface TangleResult {
   pool: string
   output: string
   files: Map<string, Uint8Array>
+  /** 运行期诊断日志（由 e2e 报告消费） */
+  debugLog: string[]
 }
 
 export function runTangle(
@@ -93,6 +104,9 @@ export function runTangle(
   files.set('PASCALFILE', new Uint8Array())
   files.set('POOL', new Uint8Array())
 
+  // 外部传入 debugLog，便于 e2e 报告读取
+  const debugLog: string[] = []
+
   const state = runIL(pasSource, {
     input: [],
     files,
@@ -105,6 +119,7 @@ export function runTangle(
     maxSteps: 1e9,
     extensions: ['string'],
     plugins,
+    debugLog,
   })
 
   return {
@@ -113,6 +128,7 @@ export function runTangle(
     pool: Buffer.from(files.get('POOL')!).toString('utf-8'),
     output: state.outputBuffer.join(''),
     files,
+    debugLog,
   }
 }
 
@@ -139,6 +155,8 @@ export interface RunTeXResult {
   output: string
   /** 所有文件（输入 + 输出） */
   files: Map<string, Uint8Array>
+  /** 运行期诊断日志（pool 文件读取追踪等，由 e2e 报告消费） */
+  debugLog: string[]
 }
 
 /**
@@ -187,12 +205,16 @@ export function runTeXCompiled(
     }
   }
 
+  // 外部注入或内部新建 debugLog，便于 e2e 报告读取
+  const debugLog: string[] = []
+
   const ctx = createRuntimeContext({
     input: options.input,
     files,
     maxSteps: options.maxSteps ?? 2e9,
     extensions: options.extensions ?? ['string', 'fileEofBufferSpace'],
     plugins: options.plugins ?? [],
+    debugLog,
   })
 
   const __sys = (key: string, args: any[]): any => dispatch(ctx, key, args)
@@ -204,13 +226,22 @@ export function runTeXCompiled(
     mainFn()
     state = toRunState(ctx, 'terminated')
   } catch (e: any) {
-    if (process.env.E2E_DEBUG) {
-      console.error('[runTeXCompiled] 运行时错误:', e?.stack || e)
-    }
+    // 完整错误堆栈保存到 state.error.stackTrace，由 e2e 报告消费
+    // （不再依赖 E2E_DEBUG 环境变量输出到 stderr）
+    const stackLines: string[] = e?.stack
+      ? String(e.stack).split('\n').slice(0, 40)
+      : []
     state = toRunState(ctx, 'error', {
       message: e?.message || String(e),
-      stackTrace: e?.stack ? String(e.stack).split('\n').slice(0, 20) : [],
+      stackTrace: stackLines,
     })
+    // 在 debugLog 中也保留一份，便于 e2e 报告统一查看
+    debugLog.push(
+      `[runTeXCompiled] runtime error: ${e?.message || String(e)}`
+    )
+    for (const line of stackLines) {
+      debugLog.push(`  ${line}`)
+    }
   }
 
   // 终端输出 = outputBuffer（term_out 写入 url='TTY:' 的内容已重定向到 outputBuffer）
@@ -220,6 +251,7 @@ export function runTeXCompiled(
     state,
     output,
     files,
+    debugLog,
   }
 }
 

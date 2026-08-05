@@ -312,6 +312,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
 export interface RunOptions extends TransformOptions, RuntimeOptions {}
 
 export function run(source: string, options: RunOptions = {}): RunState {
+  const debugLog: string[] = options.debugLog ?? []
   const ctx = createRuntimeContext({
     input: options.input,
     files: options.files,
@@ -319,6 +320,7 @@ export function run(source: string, options: RunOptions = {}): RunState {
     maxSteps: options.maxSteps,
     extensions: options.extensions,
     plugins: options.plugins,
+    debugLog,
   })
 
   try {
@@ -339,10 +341,18 @@ export function run(source: string, options: RunOptions = {}): RunState {
 
     return toRunState(ctx, 'terminated')
   } catch (e: any) {
-    // 编译或执行出错：保留已产生的输出
+    // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
+    const stackLines: string[] = e?.stack
+      ? String(e.stack).split('\n').slice(0, 40)
+      : []
+    // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看
+    debugLog.push(`[run] error: ${e?.message || String(e)}`)
+    for (const line of stackLines) {
+      debugLog.push(`  ${line}`)
+    }
     const error: RunError = {
       message: e?.message || String(e),
-      stackTrace: e?.stack ? String(e.stack).split('\n').slice(0, 10) : [],
+      stackTrace: stackLines,
     }
     return toRunState(ctx, 'error', error)
   }

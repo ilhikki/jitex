@@ -58,6 +58,10 @@ export interface RuntimeContext {
   extensions: Set<string>
   /** 编译期注入的插件（运行期提供 syscall 实现，AGENTS.md 原则 A.7） */
   plugins: IlPlugin[]
+  /** 调试日志（e2e 报告消费，不写入临时文件）。
+   * 收集运行期诊断信息：pool 文件读取追踪、文件 IO 异常等。
+   * 由 e2e 测试通过 RuntimeOptions.debugLog 注入并读取。 */
+  debugLog: string[]
 }
 
 export interface RuntimeOptions {
@@ -69,6 +73,8 @@ export interface RuntimeOptions {
   extensions?: string[]
   /** 编译期注入的插件（运行期提供 syscall 实现） */
   plugins?: IlPlugin[]
+  /** 调试日志缓冲区（外部传入以复用，不传则内部新建） */
+  debugLog?: string[]
 }
 
 export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeContext {
@@ -83,6 +89,7 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     programFileUrls: options.programFileUrls ?? {},
     extensions: new Set(options.extensions ?? []),
     plugins: options.plugins ?? [],
+    debugLog: options.debugLog ?? [],
   }
 }
 
@@ -728,15 +735,28 @@ function writelnToFile(ctx: RuntimeContext, file: PascalFile): void {
     s.lines = []
     s.currentLine = ''
   }
+  // pool 文件写入追踪（TANGLE 生成 pool 时记录每一行，便于诊断字符串 ID 偏移）
+  // TANGLE 写入 url='POOL'，TeX 读取 url='TeXformats:TEX.POOL'，两者均需追踪
+  const isPoolWrite = typeof file.url === 'string' && (file.url === 'POOL' || file.url.includes('TEX.POOL'))
+  if (isPoolWrite) {
+    const cnt = (__poolWriteCount.get(file) ?? 0) + 1
+    __poolWriteCount.set(file, cnt)
+    ctx.debugLog.push(
+      `[POOL write #${cnt}] ${JSON.stringify(s.currentLine)}`
+    )
+  }
   s.lines.push(s.currentLine)
   s.currentLine = ''
   writeBackFile(ctx, file)
 }
 
-// [DEBUG] pool 文件读取追踪
+// ============================================================
+// 文件读写追踪（用于 e2e 报告诊断，不写临时文件）
+// ============================================================
+
 const __poolLineStart = new WeakMap<PascalFile, number>()
 const __poolLineCount = new WeakMap<PascalFile, number>()
-const __fsDebug = require('fs')
+const __poolWriteCount = new WeakMap<PascalFile, number>()
 
 function readFilelnSkip(ctx: RuntimeContext, file: PascalFile): void {
   const s = getFileState(ctx, file)
@@ -747,11 +767,13 @@ function readFilelnSkip(ctx: RuntimeContext, file: PascalFile): void {
     const lineBytes = content.slice(start, s.offset)
     const cnt = (__poolLineCount.get(file) ?? 0) + 1
     __poolLineCount.set(file, cnt)
-    __fsDebug.appendFileSync('pool-trace.txt', `[POOL readln #${cnt} off=${start}->${s.offset}] ${JSON.stringify(Buffer.from(lineBytes).toString('latin1'))}\n`)
+    // 诊断信息收集到 ctx.debugLog，由 e2e 报告消费
+    ctx.debugLog.push(
+      `[POOL readln #${cnt} off=${start}->${s.offset}] ${JSON.stringify(Buffer.from(lineBytes).toString('latin1'))}`
+    )
   }
   if (s.eof) return
   const content = getCurrentContent(ctx, file)
-  const beforeOff = s.offset
   while (s.offset < content.length) {
     const ch = content[s.offset]
     s.offset++
