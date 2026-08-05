@@ -29,6 +29,13 @@ interface FileState {
   lines: string[]
   currentLine: string
   /**
+   * 终端回显：TTY 文件当前行尾 \n 是否已回显。
+   * input_ln 的 while not eoln(f) 循环不消费 \n，getFile 不会回显它。
+   * 但真实终端在用户按 Enter 时会回显换行。isFileEoln 检测到行尾时
+   * 回显 \n（仅一次）， getFile 消费 \n 时重置此标记。
+   */
+  ttyEolnEchoed?: boolean
+  /**
    * Pascal-H 文件模型：RESET 后 F^ 未定义，需要 GET 预读第一个字符。
    * 标准 Pascal (ISO 7185 6.9.8.1) 中 RESET 后 F^ 已指向第一个字符。
    * 启用 extension 'pascalHFileModel' 后，RESET 设置此标记为 true。
@@ -852,12 +859,29 @@ function getFile(ctx: RuntimeContext, file: PascalFile): void {
     throw new Error(`get(f) at EOF: pre-assertion violated (ISO 7185 6.6.5.2: f0.R must not be empty) [url=${file.url}]`)
   }
   const content = getCurrentContent(ctx, file)
+  // 终端回显：读取 TTY:（终端输入）时，将消费的字符回显到 outputBuffer，
+  // 模拟真实终端驱动程序的行为。TeX 的 init_terminal 打印 ** 提示符后，
+  // input_ln 从 term_in 读取用户输入，真实终端会回显输入内容到 term_out。
+  // 没有回显，终端输出会缺少 ** 后面的输入行（如 &trip  trip）。
+  const isTty = isTtyFile(file)
+  if (isTty) {
+    const ch = content[s.offset]
+    if (ch !== undefined) {
+      // 行尾字符（\n/\r）已由 isFileEoln 回显，此处不重复回显
+      if (ch !== 10 && ch !== 13) {
+        ctx.outputBuffer.push(String.fromCharCode(ch & 0xff))
+      }
+    }
+    // getFile 消费了行尾字符，重置 eoln 回显标记
+    s.ttyEolnEchoed = false
+  }
   s.offset++
   // 文本文件 CRLF 行尾处理：当 get 跳过 \r 且下一个字符是 \n 时，额外跳过 \n。
   // 原因：TeX 的 input_ln 用 get(f)+eoln(f) 逐字符读取，bypass_eoln 的 get(f)
   // 只跳过一个字符（\r），\n 仍留在文件中导致 eoln 再次返回 true，产生空行。
   // 二进制文件不处理（10/13 是正常数据字节）。
   if (!s.binary && s.offset < content.length && content[s.offset - 1] === 13 && content[s.offset] === 10) {
+    // CRLF 的 \n 也需要跳过（回显已由 isFileEoln 处理）
     s.offset++
   }
   if (s.offset >= content.length) {
@@ -911,7 +935,15 @@ function isFileEoln(ctx: RuntimeContext, file: PascalFile): boolean {
   const content = getCurrentContent(ctx, file)
   if (s.eof || s.offset >= content.length) return true
   const ch = content[s.offset]
-  return ch === 10 || ch === 13
+  const isEoln = ch === 10 || ch === 13
+  // 终端回显：input_ln 的 while not eoln(f) 循环在 eoln 返回 true 时退出，
+  // 但不消费行尾字符。真实终端在用户按 Enter 时回显换行。
+  // 此处在 eoln 检测到行尾时回显 \n（仅一次），getFile 消费行尾时重置标记。
+  if (isEoln && isTtyFile(file) && !s.ttyEolnEchoed) {
+    s.ttyEolnEchoed = true
+    ctx.outputBuffer.push('\n')
+  }
+  return isEoln
 }
 
 // ============================================================

@@ -130,7 +130,7 @@ interface PipelineContext {
   texCompileOk: boolean
   texCompileError: string
   hello: { output: string; status: string; error?: string; steps: number; files: Map<string, Uint8Array> } | null
-  trip: { output: string; status: string; error?: string; steps: number; files: Map<string, Uint8Array> } | null
+  trip: { output: string; status: string; error?: string; steps: number; files: Map<string, Uint8Array>; logFile?: string } | null
 
   failedAt: string
 }
@@ -351,6 +351,30 @@ function validateDvi(data: Uint8Array): {
   }
 
   return { valid: true, hasContent, reason: 'ok', firstBytes, lastBytes }
+}
+
+/**
+ * 启用 TeX 统计信息：将 tex.web 中的 stat/tats 宏从注释（@{...@}）改为空操作（@t@>）。
+ *
+ * tex.web 原始定义：
+ *   @d stat==@{ ... }      ← stat 展开为 { （开启 Pascal 注释）
+ *   @d tats==@t@>@} ...    ← tats 展开为 } （关闭 Pascal 注释）
+ * 这会将所有 stat...tats 之间的代码块注释掉，包括：
+ *   - var_used/dyn_used 的增减跟踪
+ *   - ship_out 时的 "Memory usage before/after" 输出
+ *   - close_files_and_terminate 时的内存统计输出
+ *
+ * 修改后：
+ *   @d stat==@t@>          ← stat 展开为空（@t@> 是 WEB 的透明文本，无输出）
+ *   @d tats==@t@>          ← tats 展开为空
+ * 所有 stat...tats 代码块生效，使 TeX 输出与 trip.fot 一致。
+ */
+function enableStatisticsInWeb(web: string): string {
+  const statBlock = /@d stat==@\{ \{change this to[\s\S]*?usage statistics\}/
+  const tatsBlock = /@d tats==@t@>@\} \{change this to[\s\S]*?usage statistics\}/
+  return web
+    .replace(statBlock, '@d stat==@t@>')
+    .replace(tatsBlock, '@d tats==@t@>')
 }
 
 // ============================================================
@@ -695,7 +719,11 @@ const stages: StageDef[] = [
       let debugLog: string[] = []
       let stackTrace: string[] = []
       try {
-        const r = runTangle(tangleSrc, ctx.texWeb)
+        // 启用统计信息：修改 tex.web 中的 stat/tats 宏定义，
+        // 使 var_used/dyn_used 跟踪和 "Memory usage" 输出生效，
+        // 让 TeX 输出与 trip.fot 一致。
+        const texWebWithStats = enableStatisticsInWeb(ctx.texWeb)
+        const r = runTangle(tangleSrc, texWebWithStats)
         debugLog = r.debugLog ?? []
         ctx.tex = { pascal: r.pascal, pool: r.pool, output: r.output, status: r.state.status, error: r.state.error?.message }
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
@@ -1033,8 +1061,13 @@ const stages: StageDef[] = [
         // 接受标准：pass 2 状态为 terminated 且未出现 "Fatal format file error"。
         // 失败时回退到 pass 1 输出（格式文件加载未实现时）。
         if (tripFmt) {
+          // 输入需带前后空格以匹配 trip.fot 的终端回显：
+          // trip.fot 第二行为 "** &trip  trip "（** 后有空格，trip 后也有空格）。
+          // ** 是 TeX 的 init_terminal 提示符，后面的 " &trip  trip " 是终端回显的用户输入。
+          // 前导空格和尾部空格会被 input_ln 的 loc 跳过和 last_nonblank 截断，
+          // 但终端回显保留原始输入（含前后空格）。
           const r2 = runTeXCompiled(ctx.texCompiledJs, {
-            input: ['&trip  trip'],
+            input: [' &trip  trip '],
             files: {
               'trip.tex': ctx.tripTex,
               'trip.fmt': tripFmt,
@@ -1076,9 +1109,19 @@ const stages: StageDef[] = [
           tripSteps = r1.state.steps
           resultFiles = r1.files
         }
-        ctx.trip = { output, status: tripStatus, error: tripError, steps: tripSteps, files: resultFiles }
+        // 提取 TeX 写入的日志文件（trip.log）内容。
+        // trip.fot 是日志文件内容，不是终端输出，因此需要用日志文件来比较。
+        // TeX 通过 open_log_file 中的 rewrite(logfile, 'trip.log') 创建日志文件，
+        // banner 和 ** + 输入行回显都写入日志文件（SELECTOR=18, log_only），
+        // 而终端输出只包含部分内容（如 ** 提示符但无输入行回显）。
+        let tripLogFile = ''
+        const logEntry = Array.from(resultFiles.entries()).find(([k]) => k.endsWith('.log'))
+        if (logEntry) {
+          tripLogFile = new TextDecoder().decode(logEntry[1])
+        }
+        ctx.trip = { output, status: tripStatus, error: tripError, steps: tripSteps, files: resultFiles, logFile: tripLogFile }
       } catch (e: any) {
-        ctx.trip = { output: '', status: 'error', error: e?.message, steps: 0, files: new Map() }
+        ctx.trip = { output: '', status: 'error', error: e?.message, steps: 0, files: new Map(), logFile: '' }
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
       }
 
@@ -1144,6 +1187,13 @@ const stages: StageDef[] = [
       }
 
       const artifacts: StageArtifact[] = output ? [artifact('trip.log', output)] : []
+      // 保存实际日志文件（TeX 写入 trip.log 的内容，用于与 trip.fot 比较）
+      if (ctx.trip?.logFile) {
+        artifacts.push(artifact('trip.actual.log', ctx.trip.logFile))
+      }
+      // 列出所有输出文件，便于诊断
+      const allOutFiles = Array.from(resultFiles.keys()).filter((n) => n !== 'TTY:')
+      diagLines.push(`diag: output files (${allOutFiles.length}): ${allOutFiles.join(', ')}`)
       if (pass1Output) artifacts.push(artifact('trip.pass1.log', pass1Output))
       if (dviInfo) {
         artifacts.push(binaryArtifact(dviInfo.name, dviInfo.data))
@@ -1237,11 +1287,17 @@ const stages: StageDef[] = [
     run: (ctx) => {
       if (!ctx.trip) return skippedStage('14', 'compare trip vs trip.fot', 'TRIP not run')
       const t0 = now()
+      // trip.fot 是 TeX 的终端输出（含终端驱动回显的输入行）。
+      // TeX 在 init_terminal 中打印 ** 提示符，终端驱动回显用户输入 &trip  trip，
+      // 然后后续输出由 TeX 打印。日志文件内容不同（含完整 banner 和 tracing）。
       const actual = ctx.trip.output
       const expected = ctx.tripFot
+      const actualSource = 'trip output (terminal)'
 
-      const fotLines = expected.split('\n')
-      const outLines = actual.split('\n')
+      // 规范化行尾：trip.fot 使用 CRLF（\r\n），我们的输出使用 LF（\n）
+      const normalizeLineEndings = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      const fotLines = normalizeLineEndings(expected).split('\n')
+      const outLines = normalizeLineEndings(actual).split('\n')
 
       // 逐行比对（全部行，不只前 30 行）
       const maxCompare = Math.max(fotLines.length, outLines.length)
@@ -1293,6 +1349,7 @@ const stages: StageDef[] = [
       const metrics = {
         expectedLines: fotLines.length,
         actualLines: outLines.length,
+        actualSource,
         matchCount,
         mismatchCount,
         onlyInExpected,
@@ -1306,6 +1363,7 @@ const stages: StageDef[] = [
       ]
 
       const logs = [
+        `actualSource: ${actualSource}`,
         `matchRate: ${matchRate}`,
         ...markerChecks.map((c) => `marker: ${c.pass ? 'ok' : 'X'} "${c.marker}" exp=${c.inExpected} act=${c.inActual}`),
         ...compareLines.slice(0, 50),
