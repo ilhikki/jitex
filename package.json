@@ -5,7 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "test": "vitest"
+    "test": "vitest",
+    "e2e": "tsx tests/e2e/run.ts",
+    "e2e:report": "tsx tests/e2e/run.ts --report"
   },
   "keywords": [
     "pascal",
@@ -18,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^20.14.0",
     "prettier": "^3.9.5",
+    "tsx": "^4.23.5",
     "typescript": "^5.4.5",
     "vitest": "^4.1.10"
   }

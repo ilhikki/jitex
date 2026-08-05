@@ -16,6 +16,7 @@
 
 import type { RunState, RunError } from '@/runtime/run-state'
 import type { PascalFile } from '@/runtime/file-model'
+import type { IlPlugin } from '@/il/plugin'
 
 // ============================================================
 // 文件状态（同步版本，逻辑参考 file-model.ts 的 RecordFileState）
@@ -55,6 +56,8 @@ export interface RuntimeContext {
    * 默认未启用的非标特性遇到即抛错。
    */
   extensions: Set<string>
+  /** 编译期注入的插件（运行期提供 syscall 实现，AGENTS.md 原则 A.7） */
+  plugins: IlPlugin[]
 }
 
 export interface RuntimeOptions {
@@ -64,6 +67,8 @@ export interface RuntimeOptions {
   maxSteps?: number
   /** 非标特性扩展列表 */
   extensions?: string[]
+  /** 编译期注入的插件（运行期提供 syscall 实现） */
+  plugins?: IlPlugin[]
 }
 
 export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeContext {
@@ -77,6 +82,7 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     maxSteps: options.maxSteps ?? Infinity,
     programFileUrls: options.programFileUrls ?? {},
     extensions: new Set(options.extensions ?? []),
+    plugins: options.plugins ?? [],
   }
 }
 
@@ -115,6 +121,10 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
     case 'array.set':
       setArrayElement(args[0], args.slice(1, -1), args[args.length - 1])
       return undefined
+
+    // ---------- cast ----------
+    case 'cast.char.to.i64':
+      return typeof args[0] === 'string' ? args[0].charCodeAt(0) : args[0]
 
     // ---------- record ----------
     case 'rec.field':
@@ -321,7 +331,7 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
       if (!args[0]) throw new Error(`file.reset: file is undefined`)
       // Pascal reset(f, name, ...) — 先设置文件名再打开
       if (args[1] !== undefined && args[1] !== '') {
-        args[0].url = args[1]
+        args[0].url = fileUrlToString(args[1])
         ctx.fileStates.delete(args[0] as PascalFile)
       }
       resetFile(ctx, args[0])
@@ -330,7 +340,7 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
       if (!args[0]) throw new Error(`file.rewrite: file is undefined`)
       // Pascal rewrite(f, name, ...) — 先设置文件名再打开
       if (args[1] !== undefined && args[1] !== '') {
-        args[0].url = args[1]
+        args[0].url = fileUrlToString(args[1])
         ctx.fileStates.delete(args[0] as PascalFile)
       }
       rewriteFile(ctx, args[0])
@@ -377,8 +387,25 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
       }
       return undefined
 
-    default:
+    default: {
+      // 插件注入的 syscall（AGENTS.md 原则 A.7）
+      // key 格式：'plugin.{pluginName}.{procName}'
+      if (key.startsWith('plugin.')) {
+        const rest = key.slice('plugin.'.length) // '{pluginName}.{procName}'
+        const dotIdx = rest.indexOf('.')
+        if (dotIdx > 0) {
+          const pluginName = rest.slice(0, dotIdx)
+          const procName = rest.slice(dotIdx + 1)
+          for (const plugin of ctx.plugins) {
+            if (plugin.name === pluginName && plugin.syscalls?.[procName]) {
+              return plugin.syscalls[procName](ctx, args)
+            }
+          }
+          throw new Error(`Plugin '${pluginName}' does not provide syscall '${procName}'`)
+        }
+      }
       throw new Error(`Unknown syscall: ${key}`)
+    }
   }
 }
 
@@ -446,7 +473,9 @@ function deepCopyValue(v: any): any {
 function getArrayElement(arr: any, indices: any[]): any {
   let cur = arr
   for (const idx of indices) {
-    cur = cur[idx]
+    // Pascal char 作为数组索引时是单字符字符串，需转 charCode
+    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx
+    cur = cur[n]
   }
   return cur
 }
@@ -454,9 +483,12 @@ function getArrayElement(arr: any, indices: any[]): any {
 function setArrayElement(arr: any, indices: any[], value: any): void {
   let cur = arr
   for (let i = 0; i < indices.length - 1; i++) {
-    cur = cur[indices[i]]
+    const n = typeof indices[i] === 'string' && indices[i].length === 1 ? indices[i].charCodeAt(0) : indices[i]
+    cur = cur[n]
   }
-  cur[indices[indices.length - 1]] = value
+  const last = indices[indices.length - 1]
+  const lastN = typeof last === 'string' && last.length === 1 ? last.charCodeAt(0) : last
+  cur[lastN] = value
 }
 
 // ============================================================
@@ -574,6 +606,27 @@ function resetFile(ctx: RuntimeContext, file: PascalFile): void {
   s.currentLine = ''
 }
 
+/**
+ * 把文件名参数转换为字符串。
+ * Pascal 中文件名通常是 `packed array[1..N] of char`（运行时为 char 数组或 JS 字符串），
+ * 需要连接为字符串并去除尾部填充（空格或 null）。
+ */
+function fileUrlToString(url: any): string {
+  if (typeof url === 'string') return url.replace(/[\s\x00]+$/, '')
+  if (url && typeof url === 'object' && typeof url.length === 'number') {
+    const chars: string[] = []
+    for (let i = 0; i < url.length; i++) {
+      const ch = url[i]
+      if (ch === undefined || ch === null) break
+      if (typeof ch === 'string') chars.push(ch)
+      else if (typeof ch === 'number') chars.push(String.fromCharCode(ch))
+      else break
+    }
+    return chars.join('').replace(/[\s\x00]+$/, '')
+  }
+  return String(url ?? '')
+}
+
 function rewriteFile(ctx: RuntimeContext, file: PascalFile): void {
   const s = getFileState(ctx, file)
   // 终端文件（TTY:）不清空输入内容：term_in 和 term_out 共享 url='TTY:'，
@@ -680,10 +733,25 @@ function writelnToFile(ctx: RuntimeContext, file: PascalFile): void {
   writeBackFile(ctx, file)
 }
 
+// [DEBUG] pool 文件读取追踪
+const __poolLineStart = new WeakMap<PascalFile, number>()
+const __poolLineCount = new WeakMap<PascalFile, number>()
+const __fsDebug = require('fs')
+
 function readFilelnSkip(ctx: RuntimeContext, file: PascalFile): void {
   const s = getFileState(ctx, file)
+  const isPool = typeof file.url === 'string' && file.url.includes('TEX.POOL')
+  if (isPool) {
+    const content = getCurrentContent(ctx, file)
+    const start = __poolLineStart.get(file) ?? 0
+    const lineBytes = content.slice(start, s.offset)
+    const cnt = (__poolLineCount.get(file) ?? 0) + 1
+    __poolLineCount.set(file, cnt)
+    __fsDebug.appendFileSync('pool-trace.txt', `[POOL readln #${cnt} off=${start}->${s.offset}] ${JSON.stringify(Buffer.from(lineBytes).toString('latin1'))}\n`)
+  }
   if (s.eof) return
   const content = getCurrentContent(ctx, file)
+  const beforeOff = s.offset
   while (s.offset < content.length) {
     const ch = content[s.offset]
     s.offset++
@@ -695,6 +763,9 @@ function readFilelnSkip(ctx: RuntimeContext, file: PascalFile): void {
   }
   if (s.offset >= content.length) {
     s.eof = true
+  }
+  if (isPool) {
+    __poolLineStart.set(file, s.offset)
   }
 }
 

@@ -13,6 +13,7 @@
 
 import { run } from '@/il/transform'
 import type { RunState } from '@/runtime/run-state'
+import type { IlPlugin } from '@/il/plugin'
 import { test, expect } from 'vitest'
 
 /** 非标扩展标识符（保留用于类型标注，实际为 string） */
@@ -58,6 +59,9 @@ export interface PascalTest {
   /** 非标扩展列表，如 ['string', 'allowUndeclaredLabels'] */
   extensions?: Extension[]
 
+  /** 非标特性插件（AGENTS.md 原则 A.7：注入优先） */
+  plugins?: IlPlugin[]
+
   /** 内存文件系统：文件名 → 文件内容 */
   files?: Map<string, Uint8Array>
 
@@ -79,6 +83,7 @@ export function runPascal(test: PascalTest): RunState {
     programFileUrls: test.programFileUrls,
     maxSteps: test.maxSteps ?? 1e5,
     extensions: test.extensions,
+    plugins: test.plugins,
   })
 }
 

@@ -16,6 +16,12 @@ import {
   Symbol,
 } from '@/il/analysis'
 import {
+  IlPlugin,
+  findProcedurePlugin,
+  findFunctionPlugin,
+  pluginSyscallKey,
+} from '@/il/plugin'
+import {
   ProgramNode,
   BlockNode,
   StatementNode,
@@ -706,19 +712,21 @@ function compileProcedureCall(
       return [evalStmt(syscall('file.get', node.arguments.map((x) => compileExpr(x, a, ws))))]
     case 'put':
       return [evalStmt(syscall('file.put', node.arguments.map((x) => compileExpr(x, a, ws))))]
-    case 'break':
-      return [evalStmt(syscall('io.break', []))]
-    case 'break_in':
-      // UCSD/Borland 扩展：清除终端输入缓冲区。模拟环境中为空操作。
-      return [evalStmt(syscall('io.break', []))]
     case 'page':
       return [evalStmt(syscall('io.page', node.arguments.map((x) => compileExpr(x, a, ws))))]
     case 'new':
       throw new Error('new/dispose not supported')
     case 'dispose':
       throw new Error('new/dispose not supported')
-    default:
+    default: {
+      // 插件注入的非标过程（AGENTS.md 原则 A.7）
+      const found = findProcedurePlugin(a.plugins(), name)
+      if (found) {
+        const args = node.arguments.map((x) => compileExpr(x, a, ws))
+        return [evalStmt(syscall(pluginSyscallKey(found.plugin.name, found.name), args))]
+      }
       throw new Error(`compileProcedureCall: unknown procedure ${name}`)
+    }
   }
 }
 
@@ -1197,8 +1205,14 @@ function compileFunctionCall(
     case 'eoln':
       if (args.length > 0) return syscall('file.eoln', argExprs)
       return syscall('io.eoln', [])
-    default:
+    default: {
+      // 插件注入的非标函数（AGENTS.md 原则 A.7）
+      const found = findFunctionPlugin(a.plugins(), name)
+      if (found) {
+        return syscall(pluginSyscallKey(found.plugin.name, found.name), argExprs)
+      }
       throw new Error(`compileFunctionCall: unknown function ${name}`)
+    }
   }
 }
 

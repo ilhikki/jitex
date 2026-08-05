@@ -2,6 +2,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { run as runIL, transform } from '@/il/transform'
 import { createRuntimeContext, dispatch, toRunState } from '@/il/runtime'
+import type { IlPlugin } from '@/il/plugin'
+import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
 
 // ============================================================
 // 资源文件常量
@@ -80,7 +82,11 @@ export interface TangleResult {
   files: Map<string, Uint8Array>
 }
 
-export function runTangle(pasSource: string, webContent: string): TangleResult {
+export function runTangle(
+  pasSource: string,
+  webContent: string,
+  plugins: IlPlugin[] = [pascalHPlugin]
+): TangleResult {
   const files = new Map<string, Uint8Array>()
   files.set('WEBFILE', new Uint8Array(Buffer.from(webContent, 'utf-8')))
   files.set('CHANGEFILE', new Uint8Array())
@@ -98,6 +104,7 @@ export function runTangle(pasSource: string, webContent: string): TangleResult {
     },
     maxSteps: 1e9,
     extensions: ['string'],
+    plugins,
   })
 
   return {
@@ -120,6 +127,8 @@ export interface RunTeXOptions {
   files?: Record<string, string | Uint8Array>
   /** 非标特性扩展 */
   extensions?: string[]
+  /** 非标特性插件（AGENTS.md 原则 A.7） */
+  plugins?: IlPlugin[]
   /** 最大步数 */
   maxSteps?: number
 }
@@ -135,10 +144,13 @@ export interface RunTeXResult {
 /**
  * 编译 tex.pas → JS 代码字符串。
  * 编译结果可在多次 runTeXCompiled 调用中复用，避免重复编译。
+ *
+ * @param plugins 非标特性插件（如 pascalHPlugin，支持 break/breakin/erstat 等）
  */
-export function compileTeX(texPasSource: string): string {
+export function compileTeX(texPasSource: string, plugins: IlPlugin[] = []): string {
   return transform(texPasSource, {
     extensions: ['string', 'fileEofBufferSpace'],
+    plugins,
   })
 }
 
@@ -180,6 +192,7 @@ export function runTeXCompiled(
     files,
     maxSteps: options.maxSteps ?? 2e9,
     extensions: options.extensions ?? ['string', 'fileEofBufferSpace'],
+    plugins: options.plugins ?? [],
   })
 
   const __sys = (key: string, args: any[]): any => dispatch(ctx, key, args)
@@ -191,9 +204,12 @@ export function runTeXCompiled(
     mainFn()
     state = toRunState(ctx, 'terminated')
   } catch (e: any) {
+    if (process.env.E2E_DEBUG) {
+      console.error('[runTeXCompiled] 运行时错误:', e?.stack || e)
+    }
     state = toRunState(ctx, 'error', {
       message: e?.message || String(e),
-      stackTrace: e?.stack ? String(e.stack).split('\n').slice(0, 10) : [],
+      stackTrace: e?.stack ? String(e.stack).split('\n').slice(0, 20) : [],
     })
   }
 
@@ -215,7 +231,7 @@ export function runTeX(
   texPasSource: string,
   options: RunTeXOptions = {}
 ): RunTeXResult & { compiledJs: string } {
-  const compiledJs = compileTeX(texPasSource)
+  const compiledJs = compileTeX(texPasSource, options.plugins)
   const result = runTeXCompiled(compiledJs, options)
   return { ...result, compiledJs }
 }

@@ -30,7 +30,9 @@ import {
   ConstDeclarationNode,
   LabelDeclarationNode,
   TypeDeclarationNode,
+  RecordVariantPartNode,
 } from '@/ast/types'
+import type { IlPlugin } from '@/il/plugin'
 
 // ============================================================
 // 类型系统
@@ -168,6 +170,8 @@ export class Analyzer {
   private idNames = new Map<number, string>()
   /** 非标特性扩展（AGENTS.md 原则 A） */
   private extensions: Set<string> = new Set()
+  /** 编译期注入的非标特性插件（AGENTS.md 原则 A.7） */
+  private plugins_: IlPlugin[] | undefined
   /** 非透明块深度（while/for/if/repeat/case/with 体内部） */
   private nonTransparentDepth = 0
   /** label 出现的非透明块深度（key: labelId，全局唯一） */
@@ -185,8 +189,9 @@ export class Analyzer {
   // 分析入口
   // --------------------------------------------------------
 
-  analyze(program: ProgramNode, extensions?: string[]): Analysis {
+  analyze(program: ProgramNode, extensions?: string[], plugins?: IlPlugin[]): Analysis {
     if (extensions) this.extensions = new Set(extensions)
+    this.plugins_ = plugins
     const topFuncId = this.allocFunc(program.block, null, false, null)
 
     this.pushScope(topFuncId)
@@ -526,6 +531,10 @@ export class Analyzer {
             fields.set(name.name.toLowerCase(), ti)
           }
         }
+        // 变体记录：收集所有变体分支的字段（变体字段共享同一内存空间）
+        if (node.variant) {
+          this.collectVariantFields(node.variant, fields)
+        }
         info = { tag: 'rec', fields }
         break
       }
@@ -558,6 +567,28 @@ export class Analyzer {
 
     this.typeNodeInfo.set(node, info)
     return info
+  }
+
+  /**
+   * 递归收集变体记录的所有字段。
+   * 变体记录中不同分支的字段共享同一内存空间（union semantics），
+   * 因此将所有分支的字段都加入 fields Map，使运行时能正确初始化。
+   */
+  private collectVariantFields(
+    variant: RecordVariantPartNode,
+    fields: Map<string, TypeInfo>
+  ): void {
+    for (const v of variant.variants) {
+      for (const f of v.fields) {
+        const ti = this.resolveTypeInfo(f.type)
+        for (const name of f.names) {
+          fields.set(name.name.toLowerCase(), ti)
+        }
+      }
+      if (v.variant) {
+        this.collectVariantFields(v.variant, fields)
+      }
+    }
   }
 
   private evalConstInt(node: ExpressionNode): number | undefined {
@@ -1163,6 +1194,9 @@ export class Analyzer {
       debugNames() {
         return new Map(self.idNames)
       },
+      plugins() {
+        return self.plugins_
+      },
     }
   }
 }
@@ -1188,12 +1222,14 @@ export interface Analysis {
   globalSymbolOf(name: string): Symbol | undefined
   /** id → 可读名字映射（调试用，仅 json-code-compiler 读取） */
   debugNames(): Map<number, string>
+  /** 编译期注入的非标特性插件（AGENTS.md 原则 A.7） */
+  plugins(): IlPlugin[] | undefined
 }
 
 // ============================================================
 // 入口
 // ============================================================
 
-export function analyzeProgram(program: ProgramNode, extensions?: string[]): Analysis {
-  return new Analyzer().analyze(program, extensions)
+export function analyzeProgram(program: ProgramNode, extensions?: string[], plugins?: IlPlugin[]): Analysis {
+  return new Analyzer().analyze(program, extensions, plugins)
 }

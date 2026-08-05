@@ -34,6 +34,7 @@ export { nodeToCode } from './ast/printer'
 export { transform, run } from './il/transform'
 export type { TransformOptions, RunOptions } from './il/transform'
 export type { RunState, RunError } from './runtime/run-state'
+export type { IlPlugin } from './il/plugin'
 
 // ==========================================================================
 // 便捷函数

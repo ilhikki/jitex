@@ -4,6 +4,7 @@
 
 import { describe } from 'vitest'
 import { type PascalTest, runPascalTests } from './_helper'
+import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
 
 describe('M5 JS - Knuth Pascal Style', () => {
   const tests: PascalTest[] = [
@@ -136,8 +137,9 @@ BEGIN
   BREAK(TERMOUT);
   WRITELN('done');
 END.`,
-      purpose: 'Knuth 风格：BREAK 过程刷新输出缓冲区（tangle-official.pas 中 ERROR 过程使用）',
+      purpose: 'Knuth 风格：BREAK 过程刷新输出缓冲区（tangle-official.pas 中 ERROR 过程使用）。启用 pascalHPlugin',
       expectedContains: 'done',
+      plugins: [pascalHPlugin],
     },
 
     {
@@ -148,8 +150,9 @@ BEGIN
   BREAK;
   WRITELN('ok');
 END.`,
-      purpose: 'BREAK 无参数调用',
+      purpose: 'BREAK 无参数调用。启用 pascalHPlugin',
       expectedContains: 'ok',
+      plugins: [pascalHPlugin],
     },
 
     {
@@ -276,8 +279,9 @@ BEGIN
   ERROR;
   WRITELN('history=', HISTORY);
 END.`,
-      purpose: '模仿 tangle-official.pas 的 ERROR 过程（使用 BREAK 和文件输出）',
+      purpose: '模仿 tangle-official.pas 的 ERROR 过程（使用 BREAK 和文件输出）。启用 pascalHPlugin',
       expectedContains: 'history=2',
+      plugins: [pascalHPlugin],
     },
 
     {
