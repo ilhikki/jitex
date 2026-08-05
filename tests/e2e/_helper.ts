@@ -96,11 +96,15 @@ export interface TangleResult {
 export function runTangle(
   pasSource: string,
   webContent: string,
-  plugins: IlPlugin[] = [pascalHPlugin]
+  plugins: IlPlugin[] = [pascalHPlugin],
+  changeContent: string | Uint8Array = ''
 ): TangleResult {
   const files = new Map<string, Uint8Array>()
   files.set('WEBFILE', new Uint8Array(Buffer.from(webContent, 'utf-8')))
-  files.set('CHANGEFILE', new Uint8Array())
+  const changeBytes = typeof changeContent === 'string'
+    ? new Uint8Array(Buffer.from(changeContent, 'utf-8'))
+    : changeContent
+  files.set('CHANGEFILE', changeBytes)
   files.set('PASCALFILE', new Uint8Array())
   files.set('POOL', new Uint8Array())
 

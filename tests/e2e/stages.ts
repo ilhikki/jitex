@@ -80,7 +80,10 @@ export function parseArgs(args: string[]): CliOptions {
       opts.noCache = true
     } else if (arg.startsWith('--stage=')) {
       const v = arg.slice('--stage='.length)
-      const nums = v.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
+      const nums = v
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n))
       opts.stages = [...(opts.stages ?? []), ...nums]
     }
   }
@@ -129,19 +132,47 @@ interface PipelineContext {
   texCompiledJs: string
   texCompileOk: boolean
   texCompileError: string
-  hello: { output: string; status: string; error?: string; steps: number; files: Map<string, Uint8Array> } | null
-  trip: { output: string; status: string; error?: string; steps: number; files: Map<string, Uint8Array>; logFile?: string } | null
+  hello: {
+    output: string
+    status: string
+    error?: string
+    steps: number
+    files: Map<string, Uint8Array>
+  } | null
+  trip: {
+    output: string
+    status: string
+    error?: string
+    steps: number
+    files: Map<string, Uint8Array>
+    logFile?: string
+  } | null
 
   failedAt: string
 }
 
 function createContext(): PipelineContext {
   return {
-    tanglePas: '', tangleWeb: '', texWeb: '', helloTex: '', tripTex: '',
-    tripTfm: new Uint8Array(0), tripFot: '',
-    compiledJs: '', v1: null, v1ParseOk: false, v2: null, v3: null,
-    tex: null, texParseOk: false, texCompiledJs: '', texCompileOk: false,
-    texCompileError: '', hello: null, trip: null, failedAt: '',
+    tanglePas: '',
+    tangleWeb: '',
+    texWeb: '',
+    helloTex: '',
+    tripTex: '',
+    tripTfm: new Uint8Array(0),
+    tripFot: '',
+    compiledJs: '',
+    v1: null,
+    v1ParseOk: false,
+    v2: null,
+    v3: null,
+    tex: null,
+    texParseOk: false,
+    texCompiledJs: '',
+    texCompileOk: false,
+    texCompileError: '',
+    hello: null,
+    trip: null,
+    failedAt: '',
   }
 }
 
@@ -149,8 +180,12 @@ function createContext(): PipelineContext {
 // 辅助函数
 // ============================================================
 
-function now(): number { return Date.now() }
-function timestamp(): string { return new Date().toISOString() }
+function now(): number {
+  return Date.now()
+}
+function timestamp(): string {
+  return new Date().toISOString()
+}
 
 /** 构造产物（含完整内容，用于保存到报告文件夹） */
 function artifact(name: string, content: string): StageArtifact {
@@ -174,7 +209,9 @@ function binaryArtifact(name: string, data: Uint8Array): StageArtifact {
 }
 
 function successStage(
-  id: string, title: string, duration: number,
+  id: string,
+  title: string,
+  duration: number,
   opts: {
     metrics?: Record<string, string | number | boolean>
     artifacts?: StageArtifact[]
@@ -186,7 +223,10 @@ function successStage(
   } = {}
 ): StageReport {
   return {
-    id, title, status: 'success', duration,
+    id,
+    title,
+    status: 'success',
+    duration,
     metrics: opts.metrics ?? {},
     artifacts: opts.artifacts ?? [],
     logs: opts.logs ?? [],
@@ -198,7 +238,10 @@ function successStage(
 }
 
 function failedStage(
-  id: string, title: string, duration: number, error: string,
+  id: string,
+  title: string,
+  duration: number,
+  error: string,
   opts: {
     metrics?: Record<string, string | number | boolean>
     artifacts?: StageArtifact[]
@@ -210,7 +253,11 @@ function failedStage(
   } = {}
 ): StageReport {
   return {
-    id, title, status: 'failed', duration, error,
+    id,
+    title,
+    status: 'failed',
+    duration,
+    error,
     metrics: opts.metrics ?? {},
     artifacts: opts.artifacts ?? [],
     logs: opts.logs ?? [],
@@ -223,15 +270,25 @@ function failedStage(
 
 function skippedStage(id: string, title: string, reason: string): StageReport {
   return {
-    id, title, status: 'skipped', duration: 0,
+    id,
+    title,
+    status: 'skipped',
+    duration: 0,
     metrics: { reason },
-    artifacts: [], logs: [], consoleLogs: [], debugLogs: [], stackTrace: [],
+    artifacts: [],
+    logs: [],
+    consoleLogs: [],
+    debugLogs: [],
+    stackTrace: [],
     assertions: [],
   }
 }
 
 function assert(
-  name: string, cond: boolean, actual?: string, expected?: string
+  name: string,
+  cond: boolean,
+  actual?: string,
+  expected?: string
 ): { name: string; passed: boolean; actual?: string; expected?: string } {
   return { name, passed: cond, actual, expected }
 }
@@ -293,22 +350,51 @@ function validateDvi(data: Uint8Array): {
   lastBytes: string
 } {
   if (data.length === 0) {
-    return { valid: false, hasContent: false, reason: 'empty dvi file', firstBytes: '', lastBytes: '' }
+    return {
+      valid: false,
+      hasContent: false,
+      reason: 'empty dvi file',
+      firstBytes: '',
+      lastBytes: '',
+    }
   }
-  const firstBytes = Array.from(data.slice(0, 8)).map((b) => b.toString(16).padStart(2, '0')).join(' ')
-  const lastBytes = data.length >= 8
-    ? Array.from(data.slice(-8)).map((b) => b.toString(16).padStart(2, '0')).join(' ')
-    : firstBytes
+  const firstBytes = Array.from(data.slice(0, 8))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join(' ')
+  const lastBytes =
+    data.length >= 8
+      ? Array.from(data.slice(-8))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join(' ')
+      : firstBytes
   // DVI preamble: opcode 247 (0xf7), version 2
   if (data[0] !== 247) {
-    return { valid: false, hasContent: false, reason: `bad preamble opcode: expected 247 (0xf7), got ${data[0]}`, firstBytes, lastBytes }
+    return {
+      valid: false,
+      hasContent: false,
+      reason: `bad preamble opcode: expected 247 (0xf7), got ${data[0]}`,
+      firstBytes,
+      lastBytes,
+    }
   }
   if (data[1] !== 2) {
-    return { valid: false, hasContent: false, reason: `bad DVI version: expected 2, got ${data[1]}`, firstBytes, lastBytes }
+    return {
+      valid: false,
+      hasContent: false,
+      reason: `bad DVI version: expected 2, got ${data[1]}`,
+      firstBytes,
+      lastBytes,
+    }
   }
   // 最小有效 DVI（preamble + postamble）约 50 字节
   if (data.length < 50) {
-    return { valid: false, hasContent: false, reason: `dvi too short: ${data.length} bytes (expected > 50)`, firstBytes, lastBytes }
+    return {
+      valid: false,
+      hasContent: false,
+      reason: `dvi too short: ${data.length} bytes (expected > 50)`,
+      firstBytes,
+      lastBytes,
+    }
   }
   // 末尾应有 4+ 个 223 (0xdf) 作为 postamble 标记
   let trailer223 = 0
@@ -316,7 +402,13 @@ function validateDvi(data: Uint8Array): {
     trailer223++
   }
   if (trailer223 < 4) {
-    return { valid: false, hasContent: false, reason: `missing postamble trailer (223 x4+): only ${trailer223}`, firstBytes, lastBytes }
+    return {
+      valid: false,
+      hasContent: false,
+      reason: `missing postamble trailer (223 x4+): only ${trailer223}`,
+      firstBytes,
+      lastBytes,
+    }
   }
 
   // 内容检查：扫描 bop..eop 段，看是否有字符/规则等内容
@@ -354,27 +446,90 @@ function validateDvi(data: Uint8Array): {
 }
 
 /**
- * 启用 TeX 统计信息：将 tex.web 中的 stat/tats 宏从注释（@{...@}）改为空操作（@t@>）。
+ * 为 TRIP 测试构造 WEB change file 内容（@x/@y/@z 块）。
  *
- * tex.web 原始定义：
- *   @d stat==@{ ... }      ← stat 展开为 { （开启 Pascal 注释）
- *   @d tats==@t@>@} ...    ← tats 展开为 } （关闭 Pascal 注释）
- * 这会将所有 stat...tats 之间的代码块注释掉，包括：
- *   - var_used/dyn_used 的增减跟踪
- *   - ship_out 时的 "Memory usage before/after" 输出
- *   - close_files_and_terminate 时的内存统计输出
+ * 按 tripman.tex step 2 "Prepare a special version of INITEX" 要求：
+ *   1. stat/tats 宏改为 null（@t@>），启用统计代码
+ *      （原始 stat==@{ ... @} 会把 stat...tats 间的代码注释掉；
+ *       改为 @t@> 后这些代码生效：var_used/dyn_used 跟踪、
+ *       ship_out 的 "Memory usage before/after"、close_files_and_terminate 的统计输出）
+ *   2. mem_min/mem_bot: 0 → 1, mem_top/mem_max: 30000 → 3000
+ *   3. error_line: 72 → 64, half_error_line: 42 → 32, max_print_line: 79 → 72
+ *      （这些参数影响 show_context 截断/缩进、print 行宽、内存统计数字，
+ *       不调整会导致 trip.fot 比对大面积 mismatch）
  *
- * 修改后：
- *   @d stat==@t@>          ← stat 展开为空（@t@> 是 WEB 的透明文本，无输出）
- *   @d tats==@t@>          ← tats 展开为空
- * 所有 stat...tats 代码块生效，使 TeX 输出与 trip.fot 一致。
+ * 用 WEB 原生的 change file 机制（TANGLE 的 @x/@y/@z），而非正则替换 web 字符串。
+ * 符合铁律#5 标准锚定 —— 用 WEB 系统自带开关，不造自己的替换逻辑。
+ *
+ * @x 块的行内容从 web 原样提取，保证字节级精确匹配（含 \\ 等特殊字符）。
  */
-function enableStatisticsInWeb(web: string): string {
-  const statBlock = /@d stat==@\{ \{change this to[\s\S]*?usage statistics\}/
-  const tatsBlock = /@d tats==@t@>@\} \{change this to[\s\S]*?usage statistics\}/
-  return web
-    .replace(statBlock, '@d stat==@t@>')
-    .replace(tatsBlock, '@d tats==@t@>')
+function buildTripChangeFile(web: string): string {
+  const lines = web.split('\n')
+  const blocks: string[] = []
+
+  /** 找到包含 substr 的第一个行索引 */
+  const findLine = (substr: string): number => {
+    const idx = lines.findIndex((l) => l.includes(substr))
+    if (idx < 0) throw new Error(`buildTripChangeFile: cannot find "${substr}" in tex.web`)
+    return idx
+  }
+
+  /** 构造一个 @x/@y/@z 块 */
+  const block = (oldLines: string[], newLines: string[]) => {
+    blocks.push('@x', ...oldLines, '@y', ...newLines, '@z')
+  }
+
+  // 注意：@x 块必须按 tex.web 的行号递增顺序排列。
+  // TANGLE 单调扫描 web 文件，前一个块匹配后扫描位置继续前进，
+  // 若后续块的目标行在已扫过的位置之前，会报 "Change file entry did not match"。
+
+  // 1. stat/tats 宏（tex.web 第 307-310 行，连续 4 行 → 2 行）
+  //    原始：
+  //      @d stat==@{ {change this to `$\\{stat}\equiv\null$' when gathering
+  //        usage statistics}
+  //      @d tats==@t@>@} {change this to `$\\{tats}\equiv\null$' when gathering
+  //        usage statistics}
+  //    替换为：
+  //      @d stat==@t@>
+  //      @d tats==@t@>
+  const statIdx = findLine('@d stat==@{')
+  block(
+    lines.slice(statIdx, statIdx + 4),
+    ['@d stat==@t@>', '@d tats==@t@>']
+  )
+
+  // 2. mem_max: 30000 → 3000（tex.web 第 387 行）
+  const memMaxIdx = findLine('@!mem_max=30000;')
+  block([lines[memMaxIdx]], [lines[memMaxIdx].replace('30000', '3000')])
+
+  // 3. mem_min: 0 → 1（tex.web 第 390 行）
+  const memMinIdx = findLine('@!mem_min=0;')
+  block([lines[memMinIdx]], [lines[memMinIdx].replace('=0;', '=1;')])
+
+  // 4. error_line: 72 → 64（tex.web 第 396 行）
+  const errLineIdx = findLine('@!error_line=72;')
+  block([lines[errLineIdx]], [lines[errLineIdx].replace('=72;', '=64;')])
+
+  // 5. half_error_line: 42 → 32（tex.web 第 397-398 行，2 行，只改第 1 行的数字）
+  const halfErrIdx = findLine('@!half_error_line=42;')
+  block(
+    lines.slice(halfErrIdx, halfErrIdx + 2),
+    [lines[halfErrIdx].replace('=42;', '=32;'), lines[halfErrIdx + 1]]
+  )
+
+  // 6. max_print_line: 79 → 72（tex.web 第 399 行）
+  const maxPrintIdx = findLine('@!max_print_line=79;')
+  block([lines[maxPrintIdx]], [lines[maxPrintIdx].replace('=79;', '=72;')])
+
+  // 7. mem_bot: 0 → 1（tex.web 第 439 行）
+  const memBotIdx = findLine('@d mem_bot=0')
+  block([lines[memBotIdx]], [lines[memBotIdx].replace('=0 ', '=1 ')])
+
+  // 8. mem_top: 30000 → 3000（tex.web 第 441 行）
+  const memTopIdx = findLine('@d mem_top==30000')
+  block([lines[memTopIdx]], [lines[memTopIdx].replace('30000', '3000')])
+
+  return blocks.join('\n') + '\n'
 }
 
 // ============================================================
@@ -412,18 +567,24 @@ const stages: StageDef[] = [
       }
 
       const duration = now() - t0
-      const metrics = { inputSize: formatBytes(ctx.tanglePas.length), lineCount: countLines(ctx.tanglePas) }
+      const metrics = {
+        inputSize: formatBytes(ctx.tanglePas.length),
+        lineCount: countLines(ctx.tanglePas),
+      }
       const artifacts = [artifact('tangle-official.pas', ctx.tanglePas)]
 
       if (!ok) {
         ctx.failedAt = '1'
         return failedStage('1', 'parse tangle-official.pas', duration, error!, {
-          metrics, artifacts, stackTrace,
+          metrics,
+          artifacts,
+          stackTrace,
           assertions: [assert('parse ok', false, 'fail', 'ok')],
         })
       }
       return successStage('1', 'parse tangle-official.pas', duration, {
-        metrics, artifacts,
+        metrics,
+        artifacts,
         logs: [`first: ${previewLine(ctx.tanglePas)}`],
         assertions: [assert('parse ok', true)],
       })
@@ -441,7 +602,12 @@ const stages: StageDef[] = [
       try {
         ctx.compiledJs = transform(ctx.tanglePas, {
           extensions: ['string'],
-          programFileUrls: { WEBFILE: 'WEBFILE', CHANGEFILE: 'CHANGEFILE', PASCALFILE: 'PASCALFILE', POOL: 'POOL' },
+          programFileUrls: {
+            WEBFILE: 'WEBFILE',
+            CHANGEFILE: 'CHANGEFILE',
+            PASCALFILE: 'PASCALFILE',
+            POOL: 'POOL',
+          },
           plugins: [pascalHPlugin],
         })
         ok = ctx.compiledJs.length > 0
@@ -451,15 +617,27 @@ const stages: StageDef[] = [
       }
 
       const duration = now() - t0
-      const metrics = { jsSize: formatBytes(ctx.compiledJs.length), jsLines: countLines(ctx.compiledJs) }
+      const metrics = {
+        jsSize: formatBytes(ctx.compiledJs.length),
+        jsLines: countLines(ctx.compiledJs),
+      }
       const assertions = [
         assert('compile ok', ok, ok ? 'ok' : 'fail', 'ok'),
-        assert('jsSize > 10KB', ctx.compiledJs.length > 10000, formatBytes(ctx.compiledJs.length), '> 10 KB'),
+        assert(
+          'jsSize > 10KB',
+          ctx.compiledJs.length > 10000,
+          formatBytes(ctx.compiledJs.length),
+          '> 10 KB'
+        ),
       ]
 
       if (!ok) {
         ctx.failedAt = '2'
-        return failedStage('2', 'compile tangle to JS', duration, error!, { metrics, assertions, stackTrace })
+        return failedStage('2', 'compile tangle to JS', duration, error!, {
+          metrics,
+          assertions,
+          stackTrace,
+        })
       }
       return successStage('2', 'compile tangle to JS', duration, {
         metrics,
@@ -479,7 +657,13 @@ const stages: StageDef[] = [
       try {
         const r = runTangle(ctx.tanglePas, ctx.tangleWeb)
         debugLog = r.debugLog ?? []
-        ctx.v1 = { pascal: r.pascal, pool: r.pool, output: r.output, status: r.state.status, error: r.state.error?.message }
+        ctx.v1 = {
+          pascal: r.pascal,
+          pool: r.pool,
+          output: r.output,
+          status: r.state.status,
+          error: r.state.error?.message,
+        }
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
         if (r.state.status !== 'terminated') ctx.failedAt = '3'
       } catch (e: any) {
@@ -500,30 +684,63 @@ const stages: StageDef[] = [
       }
       const assertions = [
         assert('run ok', ok, ctx.v1?.status, 'terminated'),
-        assert('pascalOut > 1KB', (ctx.v1?.pascal.length ?? 0) > 1000, formatBytes(ctx.v1?.pascal.length ?? 0), '> 1 KB'),
-        assert('banner v2.8', ctx.v1?.output.includes('This is TANGLE, Version 2.8') ?? false, undefined, 'contains'),
+        assert(
+          'pascalOut > 1KB',
+          (ctx.v1?.pascal.length ?? 0) > 1000,
+          formatBytes(ctx.v1?.pascal.length ?? 0),
+          '> 1 KB'
+        ),
+        assert(
+          'banner v2.8',
+          ctx.v1?.output.includes('This is TANGLE, Version 2.8') ?? false,
+          undefined,
+          'contains'
+        ),
         assert('output has *1*', ctx.v1?.output.includes('*1*') ?? false, undefined, 'contains'),
-        assert('output has Done.', ctx.v1?.output.includes('Done.') ?? false, undefined, 'contains'),
-        assert('pascal has PROGRAM TANGLE', ctx.v1?.pascal.includes('PROGRAM TANGLE') ?? false, undefined, 'contains'),
+        assert(
+          'output has Done.',
+          ctx.v1?.output.includes('Done.') ?? false,
+          undefined,
+          'contains'
+        ),
+        assert(
+          'pascal has PROGRAM TANGLE',
+          ctx.v1?.pascal.includes('PROGRAM TANGLE') ?? false,
+          undefined,
+          'contains'
+        ),
       ]
-      const artifacts = ctx.v1?.pascal ? [
-        artifact('tangle.pas.v1', ctx.v1.pascal),
-        artifact('tangle.pool.v1', ctx.v1.pool),
-      ] : []
+      const artifacts = ctx.v1?.pascal
+        ? [artifact('tangle.pas.v1', ctx.v1.pascal), artifact('tangle.pool.v1', ctx.v1.pool)]
+        : []
 
       if (!ok) {
-        return failedStage('3', 'run tangle on tangle.web → v1', duration, ctx.v1?.error ?? 'unknown', {
-          metrics, artifacts, assertions, debugLogs: debugLog, stackTrace,
-        })
+        return failedStage(
+          '3',
+          'run tangle on tangle.web → v1',
+          duration,
+          ctx.v1?.error ?? 'unknown',
+          {
+            metrics,
+            artifacts,
+            assertions,
+            debugLogs: debugLog,
+            stackTrace,
+          }
+        )
       }
       return successStage('3', 'run tangle on tangle.web → v1', duration, {
-        metrics, artifacts,
+        metrics,
+        artifacts,
         logs: [
           `banner: ${firstLine(ctx.v1!.output)}`,
           `pascal first: ${previewLine(ctx.v1!.pascal)}`,
-          ...tailLines(ctx.v1!.output, 8).map((l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`),
+          ...tailLines(ctx.v1!.output, 8).map(
+            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+          ),
         ],
-        assertions, debugLogs: debugLog,
+        assertions,
+        debugLogs: debugLog,
       })
     },
   },
@@ -550,11 +767,19 @@ const stages: StageDef[] = [
       const duration = now() - t0
       if (!ok) ctx.failedAt = '4'
       return {
-        id: '4', title: 'parse tangle.pas (v1)', status: ok ? 'success' : 'failed', duration,
-        metrics: { pascalSize: formatBytes(ctx.v1?.pascal.length ?? 0), parseResult: ok ? 'ok' : 'fail' },
+        id: '4',
+        title: 'parse tangle.pas (v1)',
+        status: ok ? 'success' : 'failed',
+        duration,
+        metrics: {
+          pascalSize: formatBytes(ctx.v1?.pascal.length ?? 0),
+          parseResult: ok ? 'ok' : 'fail',
+        },
         artifacts: ctx.v1?.pascal ? [artifact('tangle.pas.v1', ctx.v1.pascal)] : [],
         logs: error ? [`error: ${error}`] : [],
-        consoleLogs: [], debugLogs: [], stackTrace,
+        consoleLogs: [],
+        debugLogs: [],
+        stackTrace,
         error,
         assertions: [assert('parse ok', ok, ok ? 'ok' : 'fail', 'ok')],
       }
@@ -572,7 +797,13 @@ const stages: StageDef[] = [
       try {
         const r = runTangle(ctx.v1!.pascal, ctx.tangleWeb)
         debugLog = r.debugLog ?? []
-        ctx.v2 = { pascal: r.pascal, pool: r.pool, output: r.output, status: r.state.status, error: r.state.error?.message }
+        ctx.v2 = {
+          pascal: r.pascal,
+          pool: r.pool,
+          output: r.output,
+          status: r.state.status,
+          error: r.state.error?.message,
+        }
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
         if (r.state.status !== 'terminated') ctx.failedAt = '5'
       } catch (e: any) {
@@ -591,15 +822,27 @@ const stages: StageDef[] = [
       }
       const assertions = [
         assert('run ok', ok, ctx.v2?.status, 'terminated'),
-        assert('banner v4.6', ctx.v2?.output.includes('This is TANGLE, Version 4.6') ?? false, undefined, 'contains'),
-        assert('output has Done.', ctx.v2?.output.includes('Done.') ?? false, undefined, 'contains'),
+        assert(
+          'banner v4.6',
+          ctx.v2?.output.includes('This is TANGLE, Version 4.6') ?? false,
+          undefined,
+          'contains'
+        ),
+        assert(
+          'output has Done.',
+          ctx.v2?.output.includes('Done.') ?? false,
+          undefined,
+          'contains'
+        ),
       ]
 
       if (!ok) {
         return failedStage('5', 'bootstrap v1 → v2', duration, ctx.v2?.error ?? 'unknown', {
           metrics,
           artifacts: ctx.v2?.pascal ? [artifact('tangle.pas.v2', ctx.v2.pascal)] : [],
-          assertions, debugLogs: debugLog, stackTrace,
+          assertions,
+          debugLogs: debugLog,
+          stackTrace,
         })
       }
       return successStage('5', 'bootstrap v1 → v2', duration, {
@@ -607,9 +850,12 @@ const stages: StageDef[] = [
         artifacts: [artifact('tangle.pas.v2', ctx.v2!.pascal)],
         logs: [
           `banner: ${firstLine(ctx.v2!.output)}`,
-          ...tailLines(ctx.v2!.output, 5).map((l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`),
+          ...tailLines(ctx.v2!.output, 5).map(
+            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+          ),
         ],
-        assertions, debugLogs: debugLog,
+        assertions,
+        debugLogs: debugLog,
       })
     },
   },
@@ -625,7 +871,13 @@ const stages: StageDef[] = [
       try {
         const r = runTangle(ctx.v2!.pascal, ctx.tangleWeb)
         debugLog = r.debugLog ?? []
-        ctx.v3 = { pascal: r.pascal, pool: r.pool, output: r.output, status: r.state.status, error: r.state.error?.message }
+        ctx.v3 = {
+          pascal: r.pascal,
+          pool: r.pool,
+          output: r.output,
+          status: r.state.status,
+          error: r.state.error?.message,
+        }
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
       } catch (e: any) {
         ctx.v3 = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
@@ -641,12 +893,20 @@ const stages: StageDef[] = [
       }
       const assertions = [
         assert('run ok', ok, ctx.v3?.status, 'terminated'),
-        assert('banner v4.6', ctx.v3?.output.includes('This is TANGLE, Version 4.6') ?? false, undefined, 'contains'),
+        assert(
+          'banner v4.6',
+          ctx.v3?.output.includes('This is TANGLE, Version 4.6') ?? false,
+          undefined,
+          'contains'
+        ),
       ]
 
       if (!ok) {
         return failedStage('6', 'bootstrap v2 → v3', duration, ctx.v3?.error ?? 'unknown', {
-          metrics, assertions, debugLogs: debugLog, stackTrace,
+          metrics,
+          assertions,
+          debugLogs: debugLog,
+          stackTrace,
         })
       }
       return successStage('6', 'bootstrap v2 → v3', duration, {
@@ -654,9 +914,12 @@ const stages: StageDef[] = [
         artifacts: [artifact('tangle.pas.v3', ctx.v3!.pascal)],
         logs: [
           `banner: ${firstLine(ctx.v3!.output ?? '')}`,
-          ...tailLines(ctx.v3!.output ?? '', 5).map((l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`),
+          ...tailLines(ctx.v3!.output ?? '', 5).map(
+            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+          ),
         ],
-        assertions, debugLogs: debugLog,
+        assertions,
+        debugLogs: debugLog,
       })
     },
   },
@@ -684,12 +947,25 @@ const stages: StageDef[] = [
         poolEq: poolEqual,
       }
       const assertions = [
-        assert('pascal v2 === v3', equal, `${formatBytes(v2Pascal.length)} vs ${formatBytes(v3Pascal.length)}`, 'identical'),
-        assert('pool v2 === v3', poolEqual, `${formatBytes(v2Pool.length)} vs ${formatBytes(v3Pool.length)}`, 'identical'),
+        assert(
+          'pascal v2 === v3',
+          equal,
+          `${formatBytes(v2Pascal.length)} vs ${formatBytes(v3Pascal.length)}`,
+          'identical'
+        ),
+        assert(
+          'pool v2 === v3',
+          poolEqual,
+          `${formatBytes(v2Pool.length)} vs ${formatBytes(v3Pool.length)}`,
+          'identical'
+        ),
       ]
 
       if (!equal) {
-        return failedStage('7', 'verify v2 === v3', duration, 'v2 !== v3, bootstrap unstable', { metrics, assertions })
+        return failedStage('7', 'verify v2 === v3', duration, 'v2 !== v3, bootstrap unstable', {
+          metrics,
+          assertions,
+        })
       }
       return successStage('7', 'verify v2 === v3', duration, {
         metrics,
@@ -713,19 +989,29 @@ const stages: StageDef[] = [
       const tangleSrc = ctx.v3?.pascal ?? ctx.v2?.pascal ?? ''
       const tangleSrcLabel = ctx.v3?.pascal ? 'v3' : ctx.v2?.pascal ? 'v2' : 'none'
       if (!tangleSrc) {
-        return skippedStage('8', 'run tangle on tex.web → tex.pas', 'no 4.x tangle available (v2/v3 missing)')
+        return skippedStage(
+          '8',
+          'run tangle on tex.web → tex.pas',
+          'no 4.x tangle available (v2/v3 missing)'
+        )
       }
       const t0 = now()
       let debugLog: string[] = []
       let stackTrace: string[] = []
       try {
-        // 启用统计信息：修改 tex.web 中的 stat/tats 宏定义，
-        // 使 var_used/dyn_used 跟踪和 "Memory usage" 输出生效，
-        // 让 TeX 输出与 trip.fot 一致。
-        const texWebWithStats = enableStatisticsInWeb(ctx.texWeb)
-        const r = runTangle(tangleSrc, texWebWithStats)
+        // 为 TRIP 测试构造 change file（tripman.tex step 2 要求）：
+        // stat/tats 宏 + mem_min/mem_bot/mem_top/mem_max + error_line 等。
+        // 用 WEB 原生 @x/@y/@z 机制，由 TANGLE 合并到 tex.web，不改正文。
+        const tripChange = buildTripChangeFile(ctx.texWeb)
+        const r = runTangle(tangleSrc, ctx.texWeb, [pascalHPlugin], tripChange)
         debugLog = r.debugLog ?? []
-        ctx.tex = { pascal: r.pascal, pool: r.pool, output: r.output, status: r.state.status, error: r.state.error?.message }
+        ctx.tex = {
+          pascal: r.pascal,
+          pool: r.pool,
+          output: r.output,
+          status: r.state.status,
+          error: r.state.error?.message,
+        }
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
       } catch (e: any) {
         ctx.tex = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
@@ -745,24 +1031,55 @@ const stages: StageDef[] = [
       }
       const assertions = [
         assert('run ok', ok, ctx.tex?.status, 'terminated'),
-        assert('pascalOut > 100KB', (ctx.tex?.pascal.length ?? 0) > 100000, formatBytes(ctx.tex?.pascal.length ?? 0), '> 100 KB'),
-        assert('pascal has PROGRAM TEX', ctx.tex?.pascal.includes('PROGRAM TEX') ?? false, undefined, 'contains'),
-        assert('output has Done.', ctx.tex?.output.includes('Done.') ?? false, undefined, 'contains'),
+        assert(
+          'pascalOut > 100KB',
+          (ctx.tex?.pascal.length ?? 0) > 100000,
+          formatBytes(ctx.tex?.pascal.length ?? 0),
+          '> 100 KB'
+        ),
+        assert(
+          'pascal has PROGRAM TEX',
+          ctx.tex?.pascal.includes('PROGRAM TEX') ?? false,
+          undefined,
+          'contains'
+        ),
+        assert(
+          'output has Done.',
+          ctx.tex?.output.includes('Done.') ?? false,
+          undefined,
+          'contains'
+        ),
       ]
       // 提取 TANGLE 输出中的错误行（以 '! ' 开头）和警告行
       const tangleOut = ctx.tex?.output ?? ''
-      const errorLines = tangleOut.split('\n').filter((l) => l.startsWith('! ') || l.includes('Pardon me'))
-      const hasErrorHistory = tangleOut.includes('Pardon me, but I think I spotted something wrong.')
-      const artifacts = ctx.tex?.pascal ? [
-        artifact('tex.pas', ctx.tex.pascal),
-        artifact('tex.pool', ctx.tex.pool),
-        artifact('tex.tangle.out', tangleOut),
-      ] : []
+      const errorLines = tangleOut
+        .split('\n')
+        .filter((l) => l.startsWith('! ') || l.includes('Pardon me'))
+      const hasErrorHistory = tangleOut.includes(
+        'Pardon me, but I think I spotted something wrong.'
+      )
+      const artifacts = ctx.tex?.pascal
+        ? [
+            artifact('tex.pas', ctx.tex.pascal),
+            artifact('tex.pool', ctx.tex.pool),
+            artifact('tex.tangle.out', tangleOut),
+          ]
+        : []
 
       if (!ok) {
-        return failedStage('8', 'run tangle on tex.web → tex.pas', duration, ctx.tex?.error ?? 'unknown', {
-          metrics, artifacts, assertions, debugLogs: debugLog, stackTrace,
-        })
+        return failedStage(
+          '8',
+          'run tangle on tex.web → tex.pas',
+          duration,
+          ctx.tex?.error ?? 'unknown',
+          {
+            metrics,
+            artifacts,
+            assertions,
+            debugLogs: debugLog,
+            stackTrace,
+          }
+        )
       }
       return successStage('8', 'run tangle on tex.web → tex.pas', duration, {
         metrics: { ...metrics, hasErrorHistory },
@@ -771,10 +1088,13 @@ const stages: StageDef[] = [
           `tangleSource: ${tangleSrcLabel} (4.x)`,
           `banner: ${firstLine(ctx.tex!.output)}`,
           `pascal first: ${previewLine(ctx.tex!.pascal)}`,
-          ...tailLines(ctx.tex!.output, 8).map((l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`),
+          ...tailLines(ctx.tex!.output, 8).map(
+            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+          ),
           ...(errorLines.length > 0 ? errorLines.map((l) => `error: ${JSON.stringify(l)}`) : []),
         ],
-        assertions, debugLogs: debugLog,
+        assertions,
+        debugLogs: debugLog,
       })
     },
   },
@@ -803,7 +1123,10 @@ const stages: StageDef[] = [
 
       const duration = now() - t0
       return {
-        id: '9', title: 'parse tex.pas', status: ok ? 'success' : 'failed', duration,
+        id: '9',
+        title: 'parse tex.pas',
+        status: ok ? 'success' : 'failed',
+        duration,
         metrics: {
           pascalSize: formatBytes(ctx.tex.pascal.length),
           lineCount: countLines(ctx.tex.pascal),
@@ -811,7 +1134,9 @@ const stages: StageDef[] = [
         },
         artifacts: [artifact('tex.pas', ctx.tex.pascal)],
         logs: error ? [`error: ${error}`] : [],
-        consoleLogs: [], debugLogs: [], stackTrace,
+        consoleLogs: [],
+        debugLogs: [],
+        stackTrace,
         error,
         assertions: [assert('parse ok', ok, ok ? 'ok' : 'fail', 'ok')],
       }
@@ -822,7 +1147,8 @@ const stages: StageDef[] = [
     id: 10,
     title: 'compile tex.pas → tex.js',
     run: (ctx) => {
-      if (!ctx.texParseOk || !ctx.tex) return skippedStage('10', 'compile tex.pas → tex.js', 'tex.pas parse failed')
+      if (!ctx.texParseOk || !ctx.tex)
+        return skippedStage('10', 'compile tex.pas → tex.js', 'tex.pas parse failed')
       const t0 = now()
       let ok = false
       let error: string | undefined
@@ -848,14 +1174,20 @@ const stages: StageDef[] = [
       }
       const assertions = [
         assert('compile ok', ok, ok ? 'ok' : 'fail', 'ok'),
-        assert('jsOut > 50KB', ctx.texCompiledJs.length > 50000, formatBytes(ctx.texCompiledJs.length), '> 50 KB'),
+        assert(
+          'jsOut > 50KB',
+          ctx.texCompiledJs.length > 50000,
+          formatBytes(ctx.texCompiledJs.length),
+          '> 50 KB'
+        ),
       ]
 
       if (!ok) {
         return failedStage('10', 'compile tex.pas → tex.js', duration, error ?? 'unknown', {
           metrics,
           logs: error ? [`error: ${error.slice(0, 500)}`] : [],
-          assertions, stackTrace,
+          assertions,
+          stackTrace,
         })
       }
       return successStage('10', 'compile tex.pas → tex.js', duration, {
@@ -871,7 +1203,8 @@ const stages: StageDef[] = [
     id: 11,
     title: 'run TeX on hello.tex (简单测试)',
     run: (ctx) => {
-      if (!ctx.texCompileOk) return skippedStage('11', 'run TeX on hello.tex', 'tex.pas compile failed')
+      if (!ctx.texCompileOk)
+        return skippedStage('11', 'run TeX on hello.tex', 'tex.pas compile failed')
       const t0 = now()
       let debugLog: string[] = []
       let stackTrace: string[] = []
@@ -890,7 +1223,13 @@ const stages: StageDef[] = [
         debugLog = r.debugLog ?? []
         resultFiles = r.files
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
-        ctx.hello = { output: r.output, status: r.state.status, error: r.state.error?.message, steps: r.state.steps, files: r.files }
+        ctx.hello = {
+          output: r.output,
+          status: r.state.status,
+          error: r.state.error?.message,
+          steps: r.state.steps,
+          files: r.files,
+        }
       } catch (e: any) {
         ctx.hello = { output: '', status: 'error', error: e?.message, steps: 0, files: new Map() }
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
@@ -914,7 +1253,7 @@ const stages: StageDef[] = [
       // hello.tex 应该正常输出，不能有 Emergency stop，且应产生有效且非空的 DVI
       // （空 DVI = bop 紧跟 eop，没有任何字符操作，说明 TeX 没把文本排到页面上）
       const outputOk = ok && !hasEmergencyStop && !hasNoPages && dviValid && dviHasContent
-      const metrics = {
+      const metrics: Record<string, any> = {
         inputFile: 'hello.tex',
         inputSize: formatBytes(ctx.helloTex.length),
         status: ctx.hello?.status ?? 'unknown',
@@ -934,39 +1273,62 @@ const stages: StageDef[] = [
         assert('no Emergency stop', !hasEmergencyStop, undefined, 'no emergency stop'),
         assert('has pages of output', !hasNoPages, undefined, 'has pages'),
         assert('dvi file exists', hasDvi, dviInfo?.name ?? '(none)', '.dvi file'),
-        assert('dvi valid (preamble+postamble)', dviValid, dviValidation?.reason ?? 'no dvi', 'valid DVI'),
-        assert('dvi has content (chars between bop and eop)', dviHasContent,
-          dviHasContent ? 'has content' : (hasDvi ? 'empty page (bop immediately followed by eop)' : 'no dvi'),
-          'page with character operations'),
+        assert(
+          'dvi valid (preamble+postamble)',
+          dviValid,
+          dviValidation?.reason ?? 'no dvi',
+          'valid DVI'
+        ),
+        assert(
+          'dvi has content (chars between bop and eop)',
+          dviHasContent,
+          dviHasContent
+            ? 'has content'
+            : hasDvi
+              ? 'empty page (bop immediately followed by eop)'
+              : 'no dvi',
+          'page with character operations'
+        ),
       ]
       const outputLines = output.split('\n').filter((l) => l.length > 0)
       // 诊断行
       const diagLines: string[] = []
-      if (hasEmergencyStop) diagLines.push('diag: Emergency stop detected - TeX aborted prematurely')
+      if (hasEmergencyStop)
+        diagLines.push('diag: Emergency stop detected - TeX aborted prematurely')
       if (hasNoPages) diagLines.push('diag: No pages of output - TeX did not produce DVI')
       // 检查输入文件名是否被错误读取（字符偏移问题）
       const hasHelloTex = output.includes('hello.tex') || output.includes('hello')
       const hasEeXformat = output.includes('eXformat')
       if (!hasHelloTex && hasEeXformat) {
-        diagLines.push('diag: output contains "eXformat" instead of "hello" - input filename first char dropped (char offset bug)')
+        diagLines.push(
+          'diag: output contains "eXformat" instead of "hello" - input filename first char dropped (char offset bug)'
+        )
       }
       // DVI 诊断
       if (!hasDvi) {
         diagLines.push('diag: no .dvi file in output files - TeX did not produce DVI output')
         // 列出所有输出文件名，便于诊断
         const allFiles = Array.from(resultFiles.keys()).filter((n) => n !== 'TTY:')
-        diagLines.push(`diag: output files: ${allFiles.length > 0 ? allFiles.join(', ') : '(none)'}`)
+        diagLines.push(
+          `diag: output files: ${allFiles.length > 0 ? allFiles.join(', ') : '(none)'}`
+        )
       } else if (!dviValid) {
         diagLines.push(`diag: dvi invalid: ${dviValidation!.reason}`)
         diagLines.push(`diag: dvi first 8 bytes: ${dviValidation!.firstBytes}`)
         diagLines.push(`diag: dvi last 8 bytes: ${dviValidation!.lastBytes}`)
       } else if (!dviHasContent) {
-        diagLines.push(`diag: dvi empty - bop immediately followed by eop (no character ops), size=${dviSize}`)
+        diagLines.push(
+          `diag: dvi empty - bop immediately followed by eop (no character ops), size=${dviSize}`
+        )
         diagLines.push(`diag: dvi first 8 bytes: ${dviValidation!.firstBytes}`)
         diagLines.push(`diag: dvi last 8 bytes: ${dviValidation!.lastBytes}`)
-        diagLines.push('diag: TeX shipped out a page but no characters were typeset (likely nullfont/no font loaded, or \\end before any text was processed)')
+        diagLines.push(
+          'diag: TeX shipped out a page but no characters were typeset (likely nullfont/no font loaded, or \\end before any text was processed)'
+        )
       } else {
-        diagLines.push(`diag: dvi ok: ${dviInfo!.name} ${formatBytes(dviSize)}, first=${dviValidation!.firstBytes}`)
+        diagLines.push(
+          `diag: dvi ok: ${dviInfo!.name} ${formatBytes(dviSize)}, first=${dviValidation!.firstBytes}`
+        )
       }
 
       // 产物：hello.log + dvi 文件（二进制）+ plain-dvi.txt（DVI 文字提取）
@@ -995,26 +1357,38 @@ const stages: StageDef[] = [
       }
 
       if (!ok || !outputOk) {
-        return failedStage('11', 'run TeX on hello.tex', duration,
-          ctx.hello?.error ?? (hasEmergencyStop ? 'Emergency stop' : (!dviValid ? 'invalid DVI' : (!dviHasContent ? 'empty DVI (no character operations)' : 'unknown output issue'))), {
-          metrics,
-          artifacts,
-          logs: [
-            ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
-            ...diagLines,
-            ...(ctx.hello?.error ? [`error: ${ctx.hello.error}`] : []),
-          ],
-          assertions, debugLogs: debugLog, stackTrace,
-        })
+        return failedStage(
+          '11',
+          'run TeX on hello.tex',
+          duration,
+          ctx.hello?.error ??
+            (hasEmergencyStop
+              ? 'Emergency stop'
+              : !dviValid
+                ? 'invalid DVI'
+                : !dviHasContent
+                  ? 'empty DVI (no character operations)'
+                  : 'unknown output issue'),
+          {
+            metrics,
+            artifacts,
+            logs: [
+              ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
+              ...diagLines,
+              ...(ctx.hello?.error ? [`error: ${ctx.hello.error}`] : []),
+            ],
+            assertions,
+            debugLogs: debugLog,
+            stackTrace,
+          }
+        )
       }
       return successStage('11', 'run TeX on hello.tex', duration, {
         metrics,
         artifacts,
-        logs: [
-          ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
-          ...diagLines,
-        ],
-        assertions, debugLogs: debugLog,
+        logs: [...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`), ...diagLines],
+        assertions,
+        debugLogs: debugLog,
       })
     },
   },
@@ -1023,7 +1397,8 @@ const stages: StageDef[] = [
     id: 12,
     title: 'run TeX on trip.tex (TRIP 测试)',
     run: (ctx) => {
-      if (!ctx.texCompileOk) return skippedStage('12', 'run TeX on trip.tex', 'tex.pas compile failed')
+      if (!ctx.texCompileOk)
+        return skippedStage('12', 'run TeX on trip.tex', 'tex.pas compile failed')
       const t0 = now()
       let debugLog: string[] = []
       let stackTrace: string[] = []
@@ -1052,7 +1427,9 @@ const stages: StageDef[] = [
 
         // 查找生成的 trip.fmt 文件
         const tripFmt = findFile(r1.files, 'trip.fmt')
-        debugLog.push(`[pass1] status=${r1.state.status} steps=${r1.state.steps} fmtFound=${!!tripFmt} fmtSize=${tripFmt?.length ?? 0}`)
+        debugLog.push(
+          `[pass1] status=${r1.state.status} steps=${r1.state.steps} fmtFound=${!!tripFmt} fmtSize=${tripFmt?.length ?? 0}`
+        )
 
         // ---- Pass 2: 用 trip.fmt 运行 trip.tex，生成 trip.fot 输出 ----
         // trip.fot 是 pass 2 的期望输出（&trip 加载格式文件后运行 trip.tex）。
@@ -1080,7 +1457,9 @@ const stages: StageDef[] = [
           debugLog.push(...(r2.debugLog ?? []))
           if (r2.state.error?.stackTrace) stackTrace = r2.state.error.stackTrace
           const pass2Fatal = r2.output.includes('Fatal format file error')
-          debugLog.push(`[pass2] status=${r2.state.status} steps=${r2.state.steps} outLen=${r2.output.length} fatal=${pass2Fatal} err=${r2.state.error?.message ?? '(none)'}`)
+          debugLog.push(
+            `[pass2] status=${r2.state.status} steps=${r2.state.steps} outLen=${r2.output.length} fatal=${pass2Fatal} err=${r2.state.error?.message ?? '(none)'}`
+          )
           // pass 2 成功（状态 terminated 且无 fatal format error）→ 使用 pass 2
           if (r2.state.status === 'terminated' && !pass2Fatal) {
             output = r2.output
@@ -1091,9 +1470,14 @@ const stages: StageDef[] = [
             debugLog.push(`[pass2] accepted (status=terminated, no fatal format error)`)
           } else {
             // pass 2 失败（格式文件加载未实现或 fatal error），回退到 pass 1
-            debugLog.push(`[pass2] rejected (status=${r2.state.status}, fatal=${pass2Fatal}), falling back to pass 1`)
+            debugLog.push(
+              `[pass2] rejected (status=${r2.state.status}, fatal=${pass2Fatal}), falling back to pass 1`
+            )
             // 保存 pass 2 输出前 10 行用于诊断
-            const r2Lines = r2.output.split('\n').filter((l) => l.length > 0).slice(0, 10)
+            const r2Lines = r2.output
+              .split('\n')
+              .filter((l) => l.length > 0)
+              .slice(0, 10)
             debugLog.push(`[pass2] first lines: ${JSON.stringify(r2Lines)}`)
             output = r1.output
             tripStatus = r1.state.status
@@ -1119,9 +1503,23 @@ const stages: StageDef[] = [
         if (logEntry) {
           tripLogFile = new TextDecoder().decode(logEntry[1])
         }
-        ctx.trip = { output, status: tripStatus, error: tripError, steps: tripSteps, files: resultFiles, logFile: tripLogFile }
+        ctx.trip = {
+          output,
+          status: tripStatus,
+          error: tripError,
+          steps: tripSteps,
+          files: resultFiles,
+          logFile: tripLogFile,
+        }
       } catch (e: any) {
-        ctx.trip = { output: '', status: 'error', error: e?.message, steps: 0, files: new Map(), logFile: '' }
+        ctx.trip = {
+          output: '',
+          status: 'error',
+          error: e?.message,
+          steps: 0,
+          files: new Map(),
+          logFile: '',
+        }
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
       }
 
@@ -1144,7 +1542,7 @@ const stages: StageDef[] = [
       const dviValid = hasDvi && dviValidation!.valid
       const dviSize = dviInfo?.data.length ?? 0
 
-      const metrics = {
+      const metrics: Record<string, any> = {
         inputFile: 'trip.tex',
         inputSize: formatBytes(ctx.tripTex.length),
         tfmSize: formatBytes(ctx.tripTfm.length),
@@ -1171,14 +1569,19 @@ const stages: StageDef[] = [
         assert('dvi file exists', hasDvi, dviInfo?.name ?? '(none)', '.dvi file'),
       ]
       const diagLines: string[] = []
-      if (hasEmergencyStop) diagLines.push(`diag: emergency stop detected (output too short, ${outputLineCount} lines)`)
-      if (hasDisplaylimits) diagLines.push('diag: banner contains "displaylimits" (pool string offset issue)')
-      if (hasEeXformats) diagLines.push('diag: output contains "eXformats" (missing leading T, pool offset by 1)')
+      if (hasEmergencyStop)
+        diagLines.push(`diag: emergency stop detected (output too short, ${outputLineCount} lines)`)
+      if (hasDisplaylimits)
+        diagLines.push('diag: banner contains "displaylimits" (pool string offset issue)')
+      if (hasEeXformats)
+        diagLines.push('diag: output contains "eXformats" (missing leading T, pool offset by 1)')
       if (hasNoPages) diagLines.push('diag: "No pages of output" - TeX did not produce output')
       if (!hasDvi) {
         diagLines.push('diag: no .dvi file in output files - TeX did not produce DVI output')
         const allFiles = Array.from(resultFiles.keys()).filter((n) => n !== 'TTY:')
-        diagLines.push(`diag: output files: ${allFiles.length > 0 ? allFiles.join(', ') : '(none)'}`)
+        diagLines.push(
+          `diag: output files: ${allFiles.length > 0 ? allFiles.join(', ') : '(none)'}`
+        )
       } else {
         diagLines.push(`diag: dvi: ${dviInfo!.name} ${formatBytes(dviSize)}, valid=${dviValid}`)
         diagLines.push(`diag: dvi first 8 bytes: ${dviValidation!.firstBytes}`)
@@ -1225,17 +1628,17 @@ const stages: StageDef[] = [
             ...diagLines,
             ...(ctx.trip?.error ? [`error: ${ctx.trip.error}`] : []),
           ],
-          assertions, debugLogs: debugLog, stackTrace,
+          assertions,
+          debugLogs: debugLog,
+          stackTrace,
         })
       }
       return successStage('12', 'run TeX on trip.tex', duration, {
         metrics,
         artifacts,
-        logs: [
-          ...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`),
-          ...diagLines,
-        ],
-        assertions, debugLogs: debugLog,
+        logs: [...outputLines.map((l, i) => `out[${i}]: ${JSON.stringify(l)}`), ...diagLines],
+        assertions,
+        debugLogs: debugLog,
       })
     },
   },
@@ -1295,7 +1698,10 @@ const stages: StageDef[] = [
       const actualSource = 'trip output (terminal)'
 
       // 规范化行尾：trip.fot 使用 CRLF（\r\n），我们的输出使用 LF（\n）
-      const normalizeLineEndings = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      // 同时去掉末尾换行符：trip.fot 文件末尾的 \n 是文件保存时添加的，
+      // 不是 TeX 的输出（TeX 打印 "Transcript written on trip.log." 后不换行）
+      const normalizeLineEndings = (s: string) =>
+        s.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n+$/, '')
       const fotLines = normalizeLineEndings(expected).split('\n')
       const outLines = normalizeLineEndings(actual).split('\n')
 
@@ -1326,7 +1732,10 @@ const stages: StageDef[] = [
         }
       }
       const totalLines = matchCount + mismatchCount + onlyInExpected + onlyInActual
-      const matchRate = totalLines > 0 ? `${matchCount}/${totalLines} (${(matchCount / totalLines * 100).toFixed(1)}%)` : '0/0'
+      const matchRate =
+        totalLines > 0
+          ? `${matchCount}/${totalLines} (${((matchCount / totalLines) * 100).toFixed(1)}%)`
+          : '0/0'
 
       // 关键内容检查
       const expectedMarkers = [
@@ -1358,27 +1767,46 @@ const stages: StageDef[] = [
         markerChecks: `${markerPassCount}/${markerChecks.length}`,
       }
       const assertions = [
-        assert('match rate > 50%', totalLines > 0 && matchCount / totalLines > 0.5, matchRate, '> 50%'),
-        assert('markers all pass', markerPassCount === markerChecks.length, `${markerPassCount}/${markerChecks.length}`, 'all'),
+        assert(
+          'match rate = 100%',
+          totalLines > 0 && matchCount === totalLines,
+          matchRate,
+          '= 100%'
+        ),
+        assert(
+          'markers all pass',
+          markerPassCount === markerChecks.length,
+          `${markerPassCount}/${markerChecks.length}`,
+          'all'
+        ),
       ]
 
       const logs = [
         `actualSource: ${actualSource}`,
         `matchRate: ${matchRate}`,
-        ...markerChecks.map((c) => `marker: ${c.pass ? 'ok' : 'X'} "${c.marker}" exp=${c.inExpected} act=${c.inActual}`),
+        ...markerChecks.map(
+          (c) =>
+            `marker: ${c.pass ? 'ok' : 'X'} "${c.marker}" exp=${c.inExpected} act=${c.inActual}`
+        ),
         ...compareLines.slice(0, 50),
       ]
 
-      // TRIP 是 diabolical test，match rate > 50% 即算通过
-      const ok = totalLines > 0 && matchCount / totalLines > 0.5
+      // TRIP 是 diabolical test，match rate 必须 100% 通过
+      const ok = totalLines > 0 && matchCount === totalLines
 
       if (!ok) {
-        return failedStage('14', 'compare trip vs trip.fot', duration, `match rate too low: ${matchRate}`, {
-          metrics,
-          artifacts: [artifact('trip.compare.txt', compareLines.join('\n'))],
-          logs,
-          assertions,
-        })
+        return failedStage(
+          '14',
+          'compare trip vs trip.fot',
+          duration,
+          `match rate not 100%: ${matchRate}`,
+          {
+            metrics,
+            artifacts: [artifact('trip.compare.txt', compareLines.join('\n'))],
+            logs,
+            assertions,
+          }
+        )
       }
       return successStage('14', 'compare trip vs trip.fot', duration, {
         metrics,
@@ -1398,7 +1826,9 @@ export async function runE2E(opts: CliOptions): Promise<void> {
   console.log(`\n${'='.repeat(70)}`)
   console.log('E2E 测试运行器')
   console.log(`时间: ${timestamp()}`)
-  console.log(`参数: ${opts.stages ? `--stage=${opts.stages.join(',')}` : 'all'}${opts.noCache ? ' --fresh' : ''}`)
+  console.log(
+    `参数: ${opts.stages ? `--stage=${opts.stages.join(',')}` : 'all'}${opts.noCache ? ' --fresh' : ''}`
+  )
   console.log(`${'='.repeat(70)}\n`)
 
   const ctx = createContext()
@@ -1440,9 +1870,7 @@ export async function runE2E(opts: CliOptions): Promise<void> {
       report = await stage.run(ctx)
     } catch (e: any) {
       const duration = now() - stageStart
-      const stackLines: string[] = e?.stack
-        ? String(e.stack).split('\n').slice(0, 40)
-        : []
+      const stackLines: string[] = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
       report = failedStage(String(stage.id), stage.title, duration, e?.message || String(e), {
         logs: [`exception: ${e?.message || String(e)}`],
         stackTrace: stackLines,
@@ -1458,9 +1886,8 @@ export async function runE2E(opts: CliOptions): Promise<void> {
     if (consoleBuffer.length > 0) {
       report = {
         ...report,
-        consoleLogs: report.consoleLogs.length > 0
-          ? [...report.consoleLogs, ...consoleBuffer]
-          : consoleBuffer,
+        consoleLogs:
+          report.consoleLogs.length > 0 ? [...report.consoleLogs, ...consoleBuffer] : consoleBuffer,
       }
     }
 
@@ -1472,7 +1899,10 @@ export async function runE2E(opts: CliOptions): Promise<void> {
   const success = stageReports.every((s) => s.status !== 'failed')
 
   const report = createReport(
-    timestamp(), success, totalDuration, stageReports,
+    timestamp(),
+    success,
+    totalDuration,
+    stageReports,
     { node: process.version, platform: os.platform(), arch: os.arch() },
     process.argv.slice(2)
   )
@@ -1492,7 +1922,11 @@ export async function runE2E(opts: CliOptions): Promise<void> {
 function formatConsoleArg(arg: any): string {
   if (arg instanceof Error) return arg.stack || arg.message
   if (typeof arg === 'object' && arg !== null) {
-    try { return JSON.stringify(arg) } catch { return String(arg) }
+    try {
+      return JSON.stringify(arg)
+    } catch {
+      return String(arg)
+    }
   }
   return String(arg)
 }
