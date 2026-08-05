@@ -853,6 +853,13 @@ function getFile(ctx: RuntimeContext, file: PascalFile): void {
   }
   const content = getCurrentContent(ctx, file)
   s.offset++
+  // 文本文件 CRLF 行尾处理：当 get 跳过 \r 且下一个字符是 \n 时，额外跳过 \n。
+  // 原因：TeX 的 input_ln 用 get(f)+eoln(f) 逐字符读取，bypass_eoln 的 get(f)
+  // 只跳过一个字符（\r），\n 仍留在文件中导致 eoln 再次返回 true，产生空行。
+  // 二进制文件不处理（10/13 是正常数据字节）。
+  if (!s.binary && s.offset < content.length && content[s.offset - 1] === 13 && content[s.offset] === 10) {
+    s.offset++
+  }
   if (s.offset >= content.length) {
     s.eof = true
   }
