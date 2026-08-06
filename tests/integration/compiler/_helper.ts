@@ -9,11 +9,11 @@
 // - getOutput: 从 RunState 提取输出字符串
 //
 // 测试原则见 ../README.md；
-// 执行引擎实现见 src/il/transform.ts（新管线）。
+// 执行引擎实现见 src/compiler/transform.ts（新管线）。
 
-import { run } from '@/il/transform'
+import { run } from '@/compiler/transform'
 import type { RunState } from '@/runtime/run-state'
-import type { IlPlugin } from '@/il/plugin'
+import type { IlPlugin } from '@/compiler/plugin'
 import { test, expect } from 'vitest'
 
 /** 非标扩展标识符（保留用于类型标注，实际为 string） */

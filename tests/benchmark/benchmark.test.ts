@@ -1,4 +1,4 @@
-import { run as runIL } from '@/il/transform'
+import { run as runIL } from '@/compiler/transform'
 import { describe, test, expect, afterAll } from 'vitest'
 
 interface BenchmarkResult {

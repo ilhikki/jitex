@@ -4,7 +4,7 @@
 
 import { describe } from 'vitest'
 import { type PascalTest, runPascalTests } from './_helper'
-import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
+import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
 
 describe('M5 JS - Knuth Pascal Style', () => {
   const tests: PascalTest[] = [

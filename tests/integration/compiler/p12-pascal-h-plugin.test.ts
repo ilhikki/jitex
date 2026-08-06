@@ -7,8 +7,8 @@
  * ISO 7185 章节引用：6.9.8.2（标准过程列表）
  */
 import { describe, test, expect } from 'vitest'
-import { run } from '@/il/transform'
-import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
+import { run } from '@/compiler/transform'
+import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
 
 describe('Pascal-H 插件（正测试：启用 pascalHPlugin）', () => {
   test('break 过程可编译并执行（空操作）', () => {
