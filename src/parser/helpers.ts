@@ -8,7 +8,7 @@ export function peek(input: ParserInput): Token {
   return input.tokens[input.position]
 }
 
-// 给 AST 节点添加源码位置
+// 给 AST 节点添加源码位置（基础函数：传入起止 Position）
 export function withLoc<T extends AstNode>(
   node: T,
   start: Position,
@@ -17,14 +17,28 @@ export function withLoc<T extends AstNode>(
   return { ...node, loc: { start, end } }
 }
 
-// 从 Token 提取位置范围（单个 token 的 start/end）
-export function tokenLoc(token: Token): SourceLocation {
-  return { start: token.start, end: token.end }
+// loc: 统一的节点构造辅助函数，减少 `withLoc(node, token.start, token.end)` 这类重复。
+// 支持三种调用形式：
+//   loc(node, token)                       // 单个 token 的范围
+//   loc(node, startToken, endToken)        // 跨多个 token 的范围
+//   loc(node, startPos, endPos)            // 已有 Position 的范围（等价于 withLoc）
+function isPosition(x: Token | Position): x is Position {
+  return typeof (x as Position).line === 'number'
 }
 
-// 从两个 token 位置构造范围（用于跨多个 token 的节点）
-export function rangeLoc(startToken: Token, endToken: Token): SourceLocation {
-  return { start: startToken.start, end: endToken.end }
+export function loc<T extends AstNode>(
+  node: T,
+  startOrToken: Token | Position,
+  endOrToken?: Token | Position
+): T & { loc: SourceLocation } {
+  const startPos = isPosition(startOrToken) ? startOrToken : startOrToken.start
+  if (endOrToken === undefined) {
+    // 单 token 模式：start 与 end 来自同一个 token
+    const token = startOrToken as Token
+    return { ...node, loc: { start: token.start, end: token.end } }
+  }
+  const endPos = isPosition(endOrToken) ? endOrToken : endOrToken.end
+  return { ...node, loc: { start: startPos, end: endPos } }
 }
 
 // --- Success / Failure constructors ---

@@ -1,6 +1,7 @@
 import {
   ArrayAccessNode,
   BinaryExpressionNode,
+  BooleanLiteralNode,
   CharLiteralNode,
   ExpressionNode,
   FieldAccessNode,
@@ -15,7 +16,7 @@ import {
   StringLiteralNode,
   UnaryExpressionNode,
 } from '@/ast/types'
-import { expectType, fail, ok, parseList, peek, withLoc } from './helpers'
+import { expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers'
 
 // ============================================================================
 // Expression Parsers
@@ -32,7 +33,7 @@ export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode>
   }
   return ok(
     input.position + 1,
-    withLoc({ kind: 'Identifier', name: token.content }, token.start, token.end)
+    loc({ kind: 'Identifier', name: token.content } as IdentifierNode, token)
   )
 }
 
@@ -143,19 +144,19 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       if (token.content.toUpperCase() === 'TRUE') {
         return ok(
           input.position + 1,
-          withLoc({ kind: 'BooleanLiteral', value: true }, token.start, token.end)
+          loc({ kind: 'BooleanLiteral', value: true } as BooleanLiteralNode, token)
         )
       }
       if (token.content.toUpperCase() === 'FALSE') {
         return ok(
           input.position + 1,
-          withLoc({ kind: 'BooleanLiteral', value: false }, token.start, token.end)
+          loc({ kind: 'BooleanLiteral', value: false } as BooleanLiteralNode, token)
         )
       }
       if (token.content.toUpperCase() === 'NIL') {
         return ok(
           input.position + 1,
-          withLoc({ kind: 'Identifier', name: 'NIL' } as IdentifierNode, token.start, token.end)
+          loc({ kind: 'Identifier', name: 'NIL' } as IdentifierNode, token)
         )
       }
       // Could be: identifier, function call, array access, field access
@@ -288,7 +289,10 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
   const endToken = closeResult.astNode
   pos = closeResult.newPosition
 
-  return ok(pos, withLoc({ kind: 'SetConstructor', elements }, startToken.start, endToken.end))
+  return ok(
+    pos,
+    loc({ kind: 'SetConstructor', elements } as SetConstructorNode, startToken, endToken)
+  )
 }
 
 // parsePostfix — handles function calls, array access, field access
@@ -364,11 +368,11 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       // Pointer dereference (treat as field access for simplicity)
       pos++
       endPos = token.end
-      expr = withLoc(
+      expr = loc(
         {
           kind: 'FieldAccess',
           object: expr,
-          field: { kind: 'Identifier', name: '^' },
+          field: loc({ kind: 'Identifier', name: '^' } as IdentifierNode, token),
         } as FieldAccessNode,
         startToken.start,
         endPos

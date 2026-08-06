@@ -281,7 +281,7 @@ function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPa
   return ok(
     pos,
     withLoc(
-      { kind: 'RecordVariantPart', tagName, tagType: typeResult.astNode, variants },
+      { kind: 'RecordVariantPart', tagName, tagType: typeResult.astNode, variants } as RecordVariantPartNode,
       start,
       input.tokens[pos - 1].end
     )
@@ -345,7 +345,7 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
   return ok(
     pos,
     withLoc(
-      { kind: 'RecordVariant', caseLabels: caseLabelsResult.astNode, fields, variant },
+      { kind: 'RecordVariant', caseLabels: caseLabelsResult.astNode, fields, variant } as RecordVariantNode,
       start,
       input.tokens[pos - 1].end
     )

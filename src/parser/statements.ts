@@ -1,5 +1,6 @@
 import {
   AssignmentNode,
+  BinaryExpressionNode,
   CaseBranchNode,
   CaseStatementNode,
   CompoundStatementNode,
@@ -19,7 +20,7 @@ import {
   WhileStatementNode,
   WithStatementNode,
 } from '@/ast/types'
-import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
+import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers'
 import { parseExpression, parseIdentifier, parsePrimary } from './expressions'
 
 // ============================================================================
@@ -147,11 +148,14 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
     withLoc(
       {
         kind: 'LabeledStatement',
-        label: {
-          kind: 'IntegerLiteral',
-          value: labelValue,
-          raw: labelToken.content,
-        } as IntegerLiteralNode,
+        label: loc(
+          {
+            kind: 'IntegerLiteral',
+            value: labelValue,
+            raw: labelToken.content,
+          } as IntegerLiteralNode,
+          labelToken
+        ),
         statement: stmtResult.astNode,
       } as LabeledStatementNode,
       startToken.start,
@@ -224,7 +228,7 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
         {
           kind: 'ProcedureCall',
           name: exprResult.astNode as IdentifierNode,
-          arguments: [],
+          arguments: [] as ExpressionNode[],
         } as ProcedureCallNode,
         startToken.start,
         input.tokens[pos - 1].end
@@ -261,12 +265,16 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
         pos = widthResult.newPosition
 
         // Wrap in a special node — use BinaryExpression with ":" operator to represent format
-        arg = {
-          kind: 'BinaryExpression',
-          left: arg,
-          operator: ':',
-          right: widthResult.astNode,
-        } as any
+        arg = loc(
+          {
+            kind: 'BinaryExpression',
+            left: arg,
+            operator: ':',
+            right: widthResult.astNode,
+          } as BinaryExpressionNode,
+          arg.loc.start,
+          widthResult.astNode.loc.end
+        )
 
         // Check for :precision
         if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
@@ -274,12 +282,16 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
           const precResult = parseExpression({ tokens: input.tokens, position: pos })
           if (!precResult.success) return fail(precResult.error, precResult.position)
           pos = precResult.newPosition
-          arg = {
-            kind: 'BinaryExpression',
-            left: arg,
-            operator: ':',
-            right: precResult.astNode,
-          } as any
+          arg = loc(
+            {
+              kind: 'BinaryExpression',
+              left: arg,
+              operator: ':',
+              right: precResult.astNode,
+            } as BinaryExpressionNode,
+            arg.loc.start,
+            precResult.astNode.loc.end
+          )
         }
       }
 
@@ -298,7 +310,7 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
     withLoc(
       {
         kind: 'ProcedureCall',
-        name: { kind: 'Identifier', name } as IdentifierNode,
+        name: loc({ kind: 'Identifier', name } as IdentifierNode, startToken),
         arguments: args,
       } as ProcedureCallNode,
       startToken.start,
@@ -543,11 +555,17 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
     if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
     pos = stmtResult.newPosition
 
-    branches.push({
-      kind: 'CaseBranch',
-      labels: labelsResult.astNode,
-      statement: stmtResult.astNode,
-    } as CaseBranchNode)
+    branches.push(
+      loc(
+        {
+          kind: 'CaseBranch',
+          labels: labelsResult.astNode,
+          statement: stmtResult.astNode,
+        } as CaseBranchNode,
+        labelsResult.astNode[0].loc.start,
+        stmtResult.astNode.loc.end
+      )
+    )
 
     // Skip semicolons
     while (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
@@ -590,11 +608,14 @@ function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> 
     withLoc(
       {
         kind: 'GotoStatement',
-        label: {
-          kind: 'IntegerLiteral',
-          value: parseInt(token.content, 10),
-          raw: token.content,
-        } as IntegerLiteralNode,
+        label: loc(
+          {
+            kind: 'IntegerLiteral',
+            value: parseInt(token.content, 10),
+            raw: token.content,
+          } as IntegerLiteralNode,
+          token
+        ),
       } as GotoStatementNode,
       startToken.start,
       token.end

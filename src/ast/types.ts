@@ -51,7 +51,7 @@ export interface SourceLocation {
 
 export interface AstNode {
   kind: string
-  loc?: SourceLocation
+  loc: SourceLocation
 }
 
 // --- Literals ---

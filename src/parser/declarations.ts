@@ -13,7 +13,7 @@ import {
   TypeDeclarationNode,
   VariableDeclarationNode,
 } from '@/ast/types'
-import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
+import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers'
 import { parseExpression, parseIdentifier } from './expressions'
 import { parseType, parseVariableDeclaration } from './types'
 import { parseCompoundStatement } from './statements'
@@ -37,11 +37,16 @@ export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDecl
     if (value < 0 || value > 9999) {
       return fail(`Label ${value} out of range (0..9999) at line ${token.start.line}`, pos)
     }
-    labels.push({
-      kind: 'IntegerLiteral',
-      value,
-      raw: token.content,
-    } as IntegerLiteralNode)
+    labels.push(
+      loc(
+        {
+          kind: 'IntegerLiteral',
+          value,
+          raw: token.content,
+        } as IntegerLiteralNode,
+        token
+      )
+    )
     pos++
 
     if (peek({ tokens: input.tokens, position: pos }).type !== 'COMMA') break
