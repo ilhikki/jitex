@@ -214,6 +214,52 @@ export function writeReport(report: TestReport): void {
 
   // 5. 更新顶级 index.html
   fs.writeFileSync(path.join(REPORT_DIR, 'index.html'), generateIndexHtml(), 'utf-8')
+
+  // 6. 清理旧报告：默认保留最近 5 次（按目录修改时间排序）
+  pruneOldReports(5)
+}
+
+/**
+ * 清理旧报告，只保留最近 N 次。
+ *
+ * 按 REPORT_DIR 下子目录的 mtime 降序排序，删除第 N+1 之后的目录。
+ * 顶级 index.html 不算作报告，跳过。
+ *
+ * @param keep 保留的次数（默认 5）
+ */
+function pruneOldReports(keep: number = 5): void {
+  if (!fs.existsSync(REPORT_DIR)) return
+  let entries: fs.Dirent[]
+  try {
+    entries = fs.readdirSync(REPORT_DIR, { withFileTypes: true })
+  } catch {
+    return
+  }
+  // 收集所有子目录及其 mtime
+  const runs: { name: string; mtime: number }[] = []
+  for (const e of entries) {
+    if (!e.isDirectory()) continue
+    const full = path.join(REPORT_DIR, e.name)
+    try {
+      const st = fs.statSync(full)
+      runs.push({ name: e.name, mtime: st.mtimeMs })
+    } catch {
+      // 跳过无法读取的目录
+    }
+  }
+  // 按 mtime 降序排序
+  runs.sort((a, b) => b.mtime - a.mtime)
+  // 删除超出 keep 的目录
+  const toDelete = runs.slice(keep)
+  for (const r of toDelete) {
+    const full = path.join(REPORT_DIR, r.name)
+    try {
+      fs.rmSync(full, { recursive: true, force: true })
+      console.log(`[reporter] pruned old report: ${r.name}`)
+    } catch (e: any) {
+      console.warn(`[reporter] failed to prune ${r.name}: ${e?.message || e}`)
+    }
+  }
 }
 
 /** 创建报告对象（分配 id） */

@@ -1,9 +1,9 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { run as runIL, transform } from '@/il/transform'
-import { createRuntimeContext, dispatch, toRunState } from '@/il/runtime'
-import type { IlPlugin } from '@/il/plugin'
-import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
+import { run as runIL, transform } from '@/compiler/transform'
+import { createRuntimeContext, dispatch, toRunState } from '@/compiler/runtime'
+import type { IlPlugin } from '@/compiler/plugin'
+import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
 
 // ============================================================
 // 资源文件常量

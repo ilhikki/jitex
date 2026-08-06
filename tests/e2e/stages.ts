@@ -25,9 +25,9 @@
  */
 import * as os from 'os'
 import { parse } from '@/index'
-import { transform } from '@/il/transform'
-import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
-import { extractDviText } from './dvi-extract'
+import { transform } from '@/compiler/transform'
+import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
+import { extractDviText, dviToHtml, dviToJson } from './dvi-extract'
 import {
   compileTeX,
   countLines,
@@ -1379,6 +1379,10 @@ const stages: StageDef[] = [
         // 提取 DVI 中的文字内容，输出为 plain-dvi.txt 便于人工核对
         const dviText = extractDviText(dviInfo.data)
         artifacts.push(artifact('plain-dvi.txt', dviText.text))
+        // 生成 DVI → HTML 预览，便于在浏览器中查看排版结果
+        artifacts.push(artifact('hello.dvi.html', dviToHtml(dviInfo.data)))
+        // 生成 DVI → JSON 数据树，便于调试解析过程
+        artifacts.push(artifact('hello.dvi.json', dviToJson(dviInfo.data)))
         // 把 DVI 文字提取的关键信息也加入 metrics 和诊断日志
         metrics.dviPages = dviText.pages.length
         metrics.dviFonts = dviText.fonts.size
@@ -1644,6 +1648,10 @@ const stages: StageDef[] = [
         // 提取 DVI 中的文字内容，输出为 plain-dvi.txt 便于人工核对
         const dviText = extractDviText(dviInfo.data)
         artifacts.push(artifact('plain-dvi.txt', dviText.text))
+        // 生成 DVI → HTML 预览，便于在浏览器中查看排版结果
+        artifacts.push(artifact('trip.dvi.html', dviToHtml(dviInfo.data)))
+        // 生成 DVI → JSON 数据树，便于调试解析过程
+        artifacts.push(artifact('trip.dvi.json', dviToJson(dviInfo.data)))
         metrics.dviPages = dviText.pages.length
         metrics.dviFonts = dviText.fonts.size
         metrics.dviTextLen = dviText.pages.reduce((sum, p) => sum + p.length, 0)
@@ -2136,6 +2144,10 @@ const stages: StageDef[] = [
           artifact('tripman.log', output),
           ...(dvi ? [binaryArtifact('tripman.dvi', dvi.data)] : []),
           ...(dviExtract ? [artifact('tripman-dvi.txt', dviExtract.text)] : []),
+          // 生成 DVI → HTML 预览，便于在浏览器中查看排版结果
+          ...(dvi ? [artifact('tripman.dvi.html', dviToHtml(dvi.data))] : []),
+          // 生成 DVI → JSON 数据树，便于调试解析过程
+          ...(dvi ? [artifact('tripman.dvi.json', dviToJson(dvi.data))] : []),
         ]
 
         if (!ok) {
