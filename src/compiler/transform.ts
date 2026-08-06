@@ -22,18 +22,13 @@
 import { lex } from '@/lexer/lexer'
 import { parseProgram } from '@/parser/declarations'
 import type { ParserInput, ProgramNode } from '@/ast/types'
-import { analyzeProgram, type Analysis, type VarSymbol } from '@/il/analysis'
-import { compileProgram } from '@/il/compiler'
-import { toJs, type SemanticCompiler, type JsCompiler } from '@/il/json-code-compiler'
-import { JsonCode } from '@/il/json-code'
+import { analyzeProgram, type Analysis, type VarSymbol } from '@/compiler/analysis'
+import { compileProgram } from '@/compiler/compiler'
+import { toJs, type SemanticCompiler, type JsCompiler } from '@/compiler/json-code-compiler'
+import { JsonCode } from '@/compiler/json-code'
 import type { RunState, RunError } from '@/runtime/run-state'
-import {
-  createRuntimeContext,
-  dispatch,
-  toRunState,
-  type RuntimeOptions,
-} from '@/il/runtime'
-import type { IlPlugin } from '@/il/plugin'
+import { createRuntimeContext, dispatch, toRunState, type RuntimeOptions } from '@/compiler/runtime'
+import type { IlPlugin } from '@/compiler/plugin'
 
 // ============================================================
 // TransformOptions
@@ -105,11 +100,7 @@ function applyProgramFileUrls(
 
   return {
     ...fn,
-    body: [
-      ...fn.body.slice(0, initCount),
-      ...preamble,
-      ...fn.body.slice(initCount),
-    ],
+    body: [...fn.body.slice(0, initCount), ...preamble, ...fn.body.slice(initCount)],
   }
 }
 
@@ -255,7 +246,10 @@ class PascalSemanticCompiler implements SemanticCompiler {
       // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...
       case 'array.get': {
         if (args.length < 2) return args[0]
-        return `(${args[0]}${args.slice(1).map((i) => `[${i}]`).join('')})`
+        return `(${args[0]}${args
+          .slice(1)
+          .map((i) => `[${i}]`)
+          .join('')})`
       }
       // array.set: args = [arr, idx1, idx2, ..., val] → arr[idx1][idx2]... = val
       case 'array.set': {
@@ -366,9 +360,7 @@ export function run(source: string, options: RunOptions = {}): RunState {
     return toRunState(ctx, 'terminated')
   } catch (e: any) {
     // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
-    const stackLines: string[] = e?.stack
-      ? String(e.stack).split('\n').slice(0, 40)
-      : []
+    const stackLines: string[] = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
     // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看
     debugLog.push(`[run] error: ${e?.message || String(e)}`)
     for (const line of stackLines) {

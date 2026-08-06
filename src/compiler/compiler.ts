@@ -8,19 +8,14 @@
  * 计数器属于 Analysis，compiler 不自行维护。
  */
 
-import { JsonCode } from '@/il/json-code'
-import {
-  Analysis,
-  TypeInfo,
-  VarSymbol,
-  Symbol,
-} from '@/il/analysis'
+import { JsonCode } from '@/compiler/json-code'
+import { Analysis, TypeInfo, VarSymbol, Symbol } from '@/compiler/analysis'
 import {
   IlPlugin,
   findProcedurePlugin,
   findFunctionPlugin,
   pluginSyscallKey,
-} from '@/il/plugin'
+} from '@/compiler/plugin'
 import {
   ProgramNode,
   BlockNode,
@@ -396,11 +391,7 @@ function compileAssignment(
     const rvalueType = a.typeOf(node.right)
     if (rvalueType.tag === 'str' || node.right.kind === 'StringLiteral') {
       const dim = lvalueType.dims[0]
-      value = syscall('str.to.char.array', [
-        litInt(dim.low),
-        litInt(dim.high),
-        value,
-      ])
+      value = syscall('str.to.char.array', [litInt(dim.low), litInt(dim.high), value])
     }
   }
 
@@ -411,13 +402,7 @@ function compileAssignment(
       const binding = ws[i]
       const fname = node.left.name.toLowerCase()
       if (binding.fields.has(fname)) {
-        return [
-          evalStmt(syscall('rec.set', [
-            ref(binding.tempVarId),
-            litStr(fname),
-            value,
-          ])),
-        ]
+        return [evalStmt(syscall('rec.set', [ref(binding.tempVarId), litStr(fname), value]))]
       }
     }
 
@@ -491,9 +476,7 @@ function compileAssignment(
       return [evalStmt(syscall('file.put', [fExpr, value]))]
     }
     const objExpr = compileExpr(fa.object, a, ws)
-    return [
-      evalStmt(syscall('rec.set', [objExpr, litStr(fa.field.name.toLowerCase()), value])),
-    ]
+    return [evalStmt(syscall('rec.set', [objExpr, litStr(fa.field.name.toLowerCase()), value]))]
   }
 
   throw new Error('compileAssignment: unsupported left-hand side')
@@ -588,9 +571,7 @@ function compileFor(
   const cmpKey = isDown ? 'cmp.ge' : 'cmp.le'
   const stepKey = isDown ? 'i64.sub' : 'i64.add'
 
-  const varRef = varSym.isVarParam
-    ? syscall('cell.get', [ref(vid)])
-    : ref(vid)
+  const varRef = varSym.isVarParam ? syscall('cell.get', [ref(vid)]) : ref(vid)
 
   return [
     assignStmt(ref(vid), initE),
@@ -615,9 +596,7 @@ function compileCase(
   const caseVar = a.allocTempLocal(funcId, a.typeOf(node.expression))
   const L_end = a.nextId()
   const L_otherwise = node.otherwise ? a.nextId() : L_end
-  const out: JsonCode.Statement[] = [
-    assignStmt(ref(caseVar), compileExpr(node.expression, a, ws)),
-  ]
+  const out: JsonCode.Statement[] = [assignStmt(ref(caseVar), compileExpr(node.expression, a, ws))]
 
   // 为每个分支的 body 预分配 label
   const bodyLabels = node.branches.map(() => a.nextId())
@@ -667,11 +646,7 @@ function compileCase(
   return out
 }
 
-function compileGoto(
-  node: GotoStatementNode,
-  a: Analysis,
-  funcId: number
-): JsonCode.Statement[] {
+function compileGoto(node: GotoStatementNode, a: Analysis, funcId: number): JsonCode.Statement[] {
   const info = a.labelInfo(funcId, node.label.value)
   if (!info) throw new Error(`compileGoto: label ${node.label.value} not declared`)
   // 决策 13：goto 跳转前插入 steps.check，防止 goto 死循环（steps.check 只在循环回边
@@ -798,9 +773,23 @@ function compileProcedureCall(
       return [evalStmt(syscall('file.rewrite', rewriteArgs))]
     }
     case 'close':
-      return [evalStmt(syscall('file.close', node.arguments.map((x) => compileExpr(x, a, ws))))]
+      return [
+        evalStmt(
+          syscall(
+            'file.close',
+            node.arguments.map((x) => compileExpr(x, a, ws))
+          )
+        ),
+      ]
     case 'assign':
-      return [evalStmt(syscall('file.assign', node.arguments.map((x) => compileExpr(x, a, ws))))]
+      return [
+        evalStmt(
+          syscall(
+            'file.assign',
+            node.arguments.map((x) => compileExpr(x, a, ws))
+          )
+        ),
+      ]
     case 'get': {
       const getArgs = node.arguments.map((x) => compileExpr(x, a, ws))
       if (node.arguments.length > 0) {
@@ -822,7 +811,14 @@ function compileProcedureCall(
       return [evalStmt(syscall('file.put', putArgs))]
     }
     case 'page':
-      return [evalStmt(syscall('io.page', node.arguments.map((x) => compileExpr(x, a, ws))))]
+      return [
+        evalStmt(
+          syscall(
+            'io.page',
+            node.arguments.map((x) => compileExpr(x, a, ws))
+          )
+        ),
+      ]
     case 'new': {
       // ISO 7185 6.6.5.3: new(p) 创建新变量，p 指向它
       const argNode = node.arguments[0]
@@ -899,9 +895,7 @@ function compileUserCallStmt(
         const sym = resolveSymbol(argNode, a, ws)
         if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
           const cellVar = a.allocTempLocal(curFuncId, { tag: 'unknown' })
-          const valExpr = sym.isVarParam
-            ? syscall('cell.get', [ref(sym.varId)])
-            : ref(sym.varId)
+          const valExpr = sym.isVarParam ? syscall('cell.get', [ref(sym.varId)]) : ref(sym.varId)
           out.push(assignStmt(ref(cellVar), syscall('cell.create', [valExpr])))
           argExprs.push(ref(cellVar))
           cellVars.push({ argIdx: i, cellVar, targetIsVar: argNode })
@@ -996,7 +990,11 @@ function compileWriteln(
     let valExpr = compileExpr(valueNode, a, ws)
     // 二进制字节文件：把 byte 值转成单字符（String.fromCharCode），
     // 走 io.write.char.file 写入单字节，避免十进制字符串污染 DVI/TFM 等二进制产物。
-    if (isBinaryByteFile && widthExpr === null && (ti.tag === 'i64' || ti.tag === 'subrange' || ti.tag === 'enum')) {
+    if (
+      isBinaryByteFile &&
+      widthExpr === null &&
+      (ti.tag === 'i64' || ti.tag === 'subrange' || ti.tag === 'enum')
+    ) {
       valExpr = syscall('cast.i64.to.char', [valExpr])
       out.push(evalStmt(syscall('io.write.char.file', [fileExpr!, valExpr])))
       continue
@@ -1108,11 +1106,7 @@ function compileReadln(
 // compileExpr → Expr
 // ============================================================
 
-export function compileExpr(
-  node: ExpressionNode,
-  a: Analysis,
-  ws: WithBinding[]
-): JsonCode.Expr {
+export function compileExpr(node: ExpressionNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
   switch (node.kind) {
     case 'IntegerLiteral':
       return litInt(node.raw)
@@ -1157,11 +1151,7 @@ export function compileExpr(
   }
 }
 
-function compileIdentifier(
-  node: IdentifierNode,
-  a: Analysis,
-  ws: WithBinding[]
-): JsonCode.Expr {
+function compileIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
   // with 字段优先：Pascal 标准中 with record do 体内，
   // record 的字段优先于同名外层变量（ISO 7185 6.8.3.10）
   for (let i = ws.length - 1; i >= 0; i--) {
@@ -1204,11 +1194,7 @@ function compileIdentifier(
   throw new Error(`compileIdentifier: undefined identifier ${node.name}`)
 }
 
-function compileBinary(
-  node: BinaryExpressionNode,
-  a: Analysis,
-  ws: WithBinding[]
-): JsonCode.Expr {
+function compileBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
   const L = compileExpr(node.left, a, ws)
   const R = compileExpr(node.right, a, ws)
   const lt = a.typeOf(node.left)
@@ -1288,11 +1274,7 @@ function compileBinary(
   }
 }
 
-function compileUnary(
-  node: UnaryExpressionNode,
-  a: Analysis,
-  ws: WithBinding[]
-): JsonCode.Expr {
+function compileUnary(node: UnaryExpressionNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
   const X = compileExpr(node.operand, a, ws)
   const ti = a.typeOf(node.operand)
   // parser 输出大写 operator（NOT），统一转大写比较
@@ -1434,11 +1416,7 @@ function compileFunctionCall(
   }
 }
 
-function compileArrayAccess(
-  node: ArrayAccessNode,
-  a: Analysis,
-  ws: WithBinding[]
-): JsonCode.Expr {
+function compileArrayAccess(node: ArrayAccessNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
   const arr = compileExpr(node.array, a, ws)
   const indices = node.indices.map((i) => {
     const expr = compileExpr(i, a, ws)
@@ -1453,11 +1431,7 @@ function compileArrayAccess(
   return syscall('array.get', [arr, ...indices])
 }
 
-function compileFieldAccess(
-  node: FieldAccessNode,
-  a: Analysis,
-  ws: WithBinding[]
-): JsonCode.Expr {
+function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
   if (node.field.name === '^') {
     const objType = a.typeOf(node.object)
     if (objType.tag === 'pointer') {
@@ -1521,10 +1495,6 @@ function compileInExpression(
 // 符号解析（含 with 重写）
 // ============================================================
 
-function resolveSymbol(
-  node: IdentifierNode,
-  a: Analysis,
-  ws: WithBinding[]
-): Symbol | undefined {
+function resolveSymbol(node: IdentifierNode, a: Analysis, ws: WithBinding[]): Symbol | undefined {
   return a.symbolOf(node)
 }

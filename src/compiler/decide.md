@@ -119,13 +119,13 @@ analysis 的 `bind`/`lookup`/`withStack.fields`/`typeAliases`/`forwardFuncs`/`gl
 ### Step 1：核心编译器 ✅
 
 1. ✅ 调研旧 runtime/syscalls
-2. ✅ 实现 `src/il/analysis.ts`（完整 Analyzer 类）
-3. ✅ 实现 `src/il/compiler.ts`（纯函数族，所有 lowering 完成）
+2. ✅ 实现 `/analysis.ts`（完整 Analyzer 类）
+3. ✅ 实现 `/compiler.ts`（纯函数族，所有 lowering 完成）
 
 ### Step 2：syscall 实现层 ✅
 
-4. ✅ 新建 `src/il/runtime.ts`：同步 syscall + 同步 file ops + RunState 复用
-5. ✅ 新建 `src/il/transform.ts`：`PascalSemanticCompiler` + `transform` + `run`
+4. ✅ 新建 `/runtime.ts`：同步 syscall + 同步 file ops + RunState 复用
+5. ✅ 新建 `/transform.ts`：`PascalSemanticCompiler` + `transform` + `run`
 6. ✅ 在 `compiler.ts` 的 while/for/repeat lowering 中插入 `steps.check`
 7. ✅ 切换 `_helper.ts` 到新管线
 8. ✅ 跑通阶段 A-F 集成测试（1058/1058 全通过）

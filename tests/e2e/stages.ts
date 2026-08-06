@@ -29,36 +29,29 @@ import { transform } from '@/il/transform'
 import { pascalHPlugin } from '@/il/plugins/pascal-h.plugin'
 import { extractDviText } from './dvi-extract'
 import {
+  compileTeX,
+  countLines,
+  extractModuleNumbers,
+  firstLine,
+  formatBytes,
+  HYPHEN_TEX,
+  PLAIN_TEX,
+  previewLine,
+  readCmFontsForTeX,
   readResource,
   readResourceBytes,
-  readCmFontsForTeX,
   runTangle,
-  compileTeX,
   runTeXCompiled,
-  formatBytes,
-  firstLine,
   tailLines,
-  previewLine,
-  extractModuleNumbers,
-  countLines,
   TANGLE_PAS,
   TANGLE_WEB,
   TEX_WEB,
+  TRIP_FOT,
   TRIP_TEX,
   TRIP_TFM,
-  TRIP_FOT,
-  PLAIN_TEX,
-  HYPHEN_TEX,
   TRIPMAN_TEX,
 } from './_helper'
-import {
-  TestReport,
-  StageReport,
-  StageArtifact,
-  writeReport,
-  createReport,
-  REPORT_DIR,
-} from './reporter'
+import { createReport, REPORT_DIR, StageArtifact, StageReport, writeReport } from './reporter'
 import * as path from 'path'
 import * as fs from 'fs'
 
@@ -522,10 +515,7 @@ function buildTripChangeFile(web: string): string {
   //      @d stat==@t@>
   //      @d tats==@t@>
   const statIdx = findLine('@d stat==@{')
-  block(
-    lines.slice(statIdx, statIdx + 4),
-    ['@d stat==@t@>', '@d tats==@t@>']
-  )
+  block(lines.slice(statIdx, statIdx + 4), ['@d stat==@t@>', '@d tats==@t@>'])
 
   // 2. mem_max: 30000 → 3000（tex.web 第 387 行）
   const memMaxIdx = findLine('@!mem_max=30000;')
@@ -541,10 +531,10 @@ function buildTripChangeFile(web: string): string {
 
   // 5. half_error_line: 42 → 32（tex.web 第 397-398 行，2 行，只改第 1 行的数字）
   const halfErrIdx = findLine('@!half_error_line=42;')
-  block(
-    lines.slice(halfErrIdx, halfErrIdx + 2),
-    [lines[halfErrIdx].replace('=42;', '=32;'), lines[halfErrIdx + 1]]
-  )
+  block(lines.slice(halfErrIdx, halfErrIdx + 2), [
+    lines[halfErrIdx].replace('=42;', '=32;'),
+    lines[halfErrIdx + 1],
+  ])
 
   // 6. max_print_line: 79 → 72（tex.web 第 399 行）
   const maxPrintIdx = findLine('@!max_print_line=79;')
@@ -1888,7 +1878,6 @@ const stages: StageDef[] = [
       let stackTrace: string[] = []
       let output = ''
       let status = 'unknown'
-      let error: string | undefined
       let steps = 0
 
       try {
@@ -1910,7 +1899,7 @@ const stages: StageDef[] = [
         debugLog.push(...(r.debugLog ?? []))
         output = r.output
         status = r.state.status
-        error = r.state.error?.message
+        const error = r.state.error?.message
         steps = r.state.steps
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
 
@@ -1947,9 +1936,19 @@ const stages: StageDef[] = [
           assert('no missing file', !hasMissingFile, `${hasMissingFile}`, 'false'),
           assert('no capacity exceeded', !hasCapacity, `${hasCapacity}`, 'false'),
           assert('no error lines', errorLines === '', errorLines || '(none)', '(none)'),
-          assert('plain.fmt generated', !!fmt && fmt.length > 0, fmt ? formatBytes(fmt.length) : '(none)', '> 0 bytes'),
+          assert(
+            'plain.fmt generated',
+            !!fmt && fmt.length > 0,
+            fmt ? formatBytes(fmt.length) : '(none)',
+            '> 0 bytes'
+          ),
           assert('begin dump message', beginDump, `${beginDump}`, 'true'),
-          assert('memory dumped', dumpedMem, output.match(/^\d+ memory locations dumped/m)?.[0] ?? '(none)', 'N memory locations dumped'),
+          assert(
+            'memory dumped',
+            dumpedMem,
+            output.match(/^\d+ memory locations dumped/m)?.[0] ?? '(none)',
+            'N memory locations dumped'
+          ),
           assert('hyphenation trie built', hasHyphen, `${hasHyphen}`, 'true'),
         ]
 
@@ -1972,23 +1971,29 @@ const stages: StageDef[] = [
         ]
 
         if (!ok) {
-          return failedStage('15', 'generate plain.fmt', now() - t0, error ?? 'plain.fmt not generated or has errors', {
-            metrics: {
-              status,
-              steps,
-              fmtSize: fmt?.length ?? 0,
-              outputLen: output.length,
-              fatalFmt,
-              emergencyStop,
-              hasMissingFile,
-              hasCapacity,
-            },
-            artifacts: commonArtifacts,
-            consoleLogs: output.split('\n').slice(-50),
-            debugLogs: debugLog,
-            stackTrace,
-            assertions,
-          })
+          return failedStage(
+            '15',
+            'generate plain.fmt',
+            now() - t0,
+            error ?? 'plain.fmt not generated or has errors',
+            {
+              metrics: {
+                status,
+                steps,
+                fmtSize: fmt?.length ?? 0,
+                outputLen: output.length,
+                fatalFmt,
+                emergencyStop,
+                hasMissingFile,
+                hasCapacity,
+              },
+              artifacts: commonArtifacts,
+              consoleLogs: output.split('\n').slice(-50),
+              debugLogs: debugLog,
+              stackTrace,
+              assertions,
+            }
+          )
         }
 
         return successStage('15', 'generate plain.fmt', now() - t0, {
@@ -2005,7 +2010,7 @@ const stages: StageDef[] = [
           assertions,
         })
       } catch (e: any) {
-        error = e?.message || String(e)
+        const error = e?.message || String(e)
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
         return failedStage('15', 'generate plain.fmt', now() - t0, error, {
           artifacts: [artifact('plain.fmt.log', output)],
@@ -2024,15 +2029,13 @@ const stages: StageDef[] = [
         return skippedStage('16', 'compile tripman.tex', 'tex.pas compile failed')
       if (!ctx.texCompiledJsFull)
         return skippedStage('16', 'compile tripman.tex', 'tex-full.js not compiled')
-      if (!ctx.plainFmt)
-        return skippedStage('16', 'compile tripman.tex', 'plain.fmt not generated')
+      if (!ctx.plainFmt) return skippedStage('16', 'compile tripman.tex', 'plain.fmt not generated')
 
       const t0 = now()
       let debugLog: string[] = []
       let stackTrace: string[] = []
       let output = ''
       let status = 'unknown'
-      let error: string | undefined
       let steps = 0
       let resultFiles: Map<string, Uint8Array> = new Map()
 
@@ -2064,7 +2067,7 @@ const stages: StageDef[] = [
         debugLog.push(...(r.debugLog ?? []))
         output = r.output
         status = r.state.status
-        error = r.state.error?.message
+        const error = r.state.error?.message
         steps = r.state.steps
         resultFiles = r.files
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
@@ -2107,7 +2110,12 @@ const stages: StageDef[] = [
           assert('no error lines', errorLines === '', errorLines || '(none)', '(none)'),
           assert('DVI file generated', !!dvi, dvi ? dvi.name : '(none)', 'tripman.dvi'),
           assert('DVI valid', dviValid?.valid ?? false, dviValid?.reason ?? '(no dvi)', 'valid'),
-          assert('DVI has content', dviValid?.hasContent ?? false, `${dviValid?.hasContent}`, 'true'),
+          assert(
+            'DVI has content',
+            dviValid?.hasContent ?? false,
+            `${dviValid?.hasContent}`,
+            'true'
+          ),
           assert('DVI has text', dviTextLen > 0, `${dviTextLen} chars`, '> 0 chars'),
           assert('output written', hasOutputLine, `${hasOutputLine}`, 'true'),
         ]
@@ -2131,26 +2139,32 @@ const stages: StageDef[] = [
         ]
 
         if (!ok) {
-          return failedStage('16', 'compile tripman.tex', now() - t0, error ?? 'DVI not generated or has errors', {
-            metrics: {
-              status,
-              steps,
-              dviSize: dvi?.data.length ?? 0,
-              dviTextLen,
-              dviPages: dviExtract?.pages.length ?? 0,
-              dviFonts: dviExtract?.fonts.size ?? 0,
-              outputLen: output.length,
-              fatalFmt,
-              emergencyStop,
-              hasMissingFile,
-              hasCapacity,
-            },
-            artifacts: commonArtifacts,
-            consoleLogs: output.split('\n').slice(-80),
-            debugLogs: debugLog,
-            stackTrace,
-            assertions,
-          })
+          return failedStage(
+            '16',
+            'compile tripman.tex',
+            now() - t0,
+            error ?? 'DVI not generated or has errors',
+            {
+              metrics: {
+                status,
+                steps,
+                dviSize: dvi?.data.length ?? 0,
+                dviTextLen,
+                dviPages: dviExtract?.pages.length ?? 0,
+                dviFonts: dviExtract?.fonts.size ?? 0,
+                outputLen: output.length,
+                fatalFmt,
+                emergencyStop,
+                hasMissingFile,
+                hasCapacity,
+              },
+              artifacts: commonArtifacts,
+              consoleLogs: output.split('\n').slice(-80),
+              debugLogs: debugLog,
+              stackTrace,
+              assertions,
+            }
+          )
         }
 
         return successStage('16', 'compile tripman.tex', now() - t0, {
@@ -2169,7 +2183,7 @@ const stages: StageDef[] = [
           assertions,
         })
       } catch (e: any) {
-        error = e?.message || String(e)
+        const error = e?.message ?? String(e)
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
         return failedStage('16', 'compile tripman.tex', now() - t0, error, {
           artifacts: [artifact('tripman.log', output)],

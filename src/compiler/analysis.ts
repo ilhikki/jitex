@@ -32,7 +32,7 @@ import {
   TypeDeclarationNode,
   RecordVariantPartNode,
 } from '@/ast/types'
-import type { IlPlugin } from '@/il/plugin'
+import type { IlPlugin } from '@/compiler/plugin'
 
 // ============================================================
 // 类型系统
@@ -218,13 +218,17 @@ export class Analyzer {
       // 跨过程 goto：仅允许跳到祖先函数的 label
       if (labelInfo.funcId !== g.fromFuncId) {
         if (!this.isAncestorFunc(labelInfo.funcId, g.fromFuncId)) {
-          throw new Error(`Goto to label ${g.labelVal} in another procedure is forbidden (ISO 7185 6.8.2.4)`)
+          throw new Error(
+            `Goto to label ${g.labelVal} in another procedure is forbidden (ISO 7185 6.8.2.4)`
+          )
         }
       }
       // 跳入非透明块检查：label 深度 > goto 深度 → 跳入结构体内部
       const targetDepth = this.labelDepth.get(labelInfo.labelId)
       if (targetDepth !== undefined && targetDepth > g.fromDepth) {
-        throw new Error(`Goto into structured statement body is forbidden (ISO 7185 6.8.2.4): label ${g.labelVal}`)
+        throw new Error(
+          `Goto into structured statement body is forbidden (ISO 7185 6.8.2.4): label ${g.labelVal}`
+        )
       }
     }
   }
@@ -423,9 +427,7 @@ export class Analyzer {
     }
   }
 
-  private evalLiteral(
-    node: ExpressionNode
-  ): { key: string; arg: string } | undefined {
+  private evalLiteral(node: ExpressionNode): { key: string; arg: string } | undefined {
     switch (node.kind) {
       case 'IntegerLiteral':
         return { key: 'i64', arg: node.raw }
@@ -473,7 +475,9 @@ export class Analyzer {
         const name = node.name.name.toLowerCase()
         // 非标特性检查（AGENTS.md 原则 A.6）：string 类型未启用 extension 时报错
         if (name === 'string' && !this.extensions.has('string')) {
-          throw new Error(`Non-standard type 'string' used without extension 'string' (ISO 7185 has no string type)`)
+          throw new Error(
+            `Non-standard type 'string' used without extension 'string' (ISO 7185 has no string type)`
+          )
         }
         const builtin = SIMPLE_TYPES[name]
         if (builtin) {
@@ -499,15 +503,9 @@ export class Analyzer {
         const low = this.evalConstInt(node.start)
         const high = this.evalConstInt(node.end)
         let baseTag: TypeTag = 'i64'
-        if (
-          node.start.kind === 'CharLiteral' ||
-          node.end.kind === 'CharLiteral'
-        ) {
+        if (node.start.kind === 'CharLiteral' || node.end.kind === 'CharLiteral') {
           baseTag = 'char'
-        } else if (
-          node.start.kind === 'BooleanLiteral' ||
-          node.end.kind === 'BooleanLiteral'
-        ) {
+        } else if (node.start.kind === 'BooleanLiteral' || node.end.kind === 'BooleanLiteral') {
           baseTag = 'bool'
         }
         info = { tag: 'subrange', low, high, baseTag }
@@ -529,13 +527,22 @@ export class Analyzer {
             else {
               // 类型别名（可能是 subrange 或枚举）
               const alias = this.typeAliases.get(name)
-              if (alias?.tag === 'subrange' && alias.low !== undefined && alias.high !== undefined) {
+              if (
+                alias?.tag === 'subrange' &&
+                alias.low !== undefined &&
+                alias.high !== undefined
+              ) {
                 dims.push({ low: alias.low, high: alias.high })
               } else {
                 const sym = this.lookup(idx.name.name)
                 if (sym?.kind === 'type' && sym.typeInfo.tag === 'enum') {
                   dims.push({ low: 0, high: (sym.typeInfo.enumCount ?? 1) - 1 })
-                } else if (sym?.kind === 'type' && sym.typeInfo.tag === 'subrange' && sym.typeInfo.low !== undefined && sym.typeInfo.high !== undefined) {
+                } else if (
+                  sym?.kind === 'type' &&
+                  sym.typeInfo.tag === 'subrange' &&
+                  sym.typeInfo.low !== undefined &&
+                  sym.typeInfo.high !== undefined
+                ) {
                   dims.push({ low: sym.typeInfo.low, high: sym.typeInfo.high })
                 } else {
                   dims.push({ low: 0, high: 0 })
@@ -677,7 +684,10 @@ export class Analyzer {
   // --------------------------------------------------------
 
   /** 沿 parentFuncId 链查找 label */
-  private findLabel(funcId: number, labelVal: number): { labelId: number; funcId: number } | undefined {
+  private findLabel(
+    funcId: number,
+    labelVal: number
+  ): { labelId: number; funcId: number } | undefined {
     let fid: number | null = funcId
     while (fid !== null) {
       const funcLabels = this.labels.get(fid)
@@ -826,7 +836,9 @@ export class Analyzer {
         if (lt.tag === 'subrange' && lt.low !== undefined && lt.high !== undefined) {
           const constVal = this.evalConstInt(node.right)
           if (constVal !== undefined && (constVal < lt.low || constVal > lt.high)) {
-            throw new Error(`Subrange assignment out of bounds: ${constVal} not in ${lt.low}..${lt.high}`)
+            throw new Error(
+              `Subrange assignment out of bounds: ${constVal} not in ${lt.low}..${lt.high}`
+            )
           }
           // char subrange 检查
           if (lt.baseTag === 'char') {
@@ -834,7 +846,9 @@ export class Analyzer {
             if (constChar !== undefined) {
               const code = constChar.charCodeAt(0)
               if (code < lt.low || code > lt.high) {
-                throw new Error(`Subrange assignment out of bounds: '${constChar}' (code ${code}) not in ${lt.low}..${lt.high}`)
+                throw new Error(
+                  `Subrange assignment out of bounds: '${constChar}' (code ${code}) not in ${lt.low}..${lt.high}`
+                )
               }
             }
           }
@@ -1078,7 +1092,9 @@ export class Analyzer {
             if (constIdx !== undefined) {
               const dim = arrType.dims[i]
               if (constIdx < dim.low || constIdx > dim.high) {
-                throw new Error(`Array index out of bounds: ${constIdx} not in ${dim.low}..${dim.high}`)
+                throw new Error(
+                  `Array index out of bounds: ${constIdx} not in ${dim.low}..${dim.high}`
+                )
               }
             }
           }
@@ -1266,6 +1282,10 @@ export interface Analysis {
 // 入口
 // ============================================================
 
-export function analyzeProgram(program: ProgramNode, extensions?: string[], plugins?: IlPlugin[]): Analysis {
+export function analyzeProgram(
+  program: ProgramNode,
+  extensions?: string[],
+  plugins?: IlPlugin[]
+): Analysis {
   return new Analyzer().analyze(program, extensions, plugins)
 }

@@ -19,8 +19,8 @@
  * 编译 break/break_in/breakin/erstat 应抛 "unknown procedure/function" 错误。
  */
 
-import type { IlPlugin } from '@/il/plugin'
-import type { RuntimeContext } from '@/il/runtime'
+import type { IlPlugin } from '@/compiler/plugin'
+import type { RuntimeContext } from '@/compiler/runtime'
 import type { PascalFile } from '@/runtime/file-model'
 
 /**

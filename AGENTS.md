@@ -48,7 +48,7 @@ Pascal82（ISO 7185）到 JS 的编译器。将 Pascal 源码编译为 JS 代码
 ### 架构约束
 
 11. **Frozen Layers**：不修改 `src/ast/`、`src/lexer/`、`src/parser/`，除非明确是重构任务。
-12. **唯一引擎**：`src/il/` 是唯一执行引擎（IL 管线），无 fallback。
+12. **唯一引擎**：`src/compiler/` 是唯一执行引擎（IL 管线），无 fallback。
 13. **代码即文档**：文件列表、API 签名、实现细节不写进本文档，写进代码注释。
 14. **最新原则**：本文档只保留当前有效信息，历史进 git。
 

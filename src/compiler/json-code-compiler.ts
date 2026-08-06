@@ -1,4 +1,4 @@
-import { JsonCode } from '@/il/json-code'
+import { JsonCode } from '@/compiler/json-code'
 
 export interface ToJsOptions {
   semantic?: SemanticCompiler
