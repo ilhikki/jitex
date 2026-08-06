@@ -11,6 +11,7 @@
 | `integration/compiler/` | 编译器集成测试 | JS 编译器执行 Pascal 程序的测试（原 m5 + m36） |
 | `integration/parser/`   | 解析器集成测试 | 解析器语法解析测试（原 m3.5）                  |
 | `e2e/`                  | 端到端测试     | TEX82 完整编译执行的端到端测试（原 tests-tex） |
+| `e2e/resources/`        | E2E 外部资源   | TEX82/TANGLE 源码、CM 字体 .tfm、trip 测试套件 |
 
 ## 测试文件命名
 

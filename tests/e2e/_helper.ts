@@ -15,6 +15,9 @@ export const TEX_WEB = 'tex.web'
 export const TRIP_TEX = 'trip.tex'
 export const TRIP_TFM = 'trip.tfm'
 export const TRIP_FOT = 'trip.fot'
+export const PLAIN_TEX = 'plain.tex'
+export const HYPHEN_TEX = 'hyphen.tex'
+export const TRIPMAN_TEX = 'tripman.tex'
 
 // ============================================================
 // 资源读取
@@ -30,6 +33,39 @@ export function readResourceBytes(name: string): Uint8Array {
 
 export function resourcePath(name: string): string {
   return path.join(__dirname, 'resources', name)
+}
+
+/**
+ * 读取 resources/fonts/ 下的所有 CM 字体 .tfm 文件。
+ * 返回 Record<文件名, 字节>，用于注入 TeX 运行时的 files Map。
+ *
+ * 字体文件来自 CTAN fonts/cm/tfm (public domain, Knuth License)。
+ * 路径：resources/fonts/*.tfm（76 个文件，含 manfnt.tfm）。
+ */
+export function readCmFonts(): Record<string, Uint8Array> {
+  const fontsDir = path.join(__dirname, 'resources', 'fonts')
+  const result: Record<string, Uint8Array> = {}
+  for (const entry of fs.readdirSync(fontsDir)) {
+    if (entry.toLowerCase().endsWith('.tfm')) {
+      result[entry] = new Uint8Array(fs.readFileSync(path.join(fontsDir, entry)))
+    }
+  }
+  return result
+}
+
+/**
+ * 将 readCmFonts 的结果转换为 TeX 运行时文件 Map 的注入格式。
+ * TeX82 运行时用 `TeXfonts:` 前缀查找字体文件（对应 font_area）。
+ *
+ * @returns Record<'TeXfonts:cmr10.tfm', Uint8Array> 等
+ */
+export function readCmFontsForTeX(): Record<string, Uint8Array> {
+  const fonts = readCmFonts()
+  const result: Record<string, Uint8Array> = {}
+  for (const [name, data] of Object.entries(fonts)) {
+    result[`TeXfonts:${name}`] = data
+  }
+  return result
 }
 
 // ============================================================

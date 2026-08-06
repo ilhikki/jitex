@@ -61,8 +61,8 @@ Pascal82（ISO 7185）到 JS 的编译器。将 Pascal 源码编译为 JS 代码
 | `src/` | 源码（lexer/parser/il） | [src/README.md](src/README.md) |
 | `tests/` | 标准测试（unit/integration/e2e） | [tests/README.md](tests/README.md) |
 | `tests/e2e/` | TEX82 端到端测试 | — |
+| `tests/e2e/resources/` | E2E 测试外部资源（TEX82/CM 字体/TANGLE） | — |
 | `docs/` | 稳定设计文档 | [docs/README.md](docs/README.md) |
-| `knuth/` | TANGLE/TEX82 原始文件 | — |
 
 ---
 

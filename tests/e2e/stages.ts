@@ -31,6 +31,7 @@ import { extractDviText } from './dvi-extract'
 import {
   readResource,
   readResourceBytes,
+  readCmFontsForTeX,
   runTangle,
   compileTeX,
   runTeXCompiled,
@@ -46,6 +47,9 @@ import {
   TRIP_TEX,
   TRIP_TFM,
   TRIP_FOT,
+  PLAIN_TEX,
+  HYPHEN_TEX,
+  TRIPMAN_TEX,
 } from './_helper'
 import {
   TestReport,
@@ -132,6 +136,9 @@ interface PipelineContext {
   texCompiledJs: string
   texCompileOk: boolean
   texCompileError: string
+  // 默认内存配置的 tex（不带 TRIP change file，mem_top=30000），用于 INITEX/plain.fmt
+  texFull: RunResult | null
+  texCompiledJsFull: string
   hello: {
     output: string
     status: string
@@ -146,6 +153,20 @@ interface PipelineContext {
     steps: number
     files: Map<string, Uint8Array>
     logFile?: string
+  } | null
+
+  // s15/s16: plain.fmt 生成 + tripman 编译
+  plainTex: string
+  hyphenTex: string
+  tripmanTex: string
+  cmFonts: Record<string, Uint8Array>
+  plainFmt: Uint8Array | null
+  tripman: {
+    output: string
+    status: string
+    error?: string
+    steps: number
+    files: Map<string, Uint8Array>
   } | null
 
   failedAt: string
@@ -170,8 +191,16 @@ function createContext(): PipelineContext {
     texCompiledJs: '',
     texCompileOk: false,
     texCompileError: '',
+    texFull: null,
+    texCompiledJsFull: '',
     hello: null,
     trip: null,
+    plainTex: '',
+    hyphenTex: '',
+    tripmanTex: '',
+    cmFonts: {},
+    plainFmt: null,
+    tripman: null,
     failedAt: '',
   }
 }
@@ -553,6 +582,11 @@ const stages: StageDef[] = [
       ctx.tripTex = readResource(TRIP_TEX)
       ctx.tripTfm = readResourceBytes(TRIP_TFM)
       ctx.tripFot = readResource(TRIP_FOT)
+      // s15/s16 资源：plain TeX 格式 + CM 字体
+      ctx.plainTex = readResource(PLAIN_TEX)
+      ctx.hyphenTex = readResource(HYPHEN_TEX)
+      ctx.tripmanTex = readResource(TRIPMAN_TEX)
+      ctx.cmFonts = readCmFontsForTeX()
 
       let ok = false
       let error: string | undefined
@@ -1013,6 +1047,18 @@ const stages: StageDef[] = [
           error: r.state.error?.message,
         }
         if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
+
+        // 同时产出不带 TRIP change file 的默认版本（mem_top=30000），
+        // 供 s15 INITEX 生成 plain.fmt 使用（TRIP 的 mem_top=3000 内存不足）。
+        const rf = runTangle(tangleSrc, ctx.texWeb, [pascalHPlugin], '')
+        debugLog.push(`[s8-full] status=${rf.state.status} pascalLen=${rf.pascal.length}`)
+        ctx.texFull = {
+          pascal: rf.pascal,
+          pool: rf.pool,
+          output: rf.output,
+          status: rf.state.status,
+          error: rf.state.error?.message,
+        }
       } catch (e: any) {
         ctx.tex = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
@@ -1156,6 +1202,10 @@ const stages: StageDef[] = [
       try {
         ctx.texCompiledJs = compileTeX(ctx.tex.pascal, [pascalHPlugin])
         ok = ctx.texCompiledJs.length > 0
+        // 同时编译默认内存版本（mem_top=30000），供 s15/s16 使用
+        if (ok && ctx.texFull?.pascal) {
+          ctx.texCompiledJsFull = compileTeX(ctx.texFull.pascal, [pascalHPlugin])
+        }
       } catch (e: any) {
         ok = false
         error = e?.message || String(e)
@@ -1170,6 +1220,7 @@ const stages: StageDef[] = [
         jsOut: formatBytes(ctx.texCompiledJs.length),
         jsLines: countLines(ctx.texCompiledJs),
         compileResult: ok ? 'ok' : 'fail',
+        jsFullOut: formatBytes(ctx.texCompiledJsFull.length),
         plugin: 'pascalH',
       }
       const assertions = [
@@ -1814,6 +1865,318 @@ const stages: StageDef[] = [
         logs,
         assertions,
       })
+    },
+  },
+
+  // ============================================================
+  // PLAIN TeX 流水线
+  // ============================================================
+
+  {
+    id: 15,
+    title: 'generate plain.fmt (INITEX)',
+    run: (ctx) => {
+      if (!ctx.texCompileOk)
+        return skippedStage('15', 'generate plain.fmt', 'tex.pas compile failed')
+      if (!ctx.texCompiledJsFull)
+        return skippedStage('15', 'generate plain.fmt', 'tex-full.js not compiled (mem_top=30000)')
+      if (!ctx.texFull?.pool)
+        return skippedStage('15', 'generate plain.fmt', 'no TEX.POOL available')
+
+      const t0 = now()
+      let debugLog: string[] = []
+      let stackTrace: string[] = []
+      let output = ''
+      let status = 'unknown'
+      let error: string | undefined
+      let steps = 0
+
+      try {
+        // INITEX 模式：加载 plain.tex 后 \dump 生成 plain.fmt
+        // 使用默认内存版本（mem_top=30000），TRIP 版本的 mem_top=3000 内存不足。
+        // tex.web 默认 init/tini 为空（INITEX 模式），store_fmt_file 已编译
+        // 输入：第一行 'plain' → TeX 加载 plain.tex；第二行 '\dump' → 生成 fmt
+        const r = runTeXCompiled(ctx.texCompiledJsFull, {
+          input: ['plain', '\\dump'],
+          files: {
+            'plain.tex': ctx.plainTex,
+            'hyphen.tex': ctx.hyphenTex,
+            'TeXformats:TEX.POOL': ctx.texFull.pool,
+            ...ctx.cmFonts,
+          },
+          maxSteps: 5e9,
+          plugins: [pascalHPlugin],
+        })
+        debugLog.push(...(r.debugLog ?? []))
+        output = r.output
+        status = r.state.status
+        error = r.state.error?.message
+        steps = r.state.steps
+        if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
+
+        // 查找生成的 plain.fmt
+        const fmt = findFile(r.files, 'plain.fmt')
+        ctx.plainFmt = fmt
+
+        const fatalFmt = output.includes('Fatal format file error')
+        const emergencyStop = output.includes('! Emergency stop.')
+        const hasMissingFile = output.includes("I can't find file")
+        const hasCapacity = output.includes('TeX capacity exceeded')
+
+        // 从输出提取错误行（以 "! " 开头的行）
+        const errorLines = output
+          .split('\n')
+          .filter((l) => l.startsWith('! ') && !l.startsWith('! Emergency stop'))
+          .slice(0, 10)
+          .join(' | ')
+
+        // INITEX dump 后有 "Beginning to dump on file plain.fmt" 提示
+        const beginDump = output.includes('Beginning to dump on file plain.fmt')
+        // dump 完成后打印 "X memory locations dumped"（X 为数字）
+        const dumpedMem = /^\d+ memory locations dumped/m.test(output)
+        // 字体/连字统计行，表明 plain.tex 各阶段都跑完了
+        const hasHyphen = output.includes('Hyphenation trie of length')
+
+        debugLog.push(
+          `[s15] status=${status} steps=${steps} fmtFound=${!!fmt} fmtSize=${fmt?.length ?? 0} beginDump=${beginDump} dumpedMem=${dumpedMem} hyphen=${hasHyphen} fatal=${fatalFmt} emergency=${emergencyStop} missingFile=${hasMissingFile} capacity=${hasCapacity} errors=${errorLines || '(none)'}`
+        )
+
+        const assertions = [
+          assert('no fatal format error', !fatalFmt, `${fatalFmt}`, 'false'),
+          assert('no emergency stop', !emergencyStop, `${emergencyStop}`, 'false'),
+          assert('no missing file', !hasMissingFile, `${hasMissingFile}`, 'false'),
+          assert('no capacity exceeded', !hasCapacity, `${hasCapacity}`, 'false'),
+          assert('no error lines', errorLines === '', errorLines || '(none)', '(none)'),
+          assert('plain.fmt generated', !!fmt && fmt.length > 0, fmt ? formatBytes(fmt.length) : '(none)', '> 0 bytes'),
+          assert('begin dump message', beginDump, `${beginDump}`, 'true'),
+          assert('memory dumped', dumpedMem, output.match(/^\d+ memory locations dumped/m)?.[0] ?? '(none)', 'N memory locations dumped'),
+          assert('hyphenation trie built', hasHyphen, `${hasHyphen}`, 'true'),
+        ]
+
+        const ok =
+          !!fmt &&
+          fmt.length > 0 &&
+          !fatalFmt &&
+          !emergencyStop &&
+          !hasMissingFile &&
+          !hasCapacity &&
+          errorLines === '' &&
+          beginDump &&
+          dumpedMem &&
+          hasHyphen
+
+        const commonArtifacts = [
+          artifact('plain.fmt.log', output),
+          artifact('plain.fmt.debug.txt', debugLog.join('\n')),
+          ...(fmt ? [binaryArtifact('plain.fmt', fmt)] : []),
+        ]
+
+        if (!ok) {
+          return failedStage('15', 'generate plain.fmt', now() - t0, error ?? 'plain.fmt not generated or has errors', {
+            metrics: {
+              status,
+              steps,
+              fmtSize: fmt?.length ?? 0,
+              outputLen: output.length,
+              fatalFmt,
+              emergencyStop,
+              hasMissingFile,
+              hasCapacity,
+            },
+            artifacts: commonArtifacts,
+            consoleLogs: output.split('\n').slice(-50),
+            debugLogs: debugLog,
+            stackTrace,
+            assertions,
+          })
+        }
+
+        return successStage('15', 'generate plain.fmt', now() - t0, {
+          metrics: {
+            status,
+            steps,
+            fmtSize: fmt!.length,
+            fmtSizeFmt: formatBytes(fmt!.length),
+            outputLen: output.length,
+          },
+          artifacts: commonArtifacts,
+          consoleLogs: output.split('\n').slice(-30),
+          debugLogs: debugLog,
+          assertions,
+        })
+      } catch (e: any) {
+        error = e?.message || String(e)
+        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
+        return failedStage('15', 'generate plain.fmt', now() - t0, error, {
+          artifacts: [artifact('plain.fmt.log', output)],
+          debugLogs: debugLog,
+          stackTrace,
+        })
+      }
+    },
+  },
+
+  {
+    id: 16,
+    title: 'compile tripman.tex',
+    run: (ctx) => {
+      if (!ctx.texCompileOk)
+        return skippedStage('16', 'compile tripman.tex', 'tex.pas compile failed')
+      if (!ctx.texCompiledJsFull)
+        return skippedStage('16', 'compile tripman.tex', 'tex-full.js not compiled')
+      if (!ctx.plainFmt)
+        return skippedStage('16', 'compile tripman.tex', 'plain.fmt not generated')
+
+      const t0 = now()
+      let debugLog: string[] = []
+      let stackTrace: string[] = []
+      let output = ''
+      let status = 'unknown'
+      let error: string | undefined
+      let steps = 0
+      let resultFiles: Map<string, Uint8Array> = new Map()
+
+      try {
+        // 用 &plain 加载 plain.fmt，然后编译 tripman.tex
+        // 使用默认内存版本（mem_top=30000），与 plain.fmt 生成版本一致。
+        // 输入 ' &plain  tripman ' 模拟终端：先加载格式，再处理文档。
+        // tripman.tex 有多个 \verbatim{...} → \input，需注入 trip.tex/pl/log/typ/fot 等：
+        //   l.347 trip.tex, l.361 trip.pl, l.370 tripin.log, l.380 trip.log,
+        //   l.392 trip.typ, l.403 tripos.tex, l.411 trip.fot
+        const r = runTeXCompiled(ctx.texCompiledJsFull, {
+          input: [' &plain  tripman '],
+          files: {
+            'tripman.tex': ctx.tripmanTex,
+            'trip.tex': readResource('trip.tex'),
+            'trip.pl': readResource('trip.pl'),
+            'tripin.log': readResource('tripin.log'),
+            'trip.log': readResource('trip.log'),
+            'trip.typ': readResource('trip.typ'),
+            'tripos.tex': readResource('tripos.tex'),
+            'trip.fot': readResource('trip.fot'),
+            'plain.fmt': ctx.plainFmt,
+            'TeXformats:TEX.POOL': ctx.texFull!.pool,
+            ...ctx.cmFonts,
+          },
+          maxSteps: 5e9,
+          plugins: [pascalHPlugin],
+        })
+        debugLog.push(...(r.debugLog ?? []))
+        output = r.output
+        status = r.state.status
+        error = r.state.error?.message
+        steps = r.state.steps
+        resultFiles = r.files
+        if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
+
+        ctx.tripman = {
+          output,
+          status,
+          error,
+          steps,
+          files: resultFiles,
+        }
+
+        // 验证 DVI 输出
+        const dvi = findDviFile(resultFiles)
+        const dviValid = dvi ? validateDvi(dvi.data) : null
+        const dviExtract = dvi && dviValid?.valid ? extractDviText(dvi.data) : null
+        const dviTextLen = dviExtract?.pages.reduce((s, p) => s + p.length, 0) ?? 0
+        const hasOutputLine = output.includes('Output written on')
+        const fatalFmt = output.includes('Fatal format file error')
+        const emergencyStop = output.includes('! Emergency stop.')
+        const hasMissingFile = output.includes("I can't find file")
+        const hasCapacity = output.includes('TeX capacity exceeded')
+
+        // 从输出提取错误行（以 "! " 开头的行）
+        const errorLines = output
+          .split('\n')
+          .filter((l) => l.startsWith('! ') && !l.startsWith('! Emergency stop'))
+          .slice(0, 10)
+          .join(' | ')
+
+        debugLog.push(
+          `[s16] status=${status} steps=${steps} dviFound=${!!dvi} dviValid=${dviValid?.valid} dviContent=${dviValid?.hasContent} dviTextLen=${dviTextLen} pages=${dviExtract?.pages.length ?? 0} fonts=${dviExtract?.fonts.size ?? 0} hasOutput=${hasOutputLine} fatal=${fatalFmt} emergency=${emergencyStop} missingFile=${hasMissingFile} capacity=${hasCapacity} errors=${errorLines || '(none)'}`
+        )
+
+        const assertions = [
+          assert('no fatal format error', !fatalFmt, `${fatalFmt}`, 'false'),
+          assert('no emergency stop', !emergencyStop, `${emergencyStop}`, 'false'),
+          assert('no missing file', !hasMissingFile, `${hasMissingFile}`, 'false'),
+          assert('no capacity exceeded', !hasCapacity, `${hasCapacity}`, 'false'),
+          assert('no error lines', errorLines === '', errorLines || '(none)', '(none)'),
+          assert('DVI file generated', !!dvi, dvi ? dvi.name : '(none)', 'tripman.dvi'),
+          assert('DVI valid', dviValid?.valid ?? false, dviValid?.reason ?? '(no dvi)', 'valid'),
+          assert('DVI has content', dviValid?.hasContent ?? false, `${dviValid?.hasContent}`, 'true'),
+          assert('DVI has text', dviTextLen > 0, `${dviTextLen} chars`, '> 0 chars'),
+          assert('output written', hasOutputLine, `${hasOutputLine}`, 'true'),
+        ]
+
+        const ok =
+          !fatalFmt &&
+          !emergencyStop &&
+          !hasMissingFile &&
+          !hasCapacity &&
+          errorLines === '' &&
+          !!dvi &&
+          dviValid?.valid &&
+          dviValid.hasContent &&
+          dviTextLen > 0 &&
+          hasOutputLine
+
+        const commonArtifacts = [
+          artifact('tripman.log', output),
+          ...(dvi ? [binaryArtifact('tripman.dvi', dvi.data)] : []),
+          ...(dviExtract ? [artifact('tripman-dvi.txt', dviExtract.text)] : []),
+        ]
+
+        if (!ok) {
+          return failedStage('16', 'compile tripman.tex', now() - t0, error ?? 'DVI not generated or has errors', {
+            metrics: {
+              status,
+              steps,
+              dviSize: dvi?.data.length ?? 0,
+              dviTextLen,
+              dviPages: dviExtract?.pages.length ?? 0,
+              dviFonts: dviExtract?.fonts.size ?? 0,
+              outputLen: output.length,
+              fatalFmt,
+              emergencyStop,
+              hasMissingFile,
+              hasCapacity,
+            },
+            artifacts: commonArtifacts,
+            consoleLogs: output.split('\n').slice(-80),
+            debugLogs: debugLog,
+            stackTrace,
+            assertions,
+          })
+        }
+
+        return successStage('16', 'compile tripman.tex', now() - t0, {
+          metrics: {
+            status,
+            steps,
+            dviSize: dvi!.data.length,
+            dviTextLen,
+            dviPages: dviExtract!.pages.length,
+            dviFonts: dviExtract!.fonts.size,
+            outputLen: output.length,
+          },
+          artifacts: commonArtifacts,
+          consoleLogs: output.split('\n').slice(-50),
+          debugLogs: debugLog,
+          assertions,
+        })
+      } catch (e: any) {
+        error = e?.message || String(e)
+        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
+        return failedStage('16', 'compile tripman.tex', now() - t0, error, {
+          artifacts: [artifact('tripman.log', output)],
+          debugLogs: debugLog,
+          stackTrace,
+        })
+      }
     },
   },
 ]

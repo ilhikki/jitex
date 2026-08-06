@@ -16,35 +16,11 @@
 
 ### Phase 5：项目重构 ✅（明细已删除）
 
----
-
-### Phase 6：完全重新写编译器 🚧
+### Phase 6：完全重新写编译器 ✅（明细已删除）
 
 > 旧 Phase 6（性能优化与功能增强）作废。基准测试保留复用。
-> 详见 `src/il/req.md`（需求清单）、`src/il/json-code.ts` / `analysis.ts` / `compiler.ts`（设计文档）。
-
-#### 设计原则
-
-- **两阶段流水线**：Analysis（状态化，产出只读 Analysis）+ Compile（纯函数族，零 mutable state）
-- **依赖反转**：编译阶段不持 mutable state，通过 `analysis.symbolOf(node)` / `analysis.typeOf(node)` 等查询元信息。不是
-  compiler 带着 context 找节点，而是节点去 Analysis 查自己的元信息
-- **ID 全局唯一**：VarId / LabelId / Function.id 共用一个计数器，任何 ID 自解释，不需要"在哪个 function 里"的上下文
-- **JsonCode 去语言绑定**：IR 不依赖 Pascal（上游）也不依赖 JS（下游），注释无上下文可读
-- **代码风格**：哲学一致即可（纯函数 / 无隐式状态 / 依赖反转），组织形式可选用 class / namespace / 顶层函数
-    - Analysis 阶段天然有状态 → 可用 class（如 `class Analyzer`）
-    - Compile 阶段必须无状态 → 可用 namespace 组织纯函数族
-    - 不强制完全照搬 parser 的顶层函数风格
-- **syscall 精确选择**：Pascal 无泛型，类型在编译期已知，因此编译期就选定具体 syscall key（`i64.add` vs `f64.add`），不做运行时多态分派
-
-#### 进行中
-
-- 6.3：通过 e2e
--
-
-#### 已完成
-
-- 6.1 完整类型检查 ✅
-- 6.2：插件系统设计 ✅
+> 详见 `src/il/req.md`（需求清单）、`src/il/decide.md`（决策记录）。
+> 集成测试 1058/1058 全通过，E2E 测试 16/16 全通过（含 TRIP 100%、plain.fmt 生成、tripman.tex 编译）。
 
 ---
 
