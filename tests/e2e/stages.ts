@@ -45,6 +45,7 @@ import {
   tailLines,
   TANGLE_PAS,
   TANGLE_WEB,
+  TEX_TRIP_CH,
   TEX_WEB,
   TRIP_FOT,
   TRIP_TEX,
@@ -465,90 +466,6 @@ function validateDvi(data: Uint8Array): {
   }
 
   return { valid: true, hasContent, reason: 'ok', firstBytes, lastBytes }
-}
-
-/**
- * 为 TRIP 测试构造 WEB change file 内容（@x/@y/@z 块）。
- *
- * 按 tripman.tex step 2 "Prepare a special version of INITEX" 要求：
- *   1. stat/tats 宏改为 null（@t@>），启用统计代码
- *      （原始 stat==@{ ... @} 会把 stat...tats 间的代码注释掉；
- *       改为 @t@> 后这些代码生效：var_used/dyn_used 跟踪、
- *       ship_out 的 "Memory usage before/after"、close_files_and_terminate 的统计输出）
- *   2. mem_min/mem_bot: 0 → 1, mem_top/mem_max: 30000 → 3000
- *   3. error_line: 72 → 64, half_error_line: 42 → 32, max_print_line: 79 → 72
- *      （这些参数影响 show_context 截断/缩进、print 行宽、内存统计数字，
- *       不调整会导致 trip.fot 比对大面积 mismatch）
- *
- * 用 WEB 原生的 change file 机制（TANGLE 的 @x/@y/@z），而非正则替换 web 字符串。
- * 符合铁律#5 标准锚定 —— 用 WEB 系统自带开关，不造自己的替换逻辑。
- *
- * @x 块的行内容从 web 原样提取，保证字节级精确匹配（含 \\ 等特殊字符）。
- */
-function buildTripChangeFile(web: string): string {
-  const lines = web.split('\n')
-  const blocks: string[] = []
-
-  /** 找到包含 substr 的第一个行索引 */
-  const findLine = (substr: string): number => {
-    const idx = lines.findIndex((l) => l.includes(substr))
-    if (idx < 0) throw new Error(`buildTripChangeFile: cannot find "${substr}" in tex.web`)
-    return idx
-  }
-
-  /** 构造一个 @x/@y/@z 块 */
-  const block = (oldLines: string[], newLines: string[]) => {
-    blocks.push('@x', ...oldLines, '@y', ...newLines, '@z')
-  }
-
-  // 注意：@x 块必须按 tex.web 的行号递增顺序排列。
-  // TANGLE 单调扫描 web 文件，前一个块匹配后扫描位置继续前进，
-  // 若后续块的目标行在已扫过的位置之前，会报 "Change file entry did not match"。
-
-  // 1. stat/tats 宏（tex.web 第 307-310 行，连续 4 行 → 2 行）
-  //    原始：
-  //      @d stat==@{ {change this to `$\\{stat}\equiv\null$' when gathering
-  //        usage statistics}
-  //      @d tats==@t@>@} {change this to `$\\{tats}\equiv\null$' when gathering
-  //        usage statistics}
-  //    替换为：
-  //      @d stat==@t@>
-  //      @d tats==@t@>
-  const statIdx = findLine('@d stat==@{')
-  block(lines.slice(statIdx, statIdx + 4), ['@d stat==@t@>', '@d tats==@t@>'])
-
-  // 2. mem_max: 30000 → 3000（tex.web 第 387 行）
-  const memMaxIdx = findLine('@!mem_max=30000;')
-  block([lines[memMaxIdx]], [lines[memMaxIdx].replace('30000', '3000')])
-
-  // 3. mem_min: 0 → 1（tex.web 第 390 行）
-  const memMinIdx = findLine('@!mem_min=0;')
-  block([lines[memMinIdx]], [lines[memMinIdx].replace('=0;', '=1;')])
-
-  // 4. error_line: 72 → 64（tex.web 第 396 行）
-  const errLineIdx = findLine('@!error_line=72;')
-  block([lines[errLineIdx]], [lines[errLineIdx].replace('=72;', '=64;')])
-
-  // 5. half_error_line: 42 → 32（tex.web 第 397-398 行，2 行，只改第 1 行的数字）
-  const halfErrIdx = findLine('@!half_error_line=42;')
-  block(lines.slice(halfErrIdx, halfErrIdx + 2), [
-    lines[halfErrIdx].replace('=42;', '=32;'),
-    lines[halfErrIdx + 1],
-  ])
-
-  // 6. max_print_line: 79 → 72（tex.web 第 399 行）
-  const maxPrintIdx = findLine('@!max_print_line=79;')
-  block([lines[maxPrintIdx]], [lines[maxPrintIdx].replace('=79;', '=72;')])
-
-  // 7. mem_bot: 0 → 1（tex.web 第 439 行）
-  const memBotIdx = findLine('@d mem_bot=0')
-  block([lines[memBotIdx]], [lines[memBotIdx].replace('=0 ', '=1 ')])
-
-  // 8. mem_top: 30000 → 3000（tex.web 第 441 行）
-  const memTopIdx = findLine('@d mem_top==30000')
-  block([lines[memTopIdx]], [lines[memTopIdx].replace('30000', '3000')])
-
-  return blocks.join('\n') + '\n'
 }
 
 // ============================================================
@@ -1022,11 +939,15 @@ const stages: StageDef[] = [
       const t0 = now()
       let debugLog: string[] = []
       let stackTrace: string[] = []
+      // TRIP 测试用 WEB change file（tripman.tex step 2 要求）：
+      // stat/tats 宏 + init/tini + mem_min/mem_bot/mem_top/mem_max + error_line 等。
+      // 静态资源 resources/tex.trip.ch，用 WEB 原生 @x/@y/@z 机制由 TANGLE 合并。
+      // 行尾与 tex.web 对齐（tex.web 为 CRLF），确保 TANGLE 行匹配字节级一致。
+      let tripChange = readResource(TEX_TRIP_CH)
+      if (ctx.texWeb.includes('\r\n')) {
+        tripChange = tripChange.replace(/\r?\n/g, '\r\n')
+      }
       try {
-        // 为 TRIP 测试构造 change file（tripman.tex step 2 要求）：
-        // stat/tats 宏 + mem_min/mem_bot/mem_top/mem_max + error_line 等。
-        // 用 WEB 原生 @x/@y/@z 机制，由 TANGLE 合并到 tex.web，不改正文。
-        const tripChange = buildTripChangeFile(ctx.texWeb)
         const r = runTangle(tangleSrc, ctx.texWeb, [pascalHPlugin], tripChange)
         debugLog = r.debugLog ?? []
         ctx.tex = {
@@ -1099,6 +1020,7 @@ const stages: StageDef[] = [
             artifact('tex.pas', ctx.tex.pascal),
             artifact('tex.pool', ctx.tex.pool),
             artifact('tex.tangle.out', tangleOut),
+            artifact('tex.trip.ch', tripChange),
           ]
         : []
 
