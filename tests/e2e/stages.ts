@@ -18,6 +18,9 @@
  *    12. run TeX on trip.tex (TRIP 测试，含输出检查)
  *    13. verify trip banner (基本验证)
  *    14. compare trip output vs trip.fot (详细比对)
+ *   XeTeX 流水线（编译 xetex.pas，参照 web2c/xetexdir/am/xetex.am）：
+ *    17. tie 合并 tangle.web + tangle-xetex.ch → tangle v4 (大文件支持)
+ *    18. tie 合并 xetex.web + 11 个 ch → xetex-final.web，用 tangle v4 编译 → xetex.pas
  *
  * 设计：
  *   - 流水线模式：阶段顺序执行，复用上一阶段结果，失败则后续跳过
@@ -52,6 +55,7 @@ import {
   TRIP_TFM,
   TRIPMAN_TEX,
 } from './_helper'
+import { tie } from './tie'
 import { createReport, REPORT_DIR, StageArtifact, StageReport, writeReport } from './reporter'
 import * as path from 'path'
 import * as fs from 'fs'
@@ -163,6 +167,17 @@ interface PipelineContext {
     files: Map<string, Uint8Array>
   } | null
 
+  // s17/s18: XeTeX 编译流水线
+  // s17: 用 tie 合并 tangle.web + tangle-xetex.ch → tangle-final.web，
+  //      再用 v3 编译出支持大文件的 TANGLE v4（buf_size=1000, zz=5）
+  tangleXetexCh: string
+  tangleV4: RunResult | null
+  // s18: 用 tie 合并 xetex.web + 11 个 ch → xetex-final.web，
+  //      再用 tangle v4 编译出 xetex.pas
+  xetexWeb: string
+  xetexChanges: { filename: string; content: string }[]
+  xetex: RunResult | null
+
   failedAt: string
 }
 
@@ -195,6 +210,12 @@ function createContext(): PipelineContext {
     cmFonts: {},
     plainFmt: null,
     tripman: null,
+    // s17/s18: XeTeX 编译流水线
+    tangleXetexCh: '',
+    tangleV4: null,
+    xetexWeb: '',
+    xetexChanges: [],
+    xetex: null,
     failedAt: '',
   }
 }
@@ -469,6 +490,333 @@ function validateDvi(data: Uint8Array): {
 }
 
 // ============================================================
+// Stage 工厂：抽取重复代码
+//   - parseStage: parse xxx.pas（stage 1/4/9 模式）
+//   - compileStage: compile xxx.pas → JS（stage 2/10 模式）
+//   - runTangleStage: 包装 runTangle 并构造报告（stage 3/5/6/8/17/18 模式）
+//   - toRunResult: 将 TangleResult 转为 PipelineContext.RunResult
+// ============================================================
+
+type TangleCtxResult = {
+  pascal: string
+  pool: string
+  output: string
+  status: string
+  error?: string
+}
+
+/**
+ * TANGLE 运行结果 → PipelineContext.RunResult 结构
+ */
+function toRunResult(r: ReturnType<typeof runTangle>): TangleCtxResult {
+  return {
+    pascal: r.pascal,
+    pool: r.pool,
+    output: r.output,
+    status: r.state.status,
+    error: r.state.error?.message,
+  }
+}
+
+/** 从 TANGLE output 提取典型错误行（以 '! ' 开头） */
+function tangleErrorLines(output: string, max = 5): string[] {
+  if (!output) return []
+  return output
+    .split('\n')
+    .filter((l) => l.startsWith('! '))
+    .slice(0, max)
+}
+
+/** 构造 TANGLE 典型日志行：banner + pascal 首行 + tail N 行 */
+function tangleLogLines(
+  output: string,
+  pascal: string,
+  tailN = 5
+): string[] {
+  const lines: string[] = [`banner: ${firstLine(output)}`]
+  if (pascal) lines.push(`pascal first: ${previewLine(pascal)}`)
+  const tailed = tailLines(output, tailN).map(
+    (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+  )
+  return lines.concat(tailed)
+}
+
+/** TANGLE 产物：v{n}.pas + v{n}.pool（可选 tangle.out） */
+function tangleArtifacts(
+  label: string,
+  pascal: string,
+  pool: string,
+  output = ''
+): StageArtifact[] {
+  const result: StageArtifact[] = []
+  if (pascal) result.push(artifact(`${label}.pas`, pascal))
+  if (pool) result.push(artifact(`${label}.pool`, pool))
+  if (output) result.push(artifact(`${label}.out`, output))
+  return result
+}
+
+interface TangleStageOptions {
+  id: string
+  title: string
+  /** 运行阶段前的准备函数（加载资源、tie 合并等）。返回 runTangle 的参数。 */
+  prepare: (
+    ctx: PipelineContext
+  ) =>
+    | { pas: string; web: string; ch?: string | Uint8Array; debugLog: string[] }
+    | { skip: string }
+  /** 设置 ctx.* 字段（如 ctx.v1 = result） */
+  commit: (ctx: PipelineContext, res: TangleCtxResult) => void
+  /** 失败后 ctx.failedAt = id */
+  failId?: string
+  /** 依赖 prev.failedAt 检查，true 时会先检查 ctx.failedAt */
+  checkFail?: boolean
+  /** 生成 metrics */
+  metrics: (ctx: PipelineContext, res: TangleCtxResult, webInput: number) => Record<string, any>
+  /** 生成 assertions */
+  assertions: (ctx: PipelineContext, res: TangleCtxResult) => StageReport['assertions']
+  /** 生成 artifacts（默认用 tangleArtifacts，可覆盖） */
+  artifacts?: (ctx: PipelineContext, res: TangleCtxResult) => StageArtifact[]
+  /** 成功时生成 logs（默认用 tangleLogLines） */
+  logs?: (ctx: PipelineContext, res: TangleCtxResult) => string[]
+}
+
+/**
+ * tie 合并：根据原 web 文件换行符（CRLF/LF）做行尾对齐。
+ * 返回对齐后的 web + tieLogs；tie 错误信息追加到 debugLog 输出。
+ */
+function tieMerge(
+  master: string,
+  changes: { filename: string; content: string }[],
+  debugLog: string[],
+  tag: string
+): string {
+  const r = tie(master, changes)
+  const errs = r.logs.filter((l) => l.level === 'error')
+  const warns = r.logs.filter((l) => l.level === 'warn')
+  debugLog.push(
+    `[${tag}] tie: ${r.logs.length} logs, ${errs.length} errors, ${warns.length} warns, ` +
+      `web ${formatBytes(master.length)} → ${formatBytes(r.web.length)}`
+  )
+  if (errs.length) debugLog.push(`[${tag}] tie errors: ${errs.map((e) => e.message).join('; ')}`)
+  return master.includes('\r\n') ? r.web.replace(/\r?\n/g, '\r\n') : r.web
+}
+
+/**
+ * 通用 runTangle stage 工厂：
+ *   prepare → runTangle → commit → 构建报告
+ * 当 prepare 返回 {skip: reason} 时输出 skippedStage。
+ */
+function runTangleStage(opts: TangleStageOptions): StageDef['run'] {
+  const { id, title, prepare, commit, failId, checkFail, metrics, assertions } = opts
+  return (ctx: PipelineContext): StageReport => {
+    if (checkFail && ctx.failedAt)
+      return skippedStage(id, title, `prev ${ctx.failedAt} failed`)
+    const t0 = now()
+    const debugLog: string[] = []
+    let stackTrace: string[] = []
+    let res: TangleCtxResult = { pascal: '', pool: '', output: '', status: 'error' }
+    let pasArg = ''
+    let webArg = ''
+    let chArg: string | Uint8Array | undefined
+    let skipReason = ''
+    try {
+      const prep = prepare(ctx)
+      if ('skip' in prep) {
+        skipReason = prep.skip
+      } else {
+        pasArg = prep.pas
+        webArg = prep.web
+        chArg = prep.ch
+        debugLog.push(...(prep.debugLog ?? []))
+        const r = runTangle(pasArg, webArg, [pascalHPlugin], chArg ?? '')
+        debugLog.push(...(r.debugLog ?? []))
+        if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
+        res = toRunResult(r)
+        commit(ctx, res)
+        if (failId && res.status !== 'terminated') ctx.failedAt = failId
+      }
+    } catch (e: any) {
+      res = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
+      commit(ctx, res)
+      if (failId) ctx.failedAt = failId
+      stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
+    }
+
+    if (skipReason) return skippedStage(id, title, skipReason)
+
+    const duration = now() - t0
+    const ok = res.status === 'terminated'
+    const commonArtifacts = opts.artifacts
+      ? opts.artifacts(ctx, res)
+      : tangleArtifacts(`tangle.stage${id}`, res.pascal, res.pool, res.output)
+    const commonLogs = opts.logs
+      ? opts.logs(ctx, res)
+      : tangleLogLines(res.output, res.pascal, 8)
+    const commonMetrics = metrics(ctx, res, webArg.length)
+    const commonAssertions = assertions(ctx, res)
+
+    if (!ok) {
+      return failedStage(id, title, duration, res.error ?? 'unknown', {
+        metrics: commonMetrics,
+        artifacts: commonArtifacts,
+        logs: [
+          `banner: ${firstLine(res.output)}`,
+          ...tangleErrorLines(res.output).map((l) => `error: ${JSON.stringify(l)}`),
+          ...tailLines(res.output, 10).map(
+            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+          ),
+        ],
+        assertions: commonAssertions,
+        debugLogs: debugLog,
+        stackTrace,
+      })
+    }
+    return successStage(id, title, duration, {
+      metrics: commonMetrics,
+      artifacts: commonArtifacts,
+      logs: commonLogs,
+      assertions: commonAssertions,
+      debugLogs: debugLog,
+    })
+  }
+}
+
+interface ParseStageOptions {
+  id: string
+  title: string
+  /** 需要 parse 的源码，从 ctx 取 */
+  source: (ctx: PipelineContext) => string
+  /** 解析成功回调（设置 ctx.xxxParseOk = true 等） */
+  onOk?: (ctx: PipelineContext) => void
+  /** 失败后 ctx.failedAt = id */
+  failId?: string
+  /** 前置 ctx.failedAt 检查 */
+  checkFail?: boolean
+  /** 前置依赖（缺 source 则 skip） */
+  requires?: (ctx: PipelineContext) => { ok: boolean; reason?: string }
+}
+
+/** 通用 parse stage 工厂 */
+function parseStage(opts: ParseStageOptions): StageDef['run'] {
+  const { id, title, source, onOk, failId, checkFail, requires } = opts
+  return (ctx: PipelineContext): StageReport => {
+    if (checkFail && ctx.failedAt)
+      return skippedStage(id, title, `prev ${ctx.failedAt} failed`)
+    if (requires) {
+      const req = requires(ctx)
+      if (!req.ok) return skippedStage(id, title, req.reason ?? 'dependency missing')
+    }
+    const t0 = now()
+    const src = source(ctx)
+    let ok = false
+    let error: string | undefined
+    let stackTrace: string[] = []
+    try {
+      const r = parse(src)
+      ok = r.success
+      if (!ok) error = `parse failed: ${r.error ?? 'unknown'}`
+      if (ok && onOk) onOk(ctx)
+    } catch (e: any) {
+      error = e?.message || String(e)
+      stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
+    }
+    if (failId && !ok) ctx.failedAt = failId
+
+    const duration = now() - t0
+    const metrics = {
+      srcSize: formatBytes(src.length),
+      srcLines: countLines(src),
+      parseResult: ok ? 'ok' : 'fail',
+    }
+    const artifacts = src ? [artifact(`stage${id}.parse.src`, src)] : []
+    const assertList = [assert('parse ok', ok, ok ? 'ok' : 'fail', 'ok')]
+    if (!ok) {
+      return failedStage(id, title, duration, error!, {
+        metrics,
+        artifacts,
+        logs: error ? [`error: ${error}`] : [],
+        assertions: assertList,
+        stackTrace,
+      })
+    }
+    return successStage(id, title, duration, {
+      metrics,
+      artifacts,
+      logs: src ? [`first: ${previewLine(src)}`] : [],
+      assertions: assertList,
+    })
+  }
+}
+
+interface CompileStageOptions {
+  id: string
+  title: string
+  /** transform 调用 */
+  runTransform: (ctx: PipelineContext) => string
+  /** 保存编译产物到 ctx */
+  commit: (ctx: PipelineContext, js: string) => void
+  /** 失败后 ctx.failedAt = id */
+  failId?: string
+  /** 前置依赖 */
+  requires?: (ctx: PipelineContext) => { ok: boolean; reason?: string }
+  /** assertions 扩展 */
+  extraAssertions?: (ctx: PipelineContext, js: string) => StageReport['assertions']
+  /** metrics 扩展 */
+  extraMetrics?: (ctx: PipelineContext, js: string) => Record<string, any>
+}
+
+/** 通用 compile stage 工厂 */
+function compileStage(opts: CompileStageOptions): StageDef['run'] {
+  const { id, title, runTransform, commit, failId, requires, extraAssertions, extraMetrics } = opts
+  return (ctx: PipelineContext): StageReport => {
+    if (requires) {
+      const req = requires(ctx)
+      if (!req.ok) return skippedStage(id, title, req.reason ?? 'dependency missing')
+    }
+    const t0 = now()
+    let ok = false
+    let error: string | undefined
+    let stackTrace: string[] = []
+    let js = ''
+    try {
+      js = runTransform(ctx)
+      ok = js.length > 0
+      commit(ctx, js)
+    } catch (e: any) {
+      error = e?.message || String(e)
+      stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
+    }
+    if (failId && !ok) ctx.failedAt = failId
+
+    const duration = now() - t0
+    const metrics: Record<string, any> = {
+      jsSize: formatBytes(js.length),
+      jsLines: countLines(js),
+      compileResult: ok ? 'ok' : 'fail',
+      ...(extraMetrics ? extraMetrics(ctx, js) : {}),
+    }
+    const assertions: StageReport['assertions'] = [
+      assert('compile ok', ok, ok ? 'ok' : 'fail', 'ok'),
+      ...(extraAssertions ? extraAssertions(ctx, js) : []),
+    ]
+    const artifacts = js ? [artifact(`stage${id}.compiled.js`, js)] : []
+    if (!ok) {
+      return failedStage(id, title, duration, error!, {
+        metrics,
+        assertions,
+        stackTrace,
+      })
+    }
+    return successStage(id, title, duration, {
+      metrics,
+      artifacts,
+      logs: js ? [`js first: ${previewLine(js)}`] : [],
+      assertions,
+    })
+  }
+}
+
+// ============================================================
 // 阶段定义
 // ============================================================
 
@@ -481,6 +829,7 @@ const stages: StageDef[] = [
     id: 1,
     title: 'parse tangle-official.pas',
     run: (ctx) => {
+      // stage 1 有额外副作用：一次性加载所有 E2E 资源
       const t0 = now()
       ctx.tanglePas = readResource(TANGLE_PAS)
       ctx.tangleWeb = readResource(TANGLE_WEB)
@@ -489,45 +838,37 @@ const stages: StageDef[] = [
       ctx.tripTex = readResource(TRIP_TEX)
       ctx.tripTfm = readResourceBytes(TRIP_TFM)
       ctx.tripFot = readResource(TRIP_FOT)
-      // s15/s16 资源：plain TeX 格式 + CM 字体
       ctx.plainTex = readResource(PLAIN_TEX)
       ctx.hyphenTex = readResource(HYPHEN_TEX)
       ctx.tripmanTex = readResource(TRIPMAN_TEX)
       ctx.cmFonts = readCmFontsForTeX()
 
+      const src = ctx.tanglePas
       let ok = false
       let error: string | undefined
       let stackTrace: string[] = []
       try {
-        const result = parse(ctx.tanglePas)
+        const result = parse(src)
         ok = result.success
-        if (!result.success) error = `parse failed: ${result.error ?? 'unknown'}`
+        if (!ok) error = `parse failed: ${result.error ?? 'unknown'}`
       } catch (e: any) {
         error = e?.message || String(e)
         stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
       }
-
       const duration = now() - t0
-      const metrics = {
-        inputSize: formatBytes(ctx.tanglePas.length),
-        lineCount: countLines(ctx.tanglePas),
-      }
-      const artifacts = [artifact('tangle-official.pas', ctx.tanglePas)]
-
+      const metrics = { inputSize: formatBytes(src.length), lineCount: countLines(src) }
+      const artifacts = [artifact('tangle-official.pas', src)]
+      const assertList = [assert('parse ok', ok, ok ? 'ok' : 'fail', 'ok')]
       if (!ok) {
         ctx.failedAt = '1'
         return failedStage('1', 'parse tangle-official.pas', duration, error!, {
-          metrics,
-          artifacts,
-          stackTrace,
-          assertions: [assert('parse ok', false, 'fail', 'ok')],
+          metrics, artifacts, stackTrace, assertions: assertList,
         })
       }
       return successStage('1', 'parse tangle-official.pas', duration, {
-        metrics,
-        artifacts,
-        logs: [`first: ${previewLine(ctx.tanglePas)}`],
-        assertions: [assert('parse ok', true)],
+        metrics, artifacts,
+        logs: [`first: ${previewLine(src)}`],
+        assertions: assertList,
       })
     },
   },
@@ -535,334 +876,122 @@ const stages: StageDef[] = [
   {
     id: 2,
     title: 'compile tangle to JS',
-    run: (ctx) => {
-      const t0 = now()
-      let ok = false
-      let error: string | undefined
-      let stackTrace: string[] = []
-      try {
-        ctx.compiledJs = transform(ctx.tanglePas, {
+    run: compileStage({
+      id: '2',
+      title: 'compile tangle to JS',
+      failId: '2',
+      runTransform: (ctx) =>
+        transform(ctx.tanglePas, {
           extensions: ['string'],
           programFileUrls: {
-            WEBFILE: 'WEBFILE',
-            CHANGEFILE: 'CHANGEFILE',
-            PASCALFILE: 'PASCALFILE',
-            POOL: 'POOL',
+            WEBFILE: 'WEBFILE', CHANGEFILE: 'CHANGEFILE',
+            PASCALFILE: 'PASCALFILE', POOL: 'POOL',
           },
           plugins: [pascalHPlugin],
-        })
-        ok = ctx.compiledJs.length > 0
-      } catch (e: any) {
-        error = e?.message || String(e)
-        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
-      }
-
-      const duration = now() - t0
-      const metrics = {
-        jsSize: formatBytes(ctx.compiledJs.length),
-        jsLines: countLines(ctx.compiledJs),
-      }
-      const assertions = [
-        assert('compile ok', ok, ok ? 'ok' : 'fail', 'ok'),
-        assert(
-          'jsSize > 10KB',
-          ctx.compiledJs.length > 10000,
-          formatBytes(ctx.compiledJs.length),
-          '> 10 KB'
-        ),
-      ]
-
-      if (!ok) {
-        ctx.failedAt = '2'
-        return failedStage('2', 'compile tangle to JS', duration, error!, {
-          metrics,
-          assertions,
-          stackTrace,
-        })
-      }
-      return successStage('2', 'compile tangle to JS', duration, {
-        metrics,
-        artifacts: [artifact('tangle.js', ctx.compiledJs)],
-        assertions,
-      })
-    },
+        }),
+      commit: (ctx, js) => { ctx.compiledJs = js },
+      extraAssertions: (_, js) => [
+        assert('jsSize > 10KB', js.length > 10000, formatBytes(js.length), '> 10 KB'),
+      ],
+    }),
   },
 
   {
     id: 3,
     title: 'run tangle on tangle.web → tangle.pas (v1)',
-    run: (ctx) => {
-      const t0 = now()
-      let debugLog: string[] = []
-      let stackTrace: string[] = []
-      try {
-        const r = runTangle(ctx.tanglePas, ctx.tangleWeb)
-        debugLog = r.debugLog ?? []
-        ctx.v1 = {
-          pascal: r.pascal,
-          pool: r.pool,
-          output: r.output,
-          status: r.state.status,
-          error: r.state.error?.message,
-        }
-        if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
-        if (r.state.status !== 'terminated') ctx.failedAt = '3'
-      } catch (e: any) {
-        ctx.v1 = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
-        ctx.failedAt = '3'
-        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
-      }
-
-      const duration = now() - t0
-      const ok = ctx.v1?.status === 'terminated'
-      const metrics = {
-        webInput: formatBytes(ctx.tangleWeb.length),
-        status: ctx.v1?.status ?? 'unknown',
-        pascalOut: formatBytes(ctx.v1?.pascal.length ?? 0),
-        poolOut: formatBytes(ctx.v1?.pool.length ?? 0),
-        banner: firstLine(ctx.v1?.output ?? ''),
-        modules: extractModuleNumbers(ctx.v1?.output ?? ''),
-      }
-      const assertions = [
-        assert('run ok', ok, ctx.v1?.status, 'terminated'),
-        assert(
-          'pascalOut > 1KB',
-          (ctx.v1?.pascal.length ?? 0) > 1000,
-          formatBytes(ctx.v1?.pascal.length ?? 0),
-          '> 1 KB'
-        ),
-        assert(
-          'banner v2.8',
-          ctx.v1?.output.includes('This is TANGLE, Version 2.8') ?? false,
-          undefined,
-          'contains'
-        ),
-        assert('output has *1*', ctx.v1?.output.includes('*1*') ?? false, undefined, 'contains'),
-        assert(
-          'output has Done.',
-          ctx.v1?.output.includes('Done.') ?? false,
-          undefined,
-          'contains'
-        ),
-        assert(
-          'pascal has PROGRAM TANGLE',
-          ctx.v1?.pascal.includes('PROGRAM TANGLE') ?? false,
-          undefined,
-          'contains'
-        ),
-      ]
-      const artifacts = ctx.v1?.pascal
-        ? [artifact('tangle.pas.v1', ctx.v1.pascal), artifact('tangle.pool.v1', ctx.v1.pool)]
-        : []
-
-      if (!ok) {
-        return failedStage(
-          '3',
-          'run tangle on tangle.web → v1',
-          duration,
-          ctx.v1?.error ?? 'unknown',
-          {
-            metrics,
-            artifacts,
-            assertions,
-            debugLogs: debugLog,
-            stackTrace,
-          }
-        )
-      }
-      return successStage('3', 'run tangle on tangle.web → v1', duration, {
-        metrics,
-        artifacts,
-        logs: [
-          `banner: ${firstLine(ctx.v1!.output)}`,
-          `pascal first: ${previewLine(ctx.v1!.pascal)}`,
-          ...tailLines(ctx.v1!.output, 8).map(
-            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
-          ),
-        ],
-        assertions,
-        debugLogs: debugLog,
-      })
-    },
+    run: runTangleStage({
+      id: '3', title: 'run tangle on tangle.web → v1',
+      failId: '3',
+      prepare: (ctx) => ({
+        pas: ctx.tanglePas, web: ctx.tangleWeb,
+        debugLog: [`[s3] tanglePas=${formatBytes(ctx.tanglePas.length)} tangleWeb=${formatBytes(ctx.tangleWeb.length)}`],
+      }),
+      commit: (ctx, res) => { ctx.v1 = res },
+      metrics: (_, res, webInput) => ({
+        webInput: formatBytes(webInput),
+        status: res.status,
+        pascalOut: formatBytes(res.pascal.length),
+        poolOut: formatBytes(res.pool.length),
+        banner: firstLine(res.output),
+        modules: extractModuleNumbers(res.output),
+      }),
+      assertions: (_, res) => [
+        assert('run ok', res.status === 'terminated', res.status, 'terminated'),
+        assert('pascalOut > 1KB', res.pascal.length > 1000, formatBytes(res.pascal.length), '> 1 KB'),
+        assert('banner v2.8', res.output.includes('This is TANGLE, Version 2.8'), undefined, 'contains'),
+        assert('output has *1*', res.output.includes('*1*'), undefined, 'contains'),
+        assert('output has Done.', res.output.includes('Done.'), undefined, 'contains'),
+        assert('pascal has PROGRAM TANGLE', res.pascal.includes('PROGRAM TANGLE'), undefined, 'contains'),
+      ],
+      artifacts: (_, res) => tangleArtifacts('tangle.pas.v1', res.pascal, res.pool),
+    }),
   },
 
   {
     id: 4,
     title: 'parse tangle.pas (v1)',
-    run: (ctx) => {
-      const t0 = now()
-      let ok = false
-      let error: string | undefined
-      let stackTrace: string[] = []
-      try {
-        const result = parse(ctx.v1!.pascal)
-        ctx.v1ParseOk = result.success
-        ok = result.success
-        if (!result.success) error = `parse failed: ${result.error ?? 'unknown'}`
-      } catch (e: any) {
-        ctx.v1ParseOk = false
-        error = e?.message || String(e)
-        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
-      }
-
-      const duration = now() - t0
-      if (!ok) ctx.failedAt = '4'
-      return {
-        id: '4',
-        title: 'parse tangle.pas (v1)',
-        status: ok ? 'success' : 'failed',
-        duration,
-        metrics: {
-          pascalSize: formatBytes(ctx.v1?.pascal.length ?? 0),
-          parseResult: ok ? 'ok' : 'fail',
-        },
-        artifacts: ctx.v1?.pascal ? [artifact('tangle.pas.v1', ctx.v1.pascal)] : [],
-        logs: error ? [`error: ${error}`] : [],
-        consoleLogs: [],
-        debugLogs: [],
-        stackTrace,
-        error,
-        assertions: [assert('parse ok', ok, ok ? 'ok' : 'fail', 'ok')],
-      }
-    },
+    run: parseStage({
+      id: '4', title: 'parse tangle.pas (v1)',
+      failId: '4',
+      requires: (ctx) => ctx.v1?.pascal
+        ? { ok: true } : { ok: false, reason: 'v1 pascal missing' },
+      source: (ctx) => ctx.v1!.pascal,
+      onOk: (ctx) => { ctx.v1ParseOk = true },
+    }),
   },
 
   {
     id: 5,
     title: 'bootstrap: run v1 on tangle.web → v2',
-    run: (ctx) => {
-      if (ctx.failedAt) return skippedStage('5', 'bootstrap v1 → v2', `prev ${ctx.failedAt} failed`)
-      const t0 = now()
-      let debugLog: string[] = []
-      let stackTrace: string[] = []
-      try {
-        const r = runTangle(ctx.v1!.pascal, ctx.tangleWeb)
-        debugLog = r.debugLog ?? []
-        ctx.v2 = {
-          pascal: r.pascal,
-          pool: r.pool,
-          output: r.output,
-          status: r.state.status,
-          error: r.state.error?.message,
-        }
-        if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
-        if (r.state.status !== 'terminated') ctx.failedAt = '5'
-      } catch (e: any) {
-        ctx.v2 = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
-        ctx.failedAt = '5'
-        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
-      }
-
-      const duration = now() - t0
-      const ok = ctx.v2?.status === 'terminated'
-      const metrics = {
-        status: ctx.v2?.status ?? 'unknown',
-        pascalOut: formatBytes(ctx.v2?.pascal.length ?? 0),
-        banner: firstLine(ctx.v2?.output ?? ''),
-        modules: extractModuleNumbers(ctx.v2?.output ?? ''),
-      }
-      const assertions = [
-        assert('run ok', ok, ctx.v2?.status, 'terminated'),
-        assert(
-          'banner v4.6',
-          ctx.v2?.output.includes('This is TANGLE, Version 4.6') ?? false,
-          undefined,
-          'contains'
-        ),
-        assert(
-          'output has Done.',
-          ctx.v2?.output.includes('Done.') ?? false,
-          undefined,
-          'contains'
-        ),
-      ]
-
-      if (!ok) {
-        return failedStage('5', 'bootstrap v1 → v2', duration, ctx.v2?.error ?? 'unknown', {
-          metrics,
-          artifacts: ctx.v2?.pascal ? [artifact('tangle.pas.v2', ctx.v2.pascal)] : [],
-          assertions,
-          debugLogs: debugLog,
-          stackTrace,
-        })
-      }
-      return successStage('5', 'bootstrap v1 → v2', duration, {
-        metrics,
-        artifacts: [artifact('tangle.pas.v2', ctx.v2!.pascal)],
-        logs: [
-          `banner: ${firstLine(ctx.v2!.output)}`,
-          ...tailLines(ctx.v2!.output, 5).map(
-            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
-          ),
-        ],
-        assertions,
-        debugLogs: debugLog,
-      })
-    },
+    run: runTangleStage({
+      id: '5', title: 'bootstrap v1 → v2',
+      checkFail: true, failId: '5',
+      prepare: (ctx) => ({
+        pas: ctx.v1!.pascal, web: ctx.tangleWeb,
+        debugLog: [`[s5] v1Pas=${formatBytes(ctx.v1!.pascal.length)}`],
+      }),
+      commit: (ctx, res) => { ctx.v2 = res },
+      metrics: (_, res, webInput) => ({
+        webInput: formatBytes(webInput),
+        status: res.status,
+        pascalOut: formatBytes(res.pascal.length),
+        banner: firstLine(res.output),
+        modules: extractModuleNumbers(res.output),
+      }),
+      assertions: (_, res) => [
+        assert('run ok', res.status === 'terminated', res.status, 'terminated'),
+        assert('banner v4.6', res.output.includes('This is TANGLE, Version 4.6'), undefined, 'contains'),
+        assert('output has Done.', res.output.includes('Done.'), undefined, 'contains'),
+      ],
+      artifacts: (_, res) => tangleArtifacts('tangle.pas.v2', res.pascal, res.pool),
+      logs: (_, res) => tangleLogLines(res.output, res.pascal, 5),
+    }),
   },
 
   {
     id: 6,
     title: 'bootstrap: run v2 on tangle.web → v3',
-    run: (ctx) => {
-      if (ctx.failedAt) return skippedStage('6', 'bootstrap v2 → v3', `prev ${ctx.failedAt} failed`)
-      const t0 = now()
-      let debugLog: string[] = []
-      let stackTrace: string[] = []
-      try {
-        const r = runTangle(ctx.v2!.pascal, ctx.tangleWeb)
-        debugLog = r.debugLog ?? []
-        ctx.v3 = {
-          pascal: r.pascal,
-          pool: r.pool,
-          output: r.output,
-          status: r.state.status,
-          error: r.state.error?.message,
-        }
-        if (r.state.error?.stackTrace) stackTrace = r.state.error.stackTrace
-      } catch (e: any) {
-        ctx.v3 = { pascal: '', pool: '', output: '', status: 'error', error: e?.message }
-        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
-      }
-
-      const duration = now() - t0
-      const ok = ctx.v3?.status === 'terminated'
-      const metrics = {
-        status: ctx.v3?.status ?? 'unknown',
-        pascalOut: formatBytes(ctx.v3?.pascal.length ?? 0),
-        banner: firstLine(ctx.v3?.output ?? ''),
-      }
-      const assertions = [
-        assert('run ok', ok, ctx.v3?.status, 'terminated'),
-        assert(
-          'banner v4.6',
-          ctx.v3?.output.includes('This is TANGLE, Version 4.6') ?? false,
-          undefined,
-          'contains'
-        ),
-      ]
-
-      if (!ok) {
-        return failedStage('6', 'bootstrap v2 → v3', duration, ctx.v3?.error ?? 'unknown', {
-          metrics,
-          assertions,
-          debugLogs: debugLog,
-          stackTrace,
-        })
-      }
-      return successStage('6', 'bootstrap v2 → v3', duration, {
-        metrics,
-        artifacts: [artifact('tangle.pas.v3', ctx.v3!.pascal)],
-        logs: [
-          `banner: ${firstLine(ctx.v3!.output ?? '')}`,
-          ...tailLines(ctx.v3!.output ?? '', 5).map(
-            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
-          ),
-        ],
-        assertions,
-        debugLogs: debugLog,
-      })
-    },
+    run: runTangleStage({
+      id: '6', title: 'bootstrap v2 → v3',
+      checkFail: true,
+      prepare: (ctx) => ({
+        pas: ctx.v2!.pascal, web: ctx.tangleWeb,
+        debugLog: [`[s6] v2Pas=${formatBytes(ctx.v2!.pascal.length)}`],
+      }),
+      commit: (ctx, res) => { ctx.v3 = res },
+      metrics: (_, res, webInput) => ({
+        webInput: formatBytes(webInput),
+        status: res.status,
+        pascalOut: formatBytes(res.pascal.length),
+        banner: firstLine(res.output),
+      }),
+      assertions: (_, res) => [
+        assert('run ok', res.status === 'terminated', res.status, 'terminated'),
+        assert('banner v4.6', res.output.includes('This is TANGLE, Version 4.6'), undefined, 'contains'),
+      ],
+      artifacts: (_, res) => tangleArtifacts('tangle.pas.v3', res.pascal, res.pool),
+      logs: (_, res) => tangleLogLines(res.output, res.pascal, 5),
+    }),
   },
 
   {
@@ -877,41 +1006,25 @@ const stages: StageDef[] = [
       const v2Pool = ctx.v2?.pool ?? ''
       const v3Pool = ctx.v3?.pool ?? ''
       const poolEqual = v2Pool === v3Pool
-
       const duration = now() - t0
       const metrics = {
-        v2Pascal: formatBytes(v2Pascal.length),
-        v3Pascal: formatBytes(v3Pascal.length),
+        v2Pascal: formatBytes(v2Pascal.length), v3Pascal: formatBytes(v3Pascal.length),
         v2EqV3: equal,
-        v2Pool: formatBytes(v2Pool.length),
-        v3Pool: formatBytes(v3Pool.length),
+        v2Pool: formatBytes(v2Pool.length), v3Pool: formatBytes(v3Pool.length),
         poolEq: poolEqual,
       }
       const assertions = [
-        assert(
-          'pascal v2 === v3',
-          equal,
-          `${formatBytes(v2Pascal.length)} vs ${formatBytes(v3Pascal.length)}`,
-          'identical'
-        ),
-        assert(
-          'pool v2 === v3',
-          poolEqual,
-          `${formatBytes(v2Pool.length)} vs ${formatBytes(v3Pool.length)}`,
-          'identical'
-        ),
+        assert('pascal v2 === v3', equal,
+          `${formatBytes(v2Pascal.length)} vs ${formatBytes(v3Pascal.length)}`, 'identical'),
+        assert('pool v2 === v3', poolEqual,
+          `${formatBytes(v2Pool.length)} vs ${formatBytes(v3Pool.length)}`, 'identical'),
       ]
-
-      if (!equal) {
+      if (!equal)
         return failedStage('7', 'verify v2 === v3', duration, 'v2 !== v3, bootstrap unstable', {
-          metrics,
-          assertions,
+          metrics, assertions,
         })
-      }
       return successStage('7', 'verify v2 === v3', duration, {
-        metrics,
-        logs: ['bootstrap stable: v2 === v3'],
-        assertions,
+        metrics, logs: ['bootstrap stable: v2 === v3'], assertions,
       })
     },
   },
@@ -1060,106 +1173,41 @@ const stages: StageDef[] = [
   {
     id: 9,
     title: 'parse tex.pas',
-    run: (ctx) => {
-      if (!ctx.tex || ctx.tex.status !== 'terminated') {
-        return skippedStage('9', 'parse tex.pas', 'tex.pas not generated')
-      }
-      const t0 = now()
-      let ok = false
-      let error: string | undefined
-      let stackTrace: string[] = []
-      try {
-        const result = parse(ctx.tex.pascal)
-        ctx.texParseOk = result.success
-        ok = result.success
-        if (!result.success) error = `parse failed: ${result.error ?? 'unknown'}`
-      } catch (e: any) {
-        ctx.texParseOk = false
-        error = e?.message || String(e)
-        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
-      }
-
-      const duration = now() - t0
-      return {
-        id: '9',
-        title: 'parse tex.pas',
-        status: ok ? 'success' : 'failed',
-        duration,
-        metrics: {
-          pascalSize: formatBytes(ctx.tex.pascal.length),
-          lineCount: countLines(ctx.tex.pascal),
-          parseResult: ok ? 'ok' : 'fail',
-        },
-        artifacts: [artifact('tex.pas', ctx.tex.pascal)],
-        logs: error ? [`error: ${error}`] : [],
-        consoleLogs: [],
-        debugLogs: [],
-        stackTrace,
-        error,
-        assertions: [assert('parse ok', ok, ok ? 'ok' : 'fail', 'ok')],
-      }
-    },
+    run: parseStage({
+      id: '9', title: 'parse tex.pas',
+      requires: (ctx) => ctx.tex?.status === 'terminated'
+        ? { ok: true } : { ok: false, reason: 'tex.pas not generated' },
+      source: (ctx) => ctx.tex!.pascal,
+      onOk: (ctx) => { ctx.texParseOk = true },
+    }),
   },
 
   {
     id: 10,
     title: 'compile tex.pas → tex.js',
-    run: (ctx) => {
-      if (!ctx.texParseOk || !ctx.tex)
-        return skippedStage('10', 'compile tex.pas → tex.js', 'tex.pas parse failed')
-      const t0 = now()
-      let ok = false
-      let error: string | undefined
-      let stackTrace: string[] = []
-      try {
-        ctx.texCompiledJs = compileTeX(ctx.tex.pascal, [pascalHPlugin])
-        ok = ctx.texCompiledJs.length > 0
+    run: compileStage({
+      id: '10', title: 'compile tex.pas → tex.js',
+      requires: (ctx) => ctx.texParseOk && !!ctx.tex
+        ? { ok: true } : { ok: false, reason: 'tex.pas parse failed' },
+      runTransform: (ctx) => compileTeX(ctx.tex!.pascal, [pascalHPlugin]),
+      commit: (ctx, js) => {
+        ctx.texCompiledJs = js
         // 同时编译默认内存版本（mem_top=30000），供 s15/s16 使用
-        if (ok && ctx.texFull?.pascal) {
+        if (js.length > 0 && ctx.texFull?.pascal) {
           ctx.texCompiledJsFull = compileTeX(ctx.texFull.pascal, [pascalHPlugin])
         }
-      } catch (e: any) {
-        ok = false
-        error = e?.message || String(e)
-        ctx.texCompileError = error ?? ''
-        stackTrace = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
-      }
-      ctx.texCompileOk = ok
-
-      const duration = now() - t0
-      const metrics = {
-        pascalInput: formatBytes(ctx.tex.pascal.length),
-        jsOut: formatBytes(ctx.texCompiledJs.length),
-        jsLines: countLines(ctx.texCompiledJs),
-        compileResult: ok ? 'ok' : 'fail',
-        jsFullOut: formatBytes(ctx.texCompiledJsFull.length),
+        ctx.texCompileOk = js.length > 0
+        if (js.length === 0) ctx.texCompileError = 'empty compile output'
+      },
+      extraMetrics: (ctx, js) => ({
+        pascalInput: formatBytes(ctx.tex!.pascal.length),
+        jsFullOut: formatBytes(ctx.texCompiledJsFull?.length ?? 0),
         plugin: 'pascalH',
-      }
-      const assertions = [
-        assert('compile ok', ok, ok ? 'ok' : 'fail', 'ok'),
-        assert(
-          'jsOut > 50KB',
-          ctx.texCompiledJs.length > 50000,
-          formatBytes(ctx.texCompiledJs.length),
-          '> 50 KB'
-        ),
-      ]
-
-      if (!ok) {
-        return failedStage('10', 'compile tex.pas → tex.js', duration, error ?? 'unknown', {
-          metrics,
-          logs: error ? [`error: ${error.slice(0, 500)}`] : [],
-          assertions,
-          stackTrace,
-        })
-      }
-      return successStage('10', 'compile tex.pas → tex.js', duration, {
-        metrics,
-        artifacts: [artifact('tex.js', ctx.texCompiledJs)],
-        logs: [`js first: ${previewLine(ctx.texCompiledJs)}`],
-        assertions,
-      })
-    },
+      }),
+      extraAssertions: (_, js) => [
+        assert('jsOut > 50KB', js.length > 50000, formatBytes(js.length), '> 50 KB'),
+      ],
+    }),
   },
 
   {
@@ -2126,6 +2174,204 @@ const stages: StageDef[] = [
         })
       }
     },
+  },
+
+  // ============================================================
+  // XeTeX 流水线（编译 xetex.pas）
+  //   参照 web2c/xetexdir/am/xetex.am 的编译流水线：
+  //     1. tie 合并 tangle.web + tangle-xetex.ch → tangle-final.web
+  //     2. TANGLE 编译 tangle-final.web → tangle.pas (v4，支持大文件)
+  //     3. tie 合并 xetex.web + 11 个 ch → xetex-final.web
+  //     4. TANGLE v4 编译 xetex-final.web → xetex.pas
+  //   stage 17 完成步骤 1-2，stage 18 完成步骤 3-4。
+  // ============================================================
+
+  {
+    id: 17,
+    title: 'tie 合并 tangle.web + tangle-xetex.ch → TANGLE v4 (大文件支持)',
+    run: runTangleStage({
+      id: '17', title: 'compile TANGLE v4',
+      failId: '17',
+      prepare: (ctx) => {
+        if (!ctx.tanglePas || !ctx.tangleWeb)
+          return { skip: 'tanglePas/tangleWeb missing (stage 1)' }
+        // 1. 读取 tangle-xetex.ch（调整 TANGLE 内部常量以支持大文件）
+        //    - buf_size: 100 → 1000  （xetex.web 有 109 字符的长行）
+        //    - max_bytes/max_toks: → 65535
+        //    - max_names/max_texts: → 10239
+        //    - hash_size: → 8501
+        //    - zz: 3 → 5  （token 容量 3*65536 → 5*65536）
+        //    - equiv: sixteen_bits → integer  （支持 32 位大整数）
+        //    - @'100000 → @'10000000000  （数值宏偏移 2^15 → 2^30）
+        ctx.tangleXetexCh = readResource('tangle-xetex.ch')
+        const dl: string[] = [
+          `[s17] tangle-xetex.ch: ${formatBytes(ctx.tangleXetexCh.length)}`,
+        ]
+        // 2. tie 合并 tangle.web + tangle-xetex.ch
+        const finalWeb = tieMerge(ctx.tangleWeb, [
+          { filename: 'tangle-xetex.ch', content: ctx.tangleXetexCh },
+        ], dl, 's17')
+        // 3. 用 tangle-official.pas (v2.8, buf_size=100) 编译 tangle-final.web
+        //    tangle.web 本身没有长行，v2.8 的 buf_size=100 足够。
+        return { pas: ctx.tanglePas, web: finalWeb, debugLog: dl }
+      },
+      commit: (ctx, res) => { ctx.tangleV4 = res },
+      metrics: (ctx, res, webInput) => {
+        const hasBufSize1000 = res.pascal.includes('BUFSIZE=1000')
+        const hasZz5 =
+          res.pascal.includes('ARRAY[0..4,0..MAXTOKS]') ||
+          res.pascal.includes('ARRAY[0..4,0..65535')
+        const hasMaxToks65535 = res.pascal.includes('MAXTOKS=65535')
+        return {
+          chInput: formatBytes(ctx.tangleXetexCh.length),
+          webInput: formatBytes(webInput),
+          status: res.status,
+          pascalOut: formatBytes(res.pascal.length),
+          poolOut: formatBytes(res.pool.length),
+          banner: firstLine(res.output),
+          hasBufSize1000,
+          hasZz5,
+          hasMaxToks65535,
+          noErrors: res.output.includes('(No errors were found.)'),
+          hasDone: res.output.includes('Done.'),
+        }
+      },
+      assertions: (_, res) => {
+        const hasBufSize1000 = res.pascal.includes('BUFSIZE=1000')
+        const hasZz5 =
+          res.pascal.includes('ARRAY[0..4,0..MAXTOKS]') ||
+          res.pascal.includes('ARRAY[0..4,0..65535')
+        return [
+          assert('run ok', res.status === 'terminated', res.status, 'terminated'),
+          assert('pascalOut > 40KB', res.pascal.length > 40000,
+            formatBytes(res.pascal.length), '> 40 KB'),
+          assert('output has Done.', res.output.includes('Done.'), undefined, 'contains'),
+          assert('buf_size=1000 (长行支持)', hasBufSize1000,
+            hasBufSize1000 ? 'found' : 'missing', 'BUF_SIZE=1000'),
+          assert('zz=5 (token 容量 5*65536)', hasZz5,
+            hasZz5 ? 'found' : 'missing', 'zz=5'),
+        ]
+      },
+      artifacts: (ctx, res) => res.pascal ? [
+        artifact('tangle.pas.v4', res.pascal),
+        artifact('tangle.pool.v4', res.pool),
+        artifact('tangle.v4.out', res.output),
+        artifact('tangle-xetex.ch', ctx.tangleXetexCh),
+      ] : [],
+      logs: (_, res) => [
+        `banner: ${firstLine(res.output)}`,
+        `pascal first: ${previewLine(res.pascal)}`,
+        ...tailLines(res.output, 5).map(
+          (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+        ),
+      ],
+    }),
+  },
+
+  {
+    id: 18,
+    title: 'tie 合并 xetex.web + 11 ch → 编译 xetex.pas',
+    run: runTangleStage({
+      id: '18', title: 'compile xetex.pas',
+      failId: '18',
+      prepare: (ctx) => {
+        if (!ctx.tangleV4 || ctx.tangleV4.status !== 'terminated')
+          return { skip: 'TANGLE v4 not available (stage 17)' }
+        // 1. 读取 xetex.web 和 11 个 change file
+        //    change file 顺序参照 web2c/xetexdir/am/xetex.am 的 xetex_ch_srcs：
+        //      xetex.web, xetex-tex.ch0, tex.ch, tracingstacklevels.ch,
+        //      partoken-102.ch, partoken.ch, locnull-optimize.ch,
+        //      unbalanced-braces.ch, showstream.ch, xetex.ch,
+        //      char-warning-xetex.ch, tex-binpool.ch
+        //    （跳过 synctex 相关 ch，因为我们的 TANGLE 不支持 synctex 扩展）
+        ctx.xetexWeb = readResource('xetex.web')
+        const chFiles = [
+          'xetex-tex.ch0', 'xetex-tex.ch', 'xetex-tracingstacklevels.ch',
+          'xetex-partoken-102.ch', 'xetex-partoken.ch', 'xetex-locnull-optimize.ch',
+          'xetex-unbalanced-braces.ch', 'xetex-showstream.ch', 'xetex.ch',
+          'xetex-char-warning-xetex.ch', 'xetex-tex-binpool.ch',
+        ]
+        ctx.xetexChanges = chFiles.map((f) => ({ filename: f, content: readResource(f) }))
+        const dl: string[] = [
+          `[s18] xetex.web: ${formatBytes(ctx.xetexWeb.length)}, ${chFiles.length} ch files: ` +
+            ctx.xetexChanges.map((c) => `${c.filename}=${formatBytes(c.content.length)}`).join(', '),
+        ]
+        // 2. tie 合并 xetex.web + 11 ch → xetex-final.web
+        const finalWeb = tieMerge(ctx.xetexWeb, ctx.xetexChanges, dl, 's18')
+        dl.push(`[s18] xetex-final.web: ${formatBytes(finalWeb.length)}`)
+        // 3. 用 TANGLE v4 (buf_size=1000, zz=5) 编译
+        return { pas: ctx.tangleV4.pascal, web: finalWeb, debugLog: dl }
+      },
+      commit: (ctx, res) => { ctx.xetex = res },
+      metrics: (ctx, res, webInput) => {
+        const hasEmergencyStop = res.output.includes('(That was a fatal error, my friend.)')
+        const hasTokenExceeded = res.output.includes('token capacity exceeded')
+        const hasInputLineTooLong = res.output.includes('Input line too long')
+        const hasValueTooBig = res.output.includes('Value too big')
+        const errorLines = tangleErrorLines(res.output, 5)
+        const modules = extractModuleNumbers(res.output)
+        const chTotal = ctx.xetexChanges.reduce((s, c) => s + c.content.length, 0)
+        return {
+          webInput: formatBytes(webInput),
+          chCount: ctx.xetexChanges.length,
+          chTotalSize: formatBytes(chTotal),
+          status: res.status,
+          pascalOut: formatBytes(res.pascal.length),
+          poolOut: formatBytes(res.pool.length),
+          banner: firstLine(res.output),
+          modules,
+          hasBanner: res.output.includes('This is TANGLE, Version 4.6'),
+          hasDone: res.output.includes('Done.'),
+          noErrors: res.output.includes('(No errors were found.)'),
+          hasProgramXetex: res.pascal.includes('PROGRAM XETEX'),
+          hasEmergencyStop,
+          hasTokenExceeded,
+          hasInputLineTooLong,
+          hasValueTooBig,
+          errorLines: errorLines.length,
+        }
+      },
+      assertions: (_, res) => {
+        const hasBanner = res.output.includes('This is TANGLE, Version 4.6')
+        const hasProgramXetex = res.pascal.includes('PROGRAM XETEX')
+        const hasDone = res.output.includes('Done.')
+        const hasEmergencyStop = res.output.includes('(That was a fatal error, my friend.)')
+        const hasTokenExceeded = res.output.includes('token capacity exceeded')
+        const hasInputLineTooLong = res.output.includes('Input line too long')
+        return [
+          assert('run ok', res.status === 'terminated', res.status, 'terminated'),
+          assert('banner v4.6', hasBanner,
+            hasBanner ? 'found' : 'missing', 'This is TANGLE, Version 4.6'),
+          assert('pascalOut > 500KB', res.pascal.length > 500000,
+            formatBytes(res.pascal.length), '> 500 KB'),
+          assert('pascal has PROGRAM XETEX', hasProgramXetex,
+            hasProgramXetex ? 'found' : 'missing', 'PROGRAM XETEX'),
+          assert('output has Done.', hasDone, undefined, 'contains'),
+          assert('no fatal error', !hasEmergencyStop,
+            hasEmergencyStop ? 'fatal' : 'ok', 'no fatal error'),
+          assert('no token capacity exceeded', !hasTokenExceeded,
+            hasTokenExceeded ? 'exceeded' : 'ok', 'no token overflow'),
+          assert('no input line too long', !hasInputLineTooLong,
+            hasInputLineTooLong ? 'too long' : 'ok', 'no long line'),
+        ]
+      },
+      artifacts: (_, res) => res.pascal ? [
+        artifact('xetex.pas', res.pascal),
+        artifact('xetex.pool', res.pool),
+        artifact('xetex.tangle.out', res.output),
+      ] : [],
+      logs: (_, res) => {
+        const modules = extractModuleNumbers(res.output)
+        return [
+          `banner: ${firstLine(res.output)}`,
+          `modules: ${modules.slice(0, 80)}...`,
+          `pascal first: ${previewLine(res.pascal)}`,
+          ...tailLines(res.output, 5).map(
+            (l, i, arr) => `tail[${arr.length - i}]: ${JSON.stringify(l)}`
+          ),
+        ]
+      },
+    }),
   },
 ]
 
