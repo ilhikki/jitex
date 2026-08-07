@@ -24,9 +24,7 @@
  *
  * 设计：
  *   - 流水线模式：阶段顺序执行，复用上一阶段结果，失败则后续跳过
- *   --fresh 模式：每阶段独立运行（用于调试单阶段）
  */
-import * as os from 'os'
 import { parse } from '@/index'
 import { transform } from '@/compiler/transform'
 import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
@@ -57,36 +55,22 @@ import {
 } from './_helper'
 import { tie } from './tie'
 import { createReport, REPORT_DIR, StageArtifact, StageReport, writeReport } from './reporter'
+import * as os from 'os'
 import * as path from 'path'
-import * as fs from 'fs'
 
 // ============================================================
 // 命令行参数
 // ============================================================
 
 export interface CliOptions {
-  stages?: number[]
   list: boolean
-  report: boolean
-  noCache: boolean
 }
 
 export function parseArgs(args: string[]): CliOptions {
-  const opts: CliOptions = { list: false, report: false, noCache: false }
+  const opts: CliOptions = { list: false }
   for (const arg of args) {
     if (arg === '--list') {
       opts.list = true
-    } else if (arg === '--report') {
-      opts.report = true
-    } else if (arg === '--fresh') {
-      opts.noCache = true
-    } else if (arg.startsWith('--stage=')) {
-      const v = arg.slice('--stage='.length)
-      const nums = v
-        .split(',')
-        .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => !isNaN(n))
-      opts.stages = [...(opts.stages ?? []), ...nums]
     }
   }
   return opts
@@ -2379,13 +2363,10 @@ const stages: StageDef[] = [
 // 主执行器
 // ============================================================
 
-export async function runE2E(opts: CliOptions): Promise<void> {
+export async function runE2E(): Promise<void> {
   console.log(`\n${'='.repeat(70)}`)
   console.log('E2E 测试运行器')
   console.log(`时间: ${timestamp()}`)
-  console.log(
-    `参数: ${opts.stages ? `--stage=${opts.stages.join(',')}` : 'all'}${opts.noCache ? ' --fresh' : ''}`
-  )
   console.log(`${'='.repeat(70)}\n`)
 
   const ctx = createContext()
@@ -2398,9 +2379,7 @@ export async function runE2E(opts: CliOptions): Promise<void> {
   const origWarn = console.warn
 
   for (const stage of stages) {
-    if (opts.stages && !opts.stages.includes(stage.id)) continue
-
-    if (!opts.noCache && ctx.failedAt && !opts.stages) {
+    if (ctx.failedAt) {
       const report = skippedStage(String(stage.id), stage.title, `prev ${ctx.failedAt} failed`)
       stageReports.push(report)
       printStageProgress(report)
@@ -2505,25 +2484,6 @@ export function listStages(): void {
     console.log(`  [${String(stage.id).padStart(2, ' ')}] ${stage.title}`)
   }
   console.log('\n用法：')
-  console.log('  npm run e2e                  # 运行所有阶段')
-  console.log('  npm run e2e -- --stage=10    # 只运行阶段 10')
-  console.log('  npm run e2e -- --list        # 列出所有阶段')
-  console.log('  npm run e2e -- --report      # 运行后打开 HTML 报告')
-  console.log('  npm run e2e -- --fresh       # 禁用流水线复用')
-}
-
-export function openReport(): void {
-  const indexPath = path.join(REPORT_DIR, 'index.html')
-  if (!fs.existsSync(indexPath)) {
-    console.error(`报告不存在: ${indexPath}`)
-    return
-  }
-  const platform = os.platform()
-  const cmd = platform === 'win32' ? 'start ""' : platform === 'darwin' ? 'open' : 'xdg-open'
-  try {
-    require('child_process').execSync(`${cmd} "${indexPath}"`)
-    console.log(`已打开报告: ${indexPath}`)
-  } catch {
-    console.log(`请手动打开报告: ${indexPath}`)
-  }
+  console.log('  npm run e2e              # 运行所有阶段')
+  console.log('  npm run e2e -- --list   # 列出所有阶段')
 }
