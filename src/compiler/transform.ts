@@ -12,7 +12,7 @@
  *   3. compile：AST + Analysis → JsonCode
  *   4. 后处理 JsonCode：插入 programFileUrls 的 file.assign
  *   5. toJs：JsonCode → JS 代码字符串（通过 SemanticCompiler 实现）
- *   6. 包装：返回可执行的 JS 代码
+ *   6. 包装：返回 ES module 代码（export）
  *
  * SemanticCompiler 实现（决策 6）：
  *   - literalToJs：i64/f64/str/char/bool → JS 字面量
@@ -41,8 +41,6 @@ export interface TransformOptions {
   extensions?: string[]
   /** 非标特性插件（AGENTS.md 原则 A.7：注入优先） */
   plugins?: IlPlugin[]
-  /** 调试模式：生成带可读变量名的 JS 代码（v{id}_{name}） */
-  debug?: boolean
 }
 
 // ============================================================
@@ -295,9 +293,19 @@ class PascalSemanticCompiler implements SemanticCompiler {
 }
 
 // ============================================================
-// transform：Pascal 源码 → JS 代码字符串
+// transform：Pascal 源码 → ES module JS 代码
 // ============================================================
 
+/**
+ * 将 Pascal 源码编译为 ES module JS 代码字符串。
+ *
+ * 输出格式（ES module，非 CommonJS）：
+ *   function v1_main(__sys) { ... }
+ *   export { v1_main };
+ *
+ * 变量/函数名携带可读名（v{id}_{name}），便于调试。
+ * __sys 作为顶层函数参数，由 executeCompiled 或 import 后调用时注入。
+ */
 export function transform(source: string, options: TransformOptions = {}): string {
   // 1. parse
   const ast = parseSource(source)
@@ -311,16 +319,45 @@ export function transform(source: string, options: TransformOptions = {}): strin
   // 4. 后处理：插入 programFileUrls 的 file.assign
   jsonCode = applyProgramFileUrls(jsonCode, analysis, options.programFileUrls)
 
-  // 5. toJs
+  // 5. toJs（始终携带可读变量名）
   const semantic = new PascalSemanticCompiler()
-  const jsBody = toJs(jsonCode, {
+  const { code: jsBody, mainName } = toJs(jsonCode, {
     semantic,
-    debugNames: options.debug ? analysis.debugNames() : undefined,
+    debugNames: analysis.debugNames(),
   })
 
-  // 6. 包装：返回可执行的 JS 代码
-  //    __sys 通过闭包在生成的函数内部可见
-  return `return ${jsBody}`
+  // 6. 包装为 ES module
+  return `${jsBody}\nexport { ${mainName} };`
+}
+
+// ============================================================
+// executeCompiled：执行 transform 生成的 ES module 代码
+// ============================================================
+
+/**
+ * 执行 transform() 生成的 ES module 代码。
+ *
+ * 生成的代码格式：
+ *   function v1_main(__sys) { ... }
+ *   export { v1_main };
+ *
+ * 执行方式：移除 export 语句，用 new Function 创建并调用顶层函数。
+ * __sys dispatcher 作为参数传入。
+ */
+export function executeCompiled(
+  code: string,
+  __sys: (key: string, args: any[]) => any
+): void {
+  // 提取导出的函数名
+  const exportMatch = code.match(/export\s*\{\s*(\w+)\s*\}/)
+  if (!exportMatch) throw new Error('executeCompiled: no export found in code')
+  const mainName = exportMatch[1]
+
+  // 移除 export 语句，添加 return
+  const execCode = code.replace(/export\s*\{[^}]+\};?\s*$/, `return ${mainName};`)
+  const factory = new Function(execCode)
+  const mainFn = factory()
+  mainFn(__sys)
 }
 
 // ============================================================
@@ -352,10 +389,8 @@ export function run(source: string, options: RunOptions = {}): RunState {
     // __sys dispatcher
     const __sys = (key: string, args: any[]): any => dispatch(ctx, key, args)
 
-    // 执行
-    const factory = new Function('__sys', jsCode)
-    const mainFn = factory(__sys)
-    mainFn()
+    // 执行（ES module 代码）
+    executeCompiled(jsCode, __sys)
 
     return toRunState(ctx, 'terminated')
   } catch (e: any) {

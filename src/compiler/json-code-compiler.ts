@@ -17,8 +17,16 @@ export interface JsCompiler {
   compileStatement(stmt: JsonCode.Statement): string
 }
 
-export function toJs(fn: JsonCode.Function, options: ToJsOptions = {}): string {
-  return new JsCompilerImpl(options).compileFunction(fn, true)
+export interface ToJsResult {
+  code: string
+  /** 顶层函数的编译名，用于 ES module 的 export 语句 */
+  mainName: string
+}
+
+export function toJs(fn: JsonCode.Function, options: ToJsOptions = {}): ToJsResult {
+  const compiler = new JsCompilerImpl(options)
+  const code = compiler.compileFunction(fn, true)
+  return { code, mainName: compiler.compileId(fn.id) }
 }
 
 class JsCompilerImpl implements JsCompiler {
@@ -27,7 +35,7 @@ class JsCompilerImpl implements JsCompiler {
   compileFunction(fn: JsonCode.Function, top: boolean, indent = ''): string {
     const lines: string[] = []
 
-    lines.push(`${indent}${this.functionHeader(fn)}`)
+    lines.push(`${indent}${this.functionHeader(fn, top)}`)
 
     if (top) {
       lines.push(`${indent}  let __is_long_jump_mode = false;`)
@@ -49,9 +57,11 @@ class JsCompilerImpl implements JsCompiler {
     return lines.join('\n')
   }
 
-  private functionHeader(fn: JsonCode.Function): string {
-    const params = fn.params.map((x) => this.compileId(x)).join(', ')
-    return `function ${this.compileId(fn.id)}(${params}) {`
+  private functionHeader(fn: JsonCode.Function, top: boolean): string {
+    const params = fn.params.map((x) => this.compileId(x))
+    // 顶层函数添加 __sys 参数（ES module 导出后由外部注入 dispatcher）
+    if (top) params.unshift('__sys')
+    return `function ${this.compileId(fn.id)}(${params.join(', ')}) {`
   }
 
   private compileBody(fn: JsonCode.Function, lines: string[], indent: string) {

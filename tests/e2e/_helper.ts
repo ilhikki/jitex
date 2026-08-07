@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { run as runIL, transform } from '@/compiler/transform'
+import { run as runIL, transform, executeCompiled } from '@/compiler/transform'
 import { createRuntimeContext, dispatch, toRunState } from '@/compiler/runtime'
 import type { IlPlugin } from '@/compiler/plugin'
 import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
@@ -262,9 +262,7 @@ export function runTeXCompiled(
 
   let state: any
   try {
-    const factory = new Function('__sys', compiledJs)
-    const mainFn = factory(__sys)
-    mainFn()
+    executeCompiled(compiledJs, __sys)
     state = toRunState(ctx, 'terminated')
   } catch (e: any) {
     // 完整错误堆栈保存到 state.error.stackTrace，由 e2e 报告消费
