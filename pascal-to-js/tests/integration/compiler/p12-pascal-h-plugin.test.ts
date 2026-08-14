@@ -6,7 +6,7 @@
  *
  * ISO 7185 章节引用：6.9.8.2（标准过程列表）
  */
-import { describe, test, assert, assertEquals } from './_helper'
+import { assert, assertEquals, describe, test } from './_helper'
 import { run } from '@/compiler/transform'
 import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
 
@@ -21,7 +21,9 @@ function ok(state: { status: string; outputBuffer: string[] }, expectedOutput: s
   assertEquals(
     state.outputBuffer.join(''),
     expectedOutput,
-    `${label}: output mismatch.\n  expected: ${JSON.stringify(expectedOutput)}\n  actual:   ${JSON.stringify(state.outputBuffer.join(''))}`,
+    `${label}: output mismatch.\n  expected: ${JSON.stringify(expectedOutput)}\n  actual:   ${
+      JSON.stringify(state.outputBuffer.join(''))
+    }`,
   )
 }
 

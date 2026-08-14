@@ -14,7 +14,7 @@
  * 哪些走 dispatcher（IO/file/cell/mem/set）。本文件实现所有走 dispatcher 的 key。
  */
 
-import type { RunState, RunError } from '@/runtime/run-state'
+import type { RunError, RunState } from '@/runtime/run-state'
 import type { PascalFile } from '@/runtime/file-model'
 import type { IlPlugin } from '@/compiler/plugin'
 
@@ -133,7 +133,7 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
 export function toRunState(
   ctx: RuntimeContext,
   status: 'running' | 'terminated' | 'error' = 'terminated',
-  error?: RunError | null
+  error?: RunError | null,
 ): RunState {
   return {
     status,
@@ -291,11 +291,9 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
     case 'io.write.f64.fmt':
       ctx.outputBuffer.push(
         formatField(
-          args[2] !== undefined
-            ? (args[0] as number).toFixed(args[2] as number)
-            : formatReal(args[0] as number),
-          args[1] as number
-        )
+          args[2] !== undefined ? (args[0] as number).toFixed(args[2] as number) : formatReal(args[0] as number),
+          args[1] as number,
+        ),
       )
       return undefined
     case 'io.write.bool.fmt':
@@ -318,11 +316,9 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
         ctx,
         args[0],
         formatField(
-          args[3] !== undefined
-            ? (args[1] as number).toFixed(args[3] as number)
-            : formatReal(args[1] as number),
-          args[2] as number
-        )
+          args[3] !== undefined ? (args[1] as number).toFixed(args[3] as number) : formatReal(args[1] as number),
+          args[2] as number,
+        ),
       )
       return undefined
     case 'io.write.bool.fmt.file':
@@ -402,7 +398,9 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
         ctx.fileStates.delete(args[0] as PascalFile)
       }
       ctx.debugLog.push(
-        `[file.reset] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${ctx.files.get(args[0].url)?.length ?? -1}`
+        `[file.reset] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${
+          ctx.files.get(args[0].url)?.length ?? -1
+        }`,
       )
       resetFile(ctx, args[0], false)
       return undefined
@@ -414,7 +412,9 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
         ctx.fileStates.delete(args[0] as PascalFile)
       }
       ctx.debugLog.push(
-        `[file.reset.binary] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${ctx.files.get(args[0].url)?.length ?? -1}`
+        `[file.reset.binary] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${
+          ctx.files.get(args[0].url)?.length ?? -1
+        }`,
       )
       resetFile(ctx, args[0], true)
       return undefined
@@ -456,7 +456,7 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
       const s = getFileState(ctx, args[0] as PascalFile)
       if (!s.writable) {
         throw new Error(
-          'put(f) before rewrite: pre-assertion violated (ISO 7185 6.6.5.2: f0.M must be Generation)'
+          'put(f) before rewrite: pre-assertion violated (ISO 7185 6.6.5.2: f0.M must be Generation)',
         )
       }
       if (args.length >= 2) {
@@ -493,7 +493,9 @@ export function dispatch(ctx: RuntimeContext, key: string, args: any[]): any {
         ctx.fileStates.delete(args[0] as PascalFile)
       }
       ctx.debugLog.push(
-        `[file.rec.reset] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${ctx.files.get(args[0].url)?.length ?? -1}`
+        `[file.rec.reset] url="${args[0].url}" found=${ctx.files.has(args[0].url)} contentLen=${
+          ctx.files.get(args[0].url)?.length ?? -1
+        }`,
       )
       resetRecFile(ctx, args[0], typeDesc)
       return undefined
@@ -641,10 +643,7 @@ function getArrayElement(arr: any, indices: any[]): any {
 function setArrayElement(arr: any, indices: any[], value: any): void {
   let cur = arr
   for (let i = 0; i < indices.length - 1; i++) {
-    const n =
-      typeof indices[i] === 'string' && indices[i].length === 1
-        ? indices[i].charCodeAt(0)
-        : indices[i]
+    const n = typeof indices[i] === 'string' && indices[i].length === 1 ? indices[i].charCodeAt(0) : indices[i]
     cur = cur[n]
   }
   const last = indices[indices.length - 1]
@@ -871,10 +870,10 @@ function getFile(ctx: RuntimeContext, file: PascalFile): void {
   // 违反 pre-assertion 应报错（"It shall be an error if the stated pre-assertion does not hold"）
   if (s.eof) {
     ctx.debugLog.push(
-      `[getFile] EOF url="${file.url}" offset=${s.offset} fileElemTag=${s.fileElemTag ?? '(none)'}`
+      `[getFile] EOF url="${file.url}" offset=${s.offset} fileElemTag=${s.fileElemTag ?? '(none)'}`,
     )
     throw new Error(
-      `get(f) at EOF: pre-assertion violated (ISO 7185 6.6.5.2: f0.R must not be empty) [url=${file.url}]`
+      `get(f) at EOF: pre-assertion violated (ISO 7185 6.6.5.2: f0.R must not be empty) [url=${file.url}]`,
     )
   }
   const content = getCurrentContent(ctx, file)
@@ -926,7 +925,7 @@ function peekFile(ctx: RuntimeContext, file: PascalFile): string {
     // 非标 extension `fileEofBufferSpace`：EOF 时 F^ 返回空格（UCSD/Borland 扩展，Knuth WEB 依赖）。
     if (!ctx.extensions.has('fileEofBufferSpace')) {
       throw new Error(
-        'F^ accessed at EOF: undefined behavior (ISO 7185 6.9.8); enable extension "fileEofBufferSpace" to return space'
+        'F^ accessed at EOF: undefined behavior (ISO 7185 6.9.8); enable extension "fileEofBufferSpace" to return space',
       )
     }
     return ' '
@@ -1138,8 +1137,7 @@ function writelnToFile(ctx: RuntimeContext, file: PascalFile): void {
   }
   // pool 文件写入追踪（TANGLE 生成 pool 时记录每一行，便于诊断字符串 ID 偏移）
   // TANGLE 写入 url='POOL'，TeX 读取 url='TeXformats:TEX.POOL'，两者均需追踪
-  const isPoolWrite =
-    typeof file.url === 'string' && (file.url === 'POOL' || file.url.includes('TEX.POOL'))
+  const isPoolWrite = typeof file.url === 'string' && (file.url === 'POOL' || file.url.includes('TEX.POOL'))
   if (isPoolWrite) {
     const cnt = (__poolWriteCount.get(file) ?? 0) + 1
     __poolWriteCount.set(file, cnt)
@@ -1169,7 +1167,9 @@ function readFilelnSkip(ctx: RuntimeContext, file: PascalFile): void {
     __poolLineCount.set(file, cnt)
     // 诊断信息收集到 ctx.debugLog，由 e2e 报告消费
     ctx.debugLog.push(
-      `[POOL readln #${cnt} off=${start}->${s.offset}] ${JSON.stringify(Array.from(lineBytes, (b: number) => String.fromCharCode(b)).join(''))}`
+      `[POOL readln #${cnt} off=${start}->${s.offset}] ${
+        JSON.stringify(Array.from(lineBytes, (b: number) => String.fromCharCode(b)).join(''))
+      }`,
     )
   }
   if (s.eof) return

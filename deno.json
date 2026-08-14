@@ -5,13 +5,6 @@
     "./boot-tex"
   ],
   "unstable": ["sloppy-imports"],
-  "tasks": {
-    "test": "deno test -A pascal-to-js/tests/",
-    "test:unit": "deno test -A pascal-to-js/tests/unit/",
-    "test:integration": "deno test -A pascal-to-js/tests/integration/",
-    "test:benchmark": "deno test -A pascal-to-js/tests/benchmark/",
-    "check": "deno check pascal-to-js/src/index.ts"
-  },
   "compilerOptions": {
     "strict": true
   },

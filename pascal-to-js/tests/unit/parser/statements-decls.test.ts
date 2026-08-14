@@ -3,7 +3,7 @@ import { CaseStatementNode, ParserInput, ProgramNode } from '@/ast/types'
 import { parseStatement } from '@/parser/statements'
 import { parseFunctionDeclaration, parseProcedureDeclaration } from '@/parser/declarations'
 import { parse } from '@/index'
-import { describe, test, assert, assertEquals } from '../../_harness.ts'
+import { assert, assertEquals, describe, test } from '../../_harness.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

@@ -10,7 +10,8 @@
   1. Analysis（`compiler/analysis.ts`）：AST → 符号表 + 类型信息 + id 到名字映射
   2. Compile（`compiler/compiler.ts` + `compiler/json-code-compiler.ts`）：AST + Analysis → JsonCode → JS 代码
 - **同步运行时**：`compiler/runtime.ts` 提供同步 syscall dispatcher（`__sys(key, args)`），无 async/await。
-- **语义编译器**：`compiler/transform.ts` 中的 `PascalSemanticCompiler` 决定哪些 syscall inline（算术/比较），哪些走 dispatcher（IO/file/cell/mem/set）。
+- **语义编译器**：`compiler/transform.ts` 中的 `PascalSemanticCompiler` 决定哪些 syscall inline（算术/比较），哪些走
+  dispatcher（IO/file/cell/mem/set）。
 - **非标扩展**：默认未启用的非标特性遇到即抛错（如 `string` 类型需显式启用）。
 
 ## 如何更新本文档

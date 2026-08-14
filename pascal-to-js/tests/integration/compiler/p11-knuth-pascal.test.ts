@@ -33,8 +33,7 @@ BEGIN
   REWRITE(TERMOUT);
   WRITELN(TERMOUT, 'Hello');
 END.`,
-      purpose:
-        'Knuth 风格：TEXTFILE = PACKED FILE OF CHAR 类型定义（tangle-official.pas 中的定义）',
+      purpose: 'Knuth 风格：TEXTFILE = PACKED FILE OF CHAR 类型定义（tangle-official.pas 中的定义）',
       expectedContains: 'Hello',
     },
 
@@ -195,7 +194,8 @@ BEGIN
   CH := F^;
   WRITELN('ch=', CH);
 END.`,
-      purpose: 'Knuth 风格：F^ 访问文件缓冲区（tangle-official.pas 中 INPUTLN 等过程使用）；REWRITE 后 EOF=true，启用 fileEofBufferSpace 扩展',
+      purpose:
+        'Knuth 风格：F^ 访问文件缓冲区（tangle-official.pas 中 INPUTLN 等过程使用）；REWRITE 后 EOF=true，启用 fileEofBufferSpace 扩展',
       extensions: ['fileEofBufferSpace'],
       expectedContains: 'ch=',
     },
@@ -223,7 +223,8 @@ BEGIN
   REWRITE(F);
   IF F^ = ' ' THEN WRITELN('space') ELSE WRITELN('other');
 END.`,
-      purpose: 'F^ 在 if 表达式中使用；REWRITE 后 EOF=true，访问 F^ 属 ISO 7185 6.9.8 未定义行为，启用 fileEofBufferSpace 扩展返回空格',
+      purpose:
+        'F^ 在 if 表达式中使用；REWRITE 后 EOF=true，访问 F^ 属 ISO 7185 6.9.8 未定义行为，启用 fileEofBufferSpace 扩展返回空格',
       extensions: ['fileEofBufferSpace'],
       expectedContains: 'space',
     },

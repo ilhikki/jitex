@@ -221,7 +221,7 @@ export function compileProgram(program: ProgramNode, a: Analysis): JsonCode.Func
 function compileBlock(
   block: BlockNode,
   a: Analysis,
-  parentDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null
+  parentDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null,
 ): JsonCode.Function {
   const funcId = parentDecl ? a.funcOfDecl(parentDecl) : a.funcOfBlock(block)
   const info = a.funcInfo(funcId)
@@ -305,7 +305,7 @@ export function compileStmt(
   node: StatementNode,
   a: Analysis,
   funcId: number,
-  withStack: WithBinding[]
+  withStack: WithBinding[],
 ): JsonCode.Statement[] {
   switch (node.kind) {
     case 'CompoundStatement':
@@ -341,7 +341,7 @@ function compileCompound(
   node: CompoundStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const out: JsonCode.Statement[] = []
   for (const s of node.statements) {
@@ -354,7 +354,7 @@ function compileAssignment(
   node: AssignmentNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   // Pascal record 赋值是值拷贝语义（ISO 7185），JS 对象赋值是引用。
   // 若左值类型为 record，用 rec.copy 深拷贝右值，避免别名共享。
@@ -397,10 +397,9 @@ function compileAssignment(
     if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
       const ti = sym.typeInfo
       // subrange 运行时边界检查
-      const rangeCheck =
-        ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
-          ? evalStmt(syscall('range.check', [ref(sym.varId), litInt(ti.low), litInt(ti.high)]))
-          : null
+      const rangeCheck = ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
+        ? evalStmt(syscall('range.check', [ref(sym.varId), litInt(ti.low), litInt(ti.high)]))
+        : null
       if (sym.isVarParam) {
         const stmts: JsonCode.Statement[] = [evalStmt(syscall('cell.set', [ref(sym.varId), value]))]
         if (rangeCheck) stmts.push(rangeCheck)
@@ -473,7 +472,7 @@ function compileIf(
   node: IfStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const cond = compileExpr(node.condition, a, ws)
   const L_then = a.nextId()
@@ -496,7 +495,7 @@ function compileWhile(
   node: WhileStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const L_top = a.nextId()
   const L_body = a.nextId()
@@ -517,7 +516,7 @@ function compileRepeat(
   node: RepeatStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const L_top = a.nextId()
   const L_end = a.nextId()
@@ -539,7 +538,7 @@ function compileFor(
   node: ForStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const varSym = resolveSymbol(node.variable, a, ws)
   if (!varSym || (varSym.kind !== 'var' && varSym.kind !== 'param')) {
@@ -578,7 +577,7 @@ function compileCase(
   node: CaseStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const caseVar = a.allocTempLocal(funcId, a.typeOf(node.expression))
   const L_end = a.nextId()
@@ -609,8 +608,8 @@ function compileCase(
       jumpIfStmt(
         syscall('cmp.eq', [ref(caseVar), checks[i].labelExpr]),
         checks[i].bodyLabel,
-        L_next
-      )
+        L_next,
+      ),
     )
     if (!isLast) {
       out.push(labelStmt(L_next))
@@ -659,7 +658,7 @@ function compileLabeled(
   node: LabeledStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const info = a.labelInfo(funcId, node.label.value)
   if (!info) throw new Error(`compileLabeled: label ${node.label.value} not declared`)
@@ -670,7 +669,7 @@ function compileWith(
   node: WithStatementNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const temps = a.withTempsOf(node)
   const out: JsonCode.Statement[] = []
@@ -701,7 +700,7 @@ function compileProcedureCall(
   node: ProcedureCallNode,
   a: Analysis,
   funcId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const name = node.name.name.toLowerCase()
   const sym = resolveSymbol(node.name, a, ws)
@@ -764,8 +763,8 @@ function compileProcedureCall(
         evalStmt(
           syscall(
             'file.close',
-            node.arguments.map((x) => compileExpr(x, a, ws))
-          )
+            node.arguments.map((x) => compileExpr(x, a, ws)),
+          ),
         ),
       ]
     case 'assign':
@@ -773,8 +772,8 @@ function compileProcedureCall(
         evalStmt(
           syscall(
             'file.assign',
-            node.arguments.map((x) => compileExpr(x, a, ws))
-          )
+            node.arguments.map((x) => compileExpr(x, a, ws)),
+          ),
         ),
       ]
     case 'get': {
@@ -802,8 +801,8 @@ function compileProcedureCall(
         evalStmt(
           syscall(
             'io.page',
-            node.arguments.map((x) => compileExpr(x, a, ws))
-          )
+            node.arguments.map((x) => compileExpr(x, a, ws)),
+          ),
         ),
       ]
     case 'new': {
@@ -862,7 +861,7 @@ function compileUserCallStmt(
   args: ExpressionNode[],
   a: Analysis,
   curFuncId: number,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Statement[] {
   const info = a.funcInfo(funcId)
   const out: JsonCode.Statement[] = []
@@ -924,7 +923,7 @@ function compileWriteln(
   args: ExpressionNode[],
   a: Analysis,
   ws: WithBinding[],
-  noNewline: boolean
+  noNewline: boolean,
 ): JsonCode.Statement[] {
   const out: JsonCode.Statement[] = []
 
@@ -1022,7 +1021,7 @@ function compileReadln(
   args: ExpressionNode[],
   a: Analysis,
   ws: WithBinding[],
-  isRead: boolean
+  isRead: boolean,
 ): JsonCode.Statement[] {
   const out: JsonCode.Statement[] = []
 
@@ -1283,7 +1282,7 @@ function compileUnary(node: UnaryExpressionNode, a: Analysis, ws: WithBinding[])
 function compileFunctionCall(
   node: FunctionCallNode,
   a: Analysis,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Expr {
   const sym = resolveSymbol(node.name, a, ws)
 
@@ -1449,7 +1448,7 @@ function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[
 function compileSetConstructor(
   node: SetConstructorNode,
   a: Analysis,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Expr {
   if (node.elements.length === 0) {
     return syscall('set.empty', [])
@@ -1471,7 +1470,7 @@ function compileSetConstructor(
 function compileInExpression(
   node: InExpressionNode,
   a: Analysis,
-  ws: WithBinding[]
+  ws: WithBinding[],
 ): JsonCode.Expr {
   const L = compileExpr(node.left, a, ws)
   const R = compileExpr(node.right, a, ws)

@@ -33,14 +33,16 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6)', () => {
     // --- rewrite / put / write / writeln ---
     {
       name: '6.6.5.2 rewrite(f): 正向 - 创建新文件用于写入',
-      code: `program test; var f: file of char; begin assign(f,'OUT.TXT'); rewrite(f); writeln(f,'hello'); close(f); end.`,
+      code:
+        `program test; var f: file of char; begin assign(f,'OUT.TXT'); rewrite(f); writeln(f,'hello'); close(f); end.`,
       purpose: 'ISO 6.6.5.2 rewrite(f) post-assertion: f.M = Generation, f.L = f.R = S()',
       files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
       expectedFileContains: [{ url: 'OUT.TXT', contains: 'hello' }],
     },
     {
       name: '6.6.5.2 put(f): 正向 - 将缓冲区内容追加到文件',
-      code: `program test; var f: file of integer; v: integer; begin assign(f,'OUT.TXT'); rewrite(f); v := 42; f^ := v; put(f); close(f); end.`,
+      code:
+        `program test; var f: file of integer; v: integer; begin assign(f,'OUT.TXT'); rewrite(f); v := 42; f^ := v; put(f); close(f); end.`,
       purpose: 'ISO 6.6.5.2 put(f) pre-assertion: f.M = Generation, f^ is not undefined',
       files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
       expectedFileContains: [{ url: 'OUT.TXT', contains: '42' }],
@@ -57,21 +59,24 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6)', () => {
     // --- reset / get / read / readln ---
     {
       name: '6.6.5.2 reset(f): 正向 - 打开文件用于读取，F^ 指向首字符',
-      code: `program test; var f: file of char; ch: char; begin assign(f,'IN.TXT'); reset(f); ch := f^; write(ch); end.`,
+      code:
+        `program test; var f: file of char; ch: char; begin assign(f,'IN.TXT'); reset(f); ch := f^; write(ch); end.`,
       purpose: 'ISO 6.6.5.2 reset(f) post-assertion: f.M = Inspection, f^ = f.R.first',
       files: new Map<string, Uint8Array>([['IN.TXT', text('AB')]]),
       expectedContains: 'A',
     },
     {
       name: '6.6.5.2 reset(f): 正向 - 空文件 reset 后 EOF 为真',
-      code: `program test; var f: file of char; begin assign(f,'EMPTY.TXT'); reset(f); if eof(f) then write('EMPTY') else write('NOT EMPTY'); end.`,
+      code:
+        `program test; var f: file of char; begin assign(f,'EMPTY.TXT'); reset(f); if eof(f) then write('EMPTY') else write('NOT EMPTY'); end.`,
       purpose: 'ISO 6.6.5.2 reset(f) post-assertion: f.R = S() => f^ undefined, eof true',
       files: new Map<string, Uint8Array>([['EMPTY.TXT', new Uint8Array(0)]]),
       expectedContains: 'EMPTY',
     },
     {
       name: '6.6.5.2 get(f): 正向 - 推进到下一个组件',
-      code: `program test; var f: file of char; ch: char; begin assign(f,'IN.TXT'); reset(f); get(f); ch := f^; write(ch); end.`,
+      code:
+        `program test; var f: file of char; ch: char; begin assign(f,'IN.TXT'); reset(f); get(f); ch := f^; write(ch); end.`,
       purpose: 'ISO 6.6.5.2 get(f) post-assertion: f.R = f0.R.rest, f^ = f.R.first',
       files: new Map<string, Uint8Array>([['IN.TXT', text('AB')]]),
       expectedContains: 'B',
@@ -86,14 +91,16 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6)', () => {
     },
     {
       name: '6.6.5.2 read(f, v): 正向 - 从文件读整数',
-      code: `program test; var f: file of char; n: integer; begin assign(f,'IN.TXT'); reset(f); read(f, n); write(n); end.`,
+      code:
+        `program test; var f: file of char; n: integer; begin assign(f,'IN.TXT'); reset(f); read(f, n); write(n); end.`,
       purpose: 'ISO 6.6.5.2 read(f, v) integer case: s forms signed-integer',
       files: new Map<string, Uint8Array>([['IN.TXT', text('42')]]),
       expectedContains: '42',
     },
     {
       name: '6.6.5.2 read(f, c): 正向 - 读 char 不跳过空格',
-      code: `program test; var f: file of char; c: char; begin assign(f,'IN.TXT'); reset(f); read(f, c); write(ord(c)); end.`,
+      code:
+        `program test; var f: file of char; c: char; begin assign(f,'IN.TXT'); reset(f); read(f, c); write(ord(c)); end.`,
       purpose: 'ISO 6.6.5.2 read(f, v) char case: s length 1, 不跳过空格',
       files: new Map<string, Uint8Array>([['IN.TXT', text(' A')]]),
       expectedContains: '32',
@@ -102,7 +109,8 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6)', () => {
     // --- page ---
     {
       name: '6.6.5.2 page(f): 正向 - 写入 form feed 字符',
-      code: `program test; var f: file of char; begin assign(f,'OUT.TXT'); rewrite(f); page(f); write(f, 'X'); close(f); end.`,
+      code:
+        `program test; var f: file of char; begin assign(f,'OUT.TXT'); rewrite(f); page(f); write(f, 'X'); close(f); end.`,
       purpose: 'ISO 6.6.5.2 page(f) 在文件中写入 form feed (0x0C)',
       files: new Map<string, Uint8Array>([['OUT.TXT', new Uint8Array(0)]]),
       expectedFileContains: [{ url: 'OUT.TXT', contains: '\f' }],
@@ -120,19 +128,22 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6)', () => {
     },
     {
       name: '6.6.5.3 new(p): 正向 - new 后 p 不等于 nil',
-      code: `program test; type iptr = ^integer; var p: iptr; begin new(p); if p <> nil then write('NOTNIL') else write('NIL'); dispose(p); end.`,
+      code:
+        `program test; type iptr = ^integer; var p: iptr; begin new(p); if p <> nil then write('NOTNIL') else write('NIL'); dispose(p); end.`,
       purpose: 'ISO 6.6.5.3 new(p) 后 p 是 identifying-value，非 nil',
       expectedContains: 'NOTNIL',
     },
     {
       name: '6.6.5.3 nil 比较: 正向 - 未初始化指针等于 nil',
-      code: `program test; type iptr = ^integer; var p: iptr; begin if p = nil then write('NIL') else write('NOTNIL'); end.`,
+      code:
+        `program test; type iptr = ^integer; var p: iptr; begin if p = nil then write('NIL') else write('NOTNIL'); end.`,
       purpose: 'ISO 6.4.4: 指针变量默认为 nil-value',
       expectedContains: 'NIL',
     },
     {
       name: '6.6.5.3 new/record: 正向 - 指向记录的指针',
-      code: `program test; type rptr = ^rec; rec = record x: integer; y: integer; end; var p: rptr; begin new(p); p^.x := 10; p^.y := 20; write(p^.x + p^.y); dispose(p); end.`,
+      code:
+        `program test; type rptr = ^rec; rec = record x: integer; y: integer; end; var p: rptr; begin new(p); p^.x := 10; p^.y := 20; write(p^.x + p^.y); dispose(p); end.`,
       purpose: 'ISO 6.6.5.3 new(p) 对记录类型，p^.field 访问',
       expectedContains: '30',
     },
@@ -358,14 +369,16 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6)', () => {
     },
     {
       name: '6.6.6.5 eof(f): 正向 - 文件末尾检测',
-      code: `program test; var f: file of char; begin assign(f,'EMPTY.TXT'); reset(f); if eof(f) then write('EOF'); end.`,
+      code:
+        `program test; var f: file of char; begin assign(f,'EMPTY.TXT'); reset(f); if eof(f) then write('EOF'); end.`,
       purpose: 'ISO 6.6.6.5 eof(f): "true if f.R is empty sequence"',
       files: new Map<string, Uint8Array>([['EMPTY.TXT', new Uint8Array(0)]]),
       expectedContains: 'EOF',
     },
     {
       name: '6.6.6.5 eoln(f): 正向 - 行结束检测',
-      code: `program test; var f: file of char; begin assign(f,'IN.TXT'); reset(f); while not eoln(f) do get(f); if eoln(f) then write('EOLN'); end.`,
+      code:
+        `program test; var f: file of char; begin assign(f,'IN.TXT'); reset(f); while not eoln(f) do get(f); if eoln(f) then write('EOLN'); end.`,
       purpose: 'ISO 6.6.6.5 eoln(f): "true if f^ is end-of-line or end-of-file"',
       files: new Map<string, Uint8Array>([['IN.TXT', text('AB\n')]]),
       expectedContains: 'EOLN',

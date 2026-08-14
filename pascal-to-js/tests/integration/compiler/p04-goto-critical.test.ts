@@ -534,8 +534,7 @@ begin
   writeln('done');
 end.`,
       purpose: 'while 循环体末尾有多个连续 label',
-      expectedContains:
-        'label 10, i=1\nlabel 20\nlabel 10, i=2\nlabel 20\nlabel 10, i=3\nlabel 20\ndone',
+      expectedContains: 'label 10, i=1\nlabel 20\nlabel 10, i=2\nlabel 20\nlabel 10, i=3\nlabel 20\ndone',
       maxSteps: 10000,
     },
 

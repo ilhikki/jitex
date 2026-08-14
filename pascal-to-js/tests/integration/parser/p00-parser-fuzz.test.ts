@@ -120,7 +120,7 @@ ${genDeepProc(10)}
 `,
       `
   p10
-`
+`,
     ),
     purpose: '测试10层嵌套过程声明，验证过程声明递归解析',
     shouldParse: true,
@@ -130,7 +130,7 @@ ${genDeepProc(10)}
     code: makeProgramWithVars(
       'x, y: integer;',
       '',
-      `begin\n  y := ${genDeepParens(30, 'x + 1')};\nend`
+      `begin\n  y := ${genDeepParens(30, 'x + 1')};\nend`,
     ),
     purpose: '测试30层括号嵌套表达式，验证表达式递归解析',
     shouldParse: true,
@@ -146,7 +146,7 @@ ${genDeepProc(10)}
           result = `repeat\n  ${result}\nuntil x > ${i}`
         }
         return result
-      })()
+      })(),
     ),
     purpose: '测试15层 REPEAT-UNTIL 嵌套，验证 repeat 语句递归解析',
     shouldParse: true,
@@ -162,7 +162,7 @@ ${genDeepProc(10)}
           result = `for i${i} := 1 to 10 do\n  ${result}`
         }
         return 'x := 0;\n  ' + result
-      })()
+      })(),
     ),
     purpose: '测试15层 FOR 循环嵌套，验证 for 语句递归解析',
     shouldParse: true,
@@ -187,7 +187,7 @@ ${genDeepProc(10)}
           stmts.push(`  v${i} := ${i}`)
         }
         return stmts.join(';\n')
-      })()
+      })(),
     ),
     purpose: '测试100个变量在单个 VAR 块中声明，验证长声明序列处理',
     shouldParse: true,
@@ -208,7 +208,7 @@ ${genDeepProc(10)}
           calls.push(`  p${i}`)
         }
         return calls.join(';\n')
-      })()
+      })(),
     ),
     purpose: '测试50个顶层过程声明，验证长过程序列处理',
     shouldParse: true,
@@ -226,7 +226,7 @@ end;
 `,
       `
   LongParams(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j')
-`
+`,
     ),
     purpose: '测试20个参数的过程声明和调用',
     shouldParse: true,
@@ -242,7 +242,7 @@ end;
           branches += `    ${i}: y := ${i * 10};\n`
         }
         return `begin\n  case x of\n${branches}  end;\nend`
-      })()
+      })(),
     ),
     purpose: '测试30个分支的 CASE 语句，验证长分支序列处理',
     shouldParse: true,
@@ -252,7 +252,7 @@ end;
     code: makeProgramWithVars(
       'a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, result: integer;',
       '',
-      `begin\n  result := a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t + u + v + w + x + y + z;\nend`
+      `begin\n  result := a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t + u + v + w + x + y + z;\nend`,
     ),
     purpose: '测试26个变量的长加法表达式链',
     shouldParse: true,
@@ -275,7 +275,7 @@ end.`,
     code: makeProgramWithVars(
       'a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, result: integer;',
       '',
-      `begin\n  result := a1 * a2 * a3 * a4 * a5 * a6 * a7 * a8 * a9 * a10;\nend`
+      `begin\n  result := a1 * a2 * a3 * a4 * a5 * a6 * a7 * a8 * a9 * a10;\nend`,
     ),
     purpose: '测试10个操作数的长乘法表达式链',
     shouldParse: true,
@@ -319,7 +319,7 @@ end;
 `,
       `
   ManyArgs(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
-`
+`,
     ),
     purpose: '测试20个实参的过程调用',
     shouldParse: true,
@@ -346,7 +346,7 @@ end.`,
     code: makeProgramWithVars(
       repeatStr('a', 128) + ': integer;',
       '',
-      `begin\n  ${repeatStr('a', 128)} := 42;\nend`
+      `begin\n  ${repeatStr('a', 128)} := 42;\nend`,
     ),
     purpose: '测试128字符超长标识符',
     shouldParse: true,
@@ -356,7 +356,7 @@ end.`,
     code: makeProgramWithVars(
       'a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5: integer;',
       '',
-      'begin\n  a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5 := 1;\nend'
+      'begin\n  a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5 := 1;\nend',
     ),
     purpose: '测试包含所有字母和数字的标识符',
     shouldParse: true,
@@ -366,7 +366,7 @@ end.`,
     code: makeProgramWithVars(
       repeatStr('x', 128) + ': integer;',
       '',
-      `begin\n  ${repeatStr('x', 128)} := 100;\nend`
+      `begin\n  ${repeatStr('x', 128)} := 100;\nend`,
     ),
     purpose: '测试128字符长度标识符（常见最大长度边界）',
     shouldParse: true,
@@ -376,7 +376,7 @@ end.`,
     code: makeProgramWithVars(
       'abcdefghijklmnopqrstuvwxyz: integer;',
       '',
-      'begin\n  abcdefghijklmnopqrstuvwxyz := 1;\nend'
+      'begin\n  abcdefghijklmnopqrstuvwxyz := 1;\nend',
     ),
     purpose: '测试每个字符都不同的标识符（26个不同字母）',
     shouldParse: true,
@@ -386,7 +386,7 @@ end.`,
     code: makeProgramWithVars(
       repeatStr('X', 100) + ': integer;',
       '',
-      `begin\n  ${repeatStr('X', 100)} := 1;\nend`
+      `begin\n  ${repeatStr('X', 100)} := 1;\nend`,
     ),
     purpose: '测试100字符全大写标识符',
     shouldParse: true,
@@ -396,7 +396,7 @@ end.`,
     code: makeProgramWithVars(
       'AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz: integer;',
       '',
-      'begin\n  AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz := 1;\nend'
+      'begin\n  AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz := 1;\nend',
     ),
     purpose: '测试大小写交替的长标识符',
     shouldParse: true,
@@ -406,7 +406,7 @@ end.`,
     code: makeProgramWithVars(
       'var123456789012345678901234567890: integer;',
       '',
-      'begin\n  var123456789012345678901234567890 := 1;\nend'
+      'begin\n  var123456789012345678901234567890 := 1;\nend',
     ),
     purpose: '测试带有长数字后缀的标识符',
     shouldParse: true,
@@ -416,7 +416,7 @@ end.`,
     code: makeProgramWithVars(
       `${repeatStr('a', 50)}, ${repeatStr('b', 50)}, ${repeatStr('c', 50)}: integer;`,
       '',
-      `begin\n  ${repeatStr('a', 50)} := 1;\n  ${repeatStr('b', 50)} := 2;\n  ${repeatStr('c', 50)} := 3;\nend`
+      `begin\n  ${repeatStr('a', 50)} := 1;\n  ${repeatStr('b', 50)} := 2;\n  ${repeatStr('c', 50)} := 3;\nend`,
     ),
     purpose: '测试多个50字符长标识符在同一声明中',
     shouldParse: true,
@@ -476,7 +476,7 @@ end.`,
     code: makeProgramWithVars(
       's1, s2, s3, s4, s5, s6, s7, s8, s9, s10: string;',
       '',
-      `begin\n  s1 := '';\n  s2 := '';\n  s3 := '';\n  s4 := '';\n  s5 := '';\n  s6 := '';\n  s7 := '';\n  s8 := '';\n  s9 := '';\n  s10 := '';\nend`
+      `begin\n  s1 := '';\n  s2 := '';\n  s3 := '';\n  s4 := '';\n  s5 := '';\n  s6 := '';\n  s7 := '';\n  s8 := '';\n  s9 := '';\n  s10 := '';\nend`,
     ),
     purpose: '测试多个空字符串字面量连续出现',
     shouldParse: true,
@@ -486,7 +486,7 @@ end.`,
     code: makeProgramWithVars(
       's: string;',
       '',
-      `begin\n  s := '${repeatStr('!@#$%^&*()_+-=[]{}|;:,.?', 10)}';\nend`
+      `begin\n  s := '${repeatStr('!@#$%^&*()_+-=[]{}|;:,.?', 10)}';\nend`,
     ),
     purpose: '测试包含大量特殊字符的字符串',
     shouldParse: true,
@@ -593,7 +593,8 @@ end.`,
   },
   {
     name: '全空格无换行超长行',
-    code: `program test; var x: integer; begin x := 1; x := 2; x := 3; x := 4; x := 5; x := 6; x := 7; x := 8; x := 9; x := 10; end.`,
+    code:
+      `program test; var x: integer; begin x := 1; x := 2; x := 3; x := 4; x := 5; x := 6; x := 7; x := 8; x := 9; x := 10; end.`,
     purpose: '测试全部代码在一行，用空格分隔',
     shouldParse: true,
   },
@@ -637,7 +638,7 @@ end;
 `,
       `
   AllStatements
-`
+`,
     ),
     purpose: '测试一个过程中包含所有类型的语句',
     shouldParse: true,
@@ -675,7 +676,7 @@ end;
 `,
       `
   x := ComplexFunc(10)
-`
+`,
     ),
     purpose: '测试函数中组合使用 CASE、WHILE 和 GOTO',
     shouldParse: true,
@@ -710,7 +711,7 @@ end;
 `,
       `
   Outer
-`
+`,
     ),
     purpose: '测试 FORWARD 声明、相互递归和嵌套过程的组合',
     shouldParse: true,
@@ -767,7 +768,7 @@ end;
 `,
       `
   x := Add(Mul(arr[1], arr[2]) + arr[3], Mul(arr[4] + arr[5], arr[6]))
-`
+`,
     ),
     purpose: '测试复杂表达式中嵌套函数调用和数组访问',
     shouldParse: true,
@@ -826,7 +827,7 @@ end;
   P2(5);
   g1 := F2(3, 4);
   P3(g2)
-`
+`,
     ),
     purpose: '测试常量、类型、变量、过程、函数混合声明的大杂烩程序',
     shouldParse: true,
@@ -957,7 +958,7 @@ end;
 `,
       `
   r := Calc(5, x)
-`
+`,
     ),
     purpose: '测试过程参数、嵌套函数和复杂表达式的组合',
     shouldParse: true,
@@ -1013,7 +1014,7 @@ end;
 `,
       `
   ComputeFibs
-`
+`,
     ),
     purpose: '测试 FORWARD 函数、嵌套过程和递归的组合',
     shouldParse: true,
@@ -1059,7 +1060,7 @@ end;
       `
   for i := 1 to 10 do
     PrintStr(Concat('hello', 'world'))
-`
+`,
     ),
     purpose: '测试字符串、过程调用和循环的组合',
     shouldParse: true,
@@ -1115,7 +1116,7 @@ end.`,
     code: makeProgramWithVars(
       'a, b, c, x: integer;',
       '',
-      `begin\n  if a > 0 then\n    if b > 0 then\n      if c > 0 then\n        x := 1\n      else\n        x := 2\n    else\n      begin\n        x := 3;\n      end\n  else\n    x := 4;\nend`
+      `begin\n  if a > 0 then\n    if b > 0 then\n      if c > 0 then\n        x := 1\n      else\n        x := 2\n    else\n      begin\n        x := 3;\n      end\n  else\n    x := 4;\nend`,
     ),
     purpose: '测试多层 IF-ELSE 嵌套，验证悬挂 else 绑定',
     shouldParse: true,
@@ -1125,7 +1126,7 @@ end.`,
     code: makeProgramWithVars(
       'i, j, k, sum: integer;',
       '',
-      `begin\n  sum := 0;\n  i := 0;\n  repeat\n    j := 0;\n    while j < 5 do\n      begin\n        for k := 1 to 3 do\n          sum := sum + i + j + k;\n        j := j + 1;\n      end;\n    i := i + 1;\n  until i >= 3;\nend`
+      `begin\n  sum := 0;\n  i := 0;\n  repeat\n    j := 0;\n    while j < 5 do\n      begin\n        for k := 1 to 3 do\n          sum := sum + i + j + k;\n        j := j + 1;\n      end;\n    i := i + 1;\n  until i >= 3;\nend`,
     ),
     purpose: '测试 REPEAT、WHILE、FOR 三种循环互相嵌套',
     shouldParse: true,
@@ -1166,7 +1167,7 @@ function Sum: integer;
   9999:
   Init;
   total := Sum
-`
+`,
     ),
     purpose: '测试包含所有声明段的完整程序结构',
     shouldParse: true,

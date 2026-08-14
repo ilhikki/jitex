@@ -1,5 +1,5 @@
 import { parse } from '@/index'
-import { describe, test, assert } from '../../_harness.ts'
+import { assert, describe, test } from '../../_harness.ts'
 
 describe('ISSUE-026: Variant record parsing', () => {
   test('simple variant record with tag', () => {

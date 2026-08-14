@@ -93,4 +93,4 @@ export const pascalHPlugin: IlPlugin = {
 }
 
 // 导出文件错误状态辅助函数（供 runtime 或测试使用）
-export { setFileError, getFileError }
+export { getFileError, setFileError }

@@ -217,8 +217,7 @@ begin
   writeln(p^);
   dispose(p);
 end.`,
-      purpose:
-        'ISO 7185 6.6.5.3 new/dispose + 6.4.4 pointer-types + 6.5.4 identified-variable',
+      purpose: 'ISO 7185 6.6.5.3 new/dispose + 6.4.4 pointer-types + 6.5.4 identified-variable',
       expectedContains: '10',
     },
     {
@@ -228,8 +227,7 @@ var f: text;
 begin
   reset(f);
 end.`,
-      purpose:
-        'reset on file with no external association; mock IO does not simulate file-not-found errors',
+      purpose: 'reset on file with no external association; mock IO does not simulate file-not-found errors',
     },
     {
       name: 'file write error (mock IO does not simulate file errors)',

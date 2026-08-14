@@ -16,21 +16,21 @@
  */
 
 import {
-  ProgramNode,
   BlockNode,
-  StatementNode,
+  ConstDeclarationNode,
   ExpressionNode,
-  IdentifierNode,
-  ProcedureDeclarationNode,
   FunctionDeclarationNode,
-  WithStatementNode,
+  IdentifierNode,
+  LabelDeclarationNode,
+  ParameterDeclarationNode,
+  ProcedureDeclarationNode,
+  ProgramNode,
+  RecordVariantPartNode,
+  StatementNode,
+  TypeDeclarationNode,
   TypeNode,
   VariableDeclarationNode,
-  ParameterDeclarationNode,
-  ConstDeclarationNode,
-  LabelDeclarationNode,
-  TypeDeclarationNode,
-  RecordVariantPartNode,
+  WithStatementNode,
 } from '@/ast/types'
 import type { IlPlugin } from '@/compiler/plugin'
 
@@ -219,7 +219,7 @@ export class Analyzer {
       if (labelInfo.funcId !== g.fromFuncId) {
         if (!this.isAncestorFunc(labelInfo.funcId, g.fromFuncId)) {
           throw new Error(
-            `Goto to label ${g.labelVal} in another procedure is forbidden (ISO 7185 6.8.2.4)`
+            `Goto to label ${g.labelVal} in another procedure is forbidden (ISO 7185 6.8.2.4)`,
           )
         }
       }
@@ -227,7 +227,7 @@ export class Analyzer {
       const targetDepth = this.labelDepth.get(labelInfo.labelId)
       if (targetDepth !== undefined && targetDepth > g.fromDepth) {
         throw new Error(
-          `Goto into structured statement body is forbidden (ISO 7185 6.8.2.4): label ${g.labelVal}`
+          `Goto into structured statement body is forbidden (ISO 7185 6.8.2.4): label ${g.labelVal}`,
         )
       }
     }
@@ -294,7 +294,7 @@ export class Analyzer {
     block: BlockNode | null,
     decl: ProcedureDeclarationNode | FunctionDeclarationNode | null,
     isFunction: boolean,
-    parentFuncId: number | null
+    parentFuncId: number | null,
   ): number {
     const funcId = this.allocId()
     if (decl) {
@@ -476,7 +476,7 @@ export class Analyzer {
         // 非标特性检查（AGENTS.md 原则 A.6）：string 类型未启用 extension 时报错
         if (name === 'string' && !this.extensions.has('string')) {
           throw new Error(
-            `Non-standard type 'string' used without extension 'string' (ISO 7185 has no string type)`
+            `Non-standard type 'string' used without extension 'string' (ISO 7185 has no string type)`,
           )
         }
         const builtin = SIMPLE_TYPES[name]
@@ -613,7 +613,7 @@ export class Analyzer {
    */
   private collectVariantFields(
     variant: RecordVariantPartNode,
-    fields: Map<string, TypeInfo>
+    fields: Map<string, TypeInfo>,
   ): void {
     for (const v of variant.variants) {
       for (const f of v.fields) {
@@ -686,7 +686,7 @@ export class Analyzer {
   /** 沿 parentFuncId 链查找 label */
   private findLabel(
     funcId: number,
-    labelVal: number
+    labelVal: number,
   ): { labelId: number; funcId: number } | undefined {
     let fid: number | null = funcId
     while (fid !== null) {
@@ -797,7 +797,7 @@ export class Analyzer {
   private analyzeParams(
     funcId: number,
     params: ParameterDeclarationNode[],
-    _nested: boolean
+    _nested: boolean,
   ): void {
     const info = this.funcInfos.get(funcId)!
     for (const p of params) {
@@ -837,7 +837,7 @@ export class Analyzer {
           const constVal = this.evalConstInt(node.right)
           if (constVal !== undefined && (constVal < lt.low || constVal > lt.high)) {
             throw new Error(
-              `Subrange assignment out of bounds: ${constVal} not in ${lt.low}..${lt.high}`
+              `Subrange assignment out of bounds: ${constVal} not in ${lt.low}..${lt.high}`,
             )
           }
           // char subrange 检查
@@ -847,7 +847,7 @@ export class Analyzer {
               const code = constChar.charCodeAt(0)
               if (code < lt.low || code > lt.high) {
                 throw new Error(
-                  `Subrange assignment out of bounds: '${constChar}' (code ${code}) not in ${lt.low}..${lt.high}`
+                  `Subrange assignment out of bounds: '${constChar}' (code ${code}) not in ${lt.low}..${lt.high}`,
                 )
               }
             }
@@ -1093,7 +1093,7 @@ export class Analyzer {
               const dim = arrType.dims[i]
               if (constIdx < dim.low || constIdx > dim.high) {
                 throw new Error(
-                  `Array index out of bounds: ${constIdx} not in ${dim.low}..${dim.high}`
+                  `Array index out of bounds: ${constIdx} not in ${dim.low}..${dim.high}`,
                 )
               }
             }
@@ -1285,7 +1285,7 @@ export interface Analysis {
 export function analyzeProgram(
   program: ProgramNode,
   extensions?: string[],
-  plugins?: IlPlugin[]
+  plugins?: IlPlugin[],
 ): Analysis {
   return new Analyzer().analyze(program, extensions, plugins)
 }

@@ -16,8 +16,8 @@
 import { run } from '@/compiler/transform'
 import type { RunState } from '@/runtime/run-state'
 import type { IlPlugin } from '@/compiler/plugin'
-import { describe, test, it, assert, assertEquals } from '../../_harness.ts'
-export { describe, test, it, assert, assertEquals }
+import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
+export { assert, assertEquals, describe, it, test }
 
 /** 非标扩展标识符（保留用于类型标注，实际为 string） */
 type Extension = string
@@ -133,19 +133,25 @@ export function runPascalTest(t: PascalTest): void {
     assertEquals(
       output,
       t.expectedOutput,
-      `${prefix}: output mismatch.\n  expected: ${JSON.stringify(t.expectedOutput)}\n  actual:   ${JSON.stringify(output)}`,
+      `${prefix}: output mismatch.\n  expected: ${JSON.stringify(t.expectedOutput)}\n  actual:   ${
+        JSON.stringify(output)
+      }`,
     )
   }
   if (t.expectedContains !== undefined) {
     assert(
       output.includes(t.expectedContains),
-      `${prefix}: expected output to contain ${JSON.stringify(t.expectedContains)}.\n  actual output: ${JSON.stringify(output)}`,
+      `${prefix}: expected output to contain ${JSON.stringify(t.expectedContains)}.\n  actual output: ${
+        JSON.stringify(output)
+      }`,
     )
   }
   if (t.expectedNotContains !== undefined) {
     assert(
       !output.includes(t.expectedNotContains),
-      `${prefix}: expected output NOT to contain ${JSON.stringify(t.expectedNotContains)}.\n  actual output: ${JSON.stringify(output)}`,
+      `${prefix}: expected output NOT to contain ${JSON.stringify(t.expectedNotContains)}.\n  actual output: ${
+        JSON.stringify(output)
+      }`,
     )
   }
 

@@ -1,6 +1,6 @@
 import { parse } from '@/index'
-import { describe, test, it, assert, assertEquals } from '../../_harness.ts'
-export { describe, test, it, assert, assertEquals }
+import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
+export { assert, assertEquals, describe, it, test }
 
 export interface ConformanceTest {
   name: string

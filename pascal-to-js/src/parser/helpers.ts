@@ -12,7 +12,7 @@ export function peek(input: ParserInput): Token {
 export function withLoc<T extends AstNode>(
   node: T,
   start: Position,
-  end: Position
+  end: Position,
 ): T & { loc: SourceLocation } {
   return { ...node, loc: { start, end } }
 }
@@ -29,7 +29,7 @@ function isPosition(x: Token | Position): x is Position {
 export function loc<T extends AstNode>(
   node: T,
   startOrToken: Token | Position,
-  endOrToken?: Token | Position
+  endOrToken?: Token | Position,
 ): T & { loc: SourceLocation } {
   const startPos = isPosition(startOrToken) ? startOrToken : startOrToken.start
   if (endOrToken === undefined) {
@@ -58,7 +58,7 @@ export function expectType(input: ParserInput, type: string): ParseResult<Token>
   if (token.type !== type) {
     return fail(
       `Expected ${type} but got ${token.type} (${token.content}) at line ${token.start.line}:${token.start.column}`,
-      input.position
+      input.position,
     )
   }
   return ok(input.position + 1, token)
@@ -69,7 +69,7 @@ export function expectKeyword(input: ParserInput, kw: string): ParseResult<Token
   if (token.type !== kw) {
     return fail(
       `Expected keyword ${kw} but got ${token.type} (${token.content}) at line ${token.start.line}:${token.start.column}`,
-      input.position
+      input.position,
     )
   }
   return ok(input.position + 1, token)
@@ -80,7 +80,7 @@ export function expectKeyword(input: ParserInput, kw: string): ParseResult<Token
 export function parseList<T>(
   input: ParserInput,
   parseItem: (input: ParserInput) => ParseResult<T>,
-  separator: string
+  separator: string,
 ): ParseResult<T[]> {
   const first = parseItem(input)
   if (!first.success) {

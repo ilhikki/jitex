@@ -23,8 +23,7 @@ begin
   writeln('label 100 reached');
 end.`,
       purpose: 'goto from nested loop should correctly break out of both loops',
-      expectedContains:
-        'i=1 j=1\ni=1 j=2\ni=1 j=3\ncompleted j loop for i=1\ni=2 j=1\ni=2 j=2\nlabel 100 reached',
+      expectedContains: 'i=1 j=1\ni=1 j=2\ni=1 j=3\ncompleted j loop for i=1\ni=2 j=1\ni=2 j=2\nlabel 100 reached',
       expectedNotContains: 'after outer loop',
     },
     {

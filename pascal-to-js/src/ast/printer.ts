@@ -8,10 +8,10 @@
 // - 字面量保留 raw 字段（原始 token 内容），BooleanLiteral 输出 TRUE/FALSE
 
 import type {
-  AstNode,
-  ArrayTypeNode,
   ArrayAccessNode,
+  ArrayTypeNode,
   AssignmentNode,
+  AstNode,
   BinaryExpressionNode,
   BlockNode,
   BooleanLiteralNode,
@@ -29,8 +29,8 @@ import type {
   GotoStatementNode,
   IdentifierNode,
   IfStatementNode,
-  IntegerLiteralNode,
   InExpressionNode,
+  IntegerLiteralNode,
   LabeledStatementNode,
   ParameterDeclarationNode,
   ParenthesizedExpressionNode,
@@ -224,7 +224,7 @@ function printArrayAccess(node: ArrayAccessNode, ctx: PrintContext): string {
 
 function printFieldAccess(
   node: { object: ExpressionNode; field: IdentifierNode },
-  ctx: PrintContext
+  ctx: PrintContext,
 ): string {
   const obj = printExpr(node.object, ctx)
   // Pascal 指针解引用/文件缓冲区：F^ 在 AST 中表示为 FieldAccess(field.name='^')
@@ -252,8 +252,7 @@ function printIn(node: InExpressionNode, ctx: PrintContext): string {
 // ============================================================================
 
 function printProgram(node: ProgramNode, ctx: PrintContext): string {
-  const params =
-    node.parameters.length > 0 ? `(${node.parameters.map((p) => p.name).join(', ')})` : ''
+  const params = node.parameters.length > 0 ? `(${node.parameters.map((p) => p.name).join(', ')})` : ''
   const header = `program ${node.name.name}${params};`
   const block = printBlock(node.block, ctx)
   return `${header}\n${block}.`
@@ -406,10 +405,7 @@ function printWith(node: WithStatementNode, ctx: PrintContext): string {
 }
 
 function printProcedureCall(node: ProcedureCallNode): string {
-  const args =
-    node.arguments.length > 0
-      ? `(${node.arguments.map((a) => printExpr(a, { indent: 0 })).join(', ')})`
-      : ''
+  const args = node.arguments.length > 0 ? `(${node.arguments.map((a) => printExpr(a, { indent: 0 })).join(', ')})` : ''
   return `${node.name.name}${args}`
 }
 
@@ -438,10 +434,7 @@ function printVarDecl(node: VariableDeclarationNode, ctx: PrintContext): string 
 }
 
 function printProcedureDecl(node: ProcedureDeclarationNode, ctx: PrintContext): string {
-  const params =
-    node.parameters.length > 0
-      ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
-      : ''
+  const params = node.parameters.length > 0 ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})` : ''
   let result = `procedure ${node.name.name}${params}`
   if (node.isForward) {
     result += '; forward'
@@ -455,10 +448,7 @@ function printProcedureDecl(node: ProcedureDeclarationNode, ctx: PrintContext): 
 }
 
 function printFunctionDecl(node: FunctionDeclarationNode, ctx: PrintContext): string {
-  const params =
-    node.parameters.length > 0
-      ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
-      : ''
+  const params = node.parameters.length > 0 ? `(${node.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})` : ''
   const returnType = printType(node.returnType, ctx)
   let result = `function ${node.name.name}${params}: ${returnType}`
   if (node.isForward) {

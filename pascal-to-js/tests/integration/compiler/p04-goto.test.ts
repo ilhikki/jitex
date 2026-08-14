@@ -164,8 +164,7 @@ begin
 100:
   writeln('Label 100');
 end.`,
-      purpose:
-        'Label coexists with variable of same name（Pascal82: label 是关键字，不能作变量名）',
+      purpose: 'Label coexists with variable of same name（Pascal82: label 是关键字，不能作变量名）',
       expectedContains: '42\nLabel 100',
     },
     {
@@ -372,8 +371,7 @@ begin
 200:
   writeln('Main');
 end.`,
-      purpose:
-        'GOTO from procedure to main program label (ISO 7185 允许：goto 可以跳到外层 block 的 label)',
+      purpose: 'GOTO from procedure to main program label (ISO 7185 允许：goto 可以跳到外层 block 的 label)',
       expectedContains: 'Main',
     },
     {
@@ -547,7 +545,8 @@ begin
 20:
   b;
 end.`,
-      purpose: 'GOTO between mutually recursive procedures to main program label (ISO 7185: 允许跨过程 GOTO 到外层 block)',
+      purpose:
+        'GOTO between mutually recursive procedures to main program label (ISO 7185: 允许跨过程 GOTO 到外层 block)',
       expectedContains: 'A:1',
     },
     {
@@ -952,8 +951,7 @@ begin
 60:
   writeln('Label 60');
 end.`,
-      purpose:
-        'CASE分支直接是LabeledStatement（collectLabelsFromTransparentBlock case分支LabeledStatement）',
+      purpose: 'CASE分支直接是LabeledStatement（collectLabelsFromTransparentBlock case分支LabeledStatement）',
       expectedContains: 'Label 30 is case 2 body\nLabel 60',
       expectedNotContains: 'Skipped',
     },
@@ -979,8 +977,7 @@ begin
 70:
   writeln('Label 70 outside');
 end.`,
-      purpose:
-        'CASE otherwise中compound块的label（collectLabelsFromTransparentBlock otherwise透明块）',
+      purpose: 'CASE otherwise中compound块的label（collectLabelsFromTransparentBlock otherwise透明块）',
       expectedContains: 'Otherwise begin\nLabel 70 outside',
       expectedNotContains: 'Label 40 in otherwise\nAfter case',
     },
@@ -1033,8 +1030,7 @@ begin
 90:
   writeln('Label 90');
 end.`,
-      purpose:
-        'WITH body直接是LabeledStatement（collectLabelsFromTransparentBlock with LabeledStatement）',
+      purpose: 'WITH body直接是LabeledStatement（collectLabelsFromTransparentBlock with LabeledStatement）',
       expectedContains: '100\nLabel 90',
       expectedNotContains: 'Skipped',
     },

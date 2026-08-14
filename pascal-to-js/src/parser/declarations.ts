@@ -44,8 +44,8 @@ export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDecl
           value,
           raw: token.content,
         } as IntegerLiteralNode,
-        token
-      )
+        token,
+      ),
     )
     pos++
 
@@ -62,8 +62,8 @@ export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDecl
     withLoc(
       { kind: 'LabelDeclaration', labels } as LabelDeclarationNode,
       startToken.start,
-      semiResult.astNode.end
-    )
+      semiResult.astNode.end,
+    ),
   )
 }
 
@@ -103,8 +103,8 @@ export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDec
           value: valResult.astNode,
         } as ConstDeclarationNode,
         nameStartToken.start,
-        input.tokens[pos - 1].end
-      )
+        input.tokens[pos - 1].end,
+      ),
     )
   }
 
@@ -146,8 +146,8 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
           typeDef: typeResult.astNode,
         } as TypeDeclarationNode,
         nameStartToken.start,
-        input.tokens[pos - 1].end
-      )
+        input.tokens[pos - 1].end,
+      ),
     )
   }
 
@@ -156,7 +156,7 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
 
 // VAR { identifier_list : type ; }
 export function parseVariableDeclarations(
-  input: ParserInput
+  input: ParserInput,
 ): ParseResult<VariableDeclarationNode[]> {
   if (peek(input).type !== 'VAR') {
     return ok(input.position, [])
@@ -221,8 +221,8 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
           isVar,
         } as ParameterDeclarationNode,
         paramStartToken.start,
-        input.tokens[pos - 1].end
-      )
+        input.tokens[pos - 1].end,
+      ),
     )
 
     if (peek({ tokens: input.tokens, position: pos }).type !== 'SEMICOLON') break
@@ -238,7 +238,7 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
 
 export function parseProcedureDeclaration(
   input: ParserInput,
-  outerLabels?: Set<number>
+  outerLabels?: Set<number>,
 ): ParseResult<ProcedureDeclarationNode> {
   const startToken = peek(input)
   let pos = input.position + 1 // skip PROCEDURE
@@ -272,8 +272,8 @@ export function parseProcedureDeclaration(
           isForward: true,
         } as ProcedureDeclarationNode,
         startToken.start,
-        semiResult2.astNode.end
-      )
+        semiResult2.astNode.end,
+      ),
     )
   }
 
@@ -298,14 +298,14 @@ export function parseProcedureDeclaration(
         isForward: false,
       } as ProcedureDeclarationNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
 export function parseFunctionDeclaration(
   input: ParserInput,
-  outerLabels?: Set<number>
+  outerLabels?: Set<number>,
 ): ParseResult<FunctionDeclarationNode> {
   const startToken = peek(input)
   let pos = input.position + 1 // skip FUNCTION
@@ -348,8 +348,8 @@ export function parseFunctionDeclaration(
           isForward: true,
         } as FunctionDeclarationNode,
         startToken.start,
-        semiResult2.astNode.end
-      )
+        semiResult2.astNode.end,
+      ),
     )
   }
 
@@ -374,8 +374,8 @@ export function parseFunctionDeclaration(
         isForward: false,
       } as FunctionDeclarationNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -457,8 +457,8 @@ export function parseBlock(input: ParserInput, outerLabels?: Set<number>): Parse
         compound: compoundResult.astNode,
       } as BlockNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -515,7 +515,7 @@ export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
   if (trailing.type !== 'EOF') {
     return fail(
       `Unexpected token ${trailing.type} (${trailing.content}) after program end at line ${trailing.start.line}:${trailing.start.column}`,
-      pos
+      pos,
     )
   }
 
@@ -529,7 +529,7 @@ export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
         block: blockResult.astNode,
       } as ProgramNode,
       startToken.start,
-      dotResult.astNode.end
-    )
+      dotResult.astNode.end,
+    ),
   )
 }

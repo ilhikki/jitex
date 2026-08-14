@@ -17,7 +17,7 @@ end;
 `,
       `
   CountDown(10)
-`
+`,
     ),
     purpose: '测试最简单的直接递归过程：过程调用自身',
     shouldParse: true,
@@ -38,7 +38,7 @@ end;
 `,
       `
   SumTo(5, total)
-`
+`,
     ),
     purpose: '测试带多个参数的递归过程，包含值参数和 VAR 参数',
     shouldParse: true,
@@ -61,7 +61,7 @@ end;
 `,
       `
   FactorialProc(5, f)
-`
+`,
     ),
     purpose: '测试通过 VAR 参数返回结果的递归过程',
     shouldParse: true,
@@ -83,7 +83,7 @@ end;
 `,
       `
   RecurseWithLocal(5)
-`
+`,
     ),
     purpose: '测试递归过程中使用局部变量',
     shouldParse: true,
@@ -106,7 +106,7 @@ end;
 `,
       `
   RecurseWithGoto(5)
-`
+`,
     ),
     purpose: '测试递归过程中使用 label 和 goto 语句',
     shouldParse: true,
@@ -129,7 +129,7 @@ end;
 `,
       `
   f := Factorial(5)
-`
+`,
     ),
     purpose: '测试经典的阶乘递归函数模式',
     shouldParse: true,
@@ -148,7 +148,7 @@ end;
 `,
       `
   fib := Fibonacci(10)
-`
+`,
     ),
     purpose: '测试斐波那契数列递归函数，包含多次自调用',
     shouldParse: true,
@@ -169,7 +169,7 @@ end;
 `,
       `
   a := Ackermann(3, 3)
-`
+`,
     ),
     purpose: '测试包含复杂条件分支的递归函数（Ackermann函数）',
     shouldParse: true,
@@ -192,7 +192,7 @@ end;
 `,
       `
   s := SumSquares(5)
-`
+`,
     ),
     purpose: '测试递归函数中使用局部变量存储中间结果',
     shouldParse: true,
@@ -212,7 +212,7 @@ end;
       `
   x := Power(2, 3) + Power(3, 2);
   y := Power(Power(2, 2), 2)
-`
+`,
     ),
     purpose: '测试递归函数调用作为表达式的一部分，包括嵌套调用',
     shouldParse: true,
@@ -239,7 +239,7 @@ end;
 `,
       `
   A(10)
-`
+`,
     ),
     purpose: '测试两个过程通过 forward 声明实现相互递归',
     shouldParse: true,
@@ -267,7 +267,7 @@ end;
       `
   e := IsEven(5);
   o := IsOdd(5)
-`
+`,
     ),
     purpose: '测试两个函数通过 forward 声明实现相互递归',
     shouldParse: true,
@@ -296,7 +296,7 @@ end;
 `,
       `
   A(9)
-`
+`,
     ),
     purpose: '测试三个过程形成链式递归：A -> B -> C -> A',
     shouldParse: true,
@@ -325,7 +325,7 @@ end;
 `,
       `
   ProcA(5, x)
-`
+`,
     ),
     purpose: '测试过程和函数混合的相互递归',
     shouldParse: true,
@@ -366,7 +366,7 @@ end;
 `,
       `
   P1(10)
-`
+`,
     ),
     purpose: '测试五个过程形成的深层相互递归链',
     shouldParse: true,
@@ -392,7 +392,7 @@ end;
 `,
       `
   Outer(5)
-`
+`,
     ),
     purpose: '测试嵌套过程调用外层过程形成的间接递归',
     shouldParse: true,
@@ -413,7 +413,7 @@ end;
 `,
       `
   RecurseOuter(5)
-`
+`,
     ),
     purpose: '测试递归过程内部定义嵌套过程（非递归的辅助过程）',
     shouldParse: true,
@@ -436,7 +436,7 @@ end;
 `,
       `
   s := RecurseOuter(5)
-`
+`,
     ),
     purpose: '测试递归函数内部定义嵌套辅助函数',
     shouldParse: true,
@@ -457,7 +457,7 @@ end;
 `,
       `
   Outer
-`
+`,
     ),
     purpose: '测试嵌套在过程内部的过程自身递归（不依赖外层）',
     shouldParse: true,
@@ -481,7 +481,7 @@ end;
 `,
       `
   e := Eval(10)
-`
+`,
     ),
     purpose: '测试递归函数中使用 CASE 语句进行分支控制',
     shouldParse: true,
@@ -503,7 +503,7 @@ end;
 `,
       `
   RecurseWhile(3)
-`
+`,
     ),
     purpose: '测试递归过程中包含 WHILE 循环',
     shouldParse: true,
@@ -524,7 +524,7 @@ end;
 `,
       `
   s := SumRec(5)
-`
+`,
     ),
     purpose: '测试递归函数中包含 FOR 循环',
     shouldParse: true,
@@ -547,7 +547,7 @@ end;
 `,
       `
   RecurseRepeat(3)
-`
+`,
     ),
     purpose: '测试递归过程中包含 REPEAT-UNTIL 循环',
     shouldParse: true,
@@ -569,7 +569,7 @@ end;
 `,
       `
   RecurseWith(R, 5)
-`
+`,
     ),
     purpose: '测试递归过程中使用 WITH 语句访问记录字段',
     shouldParse: true,
@@ -594,7 +594,7 @@ end;
 `,
       `
   PrintFac(5)
-`
+`,
     ),
     purpose: '测试递归过程调用递归函数，两种递归形式组合',
     shouldParse: true,

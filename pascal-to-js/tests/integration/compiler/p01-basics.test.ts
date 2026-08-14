@@ -65,37 +65,43 @@ describe('Phase 1: Basics and Operations', () => {
     },
     {
       name: 'equality (equals)',
-      code: "program test; var x, y: integer; begin x := 5; y := 5; if x = y then writeln('equal') else writeln('not equal'); end.",
+      code:
+        "program test; var x, y: integer; begin x := 5; y := 5; if x = y then writeln('equal') else writeln('not equal'); end.",
       purpose: '测试等于运算',
       expectedOutput: 'equal\n',
     },
     {
       name: 'inequality (not equals)',
-      code: "program test; var x, y: integer; begin x := 5; y := 3; if x <> y then writeln('not equal') else writeln('equal'); end.",
+      code:
+        "program test; var x, y: integer; begin x := 5; y := 3; if x <> y then writeln('not equal') else writeln('equal'); end.",
       purpose: '测试不等于运算',
       expectedOutput: 'not equal\n',
     },
     {
       name: 'less than',
-      code: "program test; var x, y: integer; begin x := 3; y := 5; if x < y then writeln('less') else writeln('not less'); end.",
+      code:
+        "program test; var x, y: integer; begin x := 3; y := 5; if x < y then writeln('less') else writeln('not less'); end.",
       purpose: '测试小于运算',
       expectedOutput: 'less\n',
     },
     {
       name: 'greater than',
-      code: "program test; var x, y: integer; begin x := 5; y := 3; if x > y then writeln('greater') else writeln('not greater'); end.",
+      code:
+        "program test; var x, y: integer; begin x := 5; y := 3; if x > y then writeln('greater') else writeln('not greater'); end.",
       purpose: '测试大于运算',
       expectedOutput: 'greater\n',
     },
     {
       name: 'less than or equal',
-      code: "program test; var x, y, z: integer; begin x := 3; y := 5; z := 3; if x <= y then writeln('ok1'); if x <= z then writeln('ok2'); end.",
+      code:
+        "program test; var x, y, z: integer; begin x := 3; y := 5; z := 3; if x <= y then writeln('ok1'); if x <= z then writeln('ok2'); end.",
       purpose: '测试小于等于运算',
       expectedOutput: 'ok1\nok2\n',
     },
     {
       name: 'greater than or equal',
-      code: "program test; var x, y, z: integer; begin x := 5; y := 3; z := 5; if x >= y then writeln('ok1'); if x >= z then writeln('ok2'); end.",
+      code:
+        "program test; var x, y, z: integer; begin x := 5; y := 3; z := 5; if x >= y then writeln('ok1'); if x >= z then writeln('ok2'); end.",
       purpose: '测试大于等于运算',
       expectedOutput: 'ok1\nok2\n',
     },
@@ -107,73 +113,85 @@ describe('Phase 1: Basics and Operations', () => {
     },
     {
       name: 'NOT operation',
-      code: "program test; var b: boolean; begin b := true; if not b then writeln('false') else writeln('true'); b := false; if not b then writeln('true') else writeln('false'); end.",
+      code:
+        "program test; var b: boolean; begin b := true; if not b then writeln('false') else writeln('true'); b := false; if not b then writeln('true') else writeln('false'); end.",
       purpose: '测试NOT逻辑运算',
       expectedOutput: 'true\ntrue\n',
     },
     {
       name: 'AND operation',
-      code: "program test; var a, b: boolean; begin a := true; b := true; if a and b then writeln('true') else writeln('false'); b := false; if a and b then writeln('true') else writeln('false'); end.",
+      code:
+        "program test; var a, b: boolean; begin a := true; b := true; if a and b then writeln('true') else writeln('false'); b := false; if a and b then writeln('true') else writeln('false'); end.",
       purpose: '测试AND逻辑运算',
       expectedOutput: 'true\nfalse\n',
     },
     {
       name: 'OR operation',
-      code: "program test; var a, b: boolean; begin a := false; b := false; if a or b then writeln('true') else writeln('false'); b := true; if a or b then writeln('true') else writeln('false'); end.",
+      code:
+        "program test; var a, b: boolean; begin a := false; b := false; if a or b then writeln('true') else writeln('false'); b := true; if a or b then writeln('true') else writeln('false'); end.",
       purpose: '测试OR逻辑运算',
       expectedOutput: 'false\ntrue\n',
     },
     {
       name: 'mixed logical operations',
-      code: "program test; var a, b, c: boolean; begin a := true; b := false; c := true; if (a and not b) or (not a and c) then writeln('true') else writeln('false'); end.",
+      code:
+        "program test; var a, b, c: boolean; begin a := true; b := false; c := true; if (a and not b) or (not a and c) then writeln('true') else writeln('false'); end.",
       purpose: '测试混合逻辑运算',
       expectedOutput: 'true\n',
     },
     {
       name: 'logical short circuit AND',
-      code: "program test; var x: integer; begin x := 0; if (x > 0) and (10 div x > 0) then writeln('true') else writeln('false'); end.",
+      code:
+        "program test; var x: integer; begin x := 0; if (x > 0) and (10 div x > 0) then writeln('true') else writeln('false'); end.",
       purpose: '测试AND逻辑短路（第一个条件为false时不应执行第二个条件）',
       expectedOutput: 'false\n',
     },
     {
       name: 'logical short circuit OR',
-      code: "program test; var x: integer; begin x := 5; if (x > 0) or (10 div 0 > 0) then writeln('true') else writeln('false'); end.",
+      code:
+        "program test; var x: integer; begin x := 5; if (x > 0) or (10 div 0 > 0) then writeln('true') else writeln('false'); end.",
       purpose: '测试OR逻辑短路（第一个条件为true时不应执行第二个条件）',
       expectedOutput: 'true\n',
     },
     {
       name: 'NOT operator precedence',
-      code: "program test; var a, b: boolean; begin a := true; b := false; if not a and b then writeln('true') else writeln('false'); if not (a and b) then writeln('true') else writeln('false'); end.",
+      code:
+        "program test; var a, b: boolean; begin a := true; b := false; if not a and b then writeln('true') else writeln('false'); if not (a and b) then writeln('true') else writeln('false'); end.",
       purpose: '测试NOT运算符优先级',
       expectedOutput: 'false\ntrue\n',
     },
     {
       name: 'set union',
-      code: "program test; type T = set of 1..10; var a, b, c: T; begin a := [1, 2, 3]; b := [3, 4, 5]; c := a + b; if 1 in c then writeln('1'); if 5 in c then writeln('5'); end.",
+      code:
+        "program test; type T = set of 1..10; var a, b, c: T; begin a := [1, 2, 3]; b := [3, 4, 5]; c := a + b; if 1 in c then writeln('1'); if 5 in c then writeln('5'); end.",
       purpose: '测试集合并运算',
       expectedOutput: '1\n5\n',
     },
     {
       name: 'set intersection',
-      code: "program test; type T = set of 1..10; var a, b, c: T; begin a := [1, 2, 3, 4]; b := [3, 4, 5, 6]; c := a * b; if 3 in c then writeln('3'); if 4 in c then writeln('4'); if 1 in c then writeln('1') else writeln('no 1'); end.",
+      code:
+        "program test; type T = set of 1..10; var a, b, c: T; begin a := [1, 2, 3, 4]; b := [3, 4, 5, 6]; c := a * b; if 3 in c then writeln('3'); if 4 in c then writeln('4'); if 1 in c then writeln('1') else writeln('no 1'); end.",
       purpose: '测试集合交运算',
       expectedOutput: '3\n4\nno 1\n',
     },
     {
       name: 'set difference',
-      code: "program test; type T = set of 1..10; var a, b, c: T; begin a := [1, 2, 3, 4]; b := [3, 4, 5]; c := a - b; if 1 in c then writeln('1'); if 3 in c then writeln('3') else writeln('no 3'); end.",
+      code:
+        "program test; type T = set of 1..10; var a, b, c: T; begin a := [1, 2, 3, 4]; b := [3, 4, 5]; c := a - b; if 1 in c then writeln('1'); if 3 in c then writeln('3') else writeln('no 3'); end.",
       purpose: '测试集合差运算',
       expectedOutput: '1\nno 3\n',
     },
     {
       name: 'IN operation',
-      code: "program test; type T = set of char; var s: T; begin s := ['A', 'B', 'C']; if 'B' in s then writeln('yes'); if 'X' in s then writeln('no') else writeln('not found'); end.",
+      code:
+        "program test; type T = set of char; var s: T; begin s := ['A', 'B', 'C']; if 'B' in s then writeln('yes'); if 'X' in s then writeln('no') else writeln('not found'); end.",
       purpose: '测试IN集合成员运算',
       expectedOutput: 'yes\nnot found\n',
     },
     {
       name: 'set assignment',
-      code: "program test; type T = set of 1..5; var s1, s2: T; begin s1 := [1, 2]; s2 := s1; s1 := s1 + [3]; if 3 in s1 then writeln('s1 has 3'); if 3 in s2 then writeln('s2 has 3') else writeln('s2 no 3'); end.",
+      code:
+        "program test; type T = set of 1..5; var s1, s2: T; begin s1 := [1, 2]; s2 := s1; s1 := s1 + [3]; if 3 in s1 then writeln('s1 has 3'); if 3 in s2 then writeln('s2 has 3') else writeln('s2 no 3'); end.",
       purpose: '测试集合赋值',
       expectedOutput: 's1 has 3\ns2 no 3\n',
     },
@@ -191,7 +209,8 @@ describe('Phase 1: Basics and Operations', () => {
     },
     {
       name: 'boolean operations',
-      code: "program test; var b1, b2, b3: boolean; begin b1 := true; b2 := false; b3 := b1 and b2; if not b3 then writeln('false'); end.",
+      code:
+        "program test; var b1, b2, b3: boolean; begin b1 := true; b2 := false; b3 := b1 and b2; if not b3 then writeln('false'); end.",
       purpose: '测试boolean类型运算',
       expectedOutput: 'false\n',
     },
@@ -203,7 +222,8 @@ describe('Phase 1: Basics and Operations', () => {
     },
     {
       name: 'enumeration type operations',
-      code: "program test; type Color = (Red, Green, Blue); var c: Color; begin c := Green; if c = Green then writeln('green'); writeln(ord(c)); end.",
+      code:
+        "program test; type Color = (Red, Green, Blue); var c: Color; begin c := Green; if c = Green then writeln('green'); writeln(ord(c)); end.",
       purpose: '测试枚举类型运算',
       expectedOutput: 'green\n1\n',
     },
@@ -227,7 +247,8 @@ describe('Phase 1: Basics and Operations', () => {
     },
     {
       name: 'negative arithmetic operations',
-      code: 'program test; var x, y: integer; begin x := -5; y := 3; writeln(x + y); writeln(x - y); writeln(x * y); writeln(-x); end.',
+      code:
+        'program test; var x, y: integer; begin x := -5; y := 3; writeln(x + y); writeln(x - y); writeln(x * y); writeln(-x); end.',
       purpose: '测试负数运算',
       expectedOutput: '-2\n-8\n-15\n5\n',
     },
@@ -239,7 +260,8 @@ describe('Phase 1: Basics and Operations', () => {
     },
     {
       name: 'zero value operations',
-      code: 'program test; var x: integer; begin x := 0; writeln(x + 5); writeln(5 - x); writeln(x * 5); writeln(5 div (x + 1)); end.',
+      code:
+        'program test; var x: integer; begin x := 0; writeln(x + 5); writeln(5 - x); writeln(x * 5); writeln(5 div (x + 1)); end.',
       purpose: '测试零值运算',
       expectedOutput: '5\n5\n0\n5\n',
     },

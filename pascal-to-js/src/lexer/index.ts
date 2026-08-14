@@ -1,1 +1,1 @@
-export { lex, tokenize, createOffsetToPosition } from './lexer'
+export { createOffsetToPosition, lex, tokenize } from './lexer'

@@ -7,16 +7,16 @@
 // 词法分析
 // ==========================================================================
 
-export { lex, tokenize, createOffsetToPosition } from './lexer/lexer'
-export type { Token, Position, LexerInput } from './ast/types'
+export { createOffsetToPosition, lex, tokenize } from './lexer/lexer'
+export type { LexerInput, Position, Token } from './ast/types'
 
 // ==========================================================================
 // 语法分析
 // ==========================================================================
 
 export { parseProgram } from './parser/declarations'
-export { parseExpression, parseIdentifier, parseExpressionList } from './parser/expressions'
-export { parseStatement, parseCompoundStatement } from './parser/statements'
+export { parseExpression, parseExpressionList, parseIdentifier } from './parser/expressions'
+export { parseCompoundStatement, parseStatement } from './parser/statements'
 export { parseType, parseVariableDeclaration } from './parser/types'
 export * from './parser/helpers'
 
@@ -31,9 +31,9 @@ export { nodeToCode } from './ast/printer'
 // 编译与执行（IL 管线）
 // ==========================================================================
 
-export { transform, run, executeCompiled } from '@/compiler/transform'
-export type { TransformOptions, RunOptions } from '@/compiler/transform'
-export type { RunState, RunError } from './runtime/run-state'
+export { executeCompiled, run, transform } from '@/compiler/transform'
+export type { RunOptions, TransformOptions } from '@/compiler/transform'
+export type { RunError, RunState } from './runtime/run-state'
 export type { IlPlugin } from '@/compiler/plugin'
 
 // ==========================================================================
@@ -42,7 +42,7 @@ export type { IlPlugin } from '@/compiler/plugin'
 
 import { lex } from '@/lexer'
 import { parseProgram } from '@/parser'
-import { ParserInput, ParseResult, ProgramNode } from './ast/types'
+import { ParseResult, ParserInput, ProgramNode } from './ast/types'
 
 /**
  * 将 Pascal 源码解析为 AST。

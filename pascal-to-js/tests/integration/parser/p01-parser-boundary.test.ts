@@ -55,7 +55,7 @@ const tests: ConformanceTest[] = [
     name: '注释在语句之间',
     code: makeProgramWithVars(
       'x: integer;',
-      'begin\n  { comment before } x := 1;\n  { comment after }\nend.'
+      'begin\n  { comment before } x := 1;\n  { comment after }\nend.',
     ),
     purpose: '验证注释出现在语句之间的情况',
     shouldParse: true,
@@ -86,7 +86,7 @@ const tests: ConformanceTest[] = [
     name: '长标识符',
     code: makeProgramWithVars(
       'thisIsAVeryLongVariableName: integer;',
-      'begin\n  thisIsAVeryLongVariableName := 1;\nend.'
+      'begin\n  thisIsAVeryLongVariableName := 1;\nend.',
     ),
     purpose: '验证较长的标识符能正确解析',
     shouldParse: true,
@@ -175,7 +175,7 @@ const tests: ConformanceTest[] = [
     name: '长字符串',
     code: makeProgramWithVars(
       's: string;',
-      "begin\n  s := 'abcdefghijklmnopqrstuvwxyz0123456789';\nend."
+      "begin\n  s := 'abcdefghijklmnopqrstuvwxyz0123456789';\nend.",
     ),
     purpose: '验证较长的字符串字面量',
     shouldParse: true,
@@ -194,7 +194,7 @@ const tests: ConformanceTest[] = [
     name: '只有 OTHERWISE 的 CASE',
     code: makeProgramWithVars(
       'x: integer;',
-      'begin\n  case x of\n    otherwise\n      x := 0;\n  end;\nend.'
+      'begin\n  case x of\n    otherwise\n      x := 0;\n  end;\nend.',
     ),
     purpose: '验证 CASE 语句可以只有 OTHERWISE 分支',
     shouldParse: true,
@@ -209,7 +209,7 @@ const tests: ConformanceTest[] = [
     name: '多值 CASE label',
     code: makeProgramWithVars(
       'x, y: integer;',
-      'begin\n  case x of\n    1, 2, 3: y := 10;\n    4, 5: y := 20;\n  end;\nend.'
+      'begin\n  case x of\n    1, 2, 3: y := 10;\n    4, 5: y := 20;\n  end;\nend.',
     ),
     purpose: '验证 CASE 分支可以有多个 label 值',
     shouldParse: true,
@@ -218,7 +218,7 @@ const tests: ConformanceTest[] = [
     name: '嵌套 CASE 语句',
     code: makeProgramWithVars(
       'x, y, z: integer;',
-      'begin\n  case x of\n    1:\n      case y of\n        1: z := 10;\n        2: z := 20;\n      end;\n    2: z := 30;\n  end;\nend.'
+      'begin\n  case x of\n    1:\n      case y of\n        1: z := 10;\n        2: z := 20;\n      end;\n    2: z := 30;\n  end;\nend.',
     ),
     purpose: '验证 CASE 语句可以嵌套',
     shouldParse: true,
@@ -233,7 +233,7 @@ const tests: ConformanceTest[] = [
     name: 'CASE label 为表达式',
     code: makeProgramWithVars(
       'x, y: integer;',
-      'begin\n  case x of\n    1 + 1: y := 10;\n    3 * 2: y := 20;\n  end;\nend.'
+      'begin\n  case x of\n    1 + 1: y := 10;\n    3 * 2: y := 20;\n  end;\nend.',
     ),
     purpose: '验证 CASE label 可以是表达式',
     shouldParse: true,
@@ -244,19 +244,22 @@ const tests: ConformanceTest[] = [
   // ==========================================================================
   {
     name: '单记录 WITH 语句',
-    code: 'program test;\ntype\n  TRec = record\n    x: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  with r do\n    x := 1;\nend.',
+    code:
+      'program test;\ntype\n  TRec = record\n    x: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  with r do\n    x := 1;\nend.',
     purpose: '验证单条记录的 WITH 语句',
     shouldParse: true,
   },
   {
     name: '多记录 WITH 语句',
-    code: 'program test;\ntype\n  TRec1 = record\n    x: integer;\n  end;\n  TRec2 = record\n    y: integer;\n  end;\nvar\n  r1: TRec1;\n  r2: TRec2;\nbegin\n  with r1, r2 do\n    begin\n      x := 1;\n      y := 2;\n    end;\nend.',
+    code:
+      'program test;\ntype\n  TRec1 = record\n    x: integer;\n  end;\n  TRec2 = record\n    y: integer;\n  end;\nvar\n  r1: TRec1;\n  r2: TRec2;\nbegin\n  with r1, r2 do\n    begin\n      x := 1;\n      y := 2;\n    end;\nend.',
     purpose: '验证 WITH 语句可以使用多个记录',
     shouldParse: true,
   },
   {
     name: '嵌套 WITH 语句',
-    code: 'program test;\ntype\n  TInner = record\n    a: integer;\n  end;\n  TOuter = record\n    inner: TInner;\n  end;\nvar\n  o: TOuter;\nbegin\n  with o do\n    with inner do\n      a := 1;\nend.',
+    code:
+      'program test;\ntype\n  TInner = record\n    a: integer;\n  end;\n  TOuter = record\n    inner: TInner;\n  end;\nvar\n  o: TOuter;\nbegin\n  with o do\n    with inner do\n      a := 1;\nend.',
     purpose: '验证 WITH 语句可以嵌套',
     shouldParse: true,
   },
@@ -334,7 +337,8 @@ const tests: ConformanceTest[] = [
   },
   {
     name: '多维数组',
-    code: 'program test;\ntype\n  TArr = array[1..10, 1..20] of integer;\nvar\n  a: TArr;\nbegin\n  a[1, 2] := 3;\nend.',
+    code:
+      'program test;\ntype\n  TArr = array[1..10, 1..20] of integer;\nvar\n  a: TArr;\nbegin\n  a[1, 2] := 3;\nend.',
     purpose: '验证二维数组的声明和访问',
     shouldParse: true,
   },

@@ -21,6 +21,7 @@
 ### 决策 1：运行时值的表示方式 ✅
 
 **确定方案 B：裸值 + 类型编入 key**
+
 - 值用 JS 裸值（number/string/boolean/Array/Object/Set）
 - 需要类型信息的 syscall 把类型编进 key：`io.write.char(x)`、`io.write.int(x)`
 - 多参数 writeln 展开为多个单参数 write + 末尾 `io.writeln.eol()`
@@ -28,6 +29,7 @@
 ### 决策 2：var 参数传递机制 ✅
 
 **确定方案 A：统一 ref cell**
+
 - 所有 var 参传 `{v: value}`，调用后写回变量
 - 调用约定：`{let __c={v:v1}; foo(__c); v1=__c.v;}`
 - 被调方用 `p1.v` 访问 var 参数
@@ -35,6 +37,7 @@
 ### 决策 3：变量初始化 ✅
 
 **确定方案 A：编译期生成**
+
 - analysis 提供类型，编译时在函数开头生成初始化
 - 简单类型直接赋值（`v1=0; v2=0.0; v3=false; v4='\0'`）
 - 复合类型用 syscall（`mem.default.array` 等）
@@ -51,11 +54,14 @@
 
 **确定：由 `SemanticCompiler` 接口解耦，不算重大问题**
 
-`json-code-compiler.ts` 已定义 `SemanticCompiler` 接口。具体每个 key 怎么翻译（inline 还是走 dispatcher）由 `transform.ts` 里的 SemanticCompiler 实现决定，不影响 compiler.ts 生成的 JsonCode。开发时按"算术/比较/逻辑/转换 inline，IO/file/cell/mem/set 走 dispatcher"实现。
+`json-code-compiler.ts` 已定义 `SemanticCompiler` 接口。具体每个 key 怎么翻译（inline 还是走 dispatcher）由
+`transform.ts` 里的 SemanticCompiler 实现决定，不影响 compiler.ts 生成的 JsonCode。开发时按"算术/比较/逻辑/转换
+inline，IO/file/cell/mem/set 走 dispatcher"实现。
 
 ### 决策 7：syscall 是否异步 ✅
 
 **确定方案 C：全部同步**
+
 - 所有 syscall 同步，文件 IO 用同步 API
 - 生成的 JS 代码无 `await`，性能最好
 - 文件操作在测试环境无阻塞问题
@@ -63,12 +69,14 @@
 ### 决策 8：maxSteps 步数限制 ✅
 
 **确定方案 B：循环回边处插入步数检查**
+
 - 在 `compiler.ts` 的 `compileWhile` / `compileFor` / `compileRepeat` 里插入 `steps.check` syscall
 - runtime 的 `steps.check`：`if (++steps > maxSteps) throw`
 
 ### 决策 9：RunState / 文件 IO 复用 ✅
 
 **确定方案 A：复用 RunState，file-model 逻辑参考但同步化**
+
 - `RunState` 直接 import `src/runtime/run-state.ts`
 - `file-model.ts` 的 `PascalFile` 类型直接复用
 - 在 `runtime.ts` 里重新实现同步的 file ops，逻辑参考 file-model.ts
@@ -83,7 +91,8 @@
 
 ### 决策 12：标识符大小写不敏感 ✅
 
-analysis 的 `bind`/`lookup`/`withStack.fields`/`typeAliases`/`forwardFuncs`/`globalBindings` 全部用 `name.toLowerCase()` 做 key。
+analysis 的 `bind`/`lookup`/`withStack.fields`/`typeAliases`/`forwardFuncs`/`globalBindings` 全部用 `name.toLowerCase()`
+做 key。
 
 ### 决策 13：goto 死循环兜底 ✅
 
@@ -100,6 +109,7 @@ analysis 的 `bind`/`lookup`/`withStack.fields`/`typeAliases`/`forwardFuncs`/`gl
 ### 决策 16：F^ 在 EOF 时的返回值 ✅
 
 按 AGENTS.md 原则 A 标准锚定：
+
 - ISO 7185 6.9.8: "After EOF(f) becomes true, the file-buffer-variable f^ is undefined."
 - 默认行为：F^ 在 EOF 时访问报错
 - 非标 extension `fileEofBufferSpace`：启用后 EOF 时 F^ 返回空格（UCSD/Borland 扩展）
@@ -110,7 +120,8 @@ analysis 的 `bind`/`lookup`/`withStack.fields`/`typeAliases`/`forwardFuncs`/`gl
 
 ### 决策 18：label 使用位置追踪 ✅
 
-添加 `labelUseFunc` Map，在 LabeledStatement 分析时记录使用位置 funcId。`compileGoto` 用 `labelUseFuncOf(labelId)` 获取使用位置，作为 longJump 的 functionId。
+添加 `labelUseFunc` Map，在 LabeledStatement 分析时记录使用位置 funcId。`compileGoto` 用 `labelUseFuncOf(labelId)`
+获取使用位置，作为 longJump 的 functionId。
 
 ---
 

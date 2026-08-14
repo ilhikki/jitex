@@ -104,7 +104,7 @@ class JsCompilerImpl implements JsCompiler {
     lines.push(`${indent}    }`)
     lines.push(`${indent}  } catch (__ignored) {`)
     lines.push(
-      `${indent}    if (!__is_long_jump_mode || __long_jump_function_id !== ${fn.id}) throw __ignored;`
+      `${indent}    if (!__is_long_jump_mode || __long_jump_function_id !== ${fn.id}) throw __ignored;`,
     )
     lines.push(`${indent}    __is_long_jump_mode = false;`)
     lines.push(`${indent}    __pc = __long_jump_label_id;`)
@@ -182,7 +182,7 @@ class JsCompilerImpl implements JsCompiler {
 
   private needStateMachine(body: JsonCode.Statement[]): boolean {
     return body.some(
-      (x) => x.kind === 'label' || x.kind === 'jump' || x.kind === 'jumpIf' || x.kind === 'longJump'
+      (x) => x.kind === 'label' || x.kind === 'jump' || x.kind === 'jumpIf' || x.kind === 'longJump',
     )
   }
 

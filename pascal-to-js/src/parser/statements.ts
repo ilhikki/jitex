@@ -72,13 +72,13 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
       // Empty statement
       return ok(
         input.position,
-        withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end)
+        withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end),
       )
 
     default:
       return ok(
         input.position,
-        withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end)
+        withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end),
       )
   }
 }
@@ -104,7 +104,7 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
     } else if (semi.type !== 'END') {
       return fail(
         `Expected ; or END but got ${semi.type} (${semi.content}) at line ${semi.start.line}:${semi.start.column}`,
-        pos
+        pos,
       )
     }
   }
@@ -118,8 +118,8 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
     withLoc(
       { kind: 'CompoundStatement', statements } as CompoundStatementNode,
       startToken.start,
-      endResult.astNode.end
-    )
+      endResult.astNode.end,
+    ),
   )
 }
 
@@ -131,7 +131,7 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   if (labelValue < 0 || labelValue > 9999) {
     return fail(
       `Label ${labelValue} out of range (0..9999) at line ${labelToken.start.line}`,
-      input.position
+      input.position,
     )
   }
   let pos = input.position + 1
@@ -154,13 +154,13 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
             value: labelValue,
             raw: labelToken.content,
           } as IntegerLiteralNode,
-          labelToken
+          labelToken,
         ),
         statement: stmtResult.astNode,
       } as LabeledStatementNode,
       startToken.start,
-      input.tokens[stmtResult.newPosition - 1].end
-    )
+      input.tokens[stmtResult.newPosition - 1].end,
+    ),
   )
 }
 
@@ -199,8 +199,8 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
           right: rightResult.astNode,
         } as AssignmentNode,
         startToken.start,
-        input.tokens[pos - 1].end
-      )
+        input.tokens[pos - 1].end,
+      ),
     )
   }
 
@@ -215,8 +215,8 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
           arguments: (exprResult.astNode as any).arguments,
         } as ProcedureCallNode,
         startToken.start,
-        input.tokens[pos - 1].end
-      )
+        input.tokens[pos - 1].end,
+      ),
     )
   }
 
@@ -231,14 +231,14 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
           arguments: [] as ExpressionNode[],
         } as ProcedureCallNode,
         startToken.start,
-        input.tokens[pos - 1].end
-      )
+        input.tokens[pos - 1].end,
+      ),
     )
   }
 
   return fail(
     `Expected := but got ${nextToken.type} (${nextToken.content}) at line ${nextToken.start.line}:${nextToken.start.column}`,
-    pos
+    pos,
   )
 }
 
@@ -273,7 +273,7 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
             right: widthResult.astNode,
           } as BinaryExpressionNode,
           arg.loc.start,
-          widthResult.astNode.loc.end
+          widthResult.astNode.loc.end,
         )
 
         // Check for :precision
@@ -290,7 +290,7 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
               right: precResult.astNode,
             } as BinaryExpressionNode,
             arg.loc.start,
-            precResult.astNode.loc.end
+            precResult.astNode.loc.end,
           )
         }
       }
@@ -314,8 +314,8 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
         arguments: args,
       } as ProcedureCallNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -355,8 +355,8 @@ function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
         elseBranch,
       } as IfStatementNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -386,8 +386,8 @@ function parseWhileStatement(input: ParserInput): ParseResult<WhileStatementNode
         body: bodyResult.astNode,
       } as WhileStatementNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -409,7 +409,7 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
     } else if (semi.type !== 'UNTIL') {
       return fail(
         `Expected ; or UNTIL but got ${semi.type} at line ${semi.start.line}:${semi.start.column}`,
-        pos
+        pos,
       )
     }
   }
@@ -431,8 +431,8 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
         untilCondition: condResult.astNode,
       } as RepeatStatementNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -465,7 +465,7 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   } else {
     return fail(
       `Expected TO or DOWNTO but got ${dirToken.type} at line ${dirToken.start.line}`,
-      pos
+      pos,
     )
   }
 
@@ -493,8 +493,8 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
         body: bodyResult.astNode,
       } as ForStatementNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -542,7 +542,7 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
     const labelsResult = parseList(
       { tokens: input.tokens, position: pos },
       parseExpression,
-      'COMMA'
+      'COMMA',
     )
     if (!labelsResult.success) return fail(labelsResult.error, labelsResult.position)
     pos = labelsResult.newPosition
@@ -563,8 +563,8 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
           statement: stmtResult.astNode,
         } as CaseBranchNode,
         labelsResult.astNode[0].loc.start,
-        stmtResult.astNode.loc.end
-      )
+        stmtResult.astNode.loc.end,
+      ),
     )
 
     // Skip semicolons
@@ -587,8 +587,8 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
         otherwise,
       } as CaseStatementNode,
       startToken.start,
-      endResult.astNode.end
-    )
+      endResult.astNode.end,
+    ),
   )
 }
 
@@ -614,12 +614,12 @@ function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> 
             value: parseInt(token.content, 10),
             raw: token.content,
           } as IntegerLiteralNode,
-          token
+          token,
         ),
       } as GotoStatementNode,
       startToken.start,
-      token.end
-    )
+      token.end,
+    ),
   )
 }
 
@@ -649,7 +649,7 @@ function parseWithStatement(input: ParserInput): ParseResult<WithStatementNode> 
         body: bodyResult.astNode,
       } as WithStatementNode,
       startToken.start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }

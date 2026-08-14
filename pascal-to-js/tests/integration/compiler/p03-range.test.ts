@@ -263,20 +263,23 @@ end.`,
     // Subrange as Array Index
     {
       name: 'subrange as array index type',
-      code: 'program test; type Index = 1..5; var a: array[Index] of integer; begin a[1] := 10; a[5] := 50; writeln(a[1]); writeln(a[5]); end.',
+      code:
+        'program test; type Index = 1..5; var a: array[Index] of integer; begin a[1] := 10; a[5] := 50; writeln(a[1]); writeln(a[5]); end.',
       purpose: '子界作为数组下标类型',
       expectedOutput: '10\n50\n',
     },
     {
       name: 'array access with subrange index in range',
-      code: 'program test; type Index = 1..5; var a: array[Index] of integer; i: Index; begin i := 3; a[i] := 30; writeln(a[i]); end.',
+      code:
+        'program test; type Index = 1..5; var a: array[Index] of integer; i: Index; begin i := 3; a[i] := 30; writeln(a[i]); end.',
       purpose: '用 subrange 变量作为数组下标',
       expectedOutput: '30\n',
     },
     // Subrange in FOR Loop
     {
       name: 'subrange as for loop variable',
-      code: 'program test; type T = 1..5; var i: T; s: integer; begin s := 0; for i := 1 to 5 do s := s + i; writeln(s); end.',
+      code:
+        'program test; type T = 1..5; var i: T; s: integer; begin s := 0; for i := 1 to 5 do s := s + i; writeln(s); end.',
       purpose: 'subrange 作为 for 循环变量',
       expectedOutput: '15\n',
     },
@@ -295,13 +298,15 @@ end.`,
     // Subrange Operations
     {
       name: 'subrange arithmetic in range',
-      code: 'program test; type T = 1..20; var a, b: T; begin a := 5; b := 10; writeln(a + b); writeln(b - a); writeln(a * 2); end.',
+      code:
+        'program test; type T = 1..20; var a, b: T; begin a := 5; b := 10; writeln(a + b); writeln(b - a); writeln(a * 2); end.',
       purpose: '子界算术运算（结果在范围内）',
       expectedOutput: '15\n5\n10\n',
     },
     {
       name: 'subrange comparison',
-      code: "program test; type T = 1..10; var a, b: T; begin a := 3; b := 7; if a < b then writeln('less'); if b > a then writeln('greater'); if a <> b then writeln('different'); end.",
+      code:
+        "program test; type T = 1..10; var a, b: T; begin a := 3; b := 7; if a < b then writeln('less'); if b > a then writeln('greater'); if a <> b then writeln('different'); end.",
       purpose: '子界比较运算',
       expectedOutput: 'less\ngreater\ndifferent\n',
     },
@@ -313,7 +318,8 @@ end.`,
     },
     {
       name: 'subrange div and mod',
-      code: 'program test; type T = 1..100; var a, b: T; begin a := 17; b := 5; writeln(a div b); writeln(a mod b); end.',
+      code:
+        'program test; type T = 1..100; var a, b: T; begin a := 17; b := 5; writeln(a div b); writeln(a mod b); end.',
       purpose: '子界 div 和 mod 运算',
       expectedOutput: '3\n2\n',
     },

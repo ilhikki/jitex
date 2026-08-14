@@ -65,7 +65,7 @@ export function pluginSyscallKey(pluginName: string, procName: string): string {
  */
 export function findProcedurePlugin(
   plugins: IlPlugin[] | undefined,
-  procName: string
+  procName: string,
 ): { plugin: IlPlugin; name: string } | undefined {
   if (!plugins) return undefined
   const name = procName.toLowerCase()
@@ -82,7 +82,7 @@ export function findProcedurePlugin(
  */
 export function findFunctionPlugin(
   plugins: IlPlugin[] | undefined,
-  funcName: string
+  funcName: string,
 ): { plugin: IlPlugin; name: string } | undefined {
   if (!plugins) return undefined
   const name = funcName.toLowerCase()

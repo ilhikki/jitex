@@ -1,11 +1,11 @@
-import { describe, test, assert, assertEquals } from '../../_harness.ts'
+import { assert, assertEquals, describe, test } from '../../_harness.ts'
 import { lex } from '@/lexer/lexer'
-import { parseProgram, parseBlock } from '@/parser/declarations'
+import { parseBlock, parseProgram } from '@/parser/declarations'
 import { parseExpression } from '@/parser/expressions'
-import { parseStatement, parseCompoundStatement as parseCompound } from '@/parser/statements'
+import { parseCompoundStatement as parseCompound, parseStatement } from '@/parser/statements'
 import { parseType } from '@/parser/types'
 import { nodeToCode } from '@/ast/printer'
-import type { ParserInput, AstNode } from '@/ast/types'
+import type { AstNode, ParserInput } from '@/ast/types'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }
@@ -35,7 +35,9 @@ function runExact(group: string, cases: CaseExact[]) {
         assertEquals(
           printed,
           c.expected,
-          `${c.name}: parse→print mismatch.\n  expected: ${JSON.stringify(c.expected)}\n  actual:   ${JSON.stringify(printed)}`,
+          `${c.name}: parse→print mismatch.\n  expected: ${JSON.stringify(c.expected)}\n  actual:   ${
+            JSON.stringify(printed)
+          }`,
         )
       })
     }
@@ -74,7 +76,7 @@ runExact('Printer: Expressions', [
   { name: 'integer literal', src: '42', parser: parseExpression, expected: '42' },
   { name: 'real literal', src: '3.14', parser: parseExpression, expected: '3.14' },
   { name: 'string literal', src: "'hello'", parser: parseExpression, expected: "'hello'" },
-  { name: "string literal with escaped quote", src: "'it''s'", parser: parseExpression, expected: "'it''s'" },
+  { name: 'string literal with escaped quote', src: "'it''s'", parser: parseExpression, expected: "'it''s'" },
   { name: 'boolean literal true', src: 'TRUE', parser: parseExpression, expected: 'TRUE' },
   { name: 'boolean literal false', src: 'FALSE', parser: parseExpression, expected: 'FALSE' },
   { name: 'identifier', src: 'foo', parser: parseExpression, expected: 'foo' },
@@ -242,7 +244,7 @@ runExact('Printer: Types', [
   { name: 'simple type boolean', src: 'BOOLEAN', parser: parseType, expected: 'BOOLEAN' },
   { name: 'simple type char', src: 'CHAR', parser: parseType, expected: 'CHAR' },
   { name: 'range type', src: '1..10', parser: parseType, expected: '1..10' },
-  { name: "range type char", src: "'a'..'z'", parser: parseType, expected: "'a'..'z'" },
+  { name: 'range type char', src: "'a'..'z'", parser: parseType, expected: "'a'..'z'" },
   {
     name: 'array type',
     src: 'ARRAY [1..10] OF INTEGER',
@@ -379,7 +381,9 @@ describe('Printer: Idempotency', () => {
       assertEquals(
         printed2,
         printed1,
-        `idempotency failed for ${JSON.stringify(source)}.\n  1st: ${JSON.stringify(printed1)}\n  2nd: ${JSON.stringify(printed2)}`,
+        `idempotency failed for ${JSON.stringify(source)}.\n  1st: ${JSON.stringify(printed1)}\n  2nd: ${
+          JSON.stringify(printed2)
+        }`,
       )
     })
   }

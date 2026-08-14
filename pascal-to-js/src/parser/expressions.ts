@@ -28,12 +28,12 @@ export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode>
   if (token.type !== 'IDENTIFIER') {
     return fail(
       `Expected identifier but got ${token.type} (${token.content}) at line ${token.start.line}:${token.start.column}`,
-      input.position
+      input.position,
     )
   }
   return ok(
     input.position + 1,
-    loc({ kind: 'Identifier', name: token.content } as IdentifierNode, token)
+    loc({ kind: 'Identifier', name: token.content } as IdentifierNode, token),
   )
 }
 
@@ -52,8 +52,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             raw: token.content,
           } as IntegerLiteralNode,
           token.start,
-          token.end
-        )
+          token.end,
+        ),
       )
     }
 
@@ -67,8 +67,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             raw: token.content,
           } as IntegerLiteralNode,
           token.start,
-          token.end
-        )
+          token.end,
+        ),
       )
     }
 
@@ -82,8 +82,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             raw: token.content,
           } as RealLiteralNode,
           token.start,
-          token.end
-        )
+          token.end,
+        ),
       )
     }
 
@@ -98,8 +98,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
               raw: token.content,
             } as CharLiteralNode,
             token.start,
-            token.end
-          )
+            token.end,
+          ),
         )
       }
       return ok(
@@ -111,8 +111,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             raw: token.content,
           } as StringLiteralNode,
           token.start,
-          token.end
-        )
+          token.end,
+        ),
       )
     }
 
@@ -134,8 +134,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             raw: token.content,
           } as CharLiteralNode,
           token.start,
-          token.end
-        )
+          token.end,
+        ),
       )
     }
 
@@ -144,19 +144,19 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       if (token.content.toUpperCase() === 'TRUE') {
         return ok(
           input.position + 1,
-          loc({ kind: 'BooleanLiteral', value: true } as BooleanLiteralNode, token)
+          loc({ kind: 'BooleanLiteral', value: true } as BooleanLiteralNode, token),
         )
       }
       if (token.content.toUpperCase() === 'FALSE') {
         return ok(
           input.position + 1,
-          loc({ kind: 'BooleanLiteral', value: false } as BooleanLiteralNode, token)
+          loc({ kind: 'BooleanLiteral', value: false } as BooleanLiteralNode, token),
         )
       }
       if (token.content.toUpperCase() === 'NIL') {
         return ok(
           input.position + 1,
-          loc({ kind: 'Identifier', name: 'NIL' } as IdentifierNode, token)
+          loc({ kind: 'Identifier', name: 'NIL' } as IdentifierNode, token),
         )
       }
       // Could be: identifier, function call, array access, field access
@@ -193,8 +193,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             expression: exprResult.astNode,
           } as ParenthesizedExpressionNode,
           startToken.start,
-          endToken.end
-        )
+          endToken.end,
+        ),
       )
     }
 
@@ -221,8 +221,8 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             operand: operandResult.astNode,
           } as UnaryExpressionNode,
           startToken.start,
-          endToken.end
-        )
+          endToken.end,
+        ),
       )
     }
 
@@ -242,15 +242,15 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             operand: operandResult.astNode,
           } as UnaryExpressionNode,
           startToken.start,
-          endToken.end
-        )
+          endToken.end,
+        ),
       )
     }
 
     default:
       return fail(
         `Unexpected token ${token.type} (${token.content}) at line ${token.start.line}:${token.start.column}`,
-        input.position
+        input.position,
       )
   }
 }
@@ -291,7 +291,7 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
 
   return ok(
     pos,
-    loc({ kind: 'SetConstructor', elements } as SetConstructorNode, startToken, endToken)
+    loc({ kind: 'SetConstructor', elements } as SetConstructorNode, startToken, endToken),
   )
 }
 
@@ -316,7 +316,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
         const listResult = parseList(
           { tokens: input.tokens, position: pos },
           parseExpression,
-          'COMMA'
+          'COMMA',
         )
         if (!listResult.success) return fail(listResult.error, listResult.position)
         args.push(...listResult.astNode)
@@ -329,7 +329,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       expr = withLoc(
         { kind: 'FunctionCall', name: idResult.astNode, arguments: args } as FunctionCallNode,
         startToken.start,
-        endPos
+        endPos,
       )
     } else if (token.type === 'LBRACKET') {
       // Array access
@@ -338,7 +338,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       const listResult = parseList(
         { tokens: input.tokens, position: pos },
         parseExpression,
-        'COMMA'
+        'COMMA',
       )
       if (!listResult.success) return fail(listResult.error, listResult.position)
       indices.push(...listResult.astNode)
@@ -350,7 +350,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       expr = withLoc(
         { kind: 'ArrayAccess', array: expr, indices } as ArrayAccessNode,
         startToken.start,
-        endPos
+        endPos,
       )
     } else if (token.type === 'DOT') {
       // Field access
@@ -362,7 +362,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       expr = withLoc(
         { kind: 'FieldAccess', object: expr, field: fieldResult.astNode } as FieldAccessNode,
         startToken.start,
-        endPos
+        endPos,
       )
     } else if (token.type === 'CARET') {
       // Pointer dereference (treat as field access for simplicity)
@@ -375,7 +375,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
           field: loc({ kind: 'Identifier', name: '^' } as IdentifierNode, token),
         } as FieldAccessNode,
         startToken.start,
-        endPos
+        endPos,
       )
     } else {
       break
@@ -401,8 +401,8 @@ function parseNot(input: ParserInput): ParseResult<ExpressionNode> {
         operand: operandResult.astNode,
       } as UnaryExpressionNode,
       startToken.start,
-      endToken.end
-    )
+      endToken.end,
+    ),
   )
 }
 
@@ -457,7 +457,7 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
         right: rightResult.astNode,
       } as BinaryExpressionNode,
       startPos,
-      endToken.end
+      endToken.end,
     )
     pos = rightResult.newPosition
   }
@@ -487,7 +487,7 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
         operand: termResult.astNode,
       } as UnaryExpressionNode,
       startPos,
-      endToken.end
+      endToken.end,
     )
   } else {
     const termResult = parseTerm({ tokens: input.tokens, position: pos })
@@ -526,7 +526,7 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
         right: rightResult.astNode,
       } as BinaryExpressionNode,
       startPos,
-      endToken.end
+      endToken.end,
     )
     pos = rightResult.newPosition
   }
@@ -589,7 +589,7 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
         right: rightResult.astNode,
       } as ExpressionNode,
       startPos,
-      endToken.end
+      endToken.end,
     )
     pos = rightResult.newPosition
   }

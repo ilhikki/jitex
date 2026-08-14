@@ -5,8 +5,8 @@ import {
   IdentifierNode,
   ParseResult,
   ParserInput,
-  Position,
   PointerTypeNode,
+  Position,
   RangeTypeNode,
   RecordTypeNode,
   RecordVariantNode,
@@ -65,7 +65,7 @@ export function parseType(input: ParserInput): ParseResult<TypeNode> {
     default:
       return fail(
         `Expected type but got ${token.type} (${token.content}) at line ${token.start.line}:${token.start.column}`,
-        input.position
+        input.position,
       )
   }
 }
@@ -91,8 +91,8 @@ function parseRangeOrSimpleType(input: ParserInput): ParseResult<TypeNode> {
           end: endResult.astNode,
         } as RangeTypeNode,
         startPos,
-        input.tokens[endResult.newPosition - 1].end
-      )
+        input.tokens[endResult.newPosition - 1].end,
+      ),
     )
   }
 
@@ -105,8 +105,8 @@ function parseRangeOrSimpleType(input: ParserInput): ParseResult<TypeNode> {
           name: startResult.astNode as IdentifierNode,
         } as SimpleTypeNode,
         startPos,
-        input.tokens[pos - 1].end
-      )
+        input.tokens[pos - 1].end,
+      ),
     )
   }
 
@@ -134,7 +134,7 @@ function parsePackedType(input: ParserInput): ParseResult<TypeNode> {
     default:
       return fail(
         `Expected ARRAY/FILE/SET/RECORD after PACKED at line ${token.start.line}`,
-        input.position
+        input.position,
       )
   }
 }
@@ -143,7 +143,7 @@ function parsePackedType(input: ParserInput): ParseResult<TypeNode> {
 function parseArrayType(
   input: ParserInput,
   isPacked: boolean = false,
-  startPos?: Position
+  startPos?: Position,
 ): ParseResult<ArrayTypeNode> {
   const start = startPos ?? peek(input).start
   let pos = input.position + 1 // skip ARRAY
@@ -178,8 +178,8 @@ function parseArrayType(
         isPacked,
       } as ArrayTypeNode,
       start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -223,8 +223,8 @@ function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<R
     withLoc(
       { kind: 'RecordType', fields, variant } as RecordTypeNode,
       start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -283,8 +283,8 @@ function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPa
     withLoc(
       { kind: 'RecordVariantPart', tagName, tagType: typeResult.astNode, variants } as RecordVariantPartNode,
       start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -296,7 +296,7 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
   const caseLabelsResult = parseList(
     { tokens: input.tokens, position: pos },
     parseExpression,
-    'COMMA'
+    'COMMA',
   )
   if (!caseLabelsResult.success) return fail(caseLabelsResult.error, caseLabelsResult.position)
   pos = caseLabelsResult.newPosition
@@ -347,8 +347,8 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
     withLoc(
       { kind: 'RecordVariant', caseLabels: caseLabelsResult.astNode, fields, variant } as RecordVariantNode,
       start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -366,8 +366,8 @@ function parsePointerType(input: ParserInput): ParseResult<PointerTypeNode> {
     withLoc(
       { kind: 'PointerType', domainType: domainResult.astNode } as PointerTypeNode,
       start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -375,7 +375,7 @@ function parsePointerType(input: ParserInput): ParseResult<PointerTypeNode> {
 function parseFileType(
   input: ParserInput,
   isPacked: boolean = false,
-  startPos?: Position
+  startPos?: Position,
 ): ParseResult<FileTypeNode> {
   const start = startPos ?? peek(input).start
   let pos = input.position + 1 // skip FILE
@@ -399,8 +399,8 @@ function parseFileType(
         isPacked,
       } as FileTypeNode,
       start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -422,8 +422,8 @@ function parseSetType(input: ParserInput, startPos?: Position): ParseResult<SetT
     withLoc(
       { kind: 'SetType', baseType: baseResult.astNode } as SetTypeNode,
       start,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }
 
@@ -450,8 +450,8 @@ function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNo
         values: valuesResult.astNode,
       } as EnumerationTypeNode,
       start,
-      closeResult.astNode.end
-    )
+      closeResult.astNode.end,
+    ),
   )
 }
 
@@ -484,7 +484,7 @@ export function parseVariableDeclaration(input: ParserInput): ParseResult<Variab
         type: typeResult.astNode,
       } as VariableDeclarationNode,
       startPos,
-      input.tokens[pos - 1].end
-    )
+      input.tokens[pos - 1].end,
+    ),
   )
 }

@@ -138,12 +138,14 @@ end.`,
   },
   {
     name: '一层嵌套过程',
-    code: 'program test;\nprocedure outer;\nprocedure inner;\nbegin\nend;\nbegin\n  inner;\nend;\nbegin\n  outer;\nend.',
+    code:
+      'program test;\nprocedure outer;\nprocedure inner;\nbegin\nend;\nbegin\n  inner;\nend;\nbegin\n  outer;\nend.',
     purpose: '验证一层嵌套过程的作用域结构',
   },
   {
     name: '嵌套过程访问外层变量',
-    code: 'program test;\nprocedure outer;\nvar\n  x: integer;\n  procedure inner;\n  begin\n    x := x + 1;\n  end;\nbegin\n  x := 0;\n  inner;\nend;\nbegin\n  outer;\nend.',
+    code:
+      'program test;\nprocedure outer;\nvar\n  x: integer;\n  procedure inner;\n  begin\n    x := x + 1;\n  end;\nbegin\n  x := 0;\n  inner;\nend;\nbegin\n  outer;\nend.',
     purpose: '验证嵌套过程访问外层作用域的变量',
   }, // ------------------------------
   // 过程和函数测试
@@ -160,49 +162,58 @@ end.`,
   },
   {
     name: '无参函数声明与调用',
-    code: 'program test;\nvar\n  x: integer;\nfunction GetAnswer: integer;\nbegin\n  GetAnswer := 42;\nend;\nbegin\n  x := GetAnswer;\nend.',
+    code:
+      'program test;\nvar\n  x: integer;\nfunction GetAnswer: integer;\nbegin\n  GetAnswer := 42;\nend;\nbegin\n  x := GetAnswer;\nend.',
     purpose: '测试无参数函数的声明和调用',
   },
   {
     name: '单参函数声明与调用',
-    code: 'program test;\nvar\n  y: integer;\nfunction Square(x: integer): integer;\nbegin\n  Square := x * x;\nend;\nbegin\n  y := Square(5);\nend.',
+    code:
+      'program test;\nvar\n  y: integer;\nfunction Square(x: integer): integer;\nbegin\n  Square := x * x;\nend;\nbegin\n  y := Square(5);\nend.',
     purpose: '测试单个参数函数的声明和调用',
   },
   {
     name: '函数返回值赋值',
-    code: 'program test;\nvar\n  m: integer;\nfunction Max(a, b: integer): integer;\nbegin\n  if a > b then\n    Max := a\n  else\n    Max := b;\nend;\nbegin\n  m := Max(10, 20);\nend.',
+    code:
+      'program test;\nvar\n  m: integer;\nfunction Max(a, b: integer): integer;\nbegin\n  if a > b then\n    Max := a\n  else\n    Max := b;\nend;\nbegin\n  m := Max(10, 20);\nend.',
     purpose: '测试函数体内对函数名赋值（返回值）',
   },
   {
     name: '嵌套函数调用',
-    code: 'program test;\nvar\n  x: integer;\nfunction Outer: integer;\n  function Inner: integer;\n  begin\n    Inner := 10;\n  end;\nbegin\n  Outer := Inner * 2;\nend;\nbegin\n  x := Outer;\nend.',
+    code:
+      'program test;\nvar\n  x: integer;\nfunction Outer: integer;\n  function Inner: integer;\n  begin\n    Inner := 10;\n  end;\nbegin\n  Outer := Inner * 2;\nend;\nbegin\n  x := Outer;\nend.',
     purpose: '测试嵌套函数的声明和调用',
   },
   {
     name: '过程 forward 声明',
-    code: 'program test;\nprocedure ForwardProc; forward;\nprocedure ForwardProc;\nbegin\nend;\nbegin\n  ForwardProc;\nend.',
+    code:
+      'program test;\nprocedure ForwardProc; forward;\nprocedure ForwardProc;\nbegin\nend;\nbegin\n  ForwardProc;\nend.',
     purpose: '测试过程的 FORWARD 声明',
   },
   {
     name: '函数 forward 声明',
-    code: 'program test;\nvar\n  x: integer;\nfunction ForwardFunc: integer; forward;\nfunction ForwardFunc: integer;\nbegin\n  ForwardFunc := 42;\nend;\nbegin\n  x := ForwardFunc;\nend.',
+    code:
+      'program test;\nvar\n  x: integer;\nfunction ForwardFunc: integer; forward;\nfunction ForwardFunc: integer;\nbegin\n  ForwardFunc := 42;\nend;\nbegin\n  x := ForwardFunc;\nend.',
     purpose: '测试函数的 FORWARD 声明',
   }, // ------------------------------
   // 递归测试
   // ------------------------------
   {
     name: '简单递归过程',
-    code: 'program test;\nprocedure CountDown(n: integer);\nbegin\n  if n > 0 then\n    CountDown(n - 1);\nend;\nbegin\n  CountDown(10);\nend.',
+    code:
+      'program test;\nprocedure CountDown(n: integer);\nbegin\n  if n > 0 then\n    CountDown(n - 1);\nend;\nbegin\n  CountDown(10);\nend.',
     purpose: '测试最简单的直接递归过程',
   },
   {
     name: '阶乘递归函数',
-    code: 'program test;\nvar\n  f: integer;\nfunction Factorial(n: integer): integer;\nbegin\n  if n <= 1 then\n    Factorial := 1\n  else\n    Factorial := n * Factorial(n - 1);\nend;\nbegin\n  f := Factorial(5);\nend.',
+    code:
+      'program test;\nvar\n  f: integer;\nfunction Factorial(n: integer): integer;\nbegin\n  if n <= 1 then\n    Factorial := 1\n  else\n    Factorial := n * Factorial(n - 1);\nend;\nbegin\n  f := Factorial(5);\nend.',
     purpose: '测试经典的阶乘递归函数模式',
   },
   {
     name: '两个过程相互递归',
-    code: 'program test;\nprocedure A(n: integer); forward;\nprocedure B(n: integer);\nbegin\n  if n > 0 then\n    A(n - 1);\nend;\nprocedure A(n: integer);\nbegin\n  if n > 0 then\n    B(n - 1);\nend;\nbegin\n  A(10);\nend.',
+    code:
+      'program test;\nprocedure A(n: integer); forward;\nprocedure B(n: integer);\nbegin\n  if n > 0 then\n    A(n - 1);\nend;\nprocedure A(n: integer);\nbegin\n  if n > 0 then\n    B(n - 1);\nend;\nbegin\n  A(10);\nend.',
     purpose: '测试两个过程通过 forward 声明实现相互递归',
   }, // ------------------------------
   // 类型测试
@@ -214,7 +225,8 @@ end.`,
   },
   {
     name: 'record 类型',
-    code: 'program test;\ntype\n  TRec = record\n    x: integer;\n    y: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  r.x := 1;\n  r.y := 2;\nend.',
+    code:
+      'program test;\ntype\n  TRec = record\n    x: integer;\n    y: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  r.x := 1;\n  r.y := 2;\nend.',
     purpose: '测试 record 类型的声明和字段访问',
   },
   {
@@ -246,7 +258,8 @@ end.`,
   },
   {
     name: 'WITH 语句',
-    code: 'program test;\ntype\n  TRec = record\n    x: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  with r do\n    x := 1;\nend.',
+    code:
+      'program test;\ntype\n  TRec = record\n    x: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  with r do\n    x := 1;\nend.',
     purpose: '验证 WITH 语句创建记录字段的局部作用域',
   },
 ]

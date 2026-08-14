@@ -21,7 +21,7 @@ const tests: ConformanceTest[] = [
     name: '全局变量在嵌套过程中可见',
     code: makeProgramWithVars(
       'x: integer;',
-      'procedure outer;\n' + 'procedure inner;\n' + 'begin\n' + 'end;\n' + 'begin\n' + 'end;'
+      'procedure outer;\n' + 'procedure inner;\n' + 'begin\n' + 'end;\n' + 'begin\n' + 'end;',
     ),
     purpose: '验证全局变量可在多层嵌套过程的外层作用域中找到',
     shouldParse: true,
@@ -46,7 +46,7 @@ const tests: ConformanceTest[] = [
     name: '过程变量不影响主程序',
     code: makeProgramWithVars(
       'x: integer;',
-      'procedure p;\n' + 'var\n' + '  x: integer;\n' + 'begin\n' + 'end;'
+      'procedure p;\n' + 'var\n' + '  x: integer;\n' + 'begin\n' + 'end;',
     ),
     purpose: '验证过程内的同名变量与全局变量处于不同作用域',
     shouldParse: true,
@@ -63,7 +63,7 @@ const tests: ConformanceTest[] = [
         'var\n' +
         '  x: integer;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证同级过程的局部变量互不影响',
     shouldParse: true,
@@ -80,7 +80,7 @@ const tests: ConformanceTest[] = [
         'begin\n' +
         'end;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证内层过程的变量隐藏外层过程的同名变量',
     shouldParse: true,
@@ -88,7 +88,7 @@ const tests: ConformanceTest[] = [
   {
     name: '过程内多个局部变量',
     code: makeProgram(
-      'procedure p;\n' + 'var\n' + '  a, b: integer;\n' + '  c: boolean;\n' + 'begin\n' + 'end;'
+      'procedure p;\n' + 'var\n' + '  a, b: integer;\n' + '  c: boolean;\n' + 'begin\n' + 'end;',
     ),
     purpose: '验证过程内多个变量声明的解析',
     shouldParse: true,
@@ -118,7 +118,7 @@ const tests: ConformanceTest[] = [
         'begin\n' +
         '  x := 1;\n' +
         '  f := x;\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证函数内可声明局部变量',
     shouldParse: true,
@@ -133,7 +133,7 @@ const tests: ConformanceTest[] = [
         'end;\n' +
         'begin\n' +
         '  outer := inner;\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证函数可嵌套声明，形成嵌套作用域',
     shouldParse: true,
@@ -157,7 +157,7 @@ const tests: ConformanceTest[] = [
   {
     name: '参数与局部变量同名',
     code: makeProgram(
-      'procedure p(x: integer);\n' + 'var\n' + '  x: integer;\n' + 'begin\n' + 'end;'
+      'procedure p(x: integer);\n' + 'var\n' + '  x: integer;\n' + 'begin\n' + 'end;',
     ),
     purpose: '验证参数与局部变量同名时的作用域结构解析',
     shouldParse: true,
@@ -181,7 +181,7 @@ const tests: ConformanceTest[] = [
   {
     name: '一层嵌套过程',
     code: makeProgram(
-      'procedure outer;\n' + 'procedure inner;\n' + 'begin\n' + 'end;\n' + 'begin\n' + 'end;'
+      'procedure outer;\n' + 'procedure inner;\n' + 'begin\n' + 'end;\n' + 'begin\n' + 'end;',
     ),
     purpose: '验证一层嵌套过程的作用域结构解析',
     shouldParse: true,
@@ -197,7 +197,7 @@ const tests: ConformanceTest[] = [
         'begin\n' +
         'end;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证两层嵌套过程的作用域结构解析',
     shouldParse: true,
@@ -218,7 +218,7 @@ const tests: ConformanceTest[] = [
         'begin\n' +
         'end;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证深层嵌套过程可访问外层各作用域的变量',
     shouldParse: true,
@@ -240,7 +240,7 @@ const tests: ConformanceTest[] = [
         'begin\n' +
         'end;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证多层嵌套中每层的同名变量依次隐藏外层',
     shouldParse: true,
@@ -255,7 +255,7 @@ const tests: ConformanceTest[] = [
         'end;\n' +
         'procedure p2;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证同级过程的作用域相互独立',
     shouldParse: true,
@@ -269,7 +269,7 @@ const tests: ConformanceTest[] = [
         'end;\n' +
         'procedure p;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证 forward 声明的过程作用域解析',
     shouldParse: true,
@@ -295,7 +295,7 @@ const tests: ConformanceTest[] = [
         'end;\n' +
         'procedure p2;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证不同过程的标签处于不同作用域',
     shouldParse: true,
@@ -314,15 +314,14 @@ const tests: ConformanceTest[] = [
         'end;\n' +
         'begin\n' +
         '  10:\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证嵌套过程中标签的作用域嵌套结构',
     shouldParse: true,
   },
   {
     name: '主程序标签',
-    code:
-      'program test;\n' + 'label\n' + '  10, 20;\n' + 'begin\n' + '  10:\n' + '  20:\n' + 'end.',
+    code: 'program test;\n' + 'label\n' + '  10, 20;\n' + 'begin\n' + '  10:\n' + '  20:\n' + 'end.',
     purpose: '验证主程序级别的标签声明和作用域',
     shouldParse: true,
   },
@@ -334,7 +333,7 @@ const tests: ConformanceTest[] = [
     name: 'WITH 内记录字段可见',
     code: makeProgram(
       'type\n' + '  T = record\n' + '    x: integer;\n' + '  end;\n' + 'var\n' + '  r: T;\n',
-      '  with r do\n' + '  begin\n' + '    x := 1;\n' + '  end;'
+      '  with r do\n' + '  begin\n' + '    x := 1;\n' + '  end;',
     ),
     purpose: '验证 WITH 语句创建记录字段的局部作用域',
     shouldParse: true,
@@ -343,7 +342,7 @@ const tests: ConformanceTest[] = [
     name: 'WITH 结束后字段不可见',
     code: makeProgram(
       'type\n' + '  T = record\n' + '    x: integer;\n' + '  end;\n' + 'var\n' + '  r: T;\n',
-      '  with r do\n' + '  begin\n' + '  end;'
+      '  with r do\n' + '  begin\n' + '  end;',
     ),
     purpose: '验证 WITH 语句结束后字段作用域结束',
     shouldParse: true,
@@ -360,7 +359,7 @@ const tests: ConformanceTest[] = [
         '  end;\n' +
         'var\n' +
         '  r: Outer;\n',
-      '  with r do\n' + '    with b do\n' + '    begin\n' + '      a := 1;\n' + '    end;'
+      '  with r do\n' + '    with b do\n' + '    begin\n' + '      a := 1;\n' + '    end;',
     ),
     purpose: '验证嵌套 WITH 语句的作用域层次解析',
     shouldParse: true,
@@ -378,7 +377,7 @@ const tests: ConformanceTest[] = [
   {
     name: '局部常量隐藏全局常量',
     code: makeProgram(
-      'const\n' + '  X = 10;\n' + 'procedure p;\n' + 'const\n' + '  X = 20;\n' + 'begin\n' + 'end;'
+      'const\n' + '  X = 10;\n' + 'procedure p;\n' + 'const\n' + '  X = 20;\n' + 'begin\n' + 'end;',
     ),
     purpose: '验证过程内的局部常量隐藏全局同名常量',
     shouldParse: true,
@@ -395,7 +394,7 @@ const tests: ConformanceTest[] = [
         '  x: MyInt;\n' +
         '  y: MyBool;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证类型声明的作用域规则，全局类型在过程中可见',
     shouldParse: true,
@@ -409,7 +408,7 @@ const tests: ConformanceTest[] = [
         'var\n' +
         '  c: Color;\n' +
         'begin\n' +
-        'end;'
+        'end;',
     ),
     purpose: '验证枚举类型及其值的作用域解析',
     shouldParse: true,

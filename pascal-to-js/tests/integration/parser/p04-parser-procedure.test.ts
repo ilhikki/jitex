@@ -15,7 +15,7 @@ end;
 `,
       `
   Hello
-`
+`,
     ),
     purpose: '测试无参数过程的声明和调用',
     shouldParse: true,
@@ -30,7 +30,7 @@ end;
 `,
       `
   PrintNum(42)
-`
+`,
     ),
     purpose: '测试单个值参数的过程声明和调用',
     shouldParse: true,
@@ -45,7 +45,7 @@ end;
 `,
       `
   Add(1, 2, x)
-`
+`,
     ),
     purpose: '测试多个参数的过程声明和调用',
     shouldParse: true,
@@ -65,7 +65,7 @@ end;
 `,
       `
   SwapVal(x, y)
-`
+`,
     ),
     purpose: '测试值参数传递的过程',
     shouldParse: true,
@@ -85,7 +85,7 @@ end;
 `,
       `
   SwapVar(x, y)
-`
+`,
     ),
     purpose: '测试 VAR 参数（引用传递）的过程',
     shouldParse: true,
@@ -100,7 +100,7 @@ end;
 `,
       `
   Mix(1, ch, true, false)
-`
+`,
     ),
     purpose: '测试值参数和 VAR 参数混合的过程',
     shouldParse: true,
@@ -119,7 +119,7 @@ end;
 `,
       `
   Outer
-`
+`,
     ),
     purpose: '测试嵌套过程的声明和调用',
     shouldParse: true,
@@ -136,7 +136,7 @@ end;
 `,
       `
   Recurse(10)
-`
+`,
     ),
     purpose: '测试递归过程的声明',
     shouldParse: true,
@@ -156,7 +156,7 @@ end;
 `,
       `
   x := GetAnswer
-`
+`,
     ),
     purpose: '测试无参数函数的声明和调用',
     shouldParse: true,
@@ -172,7 +172,7 @@ end;
 `,
       `
   y := Square(5)
-`
+`,
     ),
     purpose: '测试单个参数函数的声明和调用',
     shouldParse: true,
@@ -188,7 +188,7 @@ end;
 `,
       `
   s := Add(3, 4)
-`
+`,
     ),
     purpose: '测试多个参数函数的声明和调用',
     shouldParse: true,
@@ -207,7 +207,7 @@ end;
 `,
       `
   m := Max(10, 20)
-`
+`,
     ),
     purpose: '测试函数体内对函数名赋值（返回值）',
     shouldParse: true,
@@ -227,7 +227,7 @@ end;
 `,
       `
   x := Outer
-`
+`,
     ),
     purpose: '测试嵌套函数的声明和调用',
     shouldParse: true,
@@ -246,7 +246,7 @@ end;
 `,
       `
   f := Factorial(5)
-`
+`,
     ),
     purpose: '测试递归函数的声明',
     shouldParse: true,
@@ -262,7 +262,7 @@ end;
 `,
       `
   y := Double(3) + 1
-`
+`,
     ),
     purpose: '测试函数调用作为算术表达式的一部分',
     shouldParse: true,
@@ -282,7 +282,7 @@ end;
 `,
       `
   x := Add(Mul(2, 3), Add(4, 5))
-`
+`,
     ),
     purpose: '测试函数调用嵌套在复杂表达式中',
     shouldParse: true,
@@ -302,7 +302,7 @@ end;
 `,
       `
   IntParam(10, z)
-`
+`,
     ),
     purpose: '测试 integer 类型参数（值和 VAR）',
     shouldParse: true,
@@ -318,7 +318,7 @@ end;
 `,
       `
   CharParam('A', ch)
-`
+`,
     ),
     purpose: '测试 char 类型参数（值和 VAR）',
     shouldParse: true,
@@ -334,7 +334,7 @@ end;
 `,
       `
   BoolParam(true, flag)
-`
+`,
     ),
     purpose: '测试 boolean 类型参数（值和 VAR）',
     shouldParse: true,
@@ -350,7 +350,7 @@ end;
 `,
       `
   ArrParam(A)
-`
+`,
     ),
     purpose: '测试数组类型的值参数',
     shouldParse: true,
@@ -367,7 +367,7 @@ end;
 `,
       `
   ArrVarParam(A)
-`
+`,
     ),
     purpose: '测试数组类型的 VAR 参数',
     shouldParse: true,
@@ -383,7 +383,7 @@ end;
 `,
       `
   RecParam(R)
-`
+`,
     ),
     purpose: '测试 record 类型的值参数',
     shouldParse: true,
@@ -400,7 +400,7 @@ end;
 `,
       `
   RecVarParam(R)
-`
+`,
     ),
     purpose: '测试 record 类型的 VAR 参数',
     shouldParse: true,
@@ -419,7 +419,7 @@ end;
 `,
       `
   EnumParam(col)
-`
+`,
     ),
     purpose: '测试枚举类型参数',
     shouldParse: true,
@@ -439,7 +439,7 @@ end;
 `,
       `
   ForwardProc
-`
+`,
     ),
     purpose: '测试过程的 FORWARD 声明',
     shouldParse: true,
@@ -456,7 +456,7 @@ end;
 `,
       `
   x := ForwardFunc
-`
+`,
     ),
     purpose: '测试函数的 FORWARD 声明',
     shouldParse: true,
@@ -473,7 +473,7 @@ end;
 `,
       `
   Add(1, 2, x)
-`
+`,
     ),
     purpose: '测试 FORWARD 声明与实际定义参数列表一致',
     shouldParse: true,
@@ -496,7 +496,7 @@ end;
 `,
       `
   A(10)
-`
+`,
     ),
     purpose: '测试使用 FORWARD 实现相互递归的过程',
     shouldParse: true,
@@ -523,7 +523,7 @@ end;
   P1;
   P2(5);
   x := F1
-`
+`,
     ),
     purpose: '测试多个 FORWARD 声明',
     shouldParse: true,
@@ -546,7 +546,7 @@ end;
 `,
       `
   Level1
-`
+`,
     ),
     purpose: '测试一层嵌套的过程',
     shouldParse: true,
@@ -566,7 +566,7 @@ end;
 `,
       `
   x := Outer
-`
+`,
     ),
     purpose: '测试一层嵌套的函数',
     shouldParse: true,
@@ -589,7 +589,7 @@ end;
 `,
       `
   L1
-`
+`,
     ),
     purpose: '测试两层嵌套（L1 -> L2 -> L3）',
     shouldParse: true,
@@ -616,7 +616,7 @@ end;
 `,
       `
   Deep1
-`
+`,
     ),
     purpose: '测试三层深度嵌套过程',
     shouldParse: true,
@@ -639,7 +639,7 @@ end;
 `,
       `
   Outer
-`
+`,
     ),
     purpose: '测试嵌套过程访问外层作用域的变量',
     shouldParse: true,
@@ -659,7 +659,7 @@ end;
 `,
       `
   z := Outer(5)
-`
+`,
     ),
     purpose: '测试嵌套函数在外层函数体内被调用',
     shouldParse: true,
@@ -678,7 +678,7 @@ end;
 `,
       `
   SiblingB
-`
+`,
     ),
     purpose: '测试同一级别的过程相互调用',
     shouldParse: true,
@@ -704,7 +704,7 @@ end;
 `,
       `
   ProcOuter
-`
+`,
     ),
     purpose: '测试过程中嵌套函数，函数中再嵌套过程',
     shouldParse: true,
@@ -723,7 +723,7 @@ end;
 `,
       `
   EmptyProc
-`
+`,
     ),
     purpose: '测试过程体只有 begin end，没有任何语句',
     shouldParse: true,
@@ -742,7 +742,7 @@ end;
 `,
       `
   LabelOnly
-`
+`,
     ),
     purpose: '测试过程只有 LABEL 声明段',
     shouldParse: true,
@@ -760,7 +760,7 @@ end;
 `,
       `
   ConstOnly
-`
+`,
     ),
     purpose: '测试过程只有 CONST 声明段',
     shouldParse: true,
@@ -778,7 +778,7 @@ end;
 `,
       `
   TypeOnly
-`
+`,
     ),
     purpose: '测试过程只有 TYPE 声明段',
     shouldParse: true,
@@ -796,7 +796,7 @@ end;
 `,
       `
   VarOnly
-`
+`,
     ),
     purpose: '测试过程只有 VAR 声明段',
     shouldParse: true,
@@ -827,7 +827,7 @@ end;
 `,
       `
   FullDecl
-`
+`,
     ),
     purpose: '测试过程包含所有声明段：label, const, type, var, procedure, function',
     shouldParse: true,
@@ -843,7 +843,7 @@ end;
 `,
       `
   x := SimpleFunc
-`
+`,
     ),
     purpose: '测试最简单的函数：无参数、无局部变量',
     shouldParse: true,
@@ -861,7 +861,7 @@ end;
 `,
       `
   LongParams(1, 2, 3, 4, 5, 'a', 'b', 'c', 'd', 'e')
-`
+`,
     ),
     purpose: '测试包含10个参数的过程',
     shouldParse: true,
@@ -883,7 +883,7 @@ end;
 `,
       `
   ProcWithFunc
-`
+`,
     ),
     purpose: '测试过程内部定义函数',
     shouldParse: true,
@@ -907,7 +907,7 @@ end;
 `,
       `
   z := FuncWithProc(5)
-`
+`,
     ),
     purpose: '测试函数内部定义过程',
     shouldParse: true,
@@ -939,7 +939,7 @@ end;
   P2(1);
   x := F1;
   z := F2(2, 3)
-`
+`,
     ),
     purpose: '测试多个过程和函数混合声明',
     shouldParse: true,
@@ -959,7 +959,7 @@ begin
 end;
 `,
       `
-`
+`,
     ),
     purpose: '测试函数返回值为数组类型',
     shouldParse: true,
@@ -978,7 +978,7 @@ end;
 `,
       `
   SubrangeParam(n)
-`
+`,
     ),
     purpose: '测试子界类型参数',
     shouldParse: true,

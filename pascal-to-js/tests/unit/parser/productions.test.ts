@@ -1,20 +1,20 @@
 import { lex } from '@/lexer/lexer'
 import { ParserInput } from '@/ast/types'
-import { parseExpression, parseIdentifier, parseExpressionList } from '@/parser/expressions'
+import { parseExpression, parseExpressionList, parseIdentifier } from '@/parser/expressions'
 import { parseType, parseVariableDeclaration } from '@/parser/types'
-import { parseStatement, parseCompoundStatement } from '@/parser/statements'
+import { parseCompoundStatement, parseStatement } from '@/parser/statements'
 import {
-  parseLabelDeclaration,
+  parseBlock,
   parseConstDeclarations,
+  parseFunctionDeclaration,
+  parseLabelDeclaration,
+  parseParameterList,
+  parseProcedureDeclaration,
+  parseProgram,
   parseTypeDeclarations,
   parseVariableDeclarations,
-  parseProcedureDeclaration,
-  parseFunctionDeclaration,
-  parseParameterList,
-  parseBlock,
-  parseProgram,
 } from '@/parser/declarations'
-import { describe, test, assert, assertEquals } from '../../_harness.ts'
+import { assert, assertEquals, describe, test } from '../../_harness.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }
@@ -28,8 +28,8 @@ describe('Production: identifier', () => {
     const result = parseIdentifier(makeInput('hello'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'Identifier', "kind mismatch: " + result.astNode!.kind + " vs 'Identifier'")
-      assertEquals(result.astNode!.name, 'hello', "result.astNode.name mismatch")
+      assertEquals(result.astNode!.kind, 'Identifier', 'kind mismatch: ' + result.astNode!.kind + " vs 'Identifier'")
+      assertEquals(result.astNode!.name, 'hello', 'result.astNode.name mismatch')
     }
   })
 
@@ -52,8 +52,12 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('42'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'IntegerLiteral', "kind mismatch: " + result.astNode!.kind + " vs 'IntegerLiteral'")
-      assertEquals((result.astNode as any).value, 42, "(.value) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'IntegerLiteral',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'IntegerLiteral'",
+      )
+      assertEquals((result.astNode as any).value, 42, '(.value) mismatch')
     }
   })
 
@@ -61,7 +65,11 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput("'hello'"))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'StringLiteral', "kind mismatch: " + result.astNode!.kind + " vs 'StringLiteral'")
+      assertEquals(
+        result.astNode!.kind,
+        'StringLiteral',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'StringLiteral'",
+      )
     }
   })
 
@@ -69,7 +77,7 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('x'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'Identifier', "kind mismatch: " + result.astNode!.kind + " vs 'Identifier'")
+      assertEquals(result.astNode!.kind, 'Identifier', 'kind mismatch: ' + result.astNode!.kind + " vs 'Identifier'")
     }
   })
 
@@ -77,8 +85,12 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('a + b'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'BinaryExpression', "kind mismatch: " + result.astNode!.kind + " vs 'BinaryExpression'")
-      assertEquals((result.astNode as any).operator, '+', "(.operator) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'BinaryExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'BinaryExpression'",
+      )
+      assertEquals((result.astNode as any).operator, '+', '(.operator) mismatch')
     }
   })
 
@@ -87,10 +99,14 @@ describe('Production: expression', () => {
     assert(result.success, 'parse success')
     if (result.success) {
       // Should be: a + (b * c)
-      assertEquals(result.astNode!.kind, 'BinaryExpression', "kind mismatch: " + result.astNode!.kind + " vs 'BinaryExpression'")
-      assertEquals((result.astNode as any).operator, '+', "(.operator) mismatch")
-      assertEquals((result.astNode as any).right.kind, 'BinaryExpression', "(.right.kind) mismatch")
-      assertEquals((result.astNode as any).right.operator, '*', "(.right.operator) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'BinaryExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'BinaryExpression'",
+      )
+      assertEquals((result.astNode as any).operator, '+', '(.operator) mismatch')
+      assertEquals((result.astNode as any).right.kind, 'BinaryExpression', '(.right.kind) mismatch')
+      assertEquals((result.astNode as any).right.operator, '*', '(.right.operator) mismatch')
     }
   })
 
@@ -98,8 +114,12 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('a < b'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'BinaryExpression', "kind mismatch: " + result.astNode!.kind + " vs 'BinaryExpression'")
-      assertEquals((result.astNode as any).operator, '<', "(.operator) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'BinaryExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'BinaryExpression'",
+      )
+      assertEquals((result.astNode as any).operator, '<', '(.operator) mismatch')
     }
   })
 
@@ -107,9 +127,13 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('a DIV b MOD c'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'BinaryExpression', "kind mismatch: " + result.astNode!.kind + " vs 'BinaryExpression'")
-      assertEquals((result.astNode as any).operator, 'MOD', "(.operator) mismatch")
-      assertEquals((result.astNode as any).left.operator, 'DIV', "(.left.operator) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'BinaryExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'BinaryExpression'",
+      )
+      assertEquals((result.astNode as any).operator, 'MOD', '(.operator) mismatch')
+      assertEquals((result.astNode as any).left.operator, 'DIV', '(.left.operator) mismatch')
     }
   })
 
@@ -117,7 +141,11 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('(a + b)'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ParenthesizedExpression', "kind mismatch: " + result.astNode!.kind + " vs 'ParenthesizedExpression'")
+      assertEquals(
+        result.astNode!.kind,
+        'ParenthesizedExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'ParenthesizedExpression'",
+      )
     }
   })
 
@@ -125,8 +153,12 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('-a'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'UnaryExpression', "kind mismatch: " + result.astNode!.kind + " vs 'UnaryExpression'")
-      assertEquals((result.astNode as any).operator, '-', "(.operator) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'UnaryExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'UnaryExpression'",
+      )
+      assertEquals((result.astNode as any).operator, '-', '(.operator) mismatch')
     }
   })
 
@@ -134,8 +166,12 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('NOT a'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'UnaryExpression', "kind mismatch: " + result.astNode!.kind + " vs 'UnaryExpression'")
-      assertEquals((result.astNode as any).operator, 'NOT', "(.operator) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'UnaryExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'UnaryExpression'",
+      )
+      assertEquals((result.astNode as any).operator, 'NOT', '(.operator) mismatch')
     }
   })
 
@@ -143,8 +179,12 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('f(x, y)'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'FunctionCall', "kind mismatch: " + result.astNode!.kind + " vs 'FunctionCall'")
-      assertEquals((result.astNode as any).arguments.length, 2, "arguments length expected 2")
+      assertEquals(
+        result.astNode!.kind,
+        'FunctionCall',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'FunctionCall'",
+      )
+      assertEquals((result.astNode as any).arguments.length, 2, 'arguments length expected 2')
     }
   })
 
@@ -152,7 +192,7 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('a[i]'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ArrayAccess', "kind mismatch: " + result.astNode!.kind + " vs 'ArrayAccess'")
+      assertEquals(result.astNode!.kind, 'ArrayAccess', 'kind mismatch: ' + result.astNode!.kind + " vs 'ArrayAccess'")
     }
   })
 
@@ -160,7 +200,7 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('a.b'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'FieldAccess', "kind mismatch: " + result.astNode!.kind + " vs 'FieldAccess'")
+      assertEquals(result.astNode!.kind, 'FieldAccess', 'kind mismatch: ' + result.astNode!.kind + " vs 'FieldAccess'")
     }
   })
 
@@ -168,8 +208,8 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('a[i].b'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'FieldAccess', "kind mismatch: " + result.astNode!.kind + " vs 'FieldAccess'")
-      assertEquals((result.astNode as any).object.kind, 'ArrayAccess', "(.object.kind) mismatch")
+      assertEquals(result.astNode!.kind, 'FieldAccess', 'kind mismatch: ' + result.astNode!.kind + " vs 'FieldAccess'")
+      assertEquals((result.astNode as any).object.kind, 'ArrayAccess', '(.object.kind) mismatch')
     }
   })
 
@@ -177,7 +217,11 @@ describe('Production: expression', () => {
     const result = parseExpression(makeInput('a IN b'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'InExpression', "kind mismatch: " + result.astNode!.kind + " vs 'InExpression'")
+      assertEquals(
+        result.astNode!.kind,
+        'InExpression',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'InExpression'",
+      )
     }
   })
 })
@@ -190,7 +234,7 @@ describe('Production: expression_list', () => {
     const result = parseExpressionList(makeInput('x'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 1, "length mismatch, expected 1")
+      assertEquals(result.astNode.length, 1, 'length mismatch, expected 1')
     }
   })
 
@@ -198,7 +242,7 @@ describe('Production: expression_list', () => {
     const result = parseExpressionList(makeInput('x, y, z'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 3, "length mismatch, expected 3")
+      assertEquals(result.astNode.length, 3, 'length mismatch, expected 3')
     }
   })
 })
@@ -211,7 +255,7 @@ describe('Production: type', () => {
     const result = parseType(makeInput('INTEGER'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'SimpleType', "kind mismatch: " + result.astNode!.kind + " vs 'SimpleType'")
+      assertEquals(result.astNode!.kind, 'SimpleType', 'kind mismatch: ' + result.astNode!.kind + " vs 'SimpleType'")
     }
   })
 
@@ -219,7 +263,7 @@ describe('Production: type', () => {
     const result = parseType(makeInput('0..255'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'RangeType', "kind mismatch: " + result.astNode!.kind + " vs 'RangeType'")
+      assertEquals(result.astNode!.kind, 'RangeType', 'kind mismatch: ' + result.astNode!.kind + " vs 'RangeType'")
     }
   })
 
@@ -227,7 +271,7 @@ describe('Production: type', () => {
     const result = parseType(makeInput('ARRAY[0..100]OF INTEGER'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ArrayType', "kind mismatch: " + result.astNode!.kind + " vs 'ArrayType'")
+      assertEquals(result.astNode!.kind, 'ArrayType', 'kind mismatch: ' + result.astNode!.kind + " vs 'ArrayType'")
     }
   })
 
@@ -235,9 +279,9 @@ describe('Production: type', () => {
     const result = parseType(makeInput('PACKED ARRAY[0..1,0..45000]OF ASCIICODE'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ArrayType', "kind mismatch: " + result.astNode!.kind + " vs 'ArrayType'")
-      assertEquals((result.astNode as any).isPacked, true, "(.isPacked) mismatch")
-      assertEquals((result.astNode as any).indexTypes.length, 2, "indexTypes length expected 2")
+      assertEquals(result.astNode!.kind, 'ArrayType', 'kind mismatch: ' + result.astNode!.kind + " vs 'ArrayType'")
+      assertEquals((result.astNode as any).isPacked, true, '(.isPacked) mismatch')
+      assertEquals((result.astNode as any).indexTypes.length, 2, 'indexTypes length expected 2')
     }
   })
 
@@ -245,8 +289,8 @@ describe('Production: type', () => {
     const result = parseType(makeInput('RECORD X: INTEGER; Y: CHAR END'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'RecordType', "kind mismatch: " + result.astNode!.kind + " vs 'RecordType'")
-      assertEquals((result.astNode as any).fields.length, 2, "fields length expected 2")
+      assertEquals(result.astNode!.kind, 'RecordType', 'kind mismatch: ' + result.astNode!.kind + " vs 'RecordType'")
+      assertEquals((result.astNode as any).fields.length, 2, 'fields length expected 2')
     }
   })
 
@@ -254,7 +298,7 @@ describe('Production: type', () => {
     const result = parseType(makeInput('FILE OF CHAR'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'FileType', "kind mismatch: " + result.astNode!.kind + " vs 'FileType'")
+      assertEquals(result.astNode!.kind, 'FileType', 'kind mismatch: ' + result.astNode!.kind + " vs 'FileType'")
     }
   })
 
@@ -262,8 +306,8 @@ describe('Production: type', () => {
     const result = parseType(makeInput('PACKED FILE OF CHAR'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'FileType', "kind mismatch: " + result.astNode!.kind + " vs 'FileType'")
-      assertEquals((result.astNode as any).isPacked, true, "(.isPacked) mismatch")
+      assertEquals(result.astNode!.kind, 'FileType', 'kind mismatch: ' + result.astNode!.kind + " vs 'FileType'")
+      assertEquals((result.astNode as any).isPacked, true, '(.isPacked) mismatch')
     }
   })
 
@@ -271,8 +315,12 @@ describe('Production: type', () => {
     const result = parseType(makeInput('(RED, GREEN, BLUE)'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'EnumerationType', "kind mismatch: " + result.astNode!.kind + " vs 'EnumerationType'")
-      assertEquals((result.astNode as any).values.length, 3, "values length expected 3")
+      assertEquals(
+        result.astNode!.kind,
+        'EnumerationType',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'EnumerationType'",
+      )
+      assertEquals((result.astNode as any).values.length, 3, 'values length expected 3')
     }
   })
 
@@ -280,7 +328,7 @@ describe('Production: type', () => {
     const result = parseType(makeInput('SET OF 0..7'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'SetType', "kind mismatch: " + result.astNode!.kind + " vs 'SetType'")
+      assertEquals(result.astNode!.kind, 'SetType', 'kind mismatch: ' + result.astNode!.kind + " vs 'SetType'")
     }
   })
 })
@@ -293,8 +341,12 @@ describe('Production: variable_declaration', () => {
     const result = parseVariableDeclaration(makeInput('X: INTEGER'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'VariableDeclaration', "kind mismatch: " + result.astNode!.kind + " vs 'VariableDeclaration'")
-      assertEquals((result.astNode.names).length, 1, "length mismatch, expected 1")
+      assertEquals(
+        result.astNode!.kind,
+        'VariableDeclaration',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'VariableDeclaration'",
+      )
+      assertEquals(result.astNode.names.length, 1, 'length mismatch, expected 1')
     }
   })
 
@@ -302,7 +354,7 @@ describe('Production: variable_declaration', () => {
     const result = parseVariableDeclaration(makeInput('X, Y, Z: CHAR'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode.names).length, 3, "length mismatch, expected 3")
+      assertEquals(result.astNode.names.length, 3, 'length mismatch, expected 3')
     }
   })
 
@@ -310,7 +362,7 @@ describe('Production: variable_declaration', () => {
     const result = parseVariableDeclaration(makeInput('BUF: ARRAY[1..10]OF INTEGER'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.type.kind, 'ArrayType', "type.kind mismatch")
+      assertEquals(result.astNode!.type.kind, 'ArrayType', 'type.kind mismatch')
     }
   })
 })
@@ -323,7 +375,7 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('X := 42'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'Assignment', "kind mismatch: " + result.astNode!.kind + " vs 'Assignment'")
+      assertEquals(result.astNode!.kind, 'Assignment', 'kind mismatch: ' + result.astNode!.kind + " vs 'Assignment'")
     }
   })
 
@@ -331,8 +383,8 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('BUF[I] := 0'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'Assignment', "kind mismatch: " + result.astNode!.kind + " vs 'Assignment'")
-      assertEquals((result.astNode as any).left.kind, 'ArrayAccess', "(.left.kind) mismatch")
+      assertEquals(result.astNode!.kind, 'Assignment', 'kind mismatch: ' + result.astNode!.kind + " vs 'Assignment'")
+      assertEquals((result.astNode as any).left.kind, 'ArrayAccess', '(.left.kind) mismatch')
     }
   })
 
@@ -340,8 +392,8 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('IF X > 0 THEN Y := 1'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'IfStatement', "kind mismatch: " + result.astNode!.kind + " vs 'IfStatement'")
-      assert((result.astNode as any).elseBranch === null, "elseBranch expected null")
+      assertEquals(result.astNode!.kind, 'IfStatement', 'kind mismatch: ' + result.astNode!.kind + " vs 'IfStatement'")
+      assert((result.astNode as any).elseBranch === null, 'elseBranch expected null')
     }
   })
 
@@ -349,8 +401,8 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('IF X > 0 THEN Y := 1 ELSE Y := 2'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'IfStatement', "kind mismatch: " + result.astNode!.kind + " vs 'IfStatement'")
-      assert((result.astNode as any).elseBranch !== null, "elseBranch expected not null")
+      assertEquals(result.astNode!.kind, 'IfStatement', 'kind mismatch: ' + result.astNode!.kind + " vs 'IfStatement'")
+      assert((result.astNode as any).elseBranch !== null, 'elseBranch expected not null')
     }
   })
 
@@ -358,7 +410,11 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('WHILE X > 0 DO X := X - 1'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'WhileStatement', "kind mismatch: " + result.astNode!.kind + " vs 'WhileStatement'")
+      assertEquals(
+        result.astNode!.kind,
+        'WhileStatement',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'WhileStatement'",
+      )
     }
   })
 
@@ -366,7 +422,11 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('REPEAT X := X - 1 UNTIL X = 0'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'RepeatStatement', "kind mismatch: " + result.astNode!.kind + " vs 'RepeatStatement'")
+      assertEquals(
+        result.astNode!.kind,
+        'RepeatStatement',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'RepeatStatement'",
+      )
     }
   })
 
@@ -374,8 +434,12 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('FOR I := 1 TO 10 DO SUM := SUM + I'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ForStatement', "kind mismatch: " + result.astNode!.kind + " vs 'ForStatement'")
-      assertEquals((result.astNode as any).direction, 'TO', "(.direction) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'ForStatement',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'ForStatement'",
+      )
+      assertEquals((result.astNode as any).direction, 'TO', '(.direction) mismatch')
     }
   })
 
@@ -383,8 +447,12 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('FOR I := 10 DOWNTO 1 DO SUM := SUM + I'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ForStatement', "kind mismatch: " + result.astNode!.kind + " vs 'ForStatement'")
-      assertEquals((result.astNode as any).direction, 'DOWNTO', "(.direction) mismatch")
+      assertEquals(
+        result.astNode!.kind,
+        'ForStatement',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'ForStatement'",
+      )
+      assertEquals((result.astNode as any).direction, 'DOWNTO', '(.direction) mismatch')
     }
   })
 
@@ -392,7 +460,11 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('GOTO 9999'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'GotoStatement', "kind mismatch: " + result.astNode!.kind + " vs 'GotoStatement'")
+      assertEquals(
+        result.astNode!.kind,
+        'GotoStatement',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'GotoStatement'",
+      )
     }
   })
 
@@ -400,7 +472,11 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('WRITE(X, Y)'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ProcedureCall', "kind mismatch: " + result.astNode!.kind + " vs 'ProcedureCall'")
+      assertEquals(
+        result.astNode!.kind,
+        'ProcedureCall',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'ProcedureCall'",
+      )
     }
   })
 
@@ -408,8 +484,12 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('BREAK'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'ProcedureCall', "kind mismatch: " + result.astNode!.kind + " vs 'ProcedureCall'")
-      assertEquals((result.astNode as any).arguments.length, 0, "arguments length expected 0")
+      assertEquals(
+        result.astNode!.kind,
+        'ProcedureCall',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'ProcedureCall'",
+      )
+      assertEquals((result.astNode as any).arguments.length, 0, 'arguments length expected 0')
     }
   })
 
@@ -417,7 +497,11 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput(';'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'EmptyStatement', "kind mismatch: " + result.astNode!.kind + " vs 'EmptyStatement'")
+      assertEquals(
+        result.astNode!.kind,
+        'EmptyStatement',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'EmptyStatement'",
+      )
     }
   })
 })
@@ -430,8 +514,12 @@ describe('Production: compound_statement', () => {
     const result = parseCompoundStatement(makeInput('BEGIN END'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.kind, 'CompoundStatement', "kind mismatch: " + result.astNode!.kind + " vs 'CompoundStatement'")
-      assertEquals((result.astNode.statements).length, 0, "length mismatch, expected 0")
+      assertEquals(
+        result.astNode!.kind,
+        'CompoundStatement',
+        'kind mismatch: ' + result.astNode!.kind + " vs 'CompoundStatement'",
+      )
+      assertEquals(result.astNode.statements.length, 0, 'length mismatch, expected 0')
     }
   })
 
@@ -439,7 +527,7 @@ describe('Production: compound_statement', () => {
     const result = parseCompoundStatement(makeInput('BEGIN X := 1; Y := 2 END'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode.statements).length, 2, "length mismatch, expected 2")
+      assertEquals(result.astNode.statements.length, 2, 'length mismatch, expected 2')
     }
   })
 
@@ -447,7 +535,7 @@ describe('Production: compound_statement', () => {
     const result = parseCompoundStatement(makeInput('BEGIN BEGIN X := 1 END END'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.statements[0].kind, 'CompoundStatement', "statements[0].kind mismatch")
+      assertEquals(result.astNode!.statements[0].kind, 'CompoundStatement', 'statements[0].kind mismatch')
     }
   })
 })
@@ -460,8 +548,8 @@ describe('Production: label_declaration', () => {
     const result = parseLabelDeclaration(makeInput('LABEL 9999;'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode!.labels).length, 1, "labels length expected 1")
-      assertEquals(result.astNode!.labels[0].value, 9999, "label value mismatch")
+      assertEquals(result.astNode!.labels.length, 1, 'labels length expected 1')
+      assertEquals(result.astNode!.labels[0].value, 9999, 'label value mismatch')
     }
   })
 
@@ -469,7 +557,7 @@ describe('Production: label_declaration', () => {
     const result = parseLabelDeclaration(makeInput('LABEL 10, 20, 30;'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode.labels).length, 3, "length mismatch, expected 3")
+      assertEquals(result.astNode.labels.length, 3, 'length mismatch, expected 3')
     }
   })
 })
@@ -482,8 +570,8 @@ describe('Production: const_declarations', () => {
     const result = parseConstDeclarations(makeInput('CONST MAX = 100'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode!.length), 1, "const decls length expected 1")
-      assertEquals(result.astNode![0].name.name, 'MAX', "const decl name mismatch")
+      assertEquals(result.astNode!.length, 1, 'const decls length expected 1')
+      assertEquals(result.astNode![0].name.name, 'MAX', 'const decl name mismatch')
     }
   })
 
@@ -491,7 +579,7 @@ describe('Production: const_declarations', () => {
     const result = parseConstDeclarations(makeInput('CONST MAX = 100; MIN = 0'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 2, "length mismatch, expected 2")
+      assertEquals(result.astNode.length, 2, 'length mismatch, expected 2')
     }
   })
 
@@ -499,7 +587,7 @@ describe('Production: const_declarations', () => {
     const result = parseConstDeclarations(makeInput('VAR'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 0, "length mismatch, expected 0")
+      assertEquals(result.astNode.length, 0, 'length mismatch, expected 0')
     }
   })
 })
@@ -512,9 +600,9 @@ describe('Production: type_declarations', () => {
     const result = parseTypeDeclarations(makeInput('TYPE ASCIICODE = 0..127'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 1, "length mismatch, expected 1")
-      assertEquals(result.astNode![0].name.name, 'ASCIICODE', "type decl name mismatch")
-      assertEquals(result.astNode![0].typeDef.kind, 'RangeType', "typeDef.kind mismatch")
+      assertEquals(result.astNode.length, 1, 'length mismatch, expected 1')
+      assertEquals(result.astNode![0].name.name, 'ASCIICODE', 'type decl name mismatch')
+      assertEquals(result.astNode![0].typeDef.kind, 'RangeType', 'typeDef.kind mismatch')
     }
   })
 
@@ -522,7 +610,7 @@ describe('Production: type_declarations', () => {
     const result = parseTypeDeclarations(makeInput('TYPE A = INTEGER; B = 0..255; C = CHAR'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 3, "length mismatch, expected 3")
+      assertEquals(result.astNode.length, 3, 'length mismatch, expected 3')
     }
   })
 })
@@ -535,7 +623,7 @@ describe('Production: variable_declarations', () => {
     const result = parseVariableDeclarations(makeInput('VAR X: INTEGER'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 1, "length mismatch, expected 1")
+      assertEquals(result.astNode.length, 1, 'length mismatch, expected 1')
     }
   })
 
@@ -543,8 +631,8 @@ describe('Production: variable_declarations', () => {
     const result = parseVariableDeclarations(makeInput('VAR X: INTEGER; Y, Z: CHAR'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 2, "length mismatch, expected 2")
-      assertEquals((result.astNode[1].names).length, 2, "length mismatch, expected 2")
+      assertEquals(result.astNode.length, 2, 'length mismatch, expected 2')
+      assertEquals(result.astNode[1].names.length, 2, 'length mismatch, expected 2')
     }
   })
 })
@@ -557,7 +645,7 @@ describe('Production: parameter_list', () => {
     const result = parseParameterList(makeInput(''))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 0, "length mismatch, expected 0")
+      assertEquals(result.astNode.length, 0, 'length mismatch, expected 0')
     }
   })
 
@@ -565,8 +653,8 @@ describe('Production: parameter_list', () => {
     const result = parseParameterList(makeInput('(X: INTEGER)'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode!.length), 1, "type decls length expected 1")
-      assertEquals(result.astNode![0].isVar, false, "decl isVar expected false")
+      assertEquals(result.astNode!.length, 1, 'type decls length expected 1')
+      assertEquals(result.astNode![0].isVar, false, 'decl isVar expected false')
     }
   })
 
@@ -574,7 +662,7 @@ describe('Production: parameter_list', () => {
     const result = parseParameterList(makeInput('(VAR F: TEXTFILE)'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode![0].isVar, true, "parameter isVar should be true")
+      assertEquals(result.astNode![0].isVar, true, 'parameter isVar should be true')
     }
   })
 
@@ -582,7 +670,7 @@ describe('Production: parameter_list', () => {
     const result = parseParameterList(makeInput('(X: INTEGER; VAR Y: CHAR)'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode).length, 2, "length mismatch, expected 2")
+      assertEquals(result.astNode.length, 2, 'length mismatch, expected 2')
     }
   })
 })
@@ -595,9 +683,9 @@ describe('Production: procedure_declaration', () => {
     const result = parseProcedureDeclaration(makeInput('PROCEDURE FOO; BEGIN END;'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.name.name, 'FOO', "procedure name (FOO, no params) mismatch")
-      assertEquals((result.astNode!.parameters).length, 0, "parameters length expected 0")
-      assertEquals(result.astNode!.isForward, false, "isForward expected false")
+      assertEquals(result.astNode!.name.name, 'FOO', 'procedure name (FOO, no params) mismatch')
+      assertEquals(result.astNode!.parameters.length, 0, 'parameters length expected 0')
+      assertEquals(result.astNode!.isForward, false, 'isForward expected false')
     }
   })
 
@@ -605,8 +693,8 @@ describe('Production: procedure_declaration', () => {
     const result = parseProcedureDeclaration(makeInput('PROCEDURE BAR(X: INTEGER); BEGIN END;'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.name.name, 'BAR', "procedure name (BAR, with params) mismatch")
-      assertEquals((result.astNode!.parameters).length, 1, "parameters length expected 1")
+      assertEquals(result.astNode!.name.name, 'BAR', 'procedure name (BAR, with params) mismatch')
+      assertEquals(result.astNode!.parameters.length, 1, 'parameters length expected 1')
     }
   })
 
@@ -614,8 +702,8 @@ describe('Production: procedure_declaration', () => {
     const result = parseProcedureDeclaration(makeInput('PROCEDURE DEBUGHELP; FORWARD;'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.isForward, true, "isForward mismatch")
-      assert(result.astNode!.block === null, "block expected null (forward)")
+      assertEquals(result.astNode!.isForward, true, 'isForward mismatch')
+      assert(result.astNode!.block === null, 'block expected null (forward)')
     }
   })
 })
@@ -628,18 +716,18 @@ describe('Production: function_declaration', () => {
     const result = parseFunctionDeclaration(makeInput('FUNCTION FOO: INTEGER; BEGIN END;'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.name.name, 'FOO', "function name (FOO, no params) mismatch")
-      assertEquals(result.astNode!.returnType.kind, 'SimpleType', "returnType.kind expected SimpleType")
+      assertEquals(result.astNode!.name.name, 'FOO', 'function name (FOO, no params) mismatch')
+      assertEquals(result.astNode!.returnType.kind, 'SimpleType', 'returnType.kind expected SimpleType')
     }
   })
 
   test('should parse function with parameters', () => {
     const result = parseFunctionDeclaration(
-      makeInput('FUNCTION BAR(X: INTEGER): BOOLEAN; BEGIN END;')
+      makeInput('FUNCTION BAR(X: INTEGER): BOOLEAN; BEGIN END;'),
     )
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode.parameters).length, 1, "length mismatch, expected 1")
+      assertEquals(result.astNode.parameters.length, 1, 'length mismatch, expected 1')
     }
   })
 
@@ -647,7 +735,7 @@ describe('Production: function_declaration', () => {
     const result = parseFunctionDeclaration(makeInput('FUNCTION FOO: INTEGER; FORWARD;'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.isForward, true, "result.astNode.isForward mismatch")
+      assertEquals(result.astNode!.isForward, true, 'result.astNode.isForward mismatch')
     }
   })
 })
@@ -661,9 +749,9 @@ describe('Production: block', () => {
     const result = parseBlock(makeInput(source))
     assert(result.success, 'parse success')
     if (result.success) {
-      assert(result.astNode!.labelDeclarations !== null, "labelDeclarations expected not null")
-      assertEquals((result.astNode.constDeclarations).length, 1, "length mismatch, expected 1")
-      assertEquals((result.astNode.variableDeclarations).length, 1, "length mismatch, expected 1")
+      assert(result.astNode!.labelDeclarations !== null, 'labelDeclarations expected not null')
+      assertEquals(result.astNode.constDeclarations.length, 1, 'length mismatch, expected 1')
+      assertEquals(result.astNode.variableDeclarations.length, 1, 'length mismatch, expected 1')
     }
   })
 
@@ -672,7 +760,7 @@ describe('Production: block', () => {
     const result = parseBlock(makeInput(source))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode.procedureDeclarations).length, 1, "length mismatch, expected 1")
+      assertEquals(result.astNode.procedureDeclarations.length, 1, 'length mismatch, expected 1')
     }
   })
 })
@@ -685,8 +773,8 @@ describe('Production: program', () => {
     const result = parseProgram(makeInput('PROGRAM TEST; BEGIN END.'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.name.name, 'TEST', "program name (simple) mismatch")
-      assertEquals((result.astNode!.parameters).length, 0, "program parameters length expected 0")
+      assertEquals(result.astNode!.name.name, 'TEST', 'program name (simple) mismatch')
+      assertEquals(result.astNode!.parameters.length, 0, 'program parameters length expected 0')
     }
   })
 
@@ -694,18 +782,18 @@ describe('Production: program', () => {
     const result = parseProgram(makeInput('PROGRAM TANGLE(WEBFILE, CHANGEFILE); BEGIN END.'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals((result.astNode.parameters).length, 2, "length mismatch, expected 2")
+      assertEquals(result.astNode.parameters.length, 2, 'length mismatch, expected 2')
     }
   })
 
   test('should parse program with label and const', () => {
     const result = parseProgram(
-      makeInput('PROGRAM TEST; LABEL 9999; CONST MAX = 100; BEGIN 9999: GOTO 9999 END.')
+      makeInput('PROGRAM TEST; LABEL 9999; CONST MAX = 100; BEGIN 9999: GOTO 9999 END.'),
     )
     assert(result.success, 'parse success')
     if (result.success) {
-      assert(result.astNode!.block.labelDeclarations !== null, "block.labelDeclarations expected not null")
-      assertEquals((result.astNode!.block.constDeclarations).length, 1, "block.constDeclarations length expected 1")
+      assert(result.astNode!.block.labelDeclarations !== null, 'block.labelDeclarations expected not null')
+      assertEquals(result.astNode!.block.constDeclarations.length, 1, 'block.constDeclarations length expected 1')
     }
   })
 
@@ -713,7 +801,7 @@ describe('Production: program', () => {
     const result = parseProgram(makeInput('{$C-,A+,D-} PROGRAM TEST; BEGIN END.'))
     assert(result.success, 'parse success')
     if (result.success) {
-      assertEquals(result.astNode!.name.name, 'TEST', "program name (second TEST) mismatch")
+      assertEquals(result.astNode!.name.name, 'TEST', 'program name (second TEST) mismatch')
     }
   })
 })

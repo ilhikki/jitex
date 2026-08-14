@@ -1,5 +1,5 @@
 import { run as runIL } from '@/compiler/transform'
-import { describe, test, assert, afterAll, assertEquals } from '../_harness.ts'
+import { afterAll, assert, assertEquals, describe, test } from '../_harness.ts'
 
 interface BenchmarkResult {
   name: string
@@ -18,7 +18,7 @@ interface BenchmarkResult {
 function measureExecution(
   name: string,
   fn: () => any,
-  iterations: number
+  iterations: number,
 ): BenchmarkResult {
   const times: number[] = []
   let totalSteps = 0
@@ -85,7 +85,7 @@ function printReport(results: BenchmarkResult[]): void {
       ' | ' +
       padLeft('AvgSteps', 10) +
       ' | ' +
-      'Status'
+      'Status',
   )
   console.log(
     '-'.repeat(40) +
@@ -100,7 +100,7 @@ function printReport(results: BenchmarkResult[]): void {
       '|' +
       '-'.repeat(12) +
       '|' +
-      '-'.repeat(10)
+      '-'.repeat(10),
   )
 
   for (const r of results) {
@@ -118,7 +118,7 @@ function printReport(results: BenchmarkResult[]): void {
         padLeft(String(Math.round(r.avgSteps)), 10) +
         ' | ' +
         r.status +
-        (r.error ? ` (${r.error})` : '')
+        (r.error ? ` (${r.error})` : ''),
     )
   }
 
@@ -151,7 +151,7 @@ end.`
     const r = measureExecution(
       'arithmetic-loop-100k',
       () => runIL(code, { maxSteps: 1e9 }),
-      5
+      5,
     )
     results.push(r)
     assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
@@ -174,7 +174,7 @@ end.`
     const r = measureExecution(
       'array-access-10k',
       () => runIL(code, { maxSteps: 1e9 }),
-      5
+      5,
     )
     results.push(r)
     assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
@@ -194,7 +194,7 @@ end.`
     const r = measureExecution(
       'string-concat-10k',
       () => runIL(code, { extensions: ['string'], maxSteps: 1e9 }),
-      5
+      5,
     )
     results.push(r)
     assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
@@ -215,7 +215,7 @@ end.`
     const r = measureExecution(
       'nested-loops-100x100x100',
       () => runIL(code, { maxSteps: 1e9 }),
-      3
+      3,
     )
     results.push(r)
     assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
@@ -238,7 +238,7 @@ end.`
     const r = measureExecution(
       'goto-backward-100k',
       () => runIL(code, { maxSteps: 1e9 }),
-      5
+      5,
     )
     results.push(r)
     assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
@@ -265,7 +265,7 @@ end.`
     const r = measureExecution(
       'procedure-calls-4',
       () => runIL(code, { maxSteps: 1e9 }),
-      10
+      10,
     )
     results.push(r)
     assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
@@ -292,7 +292,7 @@ end.`
     const r = measureExecution(
       'record-access-100k',
       () => runIL(code, { maxSteps: 1e9 }),
-      5
+      5,
     )
     results.push(r)
     assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)

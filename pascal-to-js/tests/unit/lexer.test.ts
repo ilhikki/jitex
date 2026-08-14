@@ -1,5 +1,5 @@
 import { lex } from '@/index'
-import { describe, test, assert, assertEquals } from '../_harness.ts'
+import { assert, assertEquals, describe, test } from '../_harness.ts'
 
 interface Tok {
   type: string
@@ -18,7 +18,9 @@ function check(token: Tok, expectedType: string, expectedContent?: string, label
     assertEquals(
       token.content,
       expectedContent,
-      `${ctx}type=${expectedType}: expected content=${JSON.stringify(expectedContent)}, got=${JSON.stringify(token.content)}`,
+      `${ctx}type=${expectedType}: expected content=${JSON.stringify(expectedContent)}, got=${
+        JSON.stringify(token.content)
+      }`,
     )
   }
 }

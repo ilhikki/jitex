@@ -22,12 +22,12 @@
 import { lex } from '@/lexer/lexer'
 import { parseProgram } from '@/parser/declarations'
 import type { ParserInput, ProgramNode } from '@/ast/types'
-import { analyzeProgram, type Analysis, type VarSymbol } from '@/compiler/analysis'
+import { type Analysis, analyzeProgram, type VarSymbol } from '@/compiler/analysis'
 import { compileProgram } from '@/compiler/compiler'
-import { toJs, type SemanticCompiler, type JsCompiler } from '@/compiler/json-code-compiler'
+import { type JsCompiler, type SemanticCompiler, toJs } from '@/compiler/json-code-compiler'
 import { JsonCode } from '@/compiler/json-code'
-import type { RunState, RunError } from '@/runtime/run-state'
-import { createRuntimeContext, dispatch, toRunState, type RuntimeOptions } from '@/compiler/runtime'
+import type { RunError, RunState } from '@/runtime/run-state'
+import { createRuntimeContext, dispatch, type RuntimeOptions, toRunState } from '@/compiler/runtime'
 import type { IlPlugin } from '@/compiler/plugin'
 
 // ============================================================
@@ -64,7 +64,7 @@ function parseSource(source: string): ProgramNode {
 function applyProgramFileUrls(
   fn: JsonCode.Function,
   a: Analysis,
-  programFileUrls?: Record<string, string>
+  programFileUrls?: Record<string, string>,
 ): JsonCode.Function {
   if (!programFileUrls) return fn
 
@@ -146,9 +146,15 @@ class PascalSemanticCompiler implements SemanticCompiler {
       case 'i64.mul':
         return `((${args[0]} * ${args[1]}) | 0)`
       case 'i64.div':
-        return `(() => { const __d = ${args[1]}; if (__d === 0) throw new Error('JS VM: division by zero'); return (Math.trunc(${args[0]} / __d)) | 0; })()`
+        return `(() => { const __d = ${
+          args[1]
+        }; if (__d === 0) throw new Error('JS VM: division by zero'); return (Math.trunc(${args[0]} / __d)) | 0; })()`
       case 'i64.mod':
-        return `(() => { const __m = ${args[1]}; if (__m === 0) throw new Error('JS VM: division by zero'); const __l = ${args[0]}; return (__l - Math.trunc(__l / __m) * __m) | 0; })()`
+        return `(() => { const __m = ${
+          args[1]
+        }; if (__m === 0) throw new Error('JS VM: division by zero'); const __l = ${
+          args[0]
+        }; return (__l - Math.trunc(__l / __m) * __m) | 0; })()`
       case 'i64.neg':
         return `(-${args[0]} | 0)`
       case 'i64.and':
@@ -178,7 +184,9 @@ class PascalSemanticCompiler implements SemanticCompiler {
       case 'f64.sqrt':
         // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
         // sqrt(x) for x < 0 is undefined → must throw
-        return `(() => { const __x = ${args[0]}; if (!(__x >= 0)) throw new Error('sqrt: domain error (x < 0)'); return Math.sqrt(__x); })()`
+        return `(() => { const __x = ${
+          args[0]
+        }; if (!(__x >= 0)) throw new Error('sqrt: domain error (x < 0)'); return Math.sqrt(__x); })()`
       case 'f64.sin':
         return `Math.sin(${args[0]})`
       case 'f64.cos':
@@ -188,7 +196,9 @@ class PascalSemanticCompiler implements SemanticCompiler {
       case 'f64.ln':
         // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
         // ln(x) for x <= 0 is undefined → must throw
-        return `(() => { const __x = ${args[0]}; if (!(__x > 0)) throw new Error('ln: domain error (x <= 0)'); return Math.log(__x); })()`
+        return `(() => { const __x = ${
+          args[0]
+        }; if (!(__x > 0)) throw new Error('ln: domain error (x <= 0)'); return Math.log(__x); })()`
       case 'f64.arctan':
         return `Math.atan(${args[0]})`
 
@@ -238,16 +248,20 @@ class PascalSemanticCompiler implements SemanticCompiler {
       // 生成 IIFE 返回 1-based 字符数组对象，避免字符串作为数组索引时 0-based 偏移
       // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历
       case 'str.to.char.array':
-        return `(() => { const __low=${args[0]}|0, __high=${args[1]}|0, __s=${args[2]}; const __o={}; for(let __i=__low;__i<=__high;__i++){const __k=__i-__low; __o[__i]=__k<__s.length?__s.charAt(__k):' ';} __o.length=__high-__low+1; return __o; })()`
+        return `(() => { const __low=${args[0]}|0, __high=${args[1]}|0, __s=${
+          args[2]
+        }; const __o={}; for(let __i=__low;__i<=__high;__i++){const __k=__i-__low; __o[__i]=__k<__s.length?__s.charAt(__k):' ';} __o.length=__high-__low+1; return __o; })()`
 
       // ---------- 数组/记录/cell（inline，符合 JS 语义）----------
       // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...
       case 'array.get': {
         if (args.length < 2) return args[0]
-        return `(${args[0]}${args
-          .slice(1)
-          .map((i) => `[${i}]`)
-          .join('')})`
+        return `(${args[0]}${
+          args
+            .slice(1)
+            .map((i) => `[${i}]`)
+            .join('')
+        })`
       }
       // array.set: args = [arr, idx1, idx2, ..., val] → arr[idx1][idx2]... = val
       case 'array.set': {
@@ -273,10 +287,14 @@ class PascalSemanticCompiler implements SemanticCompiler {
         return `(${args[0]}.v = ${args[1]})`
       // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
       case 'ptr.deref':
-        return `(() => { const __p = ${args[0]}; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); return __p.v; })()`
+        return `(() => { const __p = ${
+          args[0]
+        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); return __p.v; })()`
       // p^ := x — nil 解引用是 error
       case 'ptr.assign':
-        return `(() => { const __p = ${args[0]}; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.v = ${args[1]}; })()`
+        return `(() => { const __p = ${
+          args[0]
+        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.v = ${args[1]}; })()`
       // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
       case 'ptr.dispose.check':
         return `(() => { if (${args[0]} === null) throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)'); })()`
@@ -346,7 +364,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
  */
 export function executeCompiled(
   code: string,
-  __sys: (key: string, args: any[]) => any
+  __sys: (key: string, args: any[]) => any,
 ): void {
   // 提取导出的函数名
   const exportMatch = code.match(/export\s*\{\s*(\w+)\s*\}/)
