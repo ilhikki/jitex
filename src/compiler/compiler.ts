@@ -9,47 +9,34 @@
  */
 
 import { JsonCode } from '@/compiler/json-code'
-import { Analysis, TypeInfo, VarSymbol, Symbol } from '@/compiler/analysis'
+import { Analysis, Symbol, TypeInfo } from '@/compiler/analysis'
+import { findFunctionPlugin, findProcedurePlugin, pluginSyscallKey } from '@/compiler/plugin'
 import {
-  IlPlugin,
-  findProcedurePlugin,
-  findFunctionPlugin,
-  pluginSyscallKey,
-} from '@/compiler/plugin'
-import {
-  ProgramNode,
-  BlockNode,
-  StatementNode,
-  ExpressionNode,
-  IdentifierNode,
-  ProcedureDeclarationNode,
-  FunctionDeclarationNode,
-  WithStatementNode,
+  ArrayAccessNode,
   AssignmentNode,
-  IfStatementNode,
-  WhileStatementNode,
-  RepeatStatementNode,
-  ForStatementNode,
+  BinaryExpressionNode,
+  BlockNode,
   CaseStatementNode,
-  CaseBranchNode,
+  CompoundStatementNode,
+  ExpressionNode,
+  FieldAccessNode,
+  ForStatementNode,
+  FunctionCallNode,
+  FunctionDeclarationNode,
   GotoStatementNode,
+  IdentifierNode,
+  IfStatementNode,
+  InExpressionNode,
   LabeledStatementNode,
   ProcedureCallNode,
-  CompoundStatementNode,
-  EmptyStatementNode,
-  BinaryExpressionNode,
-  UnaryExpressionNode,
-  FunctionCallNode,
-  ArrayAccessNode,
-  FieldAccessNode,
-  ParenthesizedExpressionNode,
+  ProcedureDeclarationNode,
+  ProgramNode,
+  RepeatStatementNode,
   SetConstructorNode,
-  InExpressionNode,
-  IntegerLiteralNode,
-  RealLiteralNode,
-  StringLiteralNode,
-  CharLiteralNode,
-  BooleanLiteralNode,
+  StatementNode,
+  UnaryExpressionNode,
+  WhileStatementNode,
+  WithStatementNode,
 } from '@/ast/types'
 
 // ============================================================

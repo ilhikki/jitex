@@ -40,8 +40,8 @@ export type { IlPlugin } from '@/compiler/plugin'
 // 便捷函数
 // ==========================================================================
 
-import { lex } from './lexer/lexer'
-import { parseProgram } from './parser/declarations'
+import { lex } from '@/lexer'
+import { parseProgram } from '@/parser'
 import { ParserInput, ParseResult, ProgramNode } from './ast/types'
 
 /**
