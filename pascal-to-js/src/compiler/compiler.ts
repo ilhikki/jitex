@@ -193,7 +193,17 @@ function typeDescLiteral(ti: TypeInfo): JsonCode.Literal {
   return { kind: 'literal', key: 'type', arg: JSON.stringify(serializeTypeInfo(ti)) }
 }
 
-function serializeTypeInfo(ti: TypeInfo): any {
+/** 序列化的类型描述符（嵌入 JsonCode literal，由 runtime.ts 消费） */
+interface TypeDescriptor {
+  tag: string
+  low?: number
+  high?: number
+  dims?: Array<{ low: number; high: number }>
+  elem?: TypeDescriptor
+  fields?: Array<{ name: string; type: TypeDescriptor }>
+}
+
+function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
   return {
     tag: ti.tag,
     low: ti.low,
