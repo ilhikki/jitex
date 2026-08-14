@@ -1,12 +1,5 @@
 {
   "name": "@jitex/integration",
   "version": "1.0.0",
-  "exports": "./mod.ts",
-  "imports": {
-    "@jitex/pascal-to-js": "../pascal-to-js/src/index.ts",
-    "@jitex/pascal-to-js/": "../pascal-to-js/"
-  },
-  "tasks": {
-    "check": "deno check mod.ts"
-  }
+  "exports": "./src/mod.ts"
 }
