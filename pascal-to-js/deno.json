@@ -9,8 +9,5 @@
   "tasks": {
     "test": "deno test -A tests/",
     "check": "deno check src/index.ts"
-  },
-  "compilerOptions": {
-    "strict": true
   }
 }

@@ -3,15 +3,12 @@
   "version": "1.0.0",
   "exports": "./mod.ts",
   "imports": {
-    "@jitex/pascal-to-js": "../pascal-to-js/mod.ts",
+    "@jitex/pascal-to-js": "../pascal-to-js/src/index.ts",
     "@jitex/pascal-to-js/": "../pascal-to-js/",
     "@jitex/integration": "../integration/mod.ts",
     "@jitex/integration/": "../integration/"
   },
   "tasks": {
     "check": "deno check mod.ts"
-  },
-  "compilerOptions": {
-    "strict": true
   }
 }
