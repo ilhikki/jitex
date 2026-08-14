@@ -12,11 +12,15 @@ import { pascalHPlugin } from '../../../src/compiler/plugins/pascal-h.plugin.ts'
 
 type Status = 'pending' | 'running' | 'terminated' | 'error'
 
-function ok(state: { status: string; outputBuffer: string[] }, expectedOutput: string, label: string) {
+function ok(
+  state: { status: string; outputBuffer: string[]; error?: { message?: string } | null },
+  expectedOutput: string,
+  label: string,
+) {
   assertEquals(
     state.status,
     'terminated' as Status,
-    `${label}: expected status=terminated, got ${state.status}, error=${(state as any).error?.message}`,
+    `${label}: expected status=terminated, got ${state.status}, error=${state.error?.message}`,
   )
   assertEquals(
     state.outputBuffer.join(''),

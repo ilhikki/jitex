@@ -5,24 +5,24 @@ import { parseExpression } from '../../../src/parser/expressions.ts'
 import { parseCompoundStatement as parseCompound, parseStatement } from '../../../src/parser/statements.ts'
 import { parseType } from '../../../src/parser/types.ts'
 import { nodeToCode } from '../../../src/ast/printer.ts'
-import type { AstNode, ParserInput } from '../../../src/ast/types.ts'
+import type { AstNode, ParseResult, ParserInput } from '../../../src/ast/types.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }
 }
 
-function parseAndPrint(source: string, parser: (input: ParserInput) => any): string {
+function parseAndPrint(source: string, parser: (input: ParserInput) => ParseResult<AstNode>): string {
   const result = parser(makeInput(source))
   if (!result.success) {
     throw new Error(`Parse failed: ${result.error}`)
   }
-  return nodeToCode(result.astNode as AstNode)
+  return nodeToCode(result.astNode)
 }
 
 interface CaseExact {
   name: string
   src: string
-  parser: (input: ParserInput) => any
+  parser: (input: ParserInput) => ParseResult<AstNode>
   expected: string
 }
 
@@ -47,7 +47,7 @@ function runExact(group: string, cases: CaseExact[]) {
 interface CaseContains {
   name: string
   src: string
-  parser: (input: ParserInput) => any
+  parser: (input: ParserInput) => ParseResult<AstNode>
   contains: string[]
 }
 
@@ -364,7 +364,7 @@ runContains('Printer: Program & Block', [
 // ============================================================================
 
 describe('Printer: Idempotency', () => {
-  function testIdempotent(name: string, source: string, parser: (input: ParserInput) => any) {
+  function testIdempotent(name: string, source: string, parser: (input: ParserInput) => ParseResult<AstNode>) {
     test(name, () => {
       const r1 = parser(makeInput(source))
       if (!r1.success) {

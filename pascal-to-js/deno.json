@@ -9,5 +9,20 @@
   "tasks": {
     "test": "deno test -A tests/",
     "check": "deno check src/index.ts"
+  },
+  "lint": {
+    "include": ["src/", "tests/"],
+    "rules": {
+      "tags": ["recommended"],
+      "include": [
+        "eqeqeq",
+        "no-throw-literal",
+        "no-self-compare",
+        "no-eval",
+        "guard-for-in",
+        "no-useless-rename",
+        "no-sync-fn-in-async-fn"
+      ]
+    }
   }
 }

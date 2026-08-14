@@ -66,9 +66,9 @@ export const pascalHPlugin: IlPlugin = {
      * break / break_in / breakin：清除终端输入缓冲区。
      * 模拟环境为空操作（无真实终端）。
      */
-    break: (_ctx: RuntimeContext, _args: any[]) => undefined,
-    break_in: (_ctx: RuntimeContext, _args: any[]) => undefined,
-    breakin: (_ctx: RuntimeContext, _args: any[]) => undefined,
+    break: (_ctx: RuntimeContext, _args: unknown[]) => undefined,
+    break_in: (_ctx: RuntimeContext, _args: unknown[]) => undefined,
+    breakin: (_ctx: RuntimeContext, _args: unknown[]) => undefined,
 
     /**
      * erstat(f)：返回文件 f 最近一次 reset/rewrite 的错误状态。
@@ -81,7 +81,7 @@ export const pascalHPlugin: IlPlugin = {
      * - reset 后若文件不存在，erstat 返回 1
      * - TTY 等特殊文件总是成功
      */
-    erstat: (ctx: RuntimeContext, args: any[]) => {
+    erstat: (ctx: RuntimeContext, args: unknown[]) => {
       const file = args[0] as PascalFile
       if (!file) return 0
       // TTY 等特殊文件总是成功

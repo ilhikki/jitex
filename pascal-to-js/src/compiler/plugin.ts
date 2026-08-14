@@ -48,7 +48,7 @@ export interface IlPlugin {
    * key 格式：`{pluginName}.{procName}`（如 'pascalH.breakin'）
    * runtime 会自动加上 'plugin.' 前缀查找。
    */
-  syscalls?: Record<string, (ctx: RuntimeContext, args: any[]) => any>
+  syscalls?: Record<string, (ctx: RuntimeContext, args: unknown[]) => unknown>
 }
 
 /**

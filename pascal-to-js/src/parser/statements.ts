@@ -7,6 +7,7 @@ import {
   EmptyStatementNode,
   ExpressionNode,
   ForStatementNode,
+  FunctionCallNode,
   GotoStatementNode,
   IdentifierNode,
   IfStatementNode,
@@ -206,13 +207,14 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
 
   // If it's a function call without :=, it's a procedure call
   if (exprResult.astNode.kind === 'FunctionCall') {
+    const fc = exprResult.astNode as FunctionCallNode
     return ok(
       pos,
       withLoc(
         {
           kind: 'ProcedureCall',
-          name: (exprResult.astNode as any).name,
-          arguments: (exprResult.astNode as any).arguments,
+          name: fc.name,
+          arguments: fc.arguments,
         } as ProcedureCallNode,
         startToken.start,
         input.tokens[pos - 1].end,

@@ -22,6 +22,7 @@ import type {
   ConstDeclarationNode,
   EnumerationTypeNode,
   ExpressionNode,
+  FieldAccessNode,
   FileTypeNode,
   ForStatementNode,
   FunctionCallNode,
@@ -31,6 +32,7 @@ import type {
   IfStatementNode,
   InExpressionNode,
   IntegerLiteralNode,
+  LabelDeclarationNode,
   LabeledStatementNode,
   ParameterDeclarationNode,
   ParenthesizedExpressionNode,
@@ -113,7 +115,7 @@ function printNode(node: AstNode, ctx: PrintContext): string {
 
     // 声明
     case 'LabelDeclaration':
-      return printLabelDecl(node as any)
+      return printLabelDecl(node as LabelDeclarationNode)
     case 'ConstDeclaration':
       return printConstDecl(node as ConstDeclarationNode)
     case 'TypeDeclaration':
@@ -165,7 +167,7 @@ function printNode(node: AstNode, ctx: PrintContext): string {
     case 'ArrayAccess':
       return printArrayAccess(node as ArrayAccessNode, ctx)
     case 'FieldAccess':
-      return printFieldAccess(node as any, ctx)
+      return printFieldAccess(node as FieldAccessNode, ctx)
     case 'ParenthesizedExpression':
       return `(${printExpr((node as ParenthesizedExpressionNode).expression, ctx)})`
     case 'SetConstructor':
@@ -173,7 +175,7 @@ function printNode(node: AstNode, ctx: PrintContext): string {
     case 'InExpression':
       return printIn(node as InExpressionNode, ctx)
     default:
-      throw new Error(`printer: unknown node kind: ${(node as any).kind}`)
+      throw new Error(`printer: unknown node kind: ${node.kind}`)
   }
 }
 

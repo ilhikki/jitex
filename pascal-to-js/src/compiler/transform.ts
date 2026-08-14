@@ -52,9 +52,9 @@ function parseSource(source: string): ProgramNode {
   const input: ParserInput = { tokens, position: 0 }
   const result = parseProgram(input)
   if (!result.success) {
-    throw new Error(`Parse error: ${(result as any).error}`)
+    throw new Error(`Parse error: ${result.error}`)
   }
-  return (result as any).astNode as ProgramNode
+  return result.astNode as ProgramNode
 }
 
 // ============================================================
@@ -364,7 +364,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
  */
 export function executeCompiled(
   code: string,
-  __sys: (key: string, args: any[]) => any,
+  __sys: (key: string, args: unknown[]) => unknown,
 ): void {
   // 提取导出的函数名
   const exportMatch = code.match(/export\s*\{\s*(\w+)\s*\}/)
@@ -405,22 +405,23 @@ export function run(source: string, options: RunOptions = {}): RunState {
     })
 
     // __sys dispatcher
-    const __sys = (key: string, args: any[]): any => dispatch(ctx, key, args)
+    const __sys = (key: string, args: unknown[]): unknown => dispatch(ctx, key, args)
 
     // 执行（ES module 代码）
     executeCompiled(jsCode, __sys)
 
     return toRunState(ctx, 'terminated')
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const err = e as { message?: string; stack?: string } | null | undefined
     // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
-    const stackLines: string[] = e?.stack ? String(e.stack).split('\n').slice(0, 40) : []
+    const stackLines: string[] = err?.stack ? String(err.stack).split('\n').slice(0, 40) : []
     // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看
-    debugLog.push(`[run] error: ${e?.message || String(e)}`)
+    debugLog.push(`[run] error: ${err?.message || String(e)}`)
     for (const line of stackLines) {
       debugLog.push(`  ${line}`)
     }
     const error: RunError = {
-      message: e?.message || String(e),
+      message: err?.message || String(e),
       stackTrace: stackLines,
     }
     return toRunState(ctx, 'error', error)

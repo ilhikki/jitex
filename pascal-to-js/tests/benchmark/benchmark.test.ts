@@ -17,7 +17,7 @@ interface BenchmarkResult {
 
 function measureExecution(
   name: string,
-  fn: () => any,
+  fn: () => unknown,
   iterations: number,
 ): BenchmarkResult {
   const times: number[] = []
@@ -28,15 +28,16 @@ function measureExecution(
   for (let i = 0; i < iterations; i++) {
     const start = performance.now()
     try {
-      const result = fn()
+      const result = fn() as { steps?: number; outputBuffer?: string[] } | undefined
       const end = performance.now()
       times.push(end - start)
       if (result?.steps !== undefined) totalSteps += result.steps
       if (result?.outputBuffer !== undefined) {
         outputSize = result.outputBuffer.join('').length
       }
-    } catch (e: any) {
-      lastError = e.message
+    } catch (e: unknown) {
+      const err = e as { message?: string } | null | undefined
+      lastError = err?.message ?? String(e)
       times.push(performance.now() - start)
     }
   }
