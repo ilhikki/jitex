@@ -2,7 +2,7 @@
 // 代码风格模仿 TANGLE.WEB 输出的 Pascal：紧凑、大写、TEXTFILE = PACKED FILE OF CHAR
 // 这些用例覆盖 RESET/REWRITE/GET/PUT/EOF/EOLN/READ/READLN/WRITE/WRITELN/F^/ASSIGN
 
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper'
 
 function text(s: string): Uint8Array {

@@ -6,7 +6,7 @@
 //
 // 这是 e2e 中 TeX 读取终端输入/文件的基础（Knuth WEB 系统依赖此行为）。
 
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper'
 
 function text(s: string): Uint8Array {

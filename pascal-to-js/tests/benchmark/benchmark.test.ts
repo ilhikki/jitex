@@ -1,5 +1,5 @@
 import { run as runIL } from '@/compiler/transform'
-import { describe, test, expect, afterAll } from 'vitest'
+import { describe, test, assert, afterAll, assertEquals } from '../_harness.ts'
 
 interface BenchmarkResult {
   name: string
@@ -154,7 +154,7 @@ end.`
       5
     )
     results.push(r)
-    expect(r.status).toBe('success')
+    assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
   }, 60000)
 
   test('array access loop', () => {
@@ -177,7 +177,7 @@ end.`
       5
     )
     results.push(r)
-    expect(r.status).toBe('success')
+    assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
   }, 60000)
 
   test('string operations', () => {
@@ -197,7 +197,7 @@ end.`
       5
     )
     results.push(r)
-    expect(r.status).toBe('success')
+    assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
   }, 60000)
 
   test('nested loops', () => {
@@ -218,7 +218,7 @@ end.`
       3
     )
     results.push(r)
-    expect(r.status).toBe('success')
+    assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
   }, 60000)
 
   test('goto backward loop', () => {
@@ -241,7 +241,7 @@ end.`
       5
     )
     results.push(r)
-    expect(r.status).toBe('success')
+    assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
   }, 60000)
 
   test('procedure calls', () => {
@@ -268,7 +268,7 @@ end.`
       10
     )
     results.push(r)
-    expect(r.status).toBe('success')
+    assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
   }, 60000)
 
   test('record operations', () => {
@@ -295,6 +295,6 @@ end.`
       5
     )
     results.push(r)
-    expect(r.status).toBe('success')
+    assertEquals(r.status, 'success', `benchmark ${r.name} failed with status=${r.status} error=${r.error}`)
   }, 60000)
 })

@@ -1,4 +1,4 @@
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper'
 
 // 复现 tangle-official.pas DEBUGHELP 中 GOTO 888 的作用域问题

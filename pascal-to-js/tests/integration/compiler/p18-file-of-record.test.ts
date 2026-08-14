@@ -15,7 +15,7 @@
 //   - 正面测试：标准 ISO 用法，验证功能正常
 //   - 反面测试：违反 ISO 约束的用法，应快速失败
 
-import { describe } from 'vitest'
+import { describe } from './_helper'
 import { type PascalTest, runPascalTests } from './_helper'
 
 describe('ISO 7185 file of record (6.4.3.5 / 6.6.5.2)', () => {

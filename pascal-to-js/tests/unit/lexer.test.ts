@@ -1,108 +1,116 @@
 import { lex } from '@/index'
-import { describe, test, expect } from 'vitest'
+import { describe, test, assert, assertEquals } from '../_harness.ts'
+
+interface Tok {
+  type: string
+  content?: string
+  start?: { line: number; column: number }
+}
+
+function check(token: Tok, expectedType: string, expectedContent?: string, label?: string): void {
+  const ctx = label ? `[${label}] ` : ''
+  assertEquals(
+    token.type,
+    expectedType,
+    `${ctx}expected type=${expectedType}, got type=${token.type} content=${JSON.stringify(token.content)}`,
+  )
+  if (expectedContent !== undefined) {
+    assertEquals(
+      token.content,
+      expectedContent,
+      `${ctx}type=${expectedType}: expected content=${JSON.stringify(expectedContent)}, got=${JSON.stringify(token.content)}`,
+    )
+  }
+}
 
 describe('Lexer', () => {
   test('should tokenize identifiers and keywords', () => {
-    const tokens = lex('PROGRAM test BEGIN END')
-    expect(tokens[0].type).toBe('PROGRAM')
-    expect(tokens[0].content).toBe('PROGRAM')
-    expect(tokens[1].type).toBe('IDENTIFIER')
-    expect(tokens[1].content).toBe('test')
-    expect(tokens[2].type).toBe('BEGIN')
-    expect(tokens[3].type).toBe('END')
+    const t = lex('PROGRAM test BEGIN END')
+    check(t[0], 'PROGRAM', 'PROGRAM', '0')
+    check(t[1], 'IDENTIFIER', 'test', '1')
+    check(t[2], 'BEGIN')
+    check(t[3], 'END')
   })
 
   test('should tokenize integers', () => {
-    const tokens = lex('42 100')
-    expect(tokens[0].type).toBe('INTEGER')
-    expect(tokens[0].content).toBe('42')
-    expect(tokens[1].type).toBe('INTEGER')
-    expect(tokens[1].content).toBe('100')
+    const t = lex('42 100')
+    check(t[0], 'INTEGER', '42', '0')
+    check(t[1], 'INTEGER', '100', '1')
   })
 
   test('should tokenize reals', () => {
-    const tokens = lex('3.14 1.0E5')
-    expect(tokens[0].type).toBe('REAL')
-    expect(tokens[0].content).toBe('3.14')
-    expect(tokens[1].type).toBe('REAL')
+    const t = lex('3.14 1.0E5')
+    check(t[0], 'REAL', '3.14', '0')
+    check(t[1], 'REAL')
   })
 
   test('should tokenize hex numbers', () => {
-    const tokens = lex('$1A2B')
-    expect(tokens[0].type).toBe('HEX_NUMBER')
-    expect(tokens[0].content).toBe('$1A2B')
+    const t = lex('$1A2B')
+    check(t[0], 'HEX_NUMBER', '$1A2B', '0')
   })
 
   test('should tokenize strings', () => {
-    const tokens = lex("'hello world'")
-    expect(tokens[0].type).toBe('STRING')
-    expect(tokens[0].content).toBe('hello world')
+    const t = lex("'hello world'")
+    check(t[0], 'STRING', 'hello world', '0')
   })
 
   test('should tokenize escaped quotes in strings', () => {
-    const tokens = lex("'it''s ok'")
-    expect(tokens[0].type).toBe('STRING')
-    expect(tokens[0].content).toBe("it's ok")
+    const t = lex("'it''s ok'")
+    check(t[0], 'STRING', "it's ok", '0')
   })
 
   test('should tokenize char codes with #', () => {
-    const tokens = lex('#65 #$41')
-    expect(tokens[0].type).toBe('CHAR_CODE')
-    expect(tokens[0].content).toBe('#65')
-    expect(tokens[1].type).toBe('CHAR_CODE')
-    expect(tokens[1].content).toBe('#$41')
+    const t = lex('#65 #$41')
+    check(t[0], 'CHAR_CODE', '#65', '0')
+    check(t[1], 'CHAR_CODE', '#$41', '1')
   })
 
   test('should tokenize operators', () => {
-    const tokens = lex(':= <= >= <> .. ==')
-    expect(tokens[0].type).toBe('ASSIGN')
-    expect(tokens[1].type).toBe('LE')
-    expect(tokens[2].type).toBe('GE')
-    expect(tokens[3].type).toBe('NE')
-    expect(tokens[4].type).toBe('DOTDOT')
-    expect(tokens[5].type).toBe('EQEQ')
+    const t = lex(':= <= >= <> .. ==')
+    check(t[0], 'ASSIGN', undefined, '0')
+    check(t[1], 'LE', undefined, '1')
+    check(t[2], 'GE', undefined, '2')
+    check(t[3], 'NE', undefined, '3')
+    check(t[4], 'DOTDOT', undefined, '4')
+    check(t[5], 'EQEQ', undefined, '5')
   })
 
   test('should skip comments', () => {
-    const tokens = lex('{ this is a comment } PROGRAM')
-    expect(tokens[0].type).toBe('PROGRAM')
+    check(lex('{ this is a comment } PROGRAM')[0], 'PROGRAM')
   })
 
   test('should skip (* *) comments', () => {
-    const tokens = lex('(* comment *) PROGRAM')
-    expect(tokens[0].type).toBe('PROGRAM')
+    check(lex('(* comment *) PROGRAM')[0], 'PROGRAM')
   })
 
   test('should skip compiler directives', () => {
-    const tokens = lex('{$C-,A+,D-} PROGRAM')
-    expect(tokens[0].type).toBe('PROGRAM')
+    check(lex('{$C-,A+,D-} PROGRAM')[0], 'PROGRAM')
   })
 
   test('should tokenize case-insensitive keywords', () => {
-    const tokens = lex('program Begin end')
-    expect(tokens[0].type).toBe('PROGRAM')
-    expect(tokens[1].type).toBe('BEGIN')
-    expect(tokens[2].type).toBe('END')
+    const t = lex('program Begin end')
+    check(t[0], 'PROGRAM')
+    check(t[1], 'BEGIN')
+    check(t[2], 'END')
   })
 
   test('should treat predefined identifiers as IDENTIFIER', () => {
-    const tokens = lex('INTEGER WRITE TRUE')
-    expect(tokens[0].type).toBe('IDENTIFIER')
-    expect(tokens[0].content).toBe('INTEGER')
-    expect(tokens[1].type).toBe('IDENTIFIER')
-    expect(tokens[2].type).toBe('IDENTIFIER')
+    const t = lex('INTEGER WRITE TRUE')
+    check(t[0], 'IDENTIFIER', 'INTEGER', '0')
+    check(t[1], 'IDENTIFIER')
+    check(t[2], 'IDENTIFIER')
   })
 
   test('should track positions', () => {
-    const tokens = lex('PROGRAM\ntest')
-    expect(tokens[0].start.line).toBe(1)
-    expect(tokens[0].start.column).toBe(1)
-    expect(tokens[1].start.line).toBe(2)
-    expect(tokens[1].start.column).toBe(1)
+    const t = lex('PROGRAM\ntest')
+    assertEquals(t[0].start!.line, 1, 'tok0 line=1')
+    assertEquals(t[0].start!.column, 1, 'tok0 col=1')
+    assertEquals(t[1].start!.line, 2, 'tok1 line=2')
+    assertEquals(t[1].start!.column, 1, 'tok1 col=1')
   })
 
   test('should handle EOF', () => {
-    const tokens = lex('PROGRAM')
-    expect(tokens[tokens.length - 1].type).toBe('EOF')
+    const t = lex('PROGRAM')
+    check(t[t.length - 1], 'EOF')
   })
 })

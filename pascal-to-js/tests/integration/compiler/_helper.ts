@@ -5,16 +5,19 @@
 // 导出：
 // - PascalTest: 测试用例接口
 // - runPascal: 执行 Pascal 源码并返回 RunState
-// - runPascalTest: 执行测试用例并返回 pass/fail 结果
+// - runPascalTest: 执行单个用例并做断言
+// - runPascalTests: 批量注册 PascalTest 为独立 Deno.test 用例
 // - getOutput: 从 RunState 提取输出字符串
+// - harness 四件套：describe / test / assert / assertEquals（方便使用方一次 import 完）
 //
 // 测试原则见 ../README.md；
-// 执行引擎实现见 src/compiler/transform.ts（新管线）。
+// 执行引擎实现见 pascal-to-js/src/compiler/transform.ts。
 
 import { run } from '@/compiler/transform'
 import type { RunState } from '@/runtime/run-state'
 import type { IlPlugin } from '@/compiler/plugin'
-import { test, expect } from 'vitest'
+import { describe, test, it, assert, assertEquals } from '../../_harness.ts'
+export { describe, test, it, assert, assertEquals }
 
 /** 非标扩展标识符（保留用于类型标注，实际为 string） */
 type Extension = string
@@ -22,13 +25,13 @@ type Extension = string
 /**
  * 单个 Pascal 测试用例。
  *
- * 断言采用“首个匹配”策略：
+ * 断言采用"首个匹配"策略：
  * - 若 expectedError 有值，则要求执行出错；
  * - 否则要求执行成功，并按 expectedOutput / expectedContains /
  *   expectedNotContains / expectedFileContains 依次校验。
  */
 export interface PascalTest {
-  /** 测试用例名称，在 jest 报告中显示 */
+  /** 测试用例名称，在测试报告中显示 */
   name: string
 
   /** Pascal 源码 */
@@ -48,8 +51,8 @@ export interface PascalTest {
 
   /**
    * 要求执行报错。
-   * - 设为空字符串 '' 表示“只要报错就行，不检查消息内容”；
-   * - 设为具体消息则表示“错误消息必须包含此字符串”。
+   * - 设为空字符串 '' 表示"只要报错就行，不检查消息内容"；
+   * - 设为具体消息则表示"错误消息必须包含此字符串"。
    */
   expectedError?: string
 
@@ -76,14 +79,14 @@ export interface PascalTest {
 }
 
 /** 执行单个测试用例，返回 RunState */
-export function runPascal(test: PascalTest): RunState {
-  return run(test.code, {
-    input: test.input,
-    files: test.files,
-    programFileUrls: test.programFileUrls,
-    maxSteps: test.maxSteps ?? 1e5,
-    extensions: test.extensions,
-    plugins: test.plugins,
+export function runPascal(t: PascalTest): RunState {
+  return run(t.code, {
+    input: t.input,
+    files: t.files,
+    programFileUrls: t.programFileUrls,
+    maxSteps: t.maxSteps ?? 1e5,
+    extensions: t.extensions,
+    plugins: t.plugins,
   })
 }
 
@@ -92,54 +95,69 @@ export function getOutput(state: RunState): string {
   return state.outputBuffer.join('')
 }
 
-/**
- * 执行单个测试用例并返回断言结果。
- */
+/** 批量注册 PascalTest 为独立的 Deno.test 用例 */
 export function runPascalTests(tests: PascalTest[]) {
   for (const testCase of tests) {
     test(testCase.name, () => runPascalTest(testCase))
   }
 }
 
-export function runPascalTest(test: PascalTest): void {
-  const state = runPascal(test)
+export function runPascalTest(t: PascalTest): void {
+  const state = runPascal(t)
   const output = getOutput(state)
+  const prefix = `[${t.name}] ${t.purpose}`
 
-  if (test.expectedError !== undefined) {
-    if (state.status !== 'error' && !state.error) {
-      expect.fail(`Expected error "${test.expectedError}", but no error occurred`)
-    }
+  // 1. 预期错误
+  if (t.expectedError !== undefined) {
+    assert(
+      state.status === 'error' || !!state.error,
+      `${prefix}: expected error "${t.expectedError}", but no error occurred`,
+    )
     const actualError = state.error?.message || ''
-    if (test.expectedError.length > 0) {
-      expect(actualError).toContain(test.expectedError)
+    if (t.expectedError.length > 0) {
+      assert(
+        actualError.includes(t.expectedError),
+        `${prefix}: expected error message to contain "${t.expectedError}", got: ${actualError}`,
+      )
     }
     return
   }
 
   // 2. 非预期错误
   if (state.status === 'error') {
-    expect.fail(`Unexpected error: ${state.error?.message}`)
+    assert(false, `${prefix}: unexpected error: ${state.error?.message}`)
   }
 
   // 3. 输出断言
-  if (test.expectedOutput !== undefined) {
-    expect(output).toBe(test.expectedOutput)
+  if (t.expectedOutput !== undefined) {
+    assertEquals(
+      output,
+      t.expectedOutput,
+      `${prefix}: output mismatch.\n  expected: ${JSON.stringify(t.expectedOutput)}\n  actual:   ${JSON.stringify(output)}`,
+    )
   }
-
-  if (test.expectedContains !== undefined) {
-    expect(output).toContain(test.expectedContains)
+  if (t.expectedContains !== undefined) {
+    assert(
+      output.includes(t.expectedContains),
+      `${prefix}: expected output to contain ${JSON.stringify(t.expectedContains)}.\n  actual output: ${JSON.stringify(output)}`,
+    )
   }
-
-  if (test.expectedNotContains !== undefined) {
-    expect(output).not.toContain(test.expectedNotContains)
+  if (t.expectedNotContains !== undefined) {
+    assert(
+      !output.includes(t.expectedNotContains),
+      `${prefix}: expected output NOT to contain ${JSON.stringify(t.expectedNotContains)}.\n  actual output: ${JSON.stringify(output)}`,
+    )
   }
 
   // 4. 文件内容断言
-  if (test.expectedFileContains && test.files) {
-    for (const exp of test.expectedFileContains) {
-      const bytes = test.files.get(exp.url)
+  if (t.expectedFileContains && t.files) {
+    for (const exp of t.expectedFileContains) {
+      const bytes = t.files.get(exp.url)
       const text = bytes ? new TextDecoder().decode(bytes) : ''
-      expect(text).toContain(exp.contains)
+      assert(
+        text.includes(exp.contains),
+        `${prefix}: expected file "${exp.url}" to contain "${exp.contains}". File content: ${JSON.stringify(text)}`,
+      )
     }
   }
 }

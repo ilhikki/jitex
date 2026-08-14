@@ -3,7 +3,7 @@ import { CaseStatementNode, ParserInput, ProgramNode } from '@/ast/types'
 import { parseStatement } from '@/parser/statements'
 import { parseFunctionDeclaration, parseProcedureDeclaration } from '@/parser/declarations'
 import { parse } from '@/index'
-import { describe, expect, test } from 'vitest'
+import { describe, test, assert, assertEquals } from '../../_harness.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }
@@ -11,54 +11,54 @@ function makeInput(source: string): ParserInput {
 
 function stmtOf(source: string) {
   const r = parseStatement(makeInput(source))
-  if (!r.success) throw new Error(r.error)
+  if (!r.success) {
+    throw new Error(r.error)
+  }
   return r.astNode
 }
 
 describe('Parser: CASE statement', () => {
   test('parse CASE with single label', () => {
     const s = stmtOf('case x of 1: y := 2 end') as CaseStatementNode
-    expect(s.kind).toBe('CaseStatement')
-    expect(s.branches.length).toBe(1)
-    expect(s.branches[0].labels.length).toBe(1)
-    expect(s.otherwise).toBeNull()
+    assertEquals(s.kind, 'CaseStatement', 'kind=CaseStatement')
+    assertEquals(s.branches.length, 1, '1 branch')
+    assertEquals(s.branches[0].labels.length, 1, '1 label')
+    assert(s.otherwise === null, 'otherwise null')
   })
 
   test('parse CASE with multiple labels per branch', () => {
     const s = stmtOf('case x of 1, 2, 3: y := 4 end') as CaseStatementNode
-    expect(s.branches.length).toBe(1)
-    expect(s.branches[0].labels.length).toBe(3)
+    assertEquals(s.branches.length, 1, '1 branch')
+    assertEquals(s.branches[0].labels.length, 3, '3 labels')
   })
 
   test('parse CASE with multiple branches', () => {
     const s = stmtOf('case x of 1: y := 2; 3: y := 4 end') as CaseStatementNode
-    expect(s.branches.length).toBe(2)
+    assertEquals(s.branches.length, 2, '2 branches')
   })
 
   test('parse CASE with OTHERWISE', () => {
     const s = stmtOf('case x of 1: y := 2; otherwise y := 0 end') as CaseStatementNode
-    expect(s.branches.length).toBe(1)
-    expect(s.otherwise).not.toBeNull()
+    assertEquals(s.branches.length, 1, '1 branch')
+    assert(s.otherwise !== null, 'otherwise present')
   })
 
   test('parse CASE with only OTHERWISE', () => {
     const s = stmtOf('case x of otherwise y := 0 end') as CaseStatementNode
-    expect(s.branches.length).toBe(0)
-    expect(s.otherwise).not.toBeNull()
+    assertEquals(s.branches.length, 0, '0 branches')
+    assert(s.otherwise !== null, 'otherwise present')
   })
 
   test('parse CASE with OTHERWISE followed by semicolon before END', () => {
-    // Regression: OTHERWISE branch must skip trailing semicolons before END,
-    // mirroring ordinary branches. tangle.pas writes `otherwise x := 0;` before `end`.
     const s = stmtOf('case x of 1: y := 2; otherwise y := 0; end') as CaseStatementNode
-    expect(s.branches.length).toBe(1)
-    expect(s.otherwise).not.toBeNull()
+    assertEquals(s.branches.length, 1, '1 branch')
+    assert(s.otherwise !== null, 'otherwise present')
   })
 
   test('parse CASE with OTHERWISE followed by multiple semicolons before END', () => {
     const s = stmtOf('case x of otherwise y := 0;; end') as CaseStatementNode
-    expect(s.branches.length).toBe(0)
-    expect(s.otherwise).not.toBeNull()
+    assertEquals(s.branches.length, 0, '0 branches')
+    assert(s.otherwise !== null, 'otherwise present')
   })
 })
 
@@ -71,12 +71,11 @@ end;
 begin
 end;`
     const r = parseProcedureDeclaration(makeInput(source))
-    expect(r.success).toBe(true)
-    if (r.success) {
-      expect(r.astNode.name.name).toBe('outer')
-      expect(r.astNode.block!.procedureDeclarations.length).toBe(1)
-      expect(r.astNode.block!.procedureDeclarations[0].name.name).toBe('inner')
-    }
+    assert(r.success, 'parse procedure')
+    if (!r.success) return
+    assertEquals(r.astNode.name.name, 'outer', 'outer name')
+    assertEquals(r.astNode.block!.procedureDeclarations.length, 1, 'one nested proc')
+    assertEquals(r.astNode.block!.procedureDeclarations[0].name.name, 'inner', 'inner name')
   })
 
   test('parse function with nested procedure', () => {
@@ -88,11 +87,10 @@ begin
   outer := x;
 end;`
     const r = parseFunctionDeclaration(makeInput(source))
-    expect(r.success).toBe(true)
-    if (r.success) {
-      expect(r.astNode.name.name).toBe('outer')
-      expect(r.astNode.block!.procedureDeclarations.length).toBe(1)
-    }
+    assert(r.success, 'parse function')
+    if (!r.success) return
+    assertEquals(r.astNode.name.name, 'outer', 'outer name')
+    assertEquals(r.astNode.block!.procedureDeclarations.length, 1, 'one nested proc')
   })
 
   test('parse procedure with parameters and label declarations', () => {
@@ -104,12 +102,11 @@ begin
   20:
 end;`
     const r = parseProcedureDeclaration(makeInput(source))
-    expect(r.success).toBe(true)
-    if (r.success) {
-      expect(r.astNode.parameters.length).toBe(1)
-      expect(r.astNode.block!.labelDeclarations).not.toBeNull()
-      expect(r.astNode.block!.variableDeclarations.length).toBe(1)
-    }
+    assert(r.success, 'parse procedure')
+    if (!r.success) return
+    assertEquals(r.astNode.parameters.length, 1, '1 param')
+    assert(r.astNode.block!.labelDeclarations !== null, 'labels present')
+    assertEquals(r.astNode.block!.variableDeclarations.length, 1, '1 var')
   })
 })
 
@@ -129,13 +126,12 @@ begin
   setval(42);
 end.`
     const r = parse(source)
-    expect(r.success).toBe(true)
-    if (r.success) {
-      const prog = r.astNode as ProgramNode
-      expect(prog.block.variableDeclarations.length).toBe(1)
-      expect(prog.block.procedureDeclarations.length).toBe(1)
-      expect(prog.block.functionDeclarations.length).toBe(1)
-    }
+    assert(r.success, 'parse program')
+    if (!r.success) return
+    const prog = r.astNode as ProgramNode
+    assertEquals(prog.block.variableDeclarations.length, 1, '1 var')
+    assertEquals(prog.block.procedureDeclarations.length, 1, '1 proc')
+    assertEquals(prog.block.functionDeclarations.length, 1, '1 func')
   })
 
   test('parse program with label + const + type + var + proc + func', () => {
@@ -159,39 +155,38 @@ begin
   x := f;
 end.`
     const r = parse(source)
-    expect(r.success).toBe(true)
-    if (r.success) {
-      const prog = r.astNode as ProgramNode
-      expect(prog.block.labelDeclarations).not.toBeNull()
-      expect(prog.block.constDeclarations.length).toBe(1)
-      expect(prog.block.typeDeclarations.length).toBe(1)
-      expect(prog.block.variableDeclarations.length).toBe(1)
-      expect(prog.block.procedureDeclarations.length).toBe(1)
-      expect(prog.block.functionDeclarations.length).toBe(1)
-    }
+    assert(r.success, 'parse full program')
+    if (!r.success) return
+    const prog = r.astNode as ProgramNode
+    assert(prog.block.labelDeclarations !== null, 'labels present')
+    assertEquals(prog.block.constDeclarations.length, 1, '1 const')
+    assertEquals(prog.block.typeDeclarations.length, 1, '1 type')
+    assertEquals(prog.block.variableDeclarations.length, 1, '1 var')
+    assertEquals(prog.block.procedureDeclarations.length, 1, '1 proc')
+    assertEquals(prog.block.functionDeclarations.length, 1, '1 func')
   })
 })
 
 describe('Parser: WITH statement', () => {
   test('parse WITH statement', () => {
     const s = stmtOf('with r do x := 1')
-    expect(s.kind).toBe('WithStatement')
+    assertEquals(s.kind, 'WithStatement', 'WithStatement')
   })
 
   test('parse WITH multiple variables', () => {
     const s = stmtOf('with a, b do x := 1')
-    expect(s.kind).toBe('WithStatement')
+    assertEquals(s.kind, 'WithStatement', 'WithStatement multi')
   })
 })
 
 describe('Parser: error cases', () => {
   test('fail on missing END in CASE', () => {
     const r = parseStatement(makeInput('case x of 1: y := 2'))
-    expect(r.success).toBe(false)
+    assert(!r.success, 'CASE missing END should fail')
   })
 
   test('fail on malformed expression', () => {
     const r = parseStatement(makeInput('x := +'))
-    expect(r.success).toBe(false)
+    assert(!r.success, 'malformed expr should fail')
   })
 })

@@ -1,5 +1,5 @@
 import { PascalTest, runPascalTests } from './_helper'
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 
 const tests: PascalTest[] = [
   // ==========================================================================

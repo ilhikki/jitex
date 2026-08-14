@@ -1,6 +1,6 @@
 // m4 过程和函数测试
 
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper'
 
 describe('M5 JS Procedures and Functions', () => {

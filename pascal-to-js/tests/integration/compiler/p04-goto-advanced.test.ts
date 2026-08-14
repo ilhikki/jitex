@@ -1,4 +1,4 @@
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper'
 
 // 高级 goto 测试：非正常场景 + 嵌套非透明块多 label

@@ -17,7 +17,7 @@
 //   - 反面测试使用 maxSteps 限制，确保即使死循环也能快速结束
 //   - 反面测试优先用 expectedError 检查错误消息，便于定位问题
 
-import { describe } from 'vitest'
+import { describe } from './_helper'
 import { type PascalTest, runPascalTests } from './_helper'
 
 function text(s: string): Uint8Array {

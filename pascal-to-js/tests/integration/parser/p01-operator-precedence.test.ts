@@ -1,5 +1,5 @@
-﻿import { ConformanceTest, makeProgramWithVars, runParseTests } from './_helper'
-import { describe } from 'vitest'
+import { ConformanceTest, makeProgramWithVars, runParseTests } from './_helper'
+import { describe } from './_helper.ts'
 
 const tests: ConformanceTest[] = [
   // =========================================================================

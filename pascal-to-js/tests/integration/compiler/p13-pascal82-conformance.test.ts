@@ -2,7 +2,7 @@
 // 代码风格模仿 TANGLE.WEB 输出的 Pascal：紧凑、大写
 // 这些用例覆盖 ISO 7185 标准中容易出错的边界情况
 
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper'
 
 describe('M4.1 Pascal82 Conformance', () => {

@@ -2,7 +2,7 @@
 // 这些特性是 UCSD/Turbo Pascal 扩展，被 Knuth 在 WEB 系统中使用
 // 代码风格模仿 tangle-official.pas（紧凑、大写关键字、OTHERS: 等）
 
-import { describe } from 'vitest'
+import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper'
 import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
 

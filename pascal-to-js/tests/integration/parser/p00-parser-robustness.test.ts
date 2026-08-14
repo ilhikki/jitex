@@ -1,5 +1,5 @@
-﻿import { parse } from '@/index'
-import { describe, test, expect } from 'vitest'
+import { parse } from '@/index'
+import { describe, test, assert } from '../../_harness.ts'
 
 interface RobustnessTest {
   name: string
@@ -112,24 +112,24 @@ const silentAcceptTests: RobustnessTest[] = [
 ]
 
 describe('M3.5 Parser Robustness (crash bugs)', () => {
-  crashTests.forEach((t) => {
+  for (const t of crashTests) {
     test(t.name, () => {
       let threw = false
       try {
         parse(t.code)
-      } catch (e) {
+      } catch {
         threw = true
       }
-      expect(threw).toBe(false)
+      assert(!threw, `[${t.name}] ${t.purpose} — parse threw an exception`)
     })
-  })
+  }
 })
 
 describe('M3.5 Parser Robustness (silent accept bugs)', () => {
-  silentAcceptTests.forEach((t) => {
+  for (const t of silentAcceptTests) {
     test(t.name, () => {
       const result = parse(t.code)
-      expect(result.success).toBe(false)
+      assert(!result.success, `[${t.name}] ${t.purpose} — parse should have failed but returned success`)
     })
-  })
+  }
 })

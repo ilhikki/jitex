@@ -1,5 +1,6 @@
 import { parse } from '@/index'
-import { expect, test } from 'vitest'
+import { describe, test, it, assert, assertEquals } from '../../_harness.ts'
+export { describe, test, it, assert, assertEquals }
 
 export interface ConformanceTest {
   name: string
@@ -7,56 +8,55 @@ export interface ConformanceTest {
   purpose: string
   shouldParse: boolean
 }
+
 export function runParseTests(t: ConformanceTest[]) {
-  t.forEach((testCase) => test(testCase.name, () => runParseTest(testCase)))
+  for (const testCase of t) {
+    test(testCase.name, () => runParseTest(testCase))
+  }
+}
+
+function formatCode(code: string): string {
+  return code.split('\n').map((l) => '    ' + l).join('\n')
 }
 
 export function runParseTest(t: ConformanceTest) {
-  let result: { success: boolean; error?: string; astNode?: any }
+  let result: { success: boolean; error?: string; astNode?: unknown }
   try {
-    result = parse(t.code) as any
-  } catch (e: any) {
-    if (t.shouldParse) {
-      expect.fail(
-        `Expected parse to succeed but it threw:\n` +
-          `  Test: ${t.name}\n` +
-          `  Purpose: ${t.purpose}\n` +
-          `  Exception: ${e.message}\n` +
-          `  Code:\n${t.code
-            .split('\n')
-            .map((l) => '    ' + l)
-            .join('\n')}`
-      )
-    }
+    result = parse(t.code) as { success: boolean; error?: string; astNode?: unknown }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    assert(
+      !t.shouldParse,
+      `Expected parse to succeed but it threw:\n` +
+        `  Test: ${t.name}\n` +
+        `  Purpose: ${t.purpose}\n` +
+        `  Exception: ${msg}\n` +
+        `  Code:\n${formatCode(t.code)}`,
+    )
     return
   }
 
   if (t.shouldParse) {
-    if (!result.success) {
-      expect.fail(
-        `Expected parse to succeed but it failed:\n` +
-          `  Test: ${t.name}\n` +
-          `  Purpose: ${t.purpose}\n` +
-          `  Error: ${result.error}\n` +
-          `  Code:\n${t.code
-            .split('\n')
-            .map((l) => '    ' + l)
-            .join('\n')}`
-      )
-    }
-    expect(result.astNode).toBeDefined()
+    assert(
+      result.success,
+      `Expected parse to succeed but it failed:\n` +
+        `  Test: ${t.name}\n` +
+        `  Purpose: ${t.purpose}\n` +
+        `  Error: ${result.error}\n` +
+        `  Code:\n${formatCode(t.code)}`,
+    )
+    assert(
+      result.astNode !== undefined,
+      `Expected parse astNode to be defined:\n  Test: ${t.name}\n  Purpose: ${t.purpose}`,
+    )
   } else {
-    if (result.success) {
-      expect.fail(
-        `Expected parse to fail but it succeeded:\n` +
-          `  Test: ${t.name}\n` +
-          `  Purpose: ${t.purpose}\n` +
-          `  Code:\n${t.code
-            .split('\n')
-            .map((l) => '    ' + l)
-            .join('\n')}`
-      )
-    }
+    assert(
+      !result.success,
+      `Expected parse to fail but it succeeded:\n` +
+        `  Test: ${t.name}\n` +
+        `  Purpose: ${t.purpose}\n` +
+        `  Code:\n${formatCode(t.code)}`,
+    )
   }
 }
 

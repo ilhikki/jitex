@@ -1,5 +1,5 @@
 import { parse } from '@/index'
-import { describe, expect, test } from 'vitest'
+import { describe, test, assert } from '../../_harness.ts'
 
 describe('ISSUE-026: Variant record parsing', () => {
   test('simple variant record with tag', () => {
@@ -24,10 +24,8 @@ BEGIN
 END.
 `
     const result = parse(source)
-    if (!result.success) {
-      console.error('Parse error:', result.error)
-    }
-    expect(result.success).toBe(true)
+    if (!result.success) console.error('Parse error:', result.error)
+    assert(result.success, 'expected parse success')
   })
 
   test('variant record without tag name', () => {
@@ -46,10 +44,8 @@ BEGIN
 END.
 `
     const result = parse(source)
-    if (!result.success) {
-      console.error('Parse error:', result.error)
-    }
-    expect(result.success).toBe(true)
+    if (!result.success) console.error('Parse error:', result.error)
+    assert(result.success, 'expected parse success')
   })
 
   test('nested variant records', () => {
@@ -74,9 +70,7 @@ BEGIN
 END.
 `
     const result = parse(source)
-    if (!result.success) {
-      console.error('Parse error:', result.error)
-    }
-    expect(result.success).toBe(true)
+    if (!result.success) console.error('Parse error:', result.error)
+    assert(result.success, 'expected parse success')
   })
 })
