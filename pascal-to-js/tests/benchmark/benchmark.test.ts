@@ -1,5 +1,5 @@
-import { run as runIL } from '@/compiler/transform'
-import { afterAll, assert, assertEquals, describe, test } from '../_harness.ts'
+import { run as runIL } from '../../src/compiler/transform.ts'
+import { afterAll, assertEquals, describe, test } from '../_harness.ts'
 
 interface BenchmarkResult {
   name: string

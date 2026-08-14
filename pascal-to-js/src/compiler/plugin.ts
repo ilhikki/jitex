@@ -18,7 +18,7 @@
  * ISO 章节引用：插件实现的具体非标特性应在注释中引用违反的 ISO 7185 章节（#8）。
  */
 
-import type { RuntimeContext } from './runtime'
+import type { RuntimeContext } from './runtime.ts'
 
 /**
  * IL 编译器插件接口。

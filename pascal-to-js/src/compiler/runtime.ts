@@ -14,9 +14,9 @@
  * 哪些走 dispatcher（IO/file/cell/mem/set）。本文件实现所有走 dispatcher 的 key。
  */
 
-import type { RunError, RunState } from '@/runtime/run-state'
-import type { PascalFile } from '@/runtime/file-model'
-import type { IlPlugin } from '@/compiler/plugin'
+import type { RunError, RunState } from '../runtime/run-state.ts'
+import type { PascalFile } from '../runtime/file-model.ts'
+import type { IlPlugin } from './plugin.ts'
 
 // ============================================================
 // 文件状态（同步版本，逻辑参考 file-model.ts 的 RecordFileState）
@@ -803,6 +803,7 @@ function resetFile(ctx: RuntimeContext, file: PascalFile, binary?: boolean): voi
  *   3. 1-based 字符数组对象（str.to.char.array 生成，键为 1..N，含 length 属性）
  */
 function fileUrlToString(url: any): string {
+  // deno-lint-ignore no-control-regex
   if (typeof url === 'string') return url.replace(/[\s\x00]+$/, '')
   if (url && typeof url === 'object') {
     const chars: string[] = []
@@ -826,6 +827,7 @@ function fileUrlToString(url: any): string {
       if (typeof ch === 'string') chars.push(ch)
       else if (typeof ch === 'number') chars.push(String.fromCharCode(ch))
     }
+    // deno-lint-ignore no-control-regex
     return chars.join('').replace(/[\s\x00]+$/, '')
   }
   return String(url ?? '')

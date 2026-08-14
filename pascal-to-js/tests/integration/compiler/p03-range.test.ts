@@ -1,5 +1,5 @@
 import { describe } from './_helper.ts'
-import { type PascalTest, runPascalTests } from './_helper'
+import { type PascalTest, runPascalTests } from './_helper.ts'
 
 /**
  * Q10: Subrange (range) 类型专项测试

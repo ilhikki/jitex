@@ -12,11 +12,11 @@ import {
   ProgramNode,
   TypeDeclarationNode,
   VariableDeclarationNode,
-} from '@/ast/types'
-import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers'
-import { parseExpression, parseIdentifier } from './expressions'
-import { parseType, parseVariableDeclaration } from './types'
-import { parseCompoundStatement } from './statements'
+} from '../ast/types.ts'
+import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
+import { parseExpression, parseIdentifier } from './expressions.ts'
+import { parseType, parseVariableDeclaration } from './types.ts'
+import { parseCompoundStatement } from './statements.ts'
 
 // ============================================================================
 // Declaration Parsers

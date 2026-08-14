@@ -1,4 +1,4 @@
-import { parse } from '@/index'
+import { parse } from '../../../src/index.ts'
 import { assert, describe, test } from '../../_harness.ts'
 
 interface RobustnessTest {

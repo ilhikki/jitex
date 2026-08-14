@@ -52,7 +52,7 @@ import type {
   VariableDeclarationNode,
   WhileStatementNode,
   WithStatementNode,
-} from './types'
+} from './types.ts'
 
 // ============================================================================
 // 公开 API

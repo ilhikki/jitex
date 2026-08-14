@@ -19,9 +19,9 @@ import {
   StatementNode,
   WhileStatementNode,
   WithStatementNode,
-} from '@/ast/types'
-import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers'
-import { parseExpression, parseIdentifier, parsePrimary } from './expressions'
+} from '../ast/types.ts'
+import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
+import { parseExpression, parseIdentifier, parsePrimary } from './expressions.ts'
 
 // ============================================================================
 // Statement Parsers

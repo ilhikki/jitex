@@ -3,7 +3,7 @@
 // 这些用例覆盖 ISO 7185 标准中容易出错的边界情况
 
 import { describe } from './_helper.ts'
-import { type PascalTest, runPascalTests } from './_helper'
+import { type PascalTest, runPascalTests } from './_helper.ts'
 
 describe('M4.1 Pascal82 Conformance', () => {
   const tests: PascalTest[] = [

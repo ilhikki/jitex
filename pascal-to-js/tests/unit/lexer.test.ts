@@ -1,5 +1,5 @@
-import { lex } from '@/index'
-import { assert, assertEquals, describe, test } from '../_harness.ts'
+import { lex } from '../../src/index.ts'
+import { assertEquals, describe, test } from '../_harness.ts'
 
 interface Tok {
   type: string

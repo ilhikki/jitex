@@ -1,5 +1,5 @@
 import { describe } from './_helper.ts'
-import { type PascalTest, runPascalTests } from './_helper'
+import { type PascalTest, runPascalTests } from './_helper.ts'
 
 describe('Phase 4: Goto Fix - Strategy D should use break not continue', () => {
   const tests: PascalTest[] = [

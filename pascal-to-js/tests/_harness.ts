@@ -15,7 +15,7 @@
  *   - assertEquals 直接重导出 jsr:@std/assert 的实现，保持与 Deno 生态一致。
  */
 
-import { assertEquals, AssertionError } from 'jsr:@std/assert'
+import { assertEquals, AssertionError } from 'jsr:@std/assert@^1.0.0'
 export { assertEquals }
 
 // ============================================================
@@ -87,4 +87,28 @@ export function assert(condition: unknown, message?: string): asserts condition 
   if (!condition) {
     throw new AssertionError(message ?? 'assertion failed')
   }
+}
+
+// ============================================================
+// assertKind — 类型安全的 kind 判别式断言 (Type Guard)
+// ============================================================
+
+/**
+ * 断言 node 的 kind 等于 expectedKind，并利用 TypeScript `asserts`
+ * 将 node 收窄为对应的具体类型，从而无需 `as any` 即可安全访问属性。
+ *
+ * 用法示例：
+ *   assertKind(result.astNode, 'IntegerLiteral')
+ *   assertEquals(result.astNode.value, 42)  // 类型安全，无需 any
+ */
+export function assertKind<T extends { kind: string }, K extends T['kind']>(
+  node: T | undefined | null,
+  expectedKind: K,
+  message?: string,
+): asserts node is Extract<T, { kind: K }> {
+  assertEquals(
+    node?.kind,
+    expectedKind,
+    message ?? `kind mismatch: expected '${expectedKind}', got '${node?.kind as string}'`,
+  )
 }

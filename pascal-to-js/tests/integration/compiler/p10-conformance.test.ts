@@ -1,4 +1,4 @@
-import { PascalTest, runPascalTests } from './_helper'
+import { PascalTest, runPascalTests } from './_helper.ts'
 import { describe } from './_helper.ts'
 
 const tests: PascalTest[] = [

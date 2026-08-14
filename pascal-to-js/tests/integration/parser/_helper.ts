@@ -1,4 +1,4 @@
-import { parse } from '@/index'
+import { parse } from '../../../src/index.ts'
 import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
 export { assert, assertEquals, describe, it, test }
 

@@ -8,9 +8,9 @@
  * 计数器属于 Analysis，compiler 不自行维护。
  */
 
-import { JsonCode } from '@/compiler/json-code'
-import { Analysis, Symbol, TypeInfo } from '@/compiler/analysis'
-import { findFunctionPlugin, findProcedurePlugin, pluginSyscallKey } from '@/compiler/plugin'
+import * as JsonCode from './json-code.ts'
+import { Analysis, Symbol, TypeInfo } from './analysis.ts'
+import { findFunctionPlugin, findProcedurePlugin, pluginSyscallKey } from './plugin.ts'
 import {
   ArrayAccessNode,
   AssignmentNode,
@@ -37,7 +37,7 @@ import {
   UnaryExpressionNode,
   WhileStatementNode,
   WithStatementNode,
-} from '@/ast/types'
+} from '../ast/types.ts'
 
 // ============================================================
 // With 绑定上下文
@@ -1481,6 +1481,6 @@ function compileInExpression(
 // 符号解析（含 with 重写）
 // ============================================================
 
-function resolveSymbol(node: IdentifierNode, a: Analysis, ws: WithBinding[]): Symbol | undefined {
+function resolveSymbol(node: IdentifierNode, a: Analysis, _ws: WithBinding[]): Symbol | undefined {
   return a.symbolOf(node)
 }

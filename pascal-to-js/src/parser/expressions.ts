@@ -15,8 +15,8 @@ import {
   SetConstructorNode,
   StringLiteralNode,
   UnaryExpressionNode,
-} from '@/ast/types'
-import { expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers'
+} from '../ast/types.ts'
+import { expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
 
 // ============================================================================
 // Expression Parsers
@@ -414,12 +414,12 @@ export function parseFactor(input: ParserInput): ParseResult<ExpressionNode> {
 // parseTerm — term: factor { (* | / | DIV | MOD | AND) factor }
 export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
-  let result = parseFactor(input)
+  const result = parseFactor(input)
   if (!result.success) return result
 
   let pos = result.newPosition
   let left = result.astNode
-  let startPos = startToken.start
+  const startPos = startToken.start
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
@@ -470,8 +470,7 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
   const startToken = peek(input)
   let pos = input.position
   let left: ExpressionNode
-  let hasLeadingSign = false
-  let startPos = startToken.start
+  const startPos = startToken.start
 
   const sign = peek({ tokens: input.tokens, position: pos })
   if (sign.type === 'PLUS' || sign.type === 'MINUS') {
@@ -542,7 +541,7 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
 
   let pos = leftResult.newPosition
   let left = leftResult.astNode
-  let startPos = startToken.start
+  const startPos = startToken.start
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })

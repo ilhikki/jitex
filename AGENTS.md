@@ -86,11 +86,11 @@
 
 所有命令在项目根目录（本文件所在目录）执行：
 
-| 命令                         | 说明                                                         |
-|------------------------------| ------------------------------------------------------------ |
-| `deno test`                  | 运行 pascal-to-js 全部测试（unit + integration + benchmark） |
-| `deno lint`                  | 代码规范检查                                                 |
-| `deno fmt --check`           | 格式检查；不带 `--check` 则自动格式化                        |
+| 命令               | 说明                                                         |
+| ------------------ | ------------------------------------------------------------ |
+| `deno test`        | 运行 pascal-to-js 全部测试（unit + integration + benchmark） |
+| `deno lint`        | 代码规范检查                                                 |
+| `deno fmt --check` | 格式检查；不带 `--check` 则自动格式化                        |
 
 子模块内部也有对应的 `deno task`（如 `cd pascal-to-js && deno task test`）。
 

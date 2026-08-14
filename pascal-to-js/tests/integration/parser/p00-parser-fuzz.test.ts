@@ -1,4 +1,4 @@
-import { ConformanceTest, makeProgram, makeProgramWithVars, runParseTests } from './_helper'
+import { ConformanceTest, makeProgram, makeProgramWithVars, runParseTests } from './_helper.ts'
 import { describe } from './_helper.ts'
 
 function repeatStr(s: string, n: number): string {

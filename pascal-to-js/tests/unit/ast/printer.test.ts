@@ -1,11 +1,11 @@
 import { assert, assertEquals, describe, test } from '../../_harness.ts'
-import { lex } from '@/lexer/lexer'
-import { parseBlock, parseProgram } from '@/parser/declarations'
-import { parseExpression } from '@/parser/expressions'
-import { parseCompoundStatement as parseCompound, parseStatement } from '@/parser/statements'
-import { parseType } from '@/parser/types'
-import { nodeToCode } from '@/ast/printer'
-import type { AstNode, ParserInput } from '@/ast/types'
+import { lex } from '../../../src/lexer/lexer.ts'
+import { parseBlock, parseProgram } from '../../../src/parser/declarations.ts'
+import { parseExpression } from '../../../src/parser/expressions.ts'
+import { parseCompoundStatement as parseCompound, parseStatement } from '../../../src/parser/statements.ts'
+import { parseType } from '../../../src/parser/types.ts'
+import { nodeToCode } from '../../../src/ast/printer.ts'
+import type { AstNode, ParserInput } from '../../../src/ast/types.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

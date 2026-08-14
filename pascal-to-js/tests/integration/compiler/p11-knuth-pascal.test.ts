@@ -3,8 +3,8 @@
 // 代码风格模仿 tangle-official.pas（紧凑、大写关键字、OTHERS: 等）
 
 import { describe } from './_helper.ts'
-import { type PascalTest, runPascalTests } from './_helper'
-import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
+import { type PascalTest, runPascalTests } from './_helper.ts'
+import { pascalHPlugin } from '../../../src/compiler/plugins/pascal-h.plugin.ts'
 
 describe('M5 JS - Knuth Pascal Style', () => {
   const tests: PascalTest[] = [

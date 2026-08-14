@@ -7,42 +7,42 @@
 // 词法分析
 // ==========================================================================
 
-export { createOffsetToPosition, lex, tokenize } from './lexer/lexer'
-export type { LexerInput, Position, Token } from './ast/types'
+export { createOffsetToPosition, lex, tokenize } from './lexer/lexer.ts'
+export type { LexerInput, Position, Token } from './ast/types.ts'
 
 // ==========================================================================
 // 语法分析
 // ==========================================================================
 
-export { parseProgram } from './parser/declarations'
-export { parseExpression, parseExpressionList, parseIdentifier } from './parser/expressions'
-export { parseCompoundStatement, parseStatement } from './parser/statements'
-export { parseType, parseVariableDeclaration } from './parser/types'
-export * from './parser/helpers'
+export { parseProgram } from './parser/declarations.ts'
+export { parseExpression, parseExpressionList, parseIdentifier } from './parser/expressions.ts'
+export { parseCompoundStatement, parseStatement } from './parser/statements.ts'
+export { parseType, parseVariableDeclaration } from './parser/types.ts'
+export * from './parser/helpers.ts'
 
 // ==========================================================================
 // AST
 // ==========================================================================
 
-export type * from './ast/types'
-export { nodeToCode } from './ast/printer'
+export type * from './ast/types.ts'
+export { nodeToCode } from './ast/printer.ts'
 
 // ==========================================================================
 // 编译与执行（IL 管线）
 // ==========================================================================
 
-export { executeCompiled, run, transform } from '@/compiler/transform'
-export type { RunOptions, TransformOptions } from '@/compiler/transform'
-export type { RunError, RunState } from './runtime/run-state'
-export type { IlPlugin } from '@/compiler/plugin'
+export { executeCompiled, run, transform } from './compiler/transform.ts'
+export type { RunOptions, TransformOptions } from './compiler/transform.ts'
+export type { RunError, RunState } from './runtime/run-state.ts'
+export type { IlPlugin } from './compiler/plugin.ts'
 
 // ==========================================================================
 // 便捷函数
 // ==========================================================================
 
-import { lex } from '@/lexer'
-import { parseProgram } from '@/parser'
-import { ParseResult, ParserInput, ProgramNode } from './ast/types'
+import { lex } from './lexer/index.ts'
+import { parseProgram } from './parser/index.ts'
+import { ParseResult, ParserInput, ProgramNode } from './ast/types.ts'
 
 /**
  * 将 Pascal 源码解析为 AST。

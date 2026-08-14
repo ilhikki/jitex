@@ -1,5 +1,5 @@
 import { describe } from './_helper.ts'
-import { type PascalTest, runPascalTests } from './_helper'
+import { type PascalTest, runPascalTests } from './_helper.ts'
 
 describe('Phase 3: Array and Record', () => {
   const tests: PascalTest[] = [

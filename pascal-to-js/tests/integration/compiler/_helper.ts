@@ -13,9 +13,9 @@
 // 测试原则见 ../README.md；
 // 执行引擎实现见 pascal-to-js/src/compiler/transform.ts。
 
-import { run } from '@/compiler/transform'
-import type { RunState } from '@/runtime/run-state'
-import type { IlPlugin } from '@/compiler/plugin'
+import { run } from '../../../src/compiler/transform.ts'
+import type { RunState } from '../../../src/runtime/run-state.ts'
+import type { IlPlugin } from '../../../src/compiler/plugin.ts'
 import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
 export { assert, assertEquals, describe, it, test }
 

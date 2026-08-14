@@ -1,4 +1,4 @@
-export { parseProgram } from './declarations'
-export { parseExpression, parseExpressionList, parseIdentifier } from './expressions'
-export { parseCompoundStatement, parseStatement } from './statements'
-export { parseType, parseVariableDeclaration } from './types'
+export { parseProgram } from './declarations.ts'
+export { parseExpression, parseExpressionList, parseIdentifier } from './expressions.ts'
+export { parseCompoundStatement, parseStatement } from './statements.ts'
+export { parseType, parseVariableDeclaration } from './types.ts'

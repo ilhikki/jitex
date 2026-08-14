@@ -6,9 +6,9 @@
  *
  * ISO 7185 章节引用：6.9.8.2（标准过程列表）
  */
-import { assert, assertEquals, describe, test } from './_helper'
-import { run } from '@/compiler/transform'
-import { pascalHPlugin } from '@/compiler/plugins/pascal-h.plugin'
+import { assert, assertEquals, describe, test } from './_helper.ts'
+import { run } from '../../../src/compiler/transform.ts'
+import { pascalHPlugin } from '../../../src/compiler/plugins/pascal-h.plugin.ts'
 
 type Status = 'pending' | 'running' | 'terminated' | 'error'
 

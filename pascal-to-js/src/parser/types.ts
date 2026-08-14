@@ -15,9 +15,9 @@ import {
   SimpleTypeNode,
   TypeNode,
   VariableDeclarationNode,
-} from '@/ast/types'
-import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers'
-import { parseExpression, parseIdentifier } from './expressions'
+} from '../ast/types.ts'
+import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers.ts'
+import { parseExpression, parseIdentifier } from './expressions.ts'
 
 // ============================================================================
 // Type Parsers

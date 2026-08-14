@@ -19,16 +19,16 @@
  *   - syscallToJs：算术/比较/逻辑/转换 inline，IO/file/cell/mem/set 走 __sys dispatcher
  */
 
-import { lex } from '@/lexer/lexer'
-import { parseProgram } from '@/parser/declarations'
-import type { ParserInput, ProgramNode } from '@/ast/types'
-import { type Analysis, analyzeProgram, type VarSymbol } from '@/compiler/analysis'
-import { compileProgram } from '@/compiler/compiler'
-import { type JsCompiler, type SemanticCompiler, toJs } from '@/compiler/json-code-compiler'
-import { JsonCode } from '@/compiler/json-code'
-import type { RunError, RunState } from '@/runtime/run-state'
-import { createRuntimeContext, dispatch, type RuntimeOptions, toRunState } from '@/compiler/runtime'
-import type { IlPlugin } from '@/compiler/plugin'
+import { lex } from '../lexer/lexer.ts'
+import { parseProgram } from '../parser/declarations.ts'
+import type { ParserInput, ProgramNode } from '../ast/types.ts'
+import { type Analysis, analyzeProgram, type VarSymbol } from './analysis.ts'
+import { compileProgram } from './compiler.ts'
+import { type JsCompiler, type SemanticCompiler, toJs } from './json-code-compiler.ts'
+import * as JsonCode from './json-code.ts'
+import type { RunError, RunState } from '../runtime/run-state.ts'
+import { createRuntimeContext, dispatch, type RuntimeOptions, toRunState } from './runtime.ts'
+import type { IlPlugin } from './plugin.ts'
 
 // ============================================================
 // TransformOptions

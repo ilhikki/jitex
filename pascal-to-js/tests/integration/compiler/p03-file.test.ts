@@ -3,7 +3,7 @@
 // 这些用例覆盖 RESET/REWRITE/GET/PUT/EOF/EOLN/READ/READLN/WRITE/WRITELN/F^/ASSIGN
 
 import { describe } from './_helper.ts'
-import { type PascalTest, runPascalTests } from './_helper'
+import { type PascalTest, runPascalTests } from './_helper.ts'
 
 function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)

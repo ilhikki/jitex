@@ -21,18 +21,15 @@ import {
   ExpressionNode,
   FunctionDeclarationNode,
   IdentifierNode,
-  LabelDeclarationNode,
   ParameterDeclarationNode,
   ProcedureDeclarationNode,
   ProgramNode,
   RecordVariantPartNode,
   StatementNode,
-  TypeDeclarationNode,
   TypeNode,
-  VariableDeclarationNode,
   WithStatementNode,
-} from '@/ast/types'
-import type { IlPlugin } from '@/compiler/plugin'
+} from '../ast/types.ts'
+import type { IlPlugin } from './plugin.ts'
 
 // ============================================================
 // 类型系统
@@ -89,10 +86,6 @@ const SIMPLE_TYPES: Record<string, TypeInfo> = {
   char: { tag: 'char' },
   string: { tag: 'str' },
   text: { tag: 'file', fileElem: { tag: 'char' } },
-}
-
-function simpleInfo(tag: TypeTag): TypeInfo {
-  return { tag }
 }
 
 // ============================================================
@@ -831,7 +824,7 @@ export class Analyzer {
         return
       case 'Assignment': {
         const lt = this.analyzeExpr(node.left)
-        const rt = this.analyzeExpr(node.right)
+        const _rt = this.analyzeExpr(node.right)
         // 编译期 subrange 边界检查（ISO 7185 6.4.3.1）
         if (lt.tag === 'subrange' && lt.low !== undefined && lt.high !== undefined) {
           const constVal = this.evalConstInt(node.right)
@@ -1176,14 +1169,13 @@ export class Analyzer {
   // --------------------------------------------------------
 
   private freeze(): Analysis {
-    const self = this
     return {
-      nextId() {
-        return self.nextId_++
+      nextId: () => {
+        return this.nextId_++
       },
-      allocTempLocal(funcId, typeInfo) {
-        const id = self.nextId_++
-        const info = self.funcInfos.get(funcId)
+      allocTempLocal: (funcId, typeInfo) => {
+        const id = this.nextId_++
+        const info = this.funcInfos.get(funcId)
         if (info) {
           info.locals.push({
             kind: 'var',
@@ -1194,60 +1186,60 @@ export class Analyzer {
         }
         return id
       },
-      symbolOf(node) {
-        return self.symbolCache.get(node)
+      symbolOf: (node) => {
+        return this.symbolCache.get(node)
       },
-      labelInfo(funcId, labelNum) {
+      labelInfo: (funcId, labelNum) => {
         let fid: number | null = funcId
         while (fid !== null) {
-          const funcLabels = self.labels.get(fid)
+          const funcLabels = this.labels.get(fid)
           if (funcLabels) {
             const info = funcLabels.get(labelNum)
             if (info) return info
           }
-          const finfo = self.funcInfos.get(fid)
+          const finfo = this.funcInfos.get(fid)
           fid = finfo ? finfo.parentFuncId : null
         }
         return undefined
       },
-      labelUseFuncOf(labelId) {
-        return self.labelUseFunc.get(labelId)
+      labelUseFuncOf: (labelId) => {
+        return this.labelUseFunc.get(labelId)
       },
-      funcOfBlock(block) {
-        const r = self.blockFunc.get(block)
+      funcOfBlock: (block) => {
+        const r = this.blockFunc.get(block)
         if (r === undefined) throw new Error('funcOfBlock: not found')
         return r
       },
-      funcOfDecl(decl) {
-        const r = self.declFunc.get(decl)
+      funcOfDecl: (decl) => {
+        const r = this.declFunc.get(decl)
         if (r === undefined) throw new Error('funcOfDecl: not found')
         return r
       },
-      funcInfo(id) {
-        const r = self.funcInfos.get(id)
+      funcInfo: (id) => {
+        const r = this.funcInfos.get(id)
         if (!r) throw new Error('funcInfo: not found')
         return r
       },
-      withTempsOf(node) {
-        return self.withTemps.get(node) ?? []
+      withTempsOf: (node) => {
+        return this.withTemps.get(node) ?? []
       },
-      typeOf(node) {
-        return self.exprType.get(node) ?? { tag: 'unknown' }
+      typeOf: (node) => {
+        return this.exprType.get(node) ?? { tag: 'unknown' }
       },
-      typeTagOfTypeNode(node) {
-        return self.resolveTypeInfo(node)
+      typeTagOfTypeNode: (node) => {
+        return this.resolveTypeInfo(node)
       },
-      evalConstInt(node) {
-        return self.evalConstInt(node)
+      evalConstInt: (node) => {
+        return this.evalConstInt(node)
       },
-      globalSymbolOf(name) {
-        return self.globalBindings.get(name.toLowerCase())
+      globalSymbolOf: (name) => {
+        return this.globalBindings.get(name.toLowerCase())
       },
-      debugNames() {
-        return new Map(self.idNames)
+      debugNames: () => {
+        return new Map(this.idNames)
       },
-      plugins() {
-        return self.plugins_
+      plugins: () => {
+        return this.plugins_
       },
     }
   }

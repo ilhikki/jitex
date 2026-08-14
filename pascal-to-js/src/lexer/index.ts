@@ -1,1 +1,1 @@
-export { createOffsetToPosition, lex, tokenize } from './lexer'
+export { createOffsetToPosition, lex, tokenize } from './lexer.ts'

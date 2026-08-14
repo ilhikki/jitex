@@ -1,5 +1,5 @@
 import { describe } from './_helper.ts'
-import { type PascalTest, runPascalTests } from './_helper'
+import { type PascalTest, runPascalTests } from './_helper.ts'
 
 // 高级 goto 测试：非正常场景 + 嵌套非透明块多 label
 // 防死循环：每个可能导致死循环的测试都设置了 maxSteps
