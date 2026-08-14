@@ -1,0 +1,40 @@
+{
+  "name": "jitex",
+  "version": "1.0.0",
+  "workspace": [
+    "./pascal-to-js",
+    "./integration",
+    "./boot-tex"
+  ],
+  "unstable": ["sloppy-imports"],
+  "imports": {
+    "@jitex/pascal-to-js": "./pascal-to-js/src/index.ts",
+    "@jitex/pascal-to-js/": "./pascal-to-js/",
+    "@jitex/integration": "./integration/mod.ts",
+    "@jitex/integration/": "./integration/",
+    "@jitex/boot-tex": "./boot-tex/mod.ts",
+    "@jitex/boot-tex/": "./boot-tex/"
+  },
+  "tasks": {
+    "check": "deno check pascal-to-js/src/index.ts",
+    "test": "cd pascal-to-js && deno test -A tests/",
+    "test:unit": "cd pascal-to-js && deno test -A tests/unit/",
+    "test:integration": "cd pascal-to-js && deno test -A tests/integration/",
+    "test:benchmark": "cd pascal-to-js && deno test -A tests/benchmark/"
+  },
+  "compilerOptions": {
+    "strict": true
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 120,
+    "indentWidth": 2,
+    "semiColons": false,
+    "singleQuote": true
+  }
+}

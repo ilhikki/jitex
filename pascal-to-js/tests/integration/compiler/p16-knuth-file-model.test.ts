@@ -47,7 +47,7 @@ begin
 end.`,
     input: [],
     files: new Map([
-      ['input.txt', new Uint8Array(Buffer.from('hello\n'))],
+      ['input.txt', new TextEncoder().encode('hello\n')],
     ]),
     extensions: ['fileEofBufferSpace', 'pascalHFileModel'],
     expectedOutput: 'hello',
@@ -98,7 +98,7 @@ begin
 end.`,
     input: [],
     files: new Map([
-      ['input.txt', new Uint8Array(Buffer.from('abc\ntest\n'))],
+      ['input.txt', new TextEncoder().encode('abc\ntest\n')],
     ]),
     extensions: ['fileEofBufferSpace', 'pascalHFileModel'],
     expectedOutput: 'abc test',
@@ -134,7 +134,7 @@ begin
 end.`,
     input: [],
     files: new Map([
-      ['input.txt', new Uint8Array(Buffer.from('hello\n'))],
+      ['input.txt', new TextEncoder().encode('hello\n')],
     ]),
     extensions: ['fileEofBufferSpace'],
     // 标准 Pascal: GET 跳过 'h'，读取 "ello"
@@ -155,7 +155,7 @@ begin
 end.`,
     input: [],
     files: new Map([
-      ['input.txt', new Uint8Array(Buffer.from('AB\n'))],
+      ['input.txt', new TextEncoder().encode('AB\n')],
     ]),
     extensions: ['fileEofBufferSpace'],
     expectedOutput: 'AB',

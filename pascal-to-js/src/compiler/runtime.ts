@@ -1169,7 +1169,7 @@ function readFilelnSkip(ctx: RuntimeContext, file: PascalFile): void {
     __poolLineCount.set(file, cnt)
     // 诊断信息收集到 ctx.debugLog，由 e2e 报告消费
     ctx.debugLog.push(
-      `[POOL readln #${cnt} off=${start}->${s.offset}] ${JSON.stringify(Buffer.from(lineBytes).toString('latin1'))}`
+      `[POOL readln #${cnt} off=${start}->${s.offset}] ${JSON.stringify(Array.from(lineBytes, (b: number) => String.fromCharCode(b)).join(''))}`
     )
   }
   if (s.eof) return

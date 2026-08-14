@@ -1,11 +1,16 @@
-node_modules/
-dist/
+# Deno
+.deno/
+
+# IDE
 .idea/
-*.log
-!tests/e2e/resources/*.log
 *.iml
-/coverage
-/temp
+
+# Build / temp
+dist/
+/temp/
 /test/temp/
 coverage-temp/
 /reports/
+
+# Logs
+*.log
