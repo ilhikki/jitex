@@ -88,7 +88,6 @@
 
 | 命令                         | 说明                                                         |
 |------------------------------| ------------------------------------------------------------ |
-| `deno task check`            | TypeScript 类型检查 `pascal-to-js/src/index.ts`              |
 | `deno test`                  | 运行 pascal-to-js 全部测试（unit + integration + benchmark） |
 | `deno lint`                  | 代码规范检查                                                 |
 | `deno fmt --check`           | 格式检查；不带 `--check` 则自动格式化                        |
