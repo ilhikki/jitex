@@ -9,8 +9,8 @@
 核心能力：
 
 - `@jitex/pascal-to-js`：将 Pascal 源码编译为 JS 代码字符串，用 `new Function()` 同步执行。
-- `@jitex/integration`：TANGLE 自举流水线（WEB→Pascal 的自举验证）+ tie/reporter 工具（e2e
-  代码待重写，当前为占位模块）。
+- `@jitex/integration`：E2E 流水线 DSL——多阶段、有依赖、可缓存、可产出结构化报告的流水线框架， 用于编排"编译 → 运行 →
+  比对产物"类长任务（TANGLE 自举、TeX TRIP 等）；不含任何 TeX 代码。
 - `@jitex/boot-tex`：TeX82 / XeTeX 编译流水线（TRIP 测试 + DVI 工具；e2e 代码待重写，当前为占位模块）。
 
 **终极目标**：让 TEX82 在合理时间内跑完。
@@ -37,8 +37,8 @@
 
 1. **任务开始先规划**：每次执行任务时，需思考——需要更新哪些文档？什么时候提交代码？更新哪些文档？
 2. **积极提交**：每个逻辑单元完成后立即提交，不等用户催促。
-3. **回归测试**：修改 pascal-to-js 代码后必须运行 `deno task test:integration`（顶层 `deno.json` task）。
-4. **TypeScript 检查**：修改 pascal-to-js/src/ 后运行 `deno task check`（顶层 `deno.json` task）。
+3. **回归测试**：修改 pascal-to-js 代码后必须运行 `deno test`（顶层 workspace 全部测试）。
+4. **TypeScript 检查**：修改 pascal-to-js/src/ 后运行 `deno check`（顶层 `deno.json`）。
 5. 每次提交前 fmt 和 lint
 
 ### 标准锚定（原则 A）
@@ -72,16 +72,16 @@
 顶层为 Deno workspace（见
 `deno.json`），包含三个子模块。依赖关系：`boot-tex → integration → pascal-to-js`（单向，无循环）。
 
-| 目录                           | 说明                                                                                                                                                            | 文档                                                                                                                    |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `deno.json`                    | 顶层 workspace 配置：workspace 列表、import map、tasks、fmt/lint/compilerOptions、unstable.sloppy-imports                                                       | —                                                                                                                       |
-| `pascal-to-js/`                | **核心子模块**：Pascal82→JS 编译器（lexer/parser/AST/IL 管线/runtime） + 全部单元/集成/基准测试（1133+ 用例）。无 Node API 依赖，纯 Deno。                      | [pascal-to-js/src/README.md](pascal-to-js/src/README.md) / [pascal-to-js/tests/README.md](pascal-to-js/tests/README.md) |
-| `pascal-to-js/_vitest_shim.ts` | 测试运行时：Deno 原生测试之上的 Vitest 兼容层（describe/test/expect/afterAll）。使 `.test.ts` 保持 vitest 风格写法不变。                                        | 代码即文档                                                                                                              |
-| `integration/`                 | **占位子模块**（e2e 待重写）：TANGLE 自举流水线 + tie 合并 WEB change file + reporter 报告生成。当前仅空 `mod.ts` + `deno.json`。                               | —                                                                                                                       |
-| `boot-tex/`                    | **占位子模块**（e2e 待重写）：TeX82 / XeTeX 编译流水线、TRIP 测试、CM 字体、DVI 解析与可视化。当前仅空 `mod.ts` + `deno.json`。e2e 资源已备份，不在本仓库恢复。 | —                                                                                                                       |
+| 目录                           | 说明                                                                                                                                                             | 文档                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `deno.json`                    | 顶层 workspace 配置：workspace 列表、import map、tasks、fmt/lint/compilerOptions、unstable.sloppy-imports                                                        | —                                                                                                                       |
+| `pascal-to-js/`                | **核心子模块**：Pascal82→JS 编译器（lexer/parser/AST/IL 管线/runtime） + 全部单元/集成/基准测试（1133+ 用例）。无 Node API 依赖，纯 Deno。                       | [pascal-to-js/src/README.md](pascal-to-js/src/README.md) / [pascal-to-js/tests/README.md](pascal-to-js/tests/README.md) |
+| `pascal-to-js/_vitest_shim.ts` | 测试运行时：Deno 原生测试之上的 Vitest 兼容层（describe/test/expect/afterAll）。使 `.test.ts` 保持 vitest 风格写法不变。                                         | 代码即文档                                                                                                              |
+| `integration/`                 | **E2E 流水线 DSL**：suite/stage/cache/assert/attach/log 原语 + before/after hook + 拓扑调度（Kahn）+ 缓存恢复 + 报告（HTML/JSON/txt）+ CLI（`src/cli.ts run`）。 | [integration/README.md](integration/README.md)                                                                          |
+| `boot-tex/`                    | **占位子模块**（e2e 待重写）：TeX82 / XeTeX 编译流水线、TRIP 测试、CM 字体、DVI 解析与可视化。当前仅空 `mod.ts` + `deno.json`。e2e 资源已备份，不在本仓库恢复。  | —                                                                                                                       |
 
-> **说明**：旧的 `src/`、`tests/`（含 e2e/）目录**已废弃**，被拆分到上述三个子模块。e2e
-> 代码按用户指示放弃迁移、后续重写；原 e2e 资源用户有独立备份。
+> **说明**：旧的 `src/`、`tests/`（含 e2e/）目录**已废弃**，被拆分到上述三个子模块。原 e2e
+> 代码按用户指示放弃迁移、后续重写；其中 integration 已重写完成，boot-tex 仍为占位待重写。 原 e2e 资源用户有独立备份。
 
 ---
 
@@ -89,20 +89,20 @@
 
 所有命令在项目根目录（本文件所在目录）执行：
 
-| 命令               | 说明                                                         |
-| ------------------ | ------------------------------------------------------------ |
-| `deno test`        | 运行 pascal-to-js 全部测试（unit + integration + benchmark） |
-| `deno lint`        | 代码规范检查                                                 |
-| `deno fmt --check` | 格式检查；不带 `--check` 则自动格式化                        |
+| 命令               | 说明                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| `deno test`        | 运行 workspace 全部测试（pascal-to-js 的 unit + integration + benchmark，integration 模块测试） |
+| `deno lint`        | 代码规范检查                                                                                    |
+| `deno fmt --check` | 格式检查；不带 `--check` 则自动格式化                                                           |
 
-子模块内部也有对应的 `deno task`（如 `cd pascal-to-js && deno task test`）。
+子模块内部命令直接进子目录运行 `deno test` / `deno lint` 等（boot-tex 有 `deno task check`）。
 
 ---
 
 ## 如何更新本文档
 
-- 新增铁律 → 添加到对应分组，按编号顺延。删除铁律时后面的编号**不回补**，保证编号唯一且稳定。当前铁律共 14
-  条（#1-#14）。
+- 新增铁律 → 添加到对应分组，按编号顺延。删除铁律时后面的编号**不回补**，保证编号唯一且稳定。当前铁律共 15
+  条（#1-#15）。
 - 新增任务类型 → 在"任务路由"表格添加。
 - 新增一级目录 → 在"一级目录"表格添加。
 - 原则/描述性文字 → 直接修改，无需编号。
