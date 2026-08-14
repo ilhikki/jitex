@@ -87,12 +87,9 @@
 所有命令在项目根目录（本文件所在目录）执行：
 
 | 命令                         | 说明                                                         |
-| ---------------------------- | ------------------------------------------------------------ |
+|------------------------------| ------------------------------------------------------------ |
 | `deno task check`            | TypeScript 类型检查 `pascal-to-js/src/index.ts`              |
-| `deno task test`             | 运行 pascal-to-js 全部测试（unit + integration + benchmark） |
-| `deno task test:unit`        | 仅运行单元测试（lexer / parser / ast printer）               |
-| `deno task test:integration` | 仅运行集成测试（compiler / parser 端到端）                   |
-| `deno task test:benchmark`   | 仅运行基准测试                                               |
+| `deno test`                  | 运行 pascal-to-js 全部测试（unit + integration + benchmark） |
 | `deno lint`                  | 代码规范检查                                                 |
 | `deno fmt --check`           | 格式检查；不带 `--check` 则自动格式化                        |
 
