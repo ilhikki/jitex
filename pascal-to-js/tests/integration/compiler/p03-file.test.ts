@@ -146,6 +146,18 @@ describe('M5 JS - File Model (async)', () => {
       expectedFileContains: [{ url: 'OUTFILE', contains: 'LINE1' }],
     },
 
+    {
+      name: '文件复制：无 programFileUrls，默认恒等映射（key === value）',
+      code:
+        `PROGRAM COPYFILE(INFILE,OUTFILE);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;CLOSE(OUTFILE);END.`,
+      purpose: '缺省 programFileUrls 时，程序文件参数名即 files 键名（恒等映射）',
+      files: new Map<string, Uint8Array>([
+        ['INFILE', text('LINE1\nLINE2\n')],
+        ['OUTFILE', new Uint8Array(0)],
+      ]),
+      expectedFileContains: [{ url: 'OUTFILE', contains: 'LINE1' }],
+    },
+
     // ==========================================================================
     // ASSIGN 显式调用
     // ==========================================================================

@@ -80,7 +80,7 @@ export function suite(name: string, fn: () => void): Suite {
 // stage
 // ------------------------------------------------------------
 
-export function stage<T extends readonly Stage<unknown>[], R>(
+export function stage<const T extends readonly Stage<unknown>[], R>(
   name: string,
   deps: T,
   fn: (results: UnwrapAll<T>) => R | Promise<R>,
@@ -140,7 +140,7 @@ export class AssertionError extends Error {
   override name = 'AssertionError'
 }
 
-export function assert(cond: boolean, message: string): void {
+export function assert(cond: boolean, message: string): asserts cond {
   const ctx = requireStageContext()
   const rec: AssertionRecord = { name: message, passed: cond }
   ctx.addAssertion(rec)

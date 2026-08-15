@@ -35,7 +35,8 @@ import type { IlPlugin } from './plugin.ts'
 // ============================================================
 
 export interface TransformOptions {
-  /** 程序文件变量名 → files 中的键名（用于 ASSIGN） */
+  /** 程序文件变量名 → files 中的键名（用于 ASSIGN）。
+   * 缺省时按恒等映射处理：程序文件参数名即 files 键名（key === value）。 */
   programFileUrls?: Record<string, string>
   /** 非标特性扩展（传递给 analysis 做语义检查） */
   extensions?: string[]
@@ -64,12 +65,18 @@ function parseSource(source: string): ProgramNode {
 function applyProgramFileUrls(
   fn: JsonCode.Function,
   a: Analysis,
-  programFileUrls?: Record<string, string>,
+  programFileUrls: Record<string, string> | undefined,
+  programParams: ProgramNode['parameters'],
 ): JsonCode.Function {
-  if (!programFileUrls) return fn
+  // programFileUrls 缺省时使用恒等映射（key === value）：
+  // 程序文件参数名直接作为 files 键名（如 WEBFILE → 'WEBFILE'），
+  // 调用方只需把文件放入 files 即可（boot-tangle 正是此用法）。
+  const mapping = programFileUrls ??
+    Object.fromEntries(programParams.map((p) => [p.name, p.name]))
+  if (Object.keys(mapping).length === 0) return fn
 
   const preamble: JsonCode.Statement[] = []
-  for (const [varName, url] of Object.entries(programFileUrls)) {
+  for (const [varName, url] of Object.entries(mapping)) {
     const sym = a.globalSymbolOf(varName)
     if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
       const varSym = sym as VarSymbol
@@ -335,7 +342,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
   let jsonCode = compileProgram(ast, analysis)
 
   // 4. 后处理：插入 programFileUrls 的 file.assign
-  jsonCode = applyProgramFileUrls(jsonCode, analysis, options.programFileUrls)
+  jsonCode = applyProgramFileUrls(jsonCode, analysis, options.programFileUrls, ast.parameters)
 
   // 5. toJs（始终携带可读变量名）
   const semantic = new PascalSemanticCompiler()

@@ -5,7 +5,7 @@
   "imports": {
     "@jitex/pascal-to-js": "../pascal-to-js/src/index.ts",
     "@jitex/pascal-to-js/": "../pascal-to-js/",
-    "@jitex/integration": "../integration/mod.ts",
+    "@jitex/integration": "../integration/src/mod.ts",
     "@jitex/integration/": "../integration/"
   },
   "tasks": {
