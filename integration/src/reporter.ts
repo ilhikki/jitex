@@ -132,7 +132,14 @@ async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
     const head = `<li>[${mark}] [${s.id}] ${escapeHtml(s.title)} - ${formatDuration(s.duration)}</li>`
     const artifacts = s.artifacts.map((a) => {
       const safe = sanitizeFilename(a.name)
-      return `<a href="stages/${s.id}/${escapeHtml(safe)}">${escapeHtml(a.name)}</a>`
+      let size = 0
+      try {
+        const stat = Deno.statSync(`${runDir}/stages/${s.id}/${safe}`)
+        size = stat.size ?? 0
+      } catch {
+        size = 0
+      }
+      return `<a href="stages/${s.id}/${escapeHtml(safe)}">${escapeHtml(a.name)}</a> - ${formatBytes(size)}`
     })
     const children: string[] = [`<a href="stages/${s.id}/logs.txt">logs.txt</a>`, ...artifacts]
     stageLi.push(`${head}<ul><li>${children.join(' ')}</li></ul>`)
@@ -204,7 +211,9 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
     const ts = r.overview?.timestamp ?? '(unknown)'
     const status = r.overview ? (r.overview.success ? 'SUCCESS' : 'FAIL') : '(no overview)'
     const dur = r.overview ? formatDuration(r.overview.duration) : ''
-    return `<li><a href="${escapeHtml(r.id)}/index.html">${escapeHtml(r.id)}</a> - ${escapeHtml(ts)} - ${escapeHtml(status)}${dur ? ' - ' + dur : ''}</li>`
+    return `<li><a href="${escapeHtml(r.id)}/index.html">${escapeHtml(r.id)}</a> - ${escapeHtml(ts)} - ${
+      escapeHtml(status)
+    }${dur ? ' - ' + dur : ''}</li>`
   })
 
   const html = [
@@ -226,7 +235,7 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
 }
 
 // 导出给 CLI：如果 CLI 只想刷新一下顶层 index（比如 --no-report 后手动触发重建），也可用。
-export { writeTopLevelIndex as _writeTopLevelIndex, writeRunIndex as _writeRunIndex }
+export { writeRunIndex as _writeRunIndex, writeTopLevelIndex as _writeTopLevelIndex }
 
 // 供 runner/cli：从 RunReport + stageContext 中拿 artifact bytes 写盘。
 // runner 里 StageContext 已经保存了 artifacts[] 字节，这里导出一个辅助把它转成 map。

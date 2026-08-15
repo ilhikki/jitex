@@ -175,14 +175,11 @@ async function main(argv: string[]): Promise<number> {
   console.log(`run ${report.id} ${report.success ? 'SUCCESS' : 'FAIL'} (${report.duration}ms)`)
   console.log(`  stages: ${okCount} ok / ${failCount} fail / ${skipCount} skip / ${cachedCount} cached`)
   for (const s of report.stages) {
-    const mark =
-      s.status === 'success'
-        ? s.cached
-          ? '[cached]'
-          : '[ok]    '
-        : s.status === 'failed'
-        ? '[FAIL]  '
-        : '[SKIP]  '
+    const mark = s.status === 'success'
+      ? s.cached ? '[cached]' : '[ok]    '
+      : s.status === 'failed'
+      ? '[FAIL]  '
+      : '[SKIP]  '
     console.log(`  ${mark} #${s.id} ${s.title} (${s.duration}ms)`)
     for (const a of s.artifacts) {
       console.log(`           artifact: ${a.name} (${a.size} bytes${a.lines != null ? `, ${a.lines} lines` : ''})`)

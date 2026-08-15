@@ -4,30 +4,22 @@
 //
 // 执行顺序：before → stages(拓扑序, 含缓存判定) → after
 
-import {
-  RunContext,
-  StageContext,
-  setGlobalRunContext,
-} from './context.ts'
-import type { Stage, Suite, CacheableRecord } from './dsl.ts'
+import { RunContext, setGlobalRunContext, StageContext } from './context.ts'
+import type { CacheableRecord, Stage, Suite } from './dsl.ts'
 import type { DepChecksum } from './cache.ts'
-import {
-  purgeCacheDir,
-  tryRecoverCache,
-  writeCache,
-} from './cache.ts'
+import { purgeCacheDir, tryRecoverCache, writeCache } from './cache.ts'
 import { buildArtifactMap, writeReport } from './reporter.ts'
 
 export interface RunOptions {
-  reportDir?: string         // 默认 ./reports
+  reportDir?: string // 默认 ./reports
   runId?: string
   filter?: (stage: Stage<unknown>) => boolean
   failFast?: boolean
-  cacheDir?: string          // 默认 {reportDir}/.cache
-  withCache?: boolean        // CLI --with-cache：严格模式，无 cache 则报错；默认 false（刷新）
-  purge?: boolean            // 启动前清空 cacheDir
-  noReport?: boolean         // 只跑不落盘报告
-  args?: string[]            // 记录到报告
+  cacheDir?: string // 默认 {reportDir}/.cache
+  withCache?: boolean // CLI --with-cache：严格模式，无 cache 则报错；默认 false（刷新）
+  purge?: boolean // 启动前清空 cacheDir
+  noReport?: boolean // 只跑不落盘报告
+  args?: string[] // 记录到报告
   env?: Record<string, string>
 }
 
@@ -62,7 +54,9 @@ export interface RunReport {
 function defaultRunId(): string {
   const now = new Date()
   const pad = (n: number, w = 2) => String(n).padStart(w, '0')
-  const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
+  const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${
+    pad(now.getMinutes())
+  }-${pad(now.getSeconds())}`
   return `${ts}_001`
 }
 
@@ -106,7 +100,7 @@ function topoSort(
       // dep 不在 universe → 非法
       if (!universeByName.has(dep.name)) {
         throw new Error(
-          `stage '${s.name}' depends on '${dep.name}' which is not in suite '${/* name available outside */'?'}'`,
+          `stage '${s.name}' depends on '${dep.name}' which is not in suite '${/* name available outside */ '?'}'`,
         )
       }
       // dep 不在 active（被 filter 排除）→ 依赖通过缓存满足（不算图中边）
@@ -385,8 +379,7 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     assertions: s.assertions,
   }))
 
-  const allSuccess =
-    suiteSuccess && stagesRec.every((s) => s.status === 'success')
+  const allSuccess = suiteSuccess && stagesRec.every((s) => s.status === 'success')
 
   const env = {
     runtime: `deno ${Deno.version.deno}`,

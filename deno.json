@@ -8,6 +8,9 @@
   "compilerOptions": {
     "strict": true
   },
+  "tasks": {
+    "boot-tangle": "deno run -A ./integration/src/cli.ts run ./boot-tex/src/tangle/boot-tangle.ts"
+  },
   "lint": {
     "rules": {
       "tags": ["recommended"]

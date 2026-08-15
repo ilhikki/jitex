@@ -89,11 +89,11 @@
 
 所有命令在项目根目录（本文件所在目录）执行：
 
-| 命令               | 说明                                                                                            |
-| ------------------ | ----------------------------------------------------------------------------------------------- |
-| `deno test`        | 运行 workspace 全部测试（pascal-to-js 的 unit + integration + benchmark，integration 模块测试） |
-| `deno lint`        | 代码规范检查                                                                                    |
-| `deno fmt --check` | 格式检查；不带 `--check` 则自动格式化                                                           |
+| 命令               | 说明                                                                      |
+| ------------------ | ------------------------------------------------------------------------- |
+| `deno test`        | 运行 workspace 全部测试（pascal-to-js 的 unit + integration + benchmark） |
+| `deno lint`        | 代码规范检查                                                              |
+| `deno fmt --check` | 格式检查；不带 `--check` 则自动格式化                                     |
 
 子模块内部命令直接进子目录运行 `deno test` / `deno lint` 等（boot-tex 有 `deno task check`）。
 

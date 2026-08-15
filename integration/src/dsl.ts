@@ -6,8 +6,8 @@
 //
 // 类型体操：Unwrap / UnwrapAll 负责从 Stage<X> 元组解包结果元组。
 
-import { requireStageContext, requireRunContext } from './context.ts'
-import type { AssertionRecord, Artifact } from './context.ts'
+import { requireRunContext, requireStageContext } from './context.ts'
+import type { Artifact, AssertionRecord } from './context.ts'
 
 // ------------------------------------------------------------
 // 类型定义

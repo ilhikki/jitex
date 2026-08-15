@@ -1,4 +1,4 @@
-import { assertEquals, attachText, attach, cache, log, Stage, stage, suite, UnwrapAll } from '@jitex/integration'
+import { assertEquals, attach, attachText, cache, log, Stage, stage, suite, UnwrapAll } from '@jitex/integration'
 import { run, transform } from '@jitex/pascal-to-js'
 import { pascalHPlugin } from '@jitex/pascal-to-js/src/compiler/plugins/pascal-h.plugin.ts'
 
@@ -90,12 +90,20 @@ const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
       return { tangleContent: tangleSource.tanglePas, webContent: tangleSource.tangleWeb }
     },
   )
-  const getTangleV2 = createTangleStage('tangleV1 => tangleV2', [stageLoadTangleSource, getTangleV1], ([src, tangleOutput]) => {
-    return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb }
-  })
-  const getTangleV3 = createTangleStage('tangleV2 => tangleV3', [stageLoadTangleSource, getTangleV2], ([src, tangleOutput]) => {
-    return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb }
-  })
+  const getTangleV2 = createTangleStage(
+    'tangleV1 => tangleV2',
+    [stageLoadTangleSource, getTangleV1],
+    ([src, tangleOutput]) => {
+      return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb }
+    },
+  )
+  const getTangleV3 = createTangleStage(
+    'tangleV2 => tangleV3',
+    [stageLoadTangleSource, getTangleV2],
+    ([src, tangleOutput]) => {
+      return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb }
+    },
+  )
 
   const valid = stage('valid tangle-v2.pas === tangle-v3.pas', [getTangleV2, getTangleV3], (result) => {
     assertEquals(result[0].pasFile, result[1].pasFile)
@@ -104,7 +112,7 @@ const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
     const tangleJs = transform(results[0].pasFile, {
       plugins: [pascalHPlugin],
     })
-    attachText("tangle.js", tangleJs)
+    attachText('tangle.js', tangleJs)
   })
 })
 export default tangleBootstrapSuite
