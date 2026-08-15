@@ -168,6 +168,7 @@ export function attach(name: string, bytes: Uint8Array): void {
   const ctx = requireStageContext()
   const a: Artifact = { name, bytes }
   ctx.addArtifact(a)
+  ctx.addLog(`attach ${name} (${bytes.length} bytes)`)
 }
 
 export function attachText(name: string, text: string): void {

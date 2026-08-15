@@ -44,6 +44,7 @@ export class StageContext {
 
   addLog(msg: string): void {
     this.logs.push(msg)
+    emitSink(msg)
   }
 
   failWith(err: unknown): void {
@@ -58,11 +59,17 @@ export class RunContext {
   readonly runId: string
   readonly suiteName: string
   stages: StageContext[] = []
+  runLogs: string[] = []
   private stageStack: StageContext[] = []
 
   constructor(runId: string, suiteName: string) {
     this.runId = runId
     this.suiteName = suiteName
+  }
+
+  log(msg: string): void {
+    this.runLogs.push(msg)
+    emitSink(msg)
   }
 
   pushStage(s: StageContext): void {
@@ -90,6 +97,18 @@ let globalCtx: RunContext | null = null
 
 export function setGlobalRunContext(ctx: RunContext | null): void {
   globalCtx = ctx
+}
+
+// 日志 sink：log / addLog 的每条消息实时转发到这里（默认控制台）。
+// runner 通过 setLogSink 注入，run 结束后清空。
+let activeSink: ((msg: string) => void) | null = null
+
+export function setLogSink(sink: ((msg: string) => void) | null): void {
+  activeSink = sink
+}
+
+function emitSink(msg: string): void {
+  activeSink?.(msg)
 }
 
 export function requireRunContext(): RunContext {

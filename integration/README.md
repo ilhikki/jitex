@@ -81,6 +81,8 @@ deno run -A src/cli.ts run my-pipeline.ts --no-report
 
 退出码：所有 stage 成功 → `0`；任一 failed/skipped 或 hook 失败 → `1`。
 
+**控制台输出**：运行开始时列出本次要跑的 stage 列表；每个 stage 开始时打印 `[n/N] running '<name>'...`；`attach` 时打印文件名和大小；`log()` 的每条消息实时转发到控制台（默认日志 sink 即 console.log）。run 级日志（stage 列表、进度、成败）同样写入 `logs.txt`。
+
 ---
 
 ## 2. 原语一览

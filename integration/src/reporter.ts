@@ -52,9 +52,10 @@ export async function writeReport(
 
   // 三份聚合日志：logs / consoleLogs / debugLogs
   // DSL 统一用 log(msg)，默认 LogSink 写三份一样的；保留三份文件以对齐样例。
-  const allLogs: string[] = []
-  const allConsole: string[] = []
-  const allDebug: string[] = []
+  const runHeader = report.runLogs.length ? [...report.runLogs, ''] : []
+  const allLogs: string[] = [...runHeader]
+  const allConsole: string[] = [...runHeader]
+  const allDebug: string[] = [...runHeader]
   for (const s of report.stages) {
     if (s.logs.length) {
       allLogs.push(`[${s.id}] ${s.title}`, ...s.logs, '')

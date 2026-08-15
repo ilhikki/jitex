@@ -4,7 +4,7 @@
 //
 // 执行顺序：before → stages(拓扑序, 含缓存判定) → after
 
-import { RunContext, setGlobalRunContext, StageContext } from './context.ts'
+import { RunContext, setGlobalRunContext, setLogSink, StageContext } from './context.ts'
 import type { CacheableRecord, Stage, Suite } from './dsl.ts'
 import type { DepChecksum } from './cache.ts'
 import { purgeCacheDir, tryRecoverCache, writeCache } from './cache.ts'
@@ -21,6 +21,7 @@ export interface RunOptions {
   noReport?: boolean // 只跑不落盘报告
   args?: string[] // 记录到报告
   env?: Record<string, string>
+  log?: (msg: string) => void // 日志 sink；默认 console.log
 }
 
 export interface StageRecord {
@@ -45,6 +46,7 @@ export interface RunReport {
   env: { runtime: string; platform: string; arch: string }
   args: string[]
   stages: StageRecord[]
+  runLogs: string[]
 }
 
 // ------------------------------------------------------------
@@ -203,10 +205,20 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
 
   const runCtx = new RunContext(runId, suite.name)
   setGlobalRunContext(runCtx)
+  setLogSink(options.log ?? ((msg: string) => console.log(msg)))
 
   let suiteSuccess = true
 
   try {
+    // --- 开始时：列出本次要跑的 stage ---
+    const filtered = filter ? suite.stages.filter(filter) : suite.stages.slice()
+    runCtx.log(`suite '${suite.name}' (${filtered.length} stage${filtered.length === 1 ? '' : 's'})`)
+    for (const s of filtered) {
+      const depsText = s.deps.length ? ` (deps: ${s.deps.map((d) => d.name).join(', ')})` : ''
+      const cacheText = s.cacheable ? ' [cacheable]' : ''
+      runCtx.log(`  [${s.id}] ${s.name}${depsText}${cacheText}`)
+    }
+
     // --- before hook ---
     if (suite.beforeFn) {
       try {
@@ -227,7 +239,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
 
     if (suiteSuccess) {
       // --- filter ---
-      const filtered = filter ? suite.stages.filter(filter) : suite.stages.slice()
       const activeStageNames = new Set(filtered.map((s) => s.name))
 
       // --- 拓扑 ---
@@ -241,6 +252,7 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
       const failedIds = new Set<string>()
 
       const recovering = new Set<string>()
+      let step = 0
 
       for (const s of order) {
         // 对被 filter 排除的依赖（在 active 之外）先预恢复（递归）
@@ -260,10 +272,13 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
 
         const sc = new StageContext(s.id, s.name)
         runCtx.pushStage(sc)
+        step++
+        runCtx.log(`[${step}/${order.length}] running '${s.name}'...`)
         try {
           if (depFailed) {
             sc.status = 'skipped'
             sc.addLog(`skipped: dep failed`)
+            runCtx.log(`[${s.id}] skipped (dep failed)`)
             continue
           }
 
@@ -303,6 +318,11 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
               sc.durationMs = 0
               stageResultById.set(s.id, recovered.results)
               checksumByName.set(s.name, recovered.checksum)
+              runCtx.log(
+                `[${s.id}] cached (${sc.artifacts.length} artifact${
+                  sc.artifacts.length === 1 ? '' : 's'
+                }, ${sc.logs.length} log line${sc.logs.length === 1 ? '' : 's'})`,
+              )
               continue
             }
           }
@@ -317,6 +337,7 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
             sc.results = value
             sc.status = 'success'
             stageResultById.set(s.id, value)
+            runCtx.log(`[${s.id}] done (${sc.durationMs}ms)`)
 
             // 写缓存（仅 cacheable 标记 + 成功）
             if (s.cacheable) {
@@ -341,6 +362,7 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
             sc.durationMs = Math.max(0, Math.round(t1 - t0))
             sc.failWith(err)
             failedIds.add(s.id)
+            runCtx.log(`[${s.id}] FAILED: ${err instanceof Error ? err.message : String(err)}`)
             if (failFast) break
           }
         } finally {
@@ -361,6 +383,7 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     }
   } finally {
     setGlobalRunContext(null)
+    setLogSink(null)
   }
 
   // --- 构建报告 ---
@@ -395,6 +418,7 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     env,
     args,
     stages: stagesRec,
+    runLogs: runCtx.runLogs,
   }
 
   // --- 写盘报告 ---
