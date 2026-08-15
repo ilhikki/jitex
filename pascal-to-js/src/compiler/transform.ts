@@ -410,7 +410,7 @@ export function run(source: string, options: RunOptions = {}): RunState {
       extensions: options.extensions,
       plugins: options.plugins,
     })
-
+    ctx.jsCode = jsCode
     // __sys dispatcher
     const __sys = (key: string, args: unknown[]): unknown => dispatch(ctx, key, args)
 

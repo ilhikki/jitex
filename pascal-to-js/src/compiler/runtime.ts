@@ -109,6 +109,7 @@ export interface RuntimeContext {
    * 收集运行期诊断信息：pool 文件读取追踪、文件 IO 异常等。
    * 由 e2e 测试通过 RuntimeOptions.debugLog 注入并读取。 */
   debugLog: string[]
+  jsCode: string | undefined
 }
 
 export interface RuntimeOptions {
@@ -137,6 +138,7 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     extensions: new Set(options.extensions ?? []),
     plugins: options.plugins ?? [],
     debugLog: options.debugLog ?? [],
+    jsCode: undefined,
   }
 }
 
@@ -151,6 +153,7 @@ export function toRunState(
     inputQueue: ctx.inputQueue,
     steps: ctx.steps,
     error: error ?? null,
+    jsCode: ctx.jsCode,
   }
 }
 

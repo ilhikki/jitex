@@ -9,4 +9,5 @@ export interface RunState {
   inputQueue: string[]
   steps: number
   error: RunError | null
+  jsCode: string | undefined
 }
