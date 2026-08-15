@@ -375,7 +375,9 @@ export function executeCompiled(
 ): void {
   // 提取导出的函数名
   const exportMatch = code.match(/export\s*\{\s*(\w+)\s*\}/)
-  if (!exportMatch) throw new Error('executeCompiled: no export found in code')
+  if (!exportMatch) {
+    throw new Error('executeCompiled: no export found in code')
+  }
   const mainName = exportMatch[1]
 
   // 移除 export 语句，添加 return
@@ -391,7 +393,7 @@ export function executeCompiled(
 
 export interface RunOptions extends TransformOptions, RuntimeOptions {}
 
-export function run(source: string, options: RunOptions = {}): RunState {
+export function runJs(source: string, options: RuntimeOptions): RunState {
   const debugLog: string[] = options.debugLog ?? []
   const ctx = createRuntimeContext({
     input: options.input,
@@ -402,20 +404,13 @@ export function run(source: string, options: RunOptions = {}): RunState {
     plugins: options.plugins,
     debugLog,
   })
-
   try {
-    // 编译
-    const jsCode = transform(source, {
-      programFileUrls: options.programFileUrls,
-      extensions: options.extensions,
-      plugins: options.plugins,
-    })
-    ctx.jsCode = jsCode
+    ctx.jsCode = source
     // __sys dispatcher
     const __sys = (key: string, args: unknown[]): unknown => dispatch(ctx, key, args)
 
     // 执行（ES module 代码）
-    executeCompiled(jsCode, __sys)
+    executeCompiled(source, __sys)
 
     return toRunState(ctx, 'terminated')
   } catch (e: unknown) {
@@ -433,4 +428,13 @@ export function run(source: string, options: RunOptions = {}): RunState {
     }
     return toRunState(ctx, 'error', error)
   }
+}
+
+export function run(source: string, options: RunOptions = {}): RunState {
+  const jsCode = transform(source, {
+    programFileUrls: options.programFileUrls,
+    extensions: options.extensions,
+    plugins: options.plugins,
+  })
+  return runJs(jsCode, options)
 }

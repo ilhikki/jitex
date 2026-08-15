@@ -41,7 +41,7 @@ const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
     assertEquals(result[0].pasFile, result[1].pasFile)
   })
 
-  stage('storeJs', [getTangleV3, valid], (results) => {
+  stage('storeJs', [getTangleV2, valid], (results) => {
     const tangleJs = transform(results[0].pasFile, {
       plugins: [pascalHPlugin],
     })

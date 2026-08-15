@@ -8,3 +8,7 @@ export function stringToBytes(str: string): Uint8Array {
 export function readTextFile(path: string): Promise<string> {
   return Deno.readTextFile(path)
 }
+
+export function readFile(path: string) {
+  return Deno.readFile(path)
+}

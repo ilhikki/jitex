@@ -9,7 +9,8 @@
     "strict": true
   },
   "tasks": {
-    "boot-tangle": "deno run -A ./integration/src/cli.ts run ./boot-tex/src/tangle/boot-tangle.ts"
+    "boot-tangle": "deno run -A ./integration/src/cli.ts run ./boot-tex/src/tangle/boot-tangle.ts",
+    "boot-tex": "deno run -A ./integration/src/cli.ts run ./boot-tex/src/tex/boot-tex.ts"
   },
   "lint": {
     "rules": {

@@ -1,7 +1,7 @@
 import { bytesToString, stringToBytes } from '../utils.ts'
 import { pascalHPlugin } from '@jitex/pascal-to-js/src/compiler/plugins/pascal-h.plugin.ts'
-import { run } from '@jitex/pascal-to-js'
-import { assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
+import { runJs, RunState, transform } from '@jitex/pascal-to-js'
+import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
 // noinspection SpellCheckingInspection
 const fileNames = {
@@ -20,6 +20,33 @@ export type TangleOutput = {
   pasFile: string
   poolFile: Uint8Array
 }
+export type RunTangleResult = {
+  state: RunState
+  pasFile: string
+  poolFile: Uint8Array
+  debugLog: string[]
+}
+
+export function validRunTangleResult(result: RunTangleResult): TangleOutput {
+  const { state, pasFile, poolFile, debugLog } = result
+  log(`state.status = ${state.status}`)
+  log(`state.steps = ${state.steps}`)
+  if (state.jsCode) {
+    attachText('tangle.js', state.jsCode)
+  } else {
+    assert(false, 'miss tangle.js')
+  }
+  attachText('result.pas', pasFile)
+  attach('pool.bin', poolFile)
+  attachText('debugLog.log', debugLog.join('\n'))
+  assertEquals(state.status, 'terminated')
+  return { pasFile, poolFile }
+}
+
+export function runTanglePascal(tangleInput: TangleInput): TangleOutput {
+  const runTangleOutput = runTangle(tangleInput)
+  return validRunTangleResult(runTangleOutput)
+}
 
 export function createTangleStage<const T extends readonly Stage<unknown>[], R>(
   name: string,
@@ -28,22 +55,15 @@ export function createTangleStage<const T extends readonly Stage<unknown>[], R>(
 ): Stage<TangleOutput> {
   return stage(name, deps, (results) => {
     const tangleInput = fn(results)
-    const { state, pasFile, poolFile, debugLog } = runTangle(tangleInput)
-    log(`state.status = ${state.status}`)
-    log(`state.steps = ${state.steps}`)
-    if (state.jsCode) {
-      attachText('tangle.js', state.jsCode)
-    }
-    attachText('result.pas', pasFile)
-    attach('pool.bin', poolFile)
-    attachText('debugLog.log', debugLog.join('\n'))
-    assertEquals(state.status, 'terminated')
-    return { pasFile, poolFile }
+    return runTanglePascal(tangleInput)
   })
 }
 
-export function runTangle(input: TangleInput) {
-  const { tangleContent, webContent, changeContent } = input
+export function runTangleJs(
+  jsCode: string,
+  webContent: string,
+  changeContent: string | undefined = undefined,
+): RunTangleResult {
   const files = new Map<string, Uint8Array>()
   files.set(fileNames.webFile, stringToBytes(webContent))
   if (changeContent) {
@@ -54,15 +74,12 @@ export function runTangle(input: TangleInput) {
   files.set(fileNames.pool, new Uint8Array())
 
   const debugLog: string[] = []
-  const state = run(
-    tangleContent,
-    {
-      files,
-      maxSteps: 1e9,
-      debugLog,
-      plugins: [pascalHPlugin],
-    },
-  )
+  const state = runJs(jsCode, {
+    files,
+    maxSteps: 1e9,
+    debugLog,
+    plugins: [pascalHPlugin],
+  })
   const pasFile = bytesToString(files.get(fileNames.pascalFile)!)
   const poolFile = files.get(fileNames.pool)!
   return {
@@ -71,4 +88,12 @@ export function runTangle(input: TangleInput) {
     poolFile,
     debugLog,
   }
+}
+
+export function runTangle(input: TangleInput) {
+  const { tangleContent, webContent, changeContent } = input
+  const jsCode = transform(tangleContent, {
+    plugins: [pascalHPlugin],
+  })
+  return runTangleJs(jsCode, webContent, changeContent)
 }

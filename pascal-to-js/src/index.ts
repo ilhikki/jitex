@@ -31,7 +31,7 @@ export { nodeToCode } from './ast/printer.ts'
 // 编译与执行（IL 管线）
 // ==========================================================================
 
-export { executeCompiled, run, transform } from './compiler/transform.ts'
+export { executeCompiled, run, runJs, transform } from './compiler/transform.ts'
 export type { RunOptions, TransformOptions } from './compiler/transform.ts'
 export type { RunError, RunState } from './runtime/run-state.ts'
 export type { IlPlugin } from './compiler/plugin.ts'

@@ -7,8 +7,5 @@
     "@jitex/pascal-to-js/": "../pascal-to-js/",
     "@jitex/integration": "../integration/src/mod.ts",
     "@jitex/integration/": "../integration/"
-  },
-  "tasks": {
-    "check": "deno check mod.ts"
   }
 }
