@@ -578,28 +578,27 @@ const syscalls: Record<string, SyscallHandler> = {
   },
 }
 
-export function dispatch(ctx: RuntimeContext, key: string, args: unknown[]): unknown {
-  const handler = syscalls[key]
-  if (handler) {
-    return handler(ctx, args)
-  }
-  // 插件注入的 syscall（AGENTS.md 原则 A.7）
-  // key 格式：'plugin.{pluginName}.{procName}'
-  if (key.startsWith('plugin.')) {
-    const rest = key.slice('plugin.'.length) // '{pluginName}.{procName}'
-    const dotIdx = rest.indexOf('.')
-    if (dotIdx > 0) {
-      const pluginName = rest.slice(0, dotIdx)
-      const procName = rest.slice(dotIdx + 1)
-      for (const plugin of ctx.plugins) {
-        if (plugin.name === pluginName && plugin.syscalls?.[procName]) {
-          return plugin.syscalls[procName](ctx, args)
-        }
+function getDefaultSyscalls(): Record<string, SyscallHandler> {
+  return syscalls
+}
+
+export function createDispatcher(plugins: IlPlugin[]): (ctx: RuntimeContext, key: string, args: unknown[]) => unknown {
+  const syscalls = { ...getDefaultSyscalls() }
+  for (const plugin of plugins) {
+    const pluginName = plugin.name
+    for (const [name, fn] of Object.entries(plugin.syscalls ?? {})) {
+      if (fn) {
+        syscalls[`plugin.${pluginName}.${name}`] = fn
       }
-      throw new Error(`Plugin '${pluginName}' does not provide syscall '${procName}'`)
     }
   }
-  throw new Error(`Unknown syscall: ${key}`)
+  return (ctx, key, args) => {
+    const fn = syscalls[key]
+    if (fn) {
+      return fn(ctx, args)
+    }
+    throw new Error(`Unknown syscall: ${key}`)
+  }
 }
 
 // ============================================================

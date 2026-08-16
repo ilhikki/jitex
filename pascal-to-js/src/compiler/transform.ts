@@ -27,7 +27,13 @@ import { compileProgram } from './compiler.ts'
 import { toJs } from './json-code-compiler.ts'
 import * as JsonCode from './json-code.ts'
 import type { RunError, RunState } from '../runtime/run-state.ts'
-import { createRuntimeContext, dispatch, type RuntimeContext, type RuntimeOptions, toRunState } from './runtime.ts'
+import {
+  createDispatcher,
+  createRuntimeContext,
+  type RuntimeContext,
+  type RuntimeOptions,
+  toRunState,
+} from './runtime.ts'
 import type { IlPlugin } from './plugin.ts'
 import { PascalSemanticCompiler } from './sys/pascal-semantic-compiler.ts'
 
@@ -220,7 +226,8 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
   try {
     ctx.jsCode = source
     // __sys dispatcher
-    const __sys = (key: string, args: unknown[]): unknown => dispatch(ctx, key, args)
+    const dispatcher = createDispatcher(options.plugins ?? [])
+    const __sys = (key: string, args: unknown[]): unknown => dispatcher(ctx, key, args)
 
     // 执行（ES module 代码）
     executeCompiled(source, __sys)
