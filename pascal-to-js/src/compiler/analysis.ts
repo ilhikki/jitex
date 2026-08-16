@@ -29,6 +29,7 @@ import {
   TypeNode,
   WithStatementNode,
 } from '../ast/types.ts'
+import { findFunctionPlugin, findProcedurePlugin } from './plugin.ts'
 import type { IlPlugin } from './plugin.ts'
 
 // ============================================================
@@ -87,6 +88,52 @@ const SIMPLE_TYPES: Record<string, TypeInfo> = {
   string: { tag: 'str' },
   text: { tag: 'file', fileElem: { tag: 'char' } },
 }
+
+// ============================================================
+// 内置过程/函数名
+// 与 compiler.ts 的 compileProcedureCall / compileFunctionCall /
+// compileIdentifier 保持一致：这些名字不需要用户定义即可调用。
+// ============================================================
+
+/** 内置过程名（compileProcedureCall 支持；ISO 7185 6.6.5 标准过程 + runtime 扩展） */
+const BUILTIN_PROCEDURES = new Set([
+  'writeln',
+  'write',
+  'readln',
+  'read',
+  'reset',
+  'rewrite',
+  'get',
+  'put',
+  'page',
+  'new',
+  'dispose',
+])
+
+/** 内置函数名（compileFunctionCall 支持；ISO 7185 6.6.6 标准函数 + runtime 扩展） */
+const BUILTIN_FUNCTIONS = new Set([
+  'abs',
+  'sqr',
+  'sqrt',
+  'sin',
+  'cos',
+  'exp',
+  'ln',
+  'arctan',
+  'trunc',
+  'round',
+  'ord',
+  'chr',
+  'pred',
+  'succ',
+  'odd',
+  'length',
+  'eof',
+  'eoln',
+])
+
+/** 内置无参标识符（parser 将无括号调用解析为 Identifier，compileIdentifier 处理） */
+const BUILTIN_IDENTIFIERS = new Set(['maxint', 'nil', 'eof', 'eoln'])
 
 // ============================================================
 // 符号
@@ -170,7 +217,7 @@ export class Analyzer {
   /** 非标特性扩展（AGENTS.md 原则 A） */
   private extensions: Set<string> = new Set()
   /** 编译期注入的非标特性插件（AGENTS.md 原则 A.7） */
-  private plugins_: IlPlugin[] | undefined
+  private plugins: IlPlugin[] | undefined
   /** 非透明块深度（while/for/if/repeat/case/with 体内部） */
   private nonTransparentDepth = 0
   /** label 出现的非透明块深度（key: labelId，全局唯一） */
@@ -190,7 +237,7 @@ export class Analyzer {
 
   analyze(program: ProgramNode, extensions?: string[], plugins?: IlPlugin[]): Analysis {
     if (extensions) this.extensions = new Set(extensions)
-    this.plugins_ = plugins
+    this.plugins = plugins
     const topFuncId = this.allocFunc(program.block, null, 'program', null)
 
     this.pushScope(topFuncId)
@@ -200,6 +247,8 @@ export class Analyzer {
 
     // post-check：所有 labelDepth 已收集完毕，现在检查 goto 规则
     this.checkGotos()
+    // 独立检查阶段：一次性报告所有无定义引用（ISO 7185 6.2.1）
+    this.checkUndefinedRefs()
 
     return this.freeze()
   }
@@ -708,6 +757,53 @@ export class Analyzer {
     return false
   }
 
+  // --------------------------------------------------------
+  // 无定义引用检查（ISO 7185: 标识符须先声明后使用）
+  //
+  // 分析遍历阶段只收集（recordUndefinedRef），不在遍历中抛错；
+  // 遍历结束后由独立的 checkUndefinedRefs() 一次性报告全部无定义引用。
+  // --------------------------------------------------------
+
+  /** 收集到的无定义引用（kind + 小写名 去重） */
+  private undefinedRefs: { kind: 'procedure' | 'function' | 'identifier'; name: string }[] = []
+
+  /** 记录一条无定义引用 */
+  private recordUndefinedRef(
+    kind: 'procedure' | 'function' | 'identifier',
+    name: string,
+  ): void {
+    const lower = name.toLowerCase()
+    if (!this.undefinedRefs.some((r) => r.kind === kind && r.name.toLowerCase() === lower)) {
+      this.undefinedRefs.push({ kind, name })
+    }
+  }
+
+  /** 独立检查阶段：一次性报告所有无定义引用 */
+  private checkUndefinedRefs(): void {
+    if (this.undefinedRefs.length === 0) return
+    const lines = this.undefinedRefs.map((r) => {
+      switch (r.kind) {
+        case 'procedure':
+          return `unknown procedure ${r.name}`
+        case 'function':
+          return `unknown function ${r.name}`
+        case 'identifier':
+          return `undefined identifier ${r.name}`
+      }
+    })
+    throw new Error(`Undefined reference(s):\n${lines.join('\n')}`)
+  }
+
+  /** 是否插件注入的过程（AGENTS.md 原则 A.7） */
+  private hasPluginProcedure(name: string): boolean {
+    return findProcedurePlugin(this.plugins, name) !== undefined
+  }
+
+  /** 是否插件注入的函数（AGENTS.md 原则 A.7） */
+  private hasPluginFunction(name: string): boolean {
+    return findFunctionPlugin(this.plugins, name) !== undefined
+  }
+
   private declareProcName(decl: ProcedureDeclarationNode): void {
     const parentFuncId = this.currentScope().funcId
     const declNameLower = decl.name.name.toLowerCase()
@@ -953,6 +1049,14 @@ export class Analyzer {
       case 'ProcedureCall': {
         const sym = this.lookup(node.name.name)
         this.symbolCache.set(node.name, sym)
+        // 过程调用无定义：收集（不在此抛错，统一在独立检查阶段报全部）
+        if (
+          !sym &&
+          !BUILTIN_PROCEDURES.has(node.name.name.toLowerCase()) &&
+          !this.hasPluginProcedure(node.name.name)
+        ) {
+          this.recordUndefinedRef('procedure', node.name.name)
+        }
         for (const a of node.arguments) this.analyzeExpr(a)
         return
       }
@@ -1006,6 +1110,10 @@ export class Analyzer {
 
         const sym = this.lookup(node.name)
         this.symbolCache.set(node, sym)
+        // 变量/无参函数引用无定义：收集（with 字段已在上方处理，内置无参标识符合法）
+        if (!sym && !BUILTIN_IDENTIFIERS.has(node.name.toLowerCase())) {
+          this.recordUndefinedRef('identifier', node.name)
+        }
         if (sym?.kind === 'var' || sym?.kind === 'param') {
           info = sym.typeInfo
         } else if (sym?.kind === 'const') {
@@ -1069,6 +1177,14 @@ export class Analyzer {
       case 'FunctionCall': {
         const sym = this.lookup(node.name.name)
         this.symbolCache.set(node.name, sym)
+        // 函数调用无定义：收集（不在此抛错，统一在独立检查阶段报全部）
+        if (
+          !sym &&
+          !BUILTIN_FUNCTIONS.has(node.name.name.toLowerCase()) &&
+          !this.hasPluginFunction(node.name.name)
+        ) {
+          this.recordUndefinedRef('function', node.name.name)
+        }
         for (const a of node.arguments) this.analyzeExpr(a)
         if (sym?.kind === 'func') {
           info = sym.retTypeInfo ?? { tag: 'unknown' }
@@ -1242,7 +1358,7 @@ export class Analyzer {
         return new Map(this.idNames)
       },
       plugins: () => {
-        return this.plugins_
+        return this.plugins
       },
     }
   }

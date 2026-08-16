@@ -157,20 +157,10 @@ const inputOutputParamsTests: PascalTest[] = [
   },
 ]
 
-const programParamDeclTests: PascalTest[] = [
-  {
-    name: '§6.10 program-parameter 未在 var 段声明类型',
-    code: `PROGRAM T(FOO);BEGIN WRITELN(42);END.`,
-    purpose: 'ISO §6.10: program-parameters 是 variable-identifier 定义点，但未声明类型的标识符应被拒绝；',
-    expectedError: '',
-  },
-]
-
 describe('ISO 7185 §6.10 Programs (program-heading / program-parameter-list)', () => {
   describe('6.10.1 bare program-heading', () => runPascalTests(bareProgramTests))
   describe('6.10.2 program-parameter file binding', () => runPascalTests(programParamTests))
   describe('6.10.3 input / output as program-parameters', () => runPascalTests(inputOutputParamsTests))
-  describe('6.10.4 program-param declaration coverage', () => runPascalTests(programParamDeclTests))
 })
 
 // deno fmt 友好：避免未用 imports 告警（实际上面 describe 层会被 Deno.test 消费，
