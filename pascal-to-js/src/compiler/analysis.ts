@@ -122,6 +122,9 @@ export type Symbol = VarSymbol | FuncSymbol | ConstSymbol | TypeSymbol
 // 函数信息
 // ============================================================
 
+/** 函数/过程/程序的分类，用于决定编译期与运行期的初始化策略 */
+export type FuncKind = 'function' | 'procedure' | 'program'
+
 export interface FuncInfo {
   funcId: number
   parentFuncId: number | null
@@ -130,7 +133,7 @@ export interface FuncInfo {
   retval?: VarSymbol
   children: number[]
   hasBody: boolean
-  isFunction: boolean
+  kind: FuncKind
 }
 
 // ============================================================
@@ -188,7 +191,7 @@ export class Analyzer {
   analyze(program: ProgramNode, extensions?: string[], plugins?: IlPlugin[]): Analysis {
     if (extensions) this.extensions = new Set(extensions)
     this.plugins_ = plugins
-    const topFuncId = this.allocFunc(program.block, null, false, null)
+    const topFuncId = this.allocFunc(program.block, null, 'program', null)
 
     this.pushScope(topFuncId)
     this.analyzeBlock(program.block, topFuncId)
@@ -286,7 +289,7 @@ export class Analyzer {
   private allocFunc(
     block: BlockNode | null,
     decl: ProcedureDeclarationNode | FunctionDeclarationNode | null,
-    isFunction: boolean,
+    kind: FuncKind,
     parentFuncId: number | null,
   ): number {
     const funcId = this.allocId()
@@ -302,7 +305,7 @@ export class Analyzer {
       locals: [],
       children: [],
       hasBody: block !== null,
-      isFunction,
+      kind,
     }
     this.funcInfos.set(funcId, info)
     if (parentFuncId !== null) {
@@ -710,7 +713,7 @@ export class Analyzer {
     const declNameLower = decl.name.name.toLowerCase()
     let funcId = this.forwardFuncs.get(declNameLower)
     if (funcId === undefined) {
-      funcId = this.allocFunc(decl.block, decl, false, parentFuncId)
+      funcId = this.allocFunc(decl.block, decl, 'procedure', parentFuncId)
     } else {
       this.declFunc.set(decl, funcId)
       if (decl.block) this.blockFunc.set(decl.block, funcId)
@@ -740,7 +743,7 @@ export class Analyzer {
     const declNameLower = decl.name.name.toLowerCase()
     let funcId = this.forwardFuncs.get(declNameLower)
     if (funcId === undefined) {
-      funcId = this.allocFunc(decl.block, decl, true, parentFuncId)
+      funcId = this.allocFunc(decl.block, decl, 'function', parentFuncId)
     } else {
       this.declFunc.set(decl, funcId)
       if (decl.block) this.blockFunc.set(decl.block, funcId)

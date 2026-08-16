@@ -219,7 +219,7 @@ function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
 // ============================================================
 
 export function compileProgram(program: ProgramNode, a: Analysis): JsonCode.Function {
-  return compileBlock(program.block, a)
+  return compileBlock(program.block, a, program.parameters)
 }
 
 // ============================================================
@@ -229,6 +229,7 @@ export function compileProgram(program: ProgramNode, a: Analysis): JsonCode.Func
 function compileBlock(
   block: BlockNode,
   analysis: Analysis,
+  programParams?: IdentifierNode[],
 ): JsonCode.Function {
   const funcId = analysis.funcOfBlock(block)
   const info = analysis.funcInfo(funcId)
@@ -273,15 +274,32 @@ function compileBlock(
   const body: JsonCode.Statement[] = []
 
   // 变量初始化
-  // 注意：记录此时 info.locals.length，因为编译 compound 语句时
-  // allocTempLocal 会向 info.locals 追加 cell 临时变量，
-  // 导致 applyProgramFileUrls 中 initCount 计算偏大。
-  const initCount = info.locals.length + (info.retval ? 1 : 0)
   for (const local of info.locals) {
     body.push(assignStmt(ref(local.varId), defaultExpr(local.typeInfo)))
   }
   if (info.retval) {
     body.push(assignStmt(ref(info.retval.varId), defaultExpr(info.retval.typeInfo)))
+  }
+
+  // program 头的文件参数初始化（ISO 7185 6.10）：
+  // PROGRAM X(INFILE, OUTFILE); 中声明的参数必须在算法开始前绑定到外部文件。
+  // 本工程在运行时用 ctx.programFileUrls 做映射（缺省为恒等映射），
+  // 通过 program.fileUrl syscall 取 url，再 file.assign 把 url 写入文件变量。
+  if (info.kind === 'program' && programParams && programParams.length > 0) {
+    for (const p of programParams) {
+      const sym = analysis.globalSymbolOf(p.name)
+      if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
+        const varSym = sym as { varId: number }
+        body.push(
+          evalStmt(
+            syscall('file.assign', [
+              ref(varSym.varId),
+              syscall('program.fileUrl', [litStr(p.name)]),
+            ]),
+          ),
+        )
+      }
+    }
   }
 
   // compound 语句
@@ -302,7 +320,6 @@ function compileBlock(
     locals,
     children,
     body,
-    initCount,
   }
 }
 

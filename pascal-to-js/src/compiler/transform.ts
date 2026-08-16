@@ -10,9 +10,11 @@
  *   1. parse：Pascal 源码 → AST
  *   2. analyze：AST → Analysis
  *   3. compile：AST + Analysis → JsonCode
- *   4. 后处理 JsonCode：插入 programFileUrls 的 file.assign
- *   5. toJs：JsonCode → JS 代码字符串（通过 SemanticCompiler 实现）
- *   6. 包装：返回 ES module 代码（export）
+ *      （program 头文件参数的 file.assign 由 compileBlock 统一插入，
+ *       url 通过 program.fileUrl syscall 在运行时从 ctx.programFileUrls 查表，
+ *       不在编译期烧死具体 url。）
+ *   4. toJs：JsonCode → JS 代码字符串（通过 SemanticCompiler 实现）
+ *   5. 包装：返回 ES module 代码（export）
  *
  * SemanticCompiler 实现（决策 6）：
  *   - literalToJs：i64/f64/str/char/bool → JS 字面量
@@ -21,11 +23,10 @@
 
 import { lex } from '../lexer/lexer.ts'
 import { parseProgram } from '../parser/declarations.ts'
-import type { ParserInput, ProgramNode } from '../ast/types.ts'
-import { type Analysis, analyzeProgram, type VarSymbol } from './analysis.ts'
+import type { ProgramNode } from '../ast/types.ts'
+import { analyzeProgram } from './analysis.ts'
 import { compileProgram } from './compiler.ts'
 import { toJs } from './json-code-compiler.ts'
-import * as JsonCode from './json-code.ts'
 import type { RunError, RunState } from '@/runtime/run-state.ts'
 import { createDispatcher, createRuntimeContext, toRunState } from '@/runtime/runtime.ts'
 import type { RuntimeContext, RuntimeOptions } from '@/runtime/runtime-type.ts'
@@ -37,9 +38,6 @@ import { PascalSemanticCompiler } from '@/runtime/sys/pascal-semantic-compiler.t
 // ============================================================
 
 export interface TransformOptions {
-  /** 程序文件变量名 → files 中的键名（用于 ASSIGN）。
-   * 缺省时按恒等映射处理：程序文件参数名即 files 键名（key === value）。 */
-  programFileUrls?: Record<string, string>
   /** 非标特性扩展（传递给 analysis 做语义检查） */
   extensions?: string[]
   /** 非标特性插件（AGENTS.md 原则 A.7：注入优先） */
@@ -52,67 +50,12 @@ export interface TransformOptions {
 
 function parseSource(source: string): ProgramNode {
   const tokens = lex(source)
-  const input: ParserInput = { tokens, position: 0 }
+  const input: any = { tokens, position: 0 }
   const result = parseProgram(input)
   if (!result.success) {
     throw new Error(`Parse error: ${result.error}`)
   }
   return result.astNode as ProgramNode
-}
-
-// ============================================================
-// applyProgramFileUrls：在变量初始化之后插入 file.assign
-// ============================================================
-
-function applyProgramFileUrls(
-  fn: JsonCode.Function,
-  a: Analysis,
-  programFileUrls: Record<string, string> | undefined,
-  programParams: ProgramNode['parameters'],
-): JsonCode.Function {
-  // programFileUrls 缺省时使用恒等映射（key === value）：
-  // 程序文件参数名直接作为 files 键名（如 WEBFILE → 'WEBFILE'），
-  // 调用方只需把文件放入 files 即可（boot-tangle 正是此用法）。
-  const mapping = programFileUrls ??
-    Object.fromEntries(programParams.map((p) => [p.name, p.name]))
-  if (Object.keys(mapping).length === 0) {
-    return fn
-  }
-
-  const preamble: JsonCode.Statement[] = []
-  for (const [varName, url] of Object.entries(mapping)) {
-    const sym = a.globalSymbolOf(varName)
-    if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
-      const varSym = sym as VarSymbol
-      preamble.push({
-        kind: 'eval',
-        expr: {
-          kind: 'syscall',
-          key: 'file.assign',
-          args: [
-            { kind: 'ref', varId: varSym.varId },
-            { kind: 'literal', key: 'str', arg: url },
-          ],
-        },
-      })
-    }
-  }
-
-  if (preamble.length === 0) {
-    return fn
-  }
-
-  // bug 22 修复：file.assign 必须在变量初始化之后执行，
-  // 否则文件变量还未被 mem.default/file.create 初始化（为 undefined），
-  // 导致 args[0].url = ... 报 "Cannot set properties of undefined"。
-  // 使用 compileBlock 记录的 initCount，而非 info.locals.length，
-  // 因为编译阶段 allocTempLocal 会向 info.locals 追加 cell 临时变量。
-  const initCount = fn.initCount ?? 0
-
-  return {
-    ...fn,
-    body: [...fn.body.slice(0, initCount), ...preamble, ...fn.body.slice(initCount)],
-  }
 }
 
 /**
@@ -133,19 +76,16 @@ export function transform(source: string, options: TransformOptions = {}): strin
   const analysis = analyzeProgram(ast, options.extensions, options.plugins)
 
   // 3. compile
-  let jsonCode = compileProgram(ast, analysis)
+  const jsonCode = compileProgram(ast, analysis)
 
-  // 4. 后处理：插入 programFileUrls 的 file.assign
-  jsonCode = applyProgramFileUrls(jsonCode, analysis, options.programFileUrls, ast.parameters)
-
-  // 5. toJs（始终携带可读变量名）
+  // 4. toJs
   const semantic = new PascalSemanticCompiler()
   const { code: jsBody, mainName } = toJs(jsonCode, {
     semantic,
     debugNames: analysis.debugNames(),
   })
 
-  // 6. 包装为 ES module
+  // 5. 包装为 ES module
   return `${jsBody}\nexport { ${mainName} };`
 }
 
@@ -237,7 +177,6 @@ export function run(source: string, options: RunOptions = {}): RunState {
   let jsCode
   try {
     jsCode = transform(source, {
-      programFileUrls: options.programFileUrls,
       extensions: options.extensions,
       plugins: options.plugins,
     })

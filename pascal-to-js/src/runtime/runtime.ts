@@ -168,6 +168,19 @@ function basicSyscall(): Record<string, SyscallHandler> {
       }
       return undefined
     },
+
+    // ---------- program（program 头文件参数运行期查表）----------
+    // PROGRAM X(INFILE, OUTFILE); 的参数在编译期无法确定 url，
+    // 编译产物只烧参数名，运行时通过 ctx.programFileUrls 查表。
+    // 缺省为恒等映射（程序参数名即 files 键名）。
+    'program.fileUrl': (ctx, [name]) => {
+      const key = String(name ?? '').toLowerCase()
+      // 大小写不敏感的精确匹配（Pascal 标识符大小写不敏感）
+      for (const [k, v] of Object.entries(ctx.programFileUrls)) {
+        if (k.toLowerCase() === key) return v
+      }
+      return String(name ?? '')
+    },
   }
 }
 
