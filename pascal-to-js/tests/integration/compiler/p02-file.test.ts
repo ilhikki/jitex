@@ -45,7 +45,8 @@ describe('M5 JS - File Model (async) — ISO 7185 compliant', () => {
 
     {
       name: 'RESET 空文件 EOF 立即为真',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('NOT EMPTY');END.`,
+      code:
+        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('NOT EMPTY');END.`,
       purpose: '空文件 RESET 后 EOF 为真',
       files: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
       expectedContains: 'EMPTY',
@@ -53,7 +54,8 @@ describe('M5 JS - File Model (async) — ISO 7185 compliant', () => {
 
     {
       name: 'RESET 非空文件 EOF 为假',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('HAS DATA');END.`,
+      code:
+        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('HAS DATA');END.`,
       purpose: '非空文件 RESET 后 EOF 为假',
       files: new Map<string, Uint8Array>([['F', text('hello')]]),
       expectedContains: 'HAS DATA',
@@ -65,7 +67,8 @@ describe('M5 JS - File Model (async) — ISO 7185 compliant', () => {
 
     {
       name: 'F^ 读首字符 + GET 推进',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);CH:=F^;WRITE(CH);GET(F);CH:=F^;WRITE(CH);WRITELN;END.`,
+      code:
+        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);CH:=F^;WRITE(CH);GET(F);CH:=F^;WRITE(CH);WRITELN;END.`,
       purpose: 'F^ 读缓冲区字符，GET 推进 offset（tangle INPUTLN 风格）',
       files: new Map<string, Uint8Array>([['F', text('AB')]]),
       expectedContains: 'AB',
@@ -73,7 +76,8 @@ describe('M5 JS - File Model (async) — ISO 7185 compliant', () => {
 
     {
       name: 'INPUTLN 风格逐字符循环',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);WHILE NOT EOLN(F)DO BEGIN CH:=F^;WRITE(CH);GET(F);END;WRITELN;END.`,
+      code:
+        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);WHILE NOT EOLN(F)DO BEGIN CH:=F^;WRITE(CH);GET(F);END;WRITELN;END.`,
       purpose: 'WHILE NOT EOLN(F) DO BEGIN CH:=F^;WRITE(CH);GET(F) END',
       files: new Map<string, Uint8Array>([['F', text('HELLO\n')]]),
       expectedContains: 'HELLO',
@@ -85,7 +89,8 @@ describe('M5 JS - File Model (async) — ISO 7185 compliant', () => {
 
     {
       name: 'EOLN 在行尾返回真',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITELN('AT EOLN');END.`,
+      code:
+        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITELN('AT EOLN');END.`,
       purpose: 'GET 推进到行尾时 EOLN 返回真',
       files: new Map<string, Uint8Array>([['F', text('AB\n')]]),
       expectedContains: 'AT EOLN',
@@ -125,7 +130,8 @@ describe('M5 JS - File Model (async) — ISO 7185 compliant', () => {
 
     {
       name: '文件复制：INFILE → OUTFILE',
-      code: `PROGRAM COPYFILE(OUTPUT,INFILE,OUTFILE);VAR INFILE,OUTFILE:TEXT;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN WHILE NOT EOLN(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;WRITELN(OUTFILE);READLN(INFILE);END;END.`,
+      code:
+        `PROGRAM COPYFILE(OUTPUT,INFILE,OUTFILE);VAR INFILE,OUTFILE:TEXT;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN WHILE NOT EOLN(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;WRITELN(OUTFILE);READLN(INFILE);END;END.`,
       purpose: '通过 PROGRAM 头声明文件参数，逐字符复制',
       files: new Map<string, Uint8Array>([
         ['INFILE', text('LINE1\nLINE2\n')],
@@ -137,7 +143,8 @@ describe('M5 JS - File Model (async) — ISO 7185 compliant', () => {
 
     {
       name: '文件复制：无 programFileUrls，默认恒等映射（key === value）',
-      code: `PROGRAM COPYFILE(OUTPUT,INFILE,OUTFILE);VAR INFILE,OUTFILE:TEXT;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;END.`,
+      code:
+        `PROGRAM COPYFILE(OUTPUT,INFILE,OUTFILE);VAR INFILE,OUTFILE:TEXT;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;END.`,
       purpose: '缺省 programFileUrls 时，程序文件参数名即 files 键名',
       files: new Map<string, Uint8Array>([
         ['INFILE', text('LINE1\nLINE2\n')],

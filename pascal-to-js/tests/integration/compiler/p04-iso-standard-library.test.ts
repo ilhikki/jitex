@@ -118,21 +118,24 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
 
     {
       name: '6.6.5.3 new(p): 正向 - new 后 p 不等于 nil',
-      code: `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN NEW(P);IF P<>NIL THEN WRITE('NOTNIL')ELSE WRITE('NIL');DISPOSE(P);END.`,
+      code:
+        `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN NEW(P);IF P<>NIL THEN WRITE('NOTNIL')ELSE WRITE('NIL');DISPOSE(P);END.`,
       purpose: 'ISO 6.6.5.3 new(p) 后 p 是 identifying‑value，非 nil',
       expectedContains: 'NOTNIL',
     },
 
     {
       name: '6.6.5.3 nil 比较: 正向 - 未初始化指针等于 nil',
-      code: `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN IF P=NIL THEN WRITE('NIL')ELSE WRITE('NOTNIL');END.`,
+      code:
+        `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN IF P=NIL THEN WRITE('NIL')ELSE WRITE('NOTNIL');END.`,
       purpose: 'ISO 6.4.4: 指针变量默认为 nil‑value',
       expectedContains: 'NIL',
     },
 
     {
       name: '6.6.5.3 new/record: 正向 - 指向记录的指针',
-      code: `PROGRAM TEST(OUTPUT);TYPE RPTR=^REC;REC=RECORD X:INTEGER;Y:INTEGER END;VAR P:RPTR;BEGIN NEW(P);P^.X:=10;P^.Y:=20;WRITE(P^.X+P^.Y);DISPOSE(P);END.`,
+      code:
+        `PROGRAM TEST(OUTPUT);TYPE RPTR=^REC;REC=RECORD X:INTEGER;Y:INTEGER END;VAR P:RPTR;BEGIN NEW(P);P^.X:=10;P^.Y:=20;WRITE(P^.X+P^.Y);DISPOSE(P);END.`,
       purpose: 'ISO 6.6.5.3 new(p) 对记录类型',
       expectedContains: '30',
     },
@@ -393,7 +396,8 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
 
     {
       name: '6.6.6.5 eoln(f): 正向 - 行结束检测',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITE('EOLN');END.`,
+      code:
+        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITE('EOLN');END.`,
       purpose: 'ISO 6.6.6.5 eoln(f): "true if f^ is end‑of‑line or end‑of‑file"',
       files: new Map<string, Uint8Array>([['F', text('AB\n')]]),
       expectedContains: 'EOLN',

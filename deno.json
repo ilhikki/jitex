@@ -4,7 +4,6 @@
     "./integration",
     "./boot-tex"
   ],
-  "unstable": ["sloppy-imports"],
   "compilerOptions": {
     "strict": true
   },
