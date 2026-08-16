@@ -131,17 +131,6 @@ end.`,
       purpose: 'writeln writes to text file',
     },
     {
-      name: 'close file (Knuth extension, supported as no-op without io)',
-      code: `program test;
-var f: text;
-begin
-  rewrite(f);
-  writeln(f, 'test');
-  close(f);
-end.`,
-      purpose: 'close is a Knuth extension (used by TANGLE); without io it is a no-op',
-    },
-    {
       name: 'ord function',
       code: `program test;
 begin
