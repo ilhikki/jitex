@@ -27,7 +27,7 @@ import { compileProgram } from './compiler.ts'
 import { type JsCompiler, type SemanticCompiler, toJs } from './json-code-compiler.ts'
 import * as JsonCode from './json-code.ts'
 import type { RunError, RunState } from '../runtime/run-state.ts'
-import { createRuntimeContext, dispatch, type RuntimeOptions, toRunState } from './runtime.ts'
+import { createRuntimeContext, dispatch, type RuntimeContext, type RuntimeOptions, toRunState } from './runtime.ts'
 import type { IlPlugin } from './plugin.ts'
 
 // ============================================================
@@ -393,8 +393,23 @@ export function executeCompiled(
 
 export interface RunOptions extends TransformOptions, RuntimeOptions {}
 
-export function runJs(source: string, options: RuntimeOptions): RunState {
-  const debugLog: string[] = options.debugLog ?? []
+function reportErrorAsState(e: unknown, ctx: RuntimeContext) {
+  const err = e as { message?: string; stack?: string } | null | undefined
+  // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
+  const stackLines: string[] = err?.stack ? String(err.stack).split('\n').slice(0, 40) : []
+  // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看
+  ctx.debugLog.push(`[run] error: ${err?.message || String(e)}`)
+  for (const line of stackLines) {
+    ctx.debugLog.push(`  ${line}`)
+  }
+  const error: RunError = {
+    message: err?.message || String(e),
+    stackTrace: stackLines,
+  }
+  return toRunState(ctx, 'error', error)
+}
+
+function getRunTimeContexFromOptions(options: RuntimeOptions) {
   const ctx = createRuntimeContext({
     input: options.input,
     files: options.files,
@@ -402,8 +417,13 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
     maxSteps: options.maxSteps,
     extensions: options.extensions,
     plugins: options.plugins,
-    debugLog,
+    debugLog: options.debugLog ?? [],
   })
+  return ctx
+}
+
+export function runJs(source: string, options: RuntimeOptions): RunState {
+  const ctx = getRunTimeContexFromOptions(options)
   try {
     ctx.jsCode = source
     // __sys dispatcher
@@ -414,27 +434,22 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
 
     return toRunState(ctx, 'terminated')
   } catch (e: unknown) {
-    const err = e as { message?: string; stack?: string } | null | undefined
-    // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
-    const stackLines: string[] = err?.stack ? String(err.stack).split('\n').slice(0, 40) : []
-    // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看
-    debugLog.push(`[run] error: ${err?.message || String(e)}`)
-    for (const line of stackLines) {
-      debugLog.push(`  ${line}`)
-    }
-    const error: RunError = {
-      message: err?.message || String(e),
-      stackTrace: stackLines,
-    }
-    return toRunState(ctx, 'error', error)
+    return reportErrorAsState(e, ctx)
   }
 }
 
 export function run(source: string, options: RunOptions = {}): RunState {
-  const jsCode = transform(source, {
-    programFileUrls: options.programFileUrls,
-    extensions: options.extensions,
-    plugins: options.plugins,
-  })
+  let jsCode
+  try {
+    jsCode = transform(source, {
+      programFileUrls: options.programFileUrls,
+      extensions: options.extensions,
+      plugins: options.plugins,
+    })
+  } catch (e: unknown) {
+    const ctx = getRunTimeContexFromOptions(options)
+    return reportErrorAsState(e, ctx)
+  }
+
   return runJs(jsCode, options)
 }
