@@ -50,7 +50,7 @@ export interface TransformOptions {
 
 function parseSource(source: string): ProgramNode {
   const tokens = lex(source)
-  const input: any = { tokens, position: 0 }
+  const input = { tokens, position: 0 }
   const result = parseProgram(input)
   if (!result.success) {
     throw new Error(`Parse error: ${result.error}`)

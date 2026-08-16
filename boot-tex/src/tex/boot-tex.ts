@@ -1,6 +1,5 @@
 import { attach, attachText, cache, log, stage, suite } from '@jitex/integration'
-import { runJs, transform } from '@jitex/pascal-to-js'
-import { pascalHPlugin } from '@jitex/pascal-to-js/src/compiler/plugins/pascal-h.plugin.ts'
+import { pascalHPlugin, runJs, transform } from '@jitex/pascal-to-js'
 import { runTangleJs, runTanglePascal, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { readFile, readTextFile, stringToBytes } from '../utils.ts'
 

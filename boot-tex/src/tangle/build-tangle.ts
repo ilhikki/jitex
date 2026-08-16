@@ -1,5 +1,5 @@
 import { bytesToString, stringToBytes } from '../utils.ts'
-import { pascalHPlugin } from '@jitex/pascal-to-js/src/compiler/plugins/pascal-h.plugin.ts'
+import { pascalHPlugin } from '@jitex/pascal-to-js'
 import { runJs, RunState, transform } from '@jitex/pascal-to-js'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 

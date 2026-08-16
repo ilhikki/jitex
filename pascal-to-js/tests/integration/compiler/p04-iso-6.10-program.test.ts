@@ -10,7 +10,7 @@
 //   required identifiers input/output 作为 program-parameter 列出时，在首次访问前
 //   分别处于 reset（input）和 rewrite（output）状态。
 
-import { assertEquals, describe, it, PascalTest, runPascalTests, test } from './_helper.ts'
+import { assertEquals, describe, PascalTest, runPascalTests } from './_helper.ts'
 
 function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)

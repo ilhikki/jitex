@@ -173,7 +173,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 
     'file.peek': (ctx, [file]) => peekFile(ctx, file as PascalFile),
 
-    'file.eof': (ctx, [file]) => {
+    'file.eof': (_ctx, [file]) => {
       if (!file) throw new Error('file.eof: file is undefined')
       return (file as PascalFile).eof
     },
