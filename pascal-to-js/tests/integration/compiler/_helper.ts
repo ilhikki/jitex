@@ -155,10 +155,10 @@ export function runPascalTest(t: PascalTest): void {
     )
   }
 
-  // 4. 文件内容断言
+  // 4. 文件内容断言（运行结果在 state.files；输入 files 不再被原地修改）
   if (t.expectedFileContains && t.files) {
     for (const exp of t.expectedFileContains) {
-      const bytes = t.files.get(exp.url)
+      const bytes = state.files.get(exp.url)
       const text = bytes ? new TextDecoder().decode(bytes) : ''
       assert(
         text.includes(exp.contains),

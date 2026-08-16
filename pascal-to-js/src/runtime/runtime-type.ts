@@ -16,6 +16,16 @@ export interface TypeDescriptor {
 
 // 注：文件状态作为 PascalFile 句柄的一部分（见 file-model.ts），不再放在 ctx 中。
 
+/** 可增长的字节缓冲（文件内容）。
+ *  data.length 即容量（limit），length 为已用字节数；容量不足时翻倍扩容。
+ *  工具函数见 runtime-util.ts（createFileBuffer / appendFileBytes / fileBufferView）。 */
+export interface FileBuffer {
+  /** 底层存储；data.length 即容量（limit） */
+  data: Uint8Array
+  /** 已用字节数 */
+  length: number
+}
+
 // ============================================================
 // 读取状态（维护当前行 tokens）
 // ============================================================
@@ -28,7 +38,7 @@ export interface ReadState {
 export interface RuntimeContext {
   outputBuffer: string[]
   inputQueue: string[]
-  files: Map<string, Uint8Array>
+  files: Map<string, FileBuffer>
   readState: ReadState
   steps: number
   maxSteps: number

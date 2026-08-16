@@ -80,8 +80,8 @@ export function runTangleJs(
     debugLog,
     plugins: [pascalHPlugin],
   })
-  const pasFile = bytesToString(files.get(fileNames.pascalFile)!)
-  const poolFile = files.get(fileNames.pool)!
+  const pasFile = bytesToString(state.files.get(fileNames.pascalFile)!)
+  const poolFile = state.files.get(fileNames.pool)!
   return {
     state,
     pasFile,

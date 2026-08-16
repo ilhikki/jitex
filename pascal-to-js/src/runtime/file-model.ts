@@ -3,7 +3,7 @@
  *
  * 设计原则（用户指示）：
  *   - 文件状态是句柄的一部分，不放在 ctx 中。
- *   - 底层存储用 bytes（ctx.files 的 value，Uint8Array），不用 string 拼接。
+ *   - 底层存储用 bytes（ctx.files 的 value，FileBuffer，见 runtime-type.ts），不用 string 拼接。
  *
  * 一个 PascalFile 实例 = 一个文件句柄（file-variable 的运行时表示）。
  * reset/rewrite/get/put/read/write 等操作直接读写句柄上的状态字段，

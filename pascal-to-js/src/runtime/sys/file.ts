@@ -4,8 +4,9 @@
  * 设计原则（用户指示）：
  *   - 状态在句柄上：PascalFile 自带 offset/eof/writable/rec* 字段，
  *     不再有 ctx.fileStates 状态表。
- *   - 底层用 bytes：ctx.files 的 value 是 Uint8Array；
+ *   - 底层用 bytes：ctx.files 的 value 是 FileBuffer（data.length 即容量，length 为已用长度）；
  *     write/put 直接把字节追加到 ctx.files.get(url)，不做 string 拼接。
+ *     容量不足时翻倍扩容（见 runtime-util.ts appendFileBytes），避免每次写入都整体拷贝数组。
  *   - 仅保留 ISO 标准能力：reset/rewrite/get/put/read/readln/write/writeln/page。
  *     已删除的非 ISO 能力（未用插件标识）：
  *       * assign(f, name) — Borland 扩展，ISO 6.6.5.2 无此过程。
@@ -39,7 +40,15 @@
 
 import type { PascalFile } from '@/runtime/file-model.ts'
 import type { RuntimeContext, SyscallHandler, TypeDescriptor } from '../runtime-type.ts'
-import { createDefaultRec, deepCopyValue, formatField, formatReal } from '@/runtime/runtime-util.ts'
+import {
+  appendFileBytes,
+  createDefaultRec,
+  createFileBuffer,
+  deepCopyValue,
+  fileBufferView,
+  formatField,
+  formatReal,
+} from '@/runtime/runtime-util.ts'
 
 export function fileSyscalls(): Record<string, SyscallHandler> {
   return {
@@ -172,7 +181,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     'file.eoln': (ctx, [file]) => {
       const f = file as PascalFile
       if (!f) throw new Error('file.eoln: file is undefined')
-      const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+      const content = fileBytes(ctx, f.url)
       if (f.eof || f.offset >= content.length) return true
       const ch = content[f.offset]
       return ch === 10 || ch === 13
@@ -230,7 +239,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       f.recList!.push(deepCopyValue(f.recBuffer))
       f.recBuffer = f.recTypeDesc ? createDefaultRec(f.recTypeDesc as TypeDescriptor) : {}
       // 同步到外部存储
-      ctx.files.set(f.url, serializeRecList(f.recList!))
+      ctx.files.set(f.url, createFileBuffer(serializeRecList(f.recList!)))
       return undefined
     },
 
@@ -263,6 +272,14 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 // 基础：字节读写
 // ============================================================
 
+/** 取文件内容（已用区域视图）。url 不存在时返回空数组（不新建 key，保持 ctx.files.has 语义）。 */
+function fileBytes(ctx: RuntimeContext, url: string): Uint8Array {
+  const buf = ctx.files.get(url)
+  return buf ? fileBufferView(buf) : EMPTY_BYTES
+}
+
+const EMPTY_BYTES = new Uint8Array(0)
+
 /** 把字节追加到文件外部内容（ctx.files.get(url)）。
  *  unbound 文件（url=''）或 output 句柄：写入 outputBuffer（stdout 语义）。 */
 function writeBytes(ctx: RuntimeContext, f: PascalFile, bytes: Uint8Array): void {
@@ -271,15 +288,16 @@ function writeBytes(ctx: RuntimeContext, f: PascalFile, bytes: Uint8Array): void
     ctx.outputBuffer.push(decodeUtf8(bytes))
     return
   }
-  const cur = ctx.files.get(f.url) ?? new Uint8Array(0)
-  const merged = new Uint8Array(cur.length + bytes.length)
-  merged.set(cur, 0)
-  merged.set(bytes, cur.length)
-  ctx.files.set(f.url, merged)
+  let buf = ctx.files.get(f.url)
+  if (!buf) {
+    buf = createFileBuffer()
+    ctx.files.set(f.url, buf)
+  }
+  appendFileBytes(buf, bytes)
 }
 
 function resetFile(ctx: RuntimeContext, f: PascalFile): void {
-  const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+  const content = fileBytes(ctx, f.url)
   f.offset = 0
   f.eof = content.length === 0
   f.writable = false
@@ -287,7 +305,7 @@ function resetFile(ctx: RuntimeContext, f: PascalFile): void {
 
 function rewriteFile(ctx: RuntimeContext, f: PascalFile): void {
   // ISO 6.6.5.2: rewrite 擦除现有外部文件
-  ctx.files.set(f.url, new Uint8Array(0))
+  ctx.files.set(f.url, createFileBuffer())
   f.offset = 0
   f.eof = true
   f.writable = true
@@ -298,7 +316,7 @@ function getFile(ctx: RuntimeContext, f: PascalFile): void {
   if (f.eof) {
     throw new Error('get(f) at EOF: pre-assertion violated (ISO 7185 6.6.5.2: f0.R must not be empty)')
   }
-  const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+  const content = fileBytes(ctx, f.url)
   f.offset++
   if (f.offset >= content.length) {
     f.eof = true
@@ -306,7 +324,7 @@ function getFile(ctx: RuntimeContext, f: PascalFile): void {
 }
 
 function peekFile(ctx: RuntimeContext, f: PascalFile): string {
-  const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+  const content = fileBytes(ctx, f.url)
   if (f.eof || f.offset >= content.length) {
     // ISO 7185 6.9.8: EOF 后 f^ 未定义；默认报错。
     throw new Error('F^ accessed at EOF: undefined behavior (ISO 7185 6.9.8)')
@@ -319,7 +337,7 @@ function peekFile(ctx: RuntimeContext, f: PascalFile): string {
 
 function readFilelnSkip(ctx: RuntimeContext, f: PascalFile): void {
   if (f.eof) return
-  const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+  const content = fileBytes(ctx, f.url)
   while (f.offset < content.length) {
     const ch = content[f.offset]
     f.offset++
@@ -335,7 +353,7 @@ function readFilelnSkip(ctx: RuntimeContext, f: PascalFile): void {
 // ============================================================
 
 function readFileToken(ctx: RuntimeContext, f: PascalFile): string {
-  const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+  const content = fileBytes(ctx, f.url)
   // 跳过空白
   while (f.offset < content.length) {
     const ch = content[f.offset]
@@ -375,7 +393,7 @@ function readFileBool(ctx: RuntimeContext, f: PascalFile): boolean {
 }
 
 function readFileChar(ctx: RuntimeContext, f: PascalFile): string {
-  const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+  const content = fileBytes(ctx, f.url)
   if (f.eof || f.offset >= content.length) return '\x00'
   const ch = content[f.offset]
   f.offset++
@@ -415,7 +433,7 @@ function deserializeRecList(content: Uint8Array): unknown[] {
 }
 
 function resetRecFile(ctx: RuntimeContext, f: PascalFile, typeDesc?: TypeDescriptor): void {
-  const content = ctx.files.get(f.url) ?? new Uint8Array(0)
+  const content = fileBytes(ctx, f.url)
   f.recTypeDesc = typeDesc
   f.recList = deserializeRecList(content)
   f.recPos = 0
@@ -431,7 +449,7 @@ function resetRecFile(ctx: RuntimeContext, f: PascalFile, typeDesc?: TypeDescrip
 }
 
 function rewriteRecFile(ctx: RuntimeContext, f: PascalFile, typeDesc?: TypeDescriptor): void {
-  ctx.files.set(f.url, new Uint8Array(0))
+  ctx.files.set(f.url, createFileBuffer())
   f.recTypeDesc = typeDesc
   f.recList = []
   f.recPos = 0

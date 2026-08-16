@@ -19,14 +19,14 @@ import type { IlPlugin } from '../compiler/plugin.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
 import { TypeDescriptor } from '@/runtime/runtime-type.ts'
 import { ioSyscalls } from './sys/io.ts'
-import { createDefaultArray, createDefaultRec, deepCopyValue } from './runtime-util.ts'
+import { createDefaultArray, createDefaultRec, deepCopyValue, unwrapFileMap, wrapFileMap } from './runtime-util.ts'
 import { fileSyscalls } from './sys/file.ts'
 
 export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeContext {
   return {
     outputBuffer: [],
     inputQueue: options.input ? [...options.input] : [],
-    files: options.files ?? new Map(),
+    files: wrapFileMap(options.files),
     readState: { tokens: [], tokenIdx: 0 },
     steps: 0,
     maxSteps: options.maxSteps ?? Infinity,
@@ -50,6 +50,7 @@ export function toRunState(
     steps: ctx.steps,
     error: error ?? null,
     jsCode: ctx.jsCode,
+    files: unwrapFileMap(ctx.files),
   }
 }
 
