@@ -73,24 +73,6 @@ end.`,
     name: '负数常量',
     code: 'program test;\nvar\n  x: integer;\nbegin\n  x := -123;\nend.',
     purpose: '验证负整数表达式',
-  },
-  {
-    name: '空字符串',
-    code: `program test;\nvar\n  s: string;\nbegin\n  s := '';\nend.`,
-    purpose: '验证空字符串字面量',
-    extensions: ['string'],
-  },
-  {
-    name: '单字符字符串',
-    code: `program test;\nvar\n  s: string;\nbegin\n  s := 'a';\nend.`,
-    purpose: '验证单字符字符串',
-    extensions: ['string'],
-  },
-  {
-    name: '转义引号（双写单引号）',
-    code: `program test;\nvar\n  s: string;\nbegin\n  s := 'it''s';\nend.`,
-    purpose: '验证 Pascal 中通过双写单引号转义引号',
-    extensions: ['string'],
   }, // ------------------------------
   // 运算符优先级测试
   // ------------------------------

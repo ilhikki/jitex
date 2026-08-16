@@ -6,9 +6,9 @@
  *
  * ISO 7185 章节引用：6.9.8.2（标准过程列表）
  */
-import { assert, assertEquals, describe, test } from './_helper.ts'
-import { run } from '../../../src/compiler/transform.ts'
-import { pascalHPlugin } from '../../../src/compiler/plugins/pascal-h.plugin.ts'
+import { assert, assertEquals, describe, test } from '../_helper.ts'
+import { run } from '../../../../src/compiler/transform.ts'
+import { pascalHPlugin } from '../../../../src/compiler/plugins/pascal-h.plugin.ts'
 
 type Status = 'pending' | 'running' | 'terminated' | 'error'
 
@@ -79,6 +79,56 @@ describe('Pascal-H 插件（正测试：启用 pascalHPlugin）', () => {
       { plugins: [pascalHPlugin], maxSteps: 1e5 },
     )
     ok(state, 'opened\n', 'erstat expr')
+  })
+
+  test('BREAK 带文件参数（Knuth tangle-official.pas 风格）', () => {
+    const state = run(
+      `PROGRAM TANGLE;
+VAR TERMOUT: FILE OF CHAR;
+BEGIN
+  REWRITE(TERMOUT);
+  WRITE(TERMOUT, 'buffered');
+  BREAK(TERMOUT);
+  WRITELN('done');
+END.`,
+      { plugins: [pascalHPlugin], maxSteps: 1e5 },
+    )
+    ok(state, 'buffereddone\n', 'break(file)')
+  })
+
+  test('BREAK 无参数（Knuth 风格）', () => {
+    const state = run(
+      `PROGRAM TANGLE;
+BEGIN
+  WRITE('buf');
+  BREAK;
+  WRITELN('ok');
+END.`,
+      { plugins: [pascalHPlugin], maxSteps: 1e5 },
+    )
+    ok(state, 'bufok\n', 'break()')
+  })
+
+  test('TANGLE 风格 ERROR 过程（使用 BREAK 和文件输出）', () => {
+    const state = run(
+      `PROGRAM TANGLE;
+VAR TERMOUT: FILE OF CHAR;
+    HISTORY: INTEGER;
+PROCEDURE ERROR;
+BEGIN
+  WRITELN(TERMOUT, '. (l.', 1:1, ')');
+  BREAK(TERMOUT);
+  HISTORY := 2;
+END;
+BEGIN
+  REWRITE(TERMOUT);
+  HISTORY := 0;
+  ERROR;
+  WRITELN('history=', HISTORY);
+END.`,
+      { plugins: [pascalHPlugin], maxSteps: 1e5 },
+    )
+    ok(state, '. (l.1)\nhistory=2\n', 'tangle ERROR proc')
   })
 })
 

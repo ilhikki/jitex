@@ -22,19 +22,19 @@
 ### 1.1 字面量
 
 - 整数字面量：零值、负数、大整数、20 位超大数、十六进制 `$1A2B`、前导零
-  `[p01-basics][p10-conformance][p01-parser-boundary]`
+  `[p01-basics][p04-conformance][p01-parser-boundary]`
 - 实数字面量：`3.14`、`1e10` 等浮点形式 `[p01-basics]`
-- 字符串字面量：空串、单字符、长字符串、转义引号（双写单引号 `''`）、特殊字符 `[p01-io][p10-conformance]`
+- 字符串字面量：空串、单字符、长字符串、转义引号（双写单引号 `''`）、特殊字符 `[p01-io][nonstandard/p01-string]`
 - 字符字面量：`'a'` 单字符 `[p01-basics]`
 - 布尔字面量：`true` / `false` `[p01-basics]`
 
 ### 1.2 标识符
 
-- 单字母、长标识符（128 字符）、大小写不敏感、数字结尾 `[p10-conformance][p00-parser-fuzz]`
+- 单字母、长标识符（128 字符）、大小写不敏感、数字结尾 `[p04-conformance][p00-parser-fuzz]`
 
 ### 1.3 注释
 
-- 花括号 `{ ... }`、星号括号 `(* ... *)`、空注释、多行注释 `[p10-conformance]`
+- 花括号 `{ ... }`、星号括号 `(* ... *)`、空注释、多行注释 `[p04-conformance]`
 
 ---
 
@@ -46,10 +46,9 @@
 - `real`（科学计数法输出 `5.00000000000000E+000`）`[p01-basics]`
 - `boolean` `[p01-basics]`
 - `char` `[p01-basics]`
-- 非标扩展 `string` 类型（仅 `extensions=['string']` 时启用；否则 `var s: string`
-  报错）`[p01-basics][p10-conformance][p15-nonstandard]`
+- 非标扩展 `string` 类型（仅 `extensions=['string']` 时启用；否则 `var s: string` 报错）`[nonstandard/p01-string]`
 
-### 2.2 子界类型 `[p03-range]`
+### 2.2 子界类型 `[p02-range]`
 
 - 整数子界、字符子界、布尔子界、负数边界 `-10..10`
 - 单值子界 `5..5`、`0..255` BYTE 范围
@@ -63,12 +62,12 @@
 - 子界作数组下标、FOR 变量、记录字段、函数返回类型、值参/var 参
 - 局部 const 与全局 const 同名不影响全局子界边界
 
-### 2.3 枚举类型 `[p01-basics][p04-parameters][p10-conformance][p13-pascal82-conformance]`
+### 2.3 枚举类型 `[p01-basics][p01-parameters][p04-conformance][p04-pascal82-conformance]`
 
 - 声明、作数组下标（`ARRAY[COLOR]`）、作 CASE 分支标签、作函数参数
 - `ord` 取枚举序号
 
-### 2.4 数组类型 `[p03-array-record][p13-pascal82-conformance]`
+### 2.4 数组类型 `[p02-array-record][p04-pascal82-conformance]`
 
 - 一维 / 多维（`array[1..2, 1..2]`）、嵌套数组（`array[1..2] of array[1..2] of Point`）
 - `ARRAY[CHAR]`（覆盖 0..255）、`ARRAY[BOOLEAN]`（0..1）、`ARRAY[ENUM]`
@@ -78,7 +77,7 @@
 - 数组整体赋值（`mem.copy` 语义）
 - 多维下标访问 `a[i, j]` 与 `a[i][j]` 等价
 
-### 2.5 记录类型 `[p03-array-record][p11-knuth-pascal]`
+### 2.5 记录类型 `[p02-array-record][p04-knuth-pascal]`
 
 - 字段访问 / 赋值、嵌套记录（`c.center.x`）
 - 记录字段为数组
@@ -86,14 +85,14 @@
 - 记录整体赋值
 - WITH 语句字段简写
 
-### 2.6 变体记录 `[p03-variant-record]`
+### 2.6 变体记录 `[p02-variant-record]`
 
 - **解析支持即可**（测试只调 `parse()` 不执行）
 - 带 tag 名 `CASE K: SHAPE OF`
 - 无 tag 名 `CASE NODETYPE OF`
 - 嵌套变体记录（CASE 内嵌 CASE）
 
-### 2.7 文件类型 `[p03-file][p11-knuth-pascal]`
+### 2.7 文件类型 `[p02-file][p04-knuth-pascal]`
 
 - `FILE OF CHAR`、`PACKED FILE OF CHAR`（等价于 text）
 - 多个 text 文件变量
@@ -163,7 +162,7 @@
 - 至少执行一次（条件一开始就满足也执行）
 - 多迭代、嵌套
 
-### 4.5 CASE `[p01-control-flow][p11-knuth-pascal]`
+### 4.5 CASE `[p01-control-flow][p04-knuth-pascal]`
 
 - 单值分支、多值分支（`1, 3, 5:`）
 - `OTHERWISE` 默认分支（ISO）
@@ -171,14 +170,14 @@
 - 无匹配：无 OTHERWISE 时无操作
 - 嵌套 CASE、CASE 在循环/过程中
 
-### 4.6 WITH `[p01-control-flow][p03-array-record]`
+### 4.6 WITH `[p01-control-flow][p02-array-record]`
 
 - 单记录、多记录（`with p1, p2 do`）
 - 嵌套 WITH（访问嵌套记录字段）
 - WITH 内调用过程、修改字段
 - **字段名与外层变量同名时字段优先**
 
-### 4.7 GOTO 与标号 `[p04-goto][p04-goto-advanced][p04-goto-critical][p04-goto-fix][p04-goto-label-in-block][p04-goto-scope-repro]`
+### 4.7 GOTO 与标号 `[p03-goto][p03-goto-advanced][p03-goto-critical][p03-goto-fix][p03-goto-label-in-block][p03-goto-scope-repro]`
 
 #### 4.7.1 基础
 
@@ -233,12 +232,12 @@
 
 ## 5. 过程与函数
 
-### 5.1 声明与调用 `[p01-procedures][p04-parameters]`
+### 5.1 声明与调用 `[p01-procedures][p01-parameters]`
 
 - 无参 / 单参 / 多参 / 同类型多参 / 不同类型参数
 - 参数顺序、参数名与全局/局部变量同名（应报错）
 
-### 5.2 参数传递 `[p04-parameters]`
+### 5.2 参数传递 `[p01-parameters]`
 
 - 值参：不修改原变量、传表达式、传函数调用结果、传数组元素、传记录字段、传负数/零/最大整数
 - var 参：修改原变量、必须为变量（传常量报错）、多 var 参（Swap）、值/var 混合
@@ -246,14 +245,14 @@
 - 数组 / 记录作值参（拷贝）和 var 参（修改原对象）
 - 类型组合：integer / char / boolean / 子界 / 枚举 / 数组 / 记录
 
-### 5.3 函数返回值 `[p01-procedures][p04-parameters]`
+### 5.3 函数返回值 `[p01-procedures][p01-parameters]`
 
 - 函数名作返回值变量赋值
 - 返回值在表达式中使用
 - 嵌套函数返回、递归函数返回
 - 函数返回数组类型
 
-### 5.4 嵌套过程 / 函数 `[p01-procedures][p04-scope][p10-conformance]`
+### 5.4 嵌套过程 / 函数 `[p01-procedures][p01-scope][p04-conformance]`
 
 - 一层 / 两层 / 三层嵌套
 - 嵌套过程访问外层变量
@@ -261,7 +260,7 @@
 - 同级过程互调
 - 过程中定义函数、函数中定义过程
 
-### 5.5 递归 `[p01-procedures][p04-parser-recursion][p10-conformance]`
+### 5.5 递归 `[p01-procedures][p04-parser-recursion][p04-conformance]`
 
 - 直接递归过程 / 函数（阶乘、斐波那契、Ackermann）
 - 相互递归（需 FORWARD）
@@ -269,7 +268,7 @@
 - 深层五过程链递归
 - 嵌套递归（递归过程内定义嵌套过程）
 
-### 5.6 FORWARD 声明 `[p10-conformance][p04-parser-procedure]`
+### 5.6 FORWARD 声明 `[p04-conformance][p04-parser-procedure]`
 
 - 过程 / 函数 FORWARD
 - FORWARD 后再定义实现体
@@ -278,7 +277,7 @@
 
 ---
 
-## 6. 作用域 `[p04-scope]`
+## 6. 作用域 `[p01-scope]`
 
 - 全局变量：主程序 / 过程 / 嵌套过程 / 函数中可见
 - 局部变量：遮蔽全局、内层遮蔽外层、兄弟过程独立、局部不可外用
@@ -339,7 +338,7 @@
 
 ---
 
-## 9. 文件操作 `[p03-file][p11-knuth-pascal]`
+## 9. 文件操作 `[p02-file][p04-knuth-pascal]`
 
 ### 9.1 文件写入
 
@@ -366,7 +365,7 @@
 - `PROGRAM COPYFILE(INFILE, OUTFILE)` 头声明文件参数
 - 通过 `programFileUrls` 映射到内存文件
 
-### 9.4 Knuth 扩展 `[p11-knuth-pascal]`
+### 9.4 Knuth 扩展 `[p04-knuth-pascal]`
 
 - `BREAK` 过程（刷新输出缓冲区，带/不带参数，简化为 no-op 也可）
 - `PAGE` 过程（输出换页符 `\f`，带/不带文件参数）
@@ -400,13 +399,13 @@
 
 ## 11. 非标扩展与合规性
 
-### 11.1 `extensions=['string']` `[p01-basics][p10-conformance]`
+### 11.1 `extensions=['string']` `[nonstandard/p01-string]`
 
 - 启用 `string` 类型
 - 字符串 `+` 拼接
 - `length` 函数
 
-### 11.2 默认合规性 `[p15-nonstandard]`
+### 11.2 默认合规性 `[nonstandard/p01-string]`
 
 - 不启用 `string` 扩展时，`var s: string` **必须报错**
 - 解释器默认不应支持非标特性
@@ -415,25 +414,35 @@
 
 ## 12. 测试用例分布速查
 
-| 文件                     | 用例数 | 关键特性                                          |
-| ------------------------ | ------ | ------------------------------------------------- |
-| p01-basics               | 多     | 算术/关系/逻辑/集合/类型转换/内置函数/字符串扩展  |
-| p01-control-flow         | 多     | IF/WHILE/FOR/REPEAT/CASE/WITH/递归                |
-| p01-io                   | 多     | writeln/write/readln/read/格式化/文件 IO/内置函数 |
-| p01-procedures           | 6      | 过程/函数/参数/递归                               |
-| p03-array-record         | 多     | 数组/记录/WITH/组合                               |
-| p03-file                 | 多     | FILE OF CHAR/ASSIGN/RESET/REWRITE/F^/GET/EOLN     |
-| p03-range                | 多     | 子界/边界检查/类型兼容                            |
-| p03-variant-record       | 3      | 变体记录（仅解析）                                |
-| p04-goto-advanced        | 多     | 嵌套 goto/防死循环                                |
-| p04-goto-critical        | 多     | 跨过程 goto/标号作用域/标号值范围                 |
-| p04-goto-fix             | 5      | 嵌套循环 goto 跳出                                |
-| p04-goto-label-in-block  | 4      | 跳入非透明块报错                                  |
-| p04-goto-scope-repro     | 3      | tangle DEBUGHELP 复现                             |
-| p04-goto                 | 多     | 基础 goto/跨结构/递归/透明块                      |
-| p04-parameters           | 多     | 值参/var 参/类型组合/边界                         |
-| p04-scope                | 多     | 全局/局部/参数/函数/常量/类型作用域               |
-| p10-conformance          | 多     | 解析边界/运算符/作用域/过程/递归/类型/控制流      |
-| p11-knuth-pascal         | 多     | Knuth 风格/FILE/OTHERS/BREAK/PAGE/F^              |
-| p13-pascal82-conformance | 多     | ARRAY[CHAR/BOOLEAN/ENUM]                          |
-| p15-nonstandard          | 1      | string 类型拒绝                                   |
+> `p{phase}-{feature}.test.ts`：`p` 是 phase（同 phase 可有多个文件），`feature` 是功能。 非标扩展测试统一在
+> `integration/compiler/nonstandard/` 目录（正反测试成对）。
+
+| 文件                                | 用例数 | 关键特性                                          |
+| ----------------------------------- | ------ | ------------------------------------------------- |
+| p01-basics                          | 多     | 算术/关系/逻辑/集合/类型转换/内置函数             |
+| p01-control-flow                    | 多     | IF/WHILE/FOR/REPEAT/CASE/WITH/递归                |
+| p01-io                              | 多     | writeln/write/readln/read/格式化/文件 IO/内置函数 |
+| p01-parameters                      | 多     | 值参/var 参/类型组合/边界                         |
+| p01-procedures                      | 6      | 过程/函数/参数/递归                               |
+| p01-scope                           | 多     | 全局/局部/参数/函数/常量/类型作用域               |
+| p02-array-record                    | 多     | 数组/记录/WITH/组合                               |
+| p02-file                            | 多     | FILE OF CHAR/ASSIGN/RESET/REWRITE/F^/GET/EOLN     |
+| p02-file-of-record                  | 多     | FILE OF RECORD 读写                               |
+| p02-range                           | 多     | 子界/边界检查/类型兼容                            |
+| p02-variant-record                  | 3      | 变体记录（仅解析）                                |
+| p03-goto                            | 多     | 基础 goto/跨结构/递归/透明块                      |
+| p03-goto-advanced                   | 多     | 嵌套 goto/防死循环                                |
+| p03-goto-critical                   | 多     | 跨过程 goto/标号作用域/标号值范围                 |
+| p03-goto-fix                        | 5      | 嵌套循环 goto 跳出                                |
+| p03-goto-label-in-block             | 4      | 跳入非透明块报错                                  |
+| p03-goto-scope-repro                | 3      | tangle DEBUGHELP 复现                             |
+| p04-conformance                     | 多     | 解析边界/运算符/作用域/过程/递归/类型/控制流      |
+| p04-iso-6.10-program                | 多     | ISO 6.10 程序参数                                 |
+| p04-iso-standard-library            | 多     | ISO 标准库                                        |
+| p04-knuth-pascal                    | 多     | Knuth 风格/FILE/OTHERS/PAGE                       |
+| p04-pascal82-conformance            | 多     | ARRAY[CHAR/BOOLEAN/ENUM]                          |
+| nonstandard/p01-string              | 5      | string 类型（正反测试）                           |
+| nonstandard/p02-pascal-h            | 多     | Pascal-H 插件 BREAK/BREAK_IN/ERSTAT（正反）       |
+| nonstandard/p03-file-eof            | 4      | fileEofBufferSpace F^（正反）                     |
+| nonstandard/p04-knuth-file-model    | 多     | Knuth 文件模型（正反）                            |
+| nonstandard/p05-pascal-h-file-model | 多     | Pascal-H 文件模型（正反）                         |

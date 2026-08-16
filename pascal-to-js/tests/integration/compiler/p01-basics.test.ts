@@ -310,18 +310,6 @@ end.`,
       expectedContains: '1 yes\n4 yes\n10 yes\n2 no',
     },
     {
-      name: 'string-concat-plus',
-      code: `program test;
-var s: string;
-begin
-  s := 'Hello' + ' ' + 'World';
-  writeln(s);
-end.`,
-      purpose: '字符串拼接 + 运算符（非标扩展）',
-      extensions: ['string'],
-      expectedContains: 'Hello World',
-    },
-    {
       name: 'real-arithmetic-basic',
       code: `program test;
 var r1, r2: real;

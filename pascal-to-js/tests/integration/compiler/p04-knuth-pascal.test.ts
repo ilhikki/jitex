@@ -4,7 +4,6 @@
 
 import { describe } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper.ts'
-import { pascalHPlugin } from '../../../src/compiler/plugins/pascal-h.plugin.ts'
 
 describe('M5 JS - Knuth Pascal Style', () => {
   const tests: PascalTest[] = [
@@ -123,36 +122,8 @@ END.`,
     },
 
     // ==========================================================================
-    // BREAK 和 PAGE 系统过程
+    // PAGE 系统过程（ISO 7185 6.6.5.2 标准）
     // ==========================================================================
-
-    {
-      name: 'BREAK 过程不报错',
-      code: `PROGRAM TANGLE;
-VAR TERMOUT: FILE OF CHAR;
-BEGIN
-  REWRITE(TERMOUT);
-  WRITE(TERMOUT, 'buffered');
-  BREAK(TERMOUT);
-  WRITELN('done');
-END.`,
-      purpose: 'Knuth 风格：BREAK 过程刷新输出缓冲区（tangle-official.pas 中 ERROR 过程使用）。启用 pascalHPlugin',
-      expectedContains: 'done',
-      plugins: [pascalHPlugin],
-    },
-
-    {
-      name: 'BREAK 无参数',
-      code: `PROGRAM TANGLE;
-BEGIN
-  WRITE('buf');
-  BREAK;
-  WRITELN('ok');
-END.`,
-      purpose: 'BREAK 无参数调用。启用 pascalHPlugin',
-      expectedContains: 'ok',
-      plugins: [pascalHPlugin],
-    },
 
     {
       name: 'PAGE 输出换页符',
@@ -184,63 +155,6 @@ END.`,
     // F^ 文件缓冲区访问（Knuth 在 WEB 系统中读取文件用 F^）
     // ==========================================================================
 
-    {
-      name: 'F^ 文件缓冲区访问（启用 fileEofBufferSpace 扩展）',
-      code: `PROGRAM TANGLE;
-VAR F: FILE OF CHAR;
-    CH: CHAR;
-BEGIN
-  REWRITE(F);
-  CH := F^;
-  WRITELN('ch=', CH);
-END.`,
-      purpose:
-        'Knuth 风格：F^ 访问文件缓冲区（tangle-official.pas 中 INPUTLN 等过程使用）；REWRITE 后 EOF=true，启用 fileEofBufferSpace 扩展',
-      extensions: ['fileEofBufferSpace'],
-      expectedContains: 'ch=',
-    },
-
-    {
-      name: 'F^ 赋值给变量（启用 fileEofBufferSpace 扩展）',
-      code: `PROGRAM TANGLE;
-VAR F: FILE OF CHAR;
-    X: CHAR;
-BEGIN
-  REWRITE(F);
-  X := F^;
-  WRITELN('x=', X);
-END.`,
-      purpose: 'F^ 赋值给 char 变量；REWRITE 后 EOF=true，启用 fileEofBufferSpace 扩展',
-      extensions: ['fileEofBufferSpace'],
-      expectedContains: 'x=',
-    },
-
-    {
-      name: 'F^ 在表达式中使用（启用 fileEofBufferSpace 扩展）',
-      code: `PROGRAM TANGLE;
-VAR F: FILE OF CHAR;
-BEGIN
-  REWRITE(F);
-  IF F^ = ' ' THEN WRITELN('space') ELSE WRITELN('other');
-END.`,
-      purpose:
-        'F^ 在 if 表达式中使用；REWRITE 后 EOF=true，访问 F^ 属 ISO 7185 6.9.8 未定义行为，启用 fileEofBufferSpace 扩展返回空格',
-      extensions: ['fileEofBufferSpace'],
-      expectedContains: 'space',
-    },
-
-    {
-      name: 'F^ 在 EOF 时默认报错（未启用扩展）',
-      code: `PROGRAM TANGLE;
-VAR F: FILE OF CHAR;
-BEGIN
-  REWRITE(F);
-  IF F^ = ' ' THEN WRITELN('space') ELSE WRITELN('other');
-END.`,
-      purpose: '反测试：默认配置下 F^ 在 EOF 时访问应报错（ISO 7185 6.9.8 未定义行为）',
-      expectedError: 'fileEofBufferSpace',
-    },
-
     // ==========================================================================
     // 综合测试：模仿 TANGLE 中的代码片段
     // ==========================================================================
@@ -261,28 +175,6 @@ BEGIN
 END.`,
       purpose: '模仿 tangle-official.pas 第 217-221 行的字符转义 case 语句',
       expectedContains: 'dollar',
-    },
-
-    {
-      name: 'TANGLE 风格 ERROR 过程',
-      code: `PROGRAM TANGLE;
-VAR TERMOUT: FILE OF CHAR;
-    HISTORY: INTEGER;
-PROCEDURE ERROR;
-BEGIN
-  WRITELN(TERMOUT, '. (l.', 1:1, ')');
-  BREAK(TERMOUT);
-  HISTORY := 2;
-END;
-BEGIN
-  REWRITE(TERMOUT);
-  HISTORY := 0;
-  ERROR;
-  WRITELN('history=', HISTORY);
-END.`,
-      purpose: '模仿 tangle-official.pas 的 ERROR 过程（使用 BREAK 和文件输出）。启用 pascalHPlugin',
-      expectedContains: 'history=2',
-      plugins: [pascalHPlugin],
     },
 
     {

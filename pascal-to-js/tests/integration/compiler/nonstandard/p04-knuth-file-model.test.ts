@@ -14,7 +14,7 @@
  * 正测试：启用 extension 'pascalHFileModel'，验证 GET 是预读（不跳字符）
  * 反测试：默认配置下，RESET 后 F^ 已定义（标准 Pascal），GET 跳过第一个字符
  */
-import { type PascalTest, runPascalTests } from './_helper.ts'
+import { type PascalTest, runPascalTests } from '../_helper.ts'
 
 const tests: PascalTest[] = [
   // ===== 正测试：启用 pascalHFileModel =====
