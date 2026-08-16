@@ -65,10 +65,10 @@ function getDefaultSyscalls(): Record<string, SyscallHandler> {
 function basicSyscall(): Record<string, SyscallHandler> {
   return {
     // ---------- cell（var 参数传递）----------
-    'cell.create': (_ctx, args) => ({ v: args[0] }),
-    'cell.get': (_ctx, args) => (args[0] as { v: unknown }).v,
-    'cell.set': (_ctx, args) => {
-      ;(args[0] as { v: unknown }).v = args[1]
+    'cell.create': (_ctx, [value]) => ({ v: value }),
+    'cell.get': (_ctx, [value]) => (value as { v: unknown }).v,
+    'cell.set': (_ctx, [left, right]) => {
+      ;(left as { v: unknown }).v = right
       return undefined
     },
 
@@ -80,20 +80,19 @@ function basicSyscall(): Record<string, SyscallHandler> {
     },
 
     // ---------- cast ----------
-    'cast.char.to.i64': (_ctx, args) => (typeof args[0] === 'string' ? args[0].charCodeAt(0) : args[0]),
+    'cast.char.to.i64': (_ctx, [value]) => (typeof value === 'string' ? value.charCodeAt(0) : value),
 
     // ---------- record ----------
-    'rec.field': (_ctx, args) => (args[0] as Record<string, unknown>)[args[1] as string],
-    'rec.set': (_ctx, args) => {
-      ;(args[0] as Record<string, unknown>)[args[1] as string] = args[2]
-      return undefined
+    'rec.field': (_ctx, [record, key]) => (record as Record<string, unknown>)[key as string],
+    'rec.set': (_ctx, [record, key, value]) => {
+      (record as Record<string, unknown>)[key as string] = value
     },
-    'rec.copy': (_ctx, args) => deepCopyValue(args[0]),
+    'rec.copy': (_ctx, [value]) => deepCopyValue(value),
 
     // ---------- mem.default（变量初始化）----------
     // type 字面量由 literalToJs 直接作为 JS 对象字面量返回，无需 JSON.parse
-    'mem.default.array': (_ctx, args) => createDefaultArray(args[0] as TypeDescriptor),
-    'mem.default.rec': (_ctx, args) => createDefaultRec(args[0] as TypeDescriptor),
+    'mem.default.array': (_ctx, [type]) => createDefaultArray(type as TypeDescriptor),
+    'mem.default.rec': (_ctx, [type]) => createDefaultRec(type as TypeDescriptor),
 
     // ---------- str.to.char.array ----------
     // Pascal `packed array[low..high] of char` 赋值为字符串字面量时，
@@ -101,10 +100,10 @@ function basicSyscall(): Record<string, SyscallHandler> {
     // 在 JS 中变成 0-based 字符串索引，导致首字符丢失。
     // args = [low, high, str]；返回对象 {low:ch1, low+1:ch2, ..., high:' '}
     // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历。
-    'str.to.char.array': (_ctx, args) => {
-      const low: number = (args[0] as number) | 0
-      const high: number = (args[1] as number) | 0
-      const str: string = typeof args[2] === 'string' ? args[2] : String(args[2] ?? '')
+    'str.to.char.array': (_ctx, [l, h, s]) => {
+      const low: number = (l as number) | 0
+      const high: number = (h as number) | 0
+      const str: string = typeof s === 'string' ? s : String(s ?? '')
       const out: Record<number | string, string | number> = {}
       for (let i = low; i <= high; i++) {
         const idx = i - low
@@ -116,25 +115,27 @@ function basicSyscall(): Record<string, SyscallHandler> {
 
     // ---------- set ----------
     'set.empty': (_ctx, _args) => new Set<number>(),
-    'set.union': (_ctx, args) => new Set<number>([...(args[0] as Set<number>), ...(args[1] as Set<number>)]),
-    'set.intersect': (_ctx, args) =>
-      new Set<number>([...(args[0] as Set<number>)].filter((x) => (args[1] as Set<number>).has(x))),
-    'set.diff': (_ctx, args) =>
-      new Set<number>([...(args[0] as Set<number>)].filter((x) => !(args[1] as Set<number>).has(x))),
-    'set.eq': (_ctx, args) =>
-      (args[0] as Set<number>).size === (args[1] as Set<number>).size &&
-      [...(args[0] as Set<number>)].every((x: number) => (args[1] as Set<number>).has(x)),
-    'set.ne': (_ctx, args) =>
-      !((args[0] as Set<number>).size === (args[1] as Set<number>).size &&
-        [...(args[0] as Set<number>)].every((x: number) => (args[1] as Set<number>).has(x))),
-    'set.le': (_ctx, args) => [...(args[0] as Set<number>)].every((x: number) => (args[1] as Set<number>).has(x)),
-    'set.ge': (_ctx, args) => [...(args[1] as Set<number>)].every((x: number) => (args[0] as Set<number>).has(x)),
-    'set.range': (_ctx, args) => {
+    'set.union': (_ctx, [v1, v2]) => new Set<number>([...(v1 as Set<number>), ...(v2 as Set<number>)]),
+    'set.intersect': (_ctx, [set, value]) =>
+      new Set<number>([...(set as Set<number>)].filter((x) => (value as Set<number>).has(x))),
+    'set.diff': (_ctx, [set, value]) =>
+      new Set<number>([...(set as Set<number>)].filter((x) => !(value as Set<number>).has(x))),
+    'set.eq': (_ctx, [left, right]) =>
+      (left as Set<number>).size === (right as Set<number>).size &&
+      [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+    'set.ne': (_ctx, [left, right]) =>
+      !((left as Set<number>).size === (right as Set<number>).size &&
+        [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x))),
+    'set.le': (_ctx, [left, right]) => [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+    'set.ge': (_ctx, [left, right]) => [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+    'set.range': (_ctx, [start, end]) => {
       const s = new Set<number>()
-      for (let i = args[0] as number; i <= (args[1] as number); i++) s.add(i)
+      for (let i = start as number; i <= (end as number); i++) {
+        s.add(i)
+      }
       return s
     },
-    'set.elem': (_ctx, args) => new Set<number>([args[0] as number]),
+    'set.elem': (_ctx, [value]) => new Set<number>([value as number]),
     'set.literal': (_ctx, args) => {
       const s = new Set<number>()
       for (const e of args) {
@@ -146,11 +147,11 @@ function basicSyscall(): Record<string, SyscallHandler> {
       }
       return s
     },
-    'set.in': (_ctx, args) => (args[1] as Set<number>).has(args[0] as number),
+    'set.in': (_ctx, [value, set]) => (set as Set<number>).has(value as number),
 
     // ---------- string ----------
-    'str.concat': (_ctx, args) => (args[0] as string) + (args[1] as string),
-    'str.length': (_ctx, args) => (args[0] as string).length,
+    'str.concat': (_ctx, [left, right]) => (left as string) + (right as string),
+    'str.length': (_ctx, [str]) => (str as string).length,
 
     // ---------- steps.check（循环步数限制）----------
     'steps.check': (ctx, _args) => {
@@ -161,9 +162,9 @@ function basicSyscall(): Record<string, SyscallHandler> {
     },
 
     // ---------- range.check（subrange 运行时边界检查）----------
-    'range.check': (_ctx, args) => {
-      if ((args[0] as number) < (args[1] as number) || (args[0] as number) > (args[2] as number)) {
-        throw new Error(`subrange value ${args[0]} out of range ${args[1]}..${args[2]}`)
+    'range.check': (_ctx, [index, min, max]) => {
+      if ((index as number) < (min as number) || (index as number) > (max as number)) {
+        throw new Error(`subrange value ${index} out of range ${min}..${max}`)
       }
       return undefined
     },
