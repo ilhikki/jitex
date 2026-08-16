@@ -283,8 +283,10 @@ function compileBlock(
 
   // program 头的文件参数初始化（ISO 7185 6.10）：
   // PROGRAM X(INFILE, OUTFILE); 中声明的参数必须在算法开始前绑定到外部文件。
-  // 本工程在运行时用 ctx.programFileUrls 做映射（缺省为恒等映射），
-  // 通过 program.fileUrl syscall 取 url，再 file.assign 把 url 写入文件变量。
+  // 绑定机制是 impl-defined（ISO 6.10）：本工程在运行时用 ctx.programFileUrls
+  // 做映射（缺省为恒等映射），通过 program.fileUrl syscall 取 url，
+  // 再用 rec.set 直接把 url 写入文件句柄的 .url 字段。
+  // （不使用 file.assign —— 那是 Borland 扩展过程，非 ISO 6.6.5.2。）
   if (info.kind === 'program' && programParams && programParams.length > 0) {
     for (const p of programParams) {
       const sym = analysis.globalSymbolOf(p.name)
@@ -292,8 +294,9 @@ function compileBlock(
         const varSym = sym as { varId: number }
         body.push(
           evalStmt(
-            syscall('file.assign', [
+            syscall('rec.set', [
               ref(varSym.varId),
+              litStr('url'),
               syscall('program.fileUrl', [litStr(p.name)]),
             ]),
           ),
@@ -470,18 +473,8 @@ function compileAssignment(
         return [evalStmt(syscall('ptr.assign', [ptrExpr, value]))]
       }
       // 文件缓冲区赋值 f^ := x → file.put
-      // 二进制字节文件（file of byte / file of eight_bits，elem 为 subrange）：
-      // x 是 0..255 的 byte 值，需转成单字符写入，否则 file.put 会把 number
-      // 转成十进制字符串污染 DVI/TFM 等二进制产物。
-      // 注意：file of integer（elem.tag === 'i64'）不走此路径，仍按文本写入。
-      const fExpr = compileExpr(fa.object, a, ws)
-      const elemTi = objType.fileElem ?? null
-      const isBinaryByteFile = elemTi !== null && elemTi.tag === 'subrange'
-      if (isBinaryByteFile) {
-        const charVal = syscall('cast.i64.to.char', [value])
-        return [evalStmt(syscall('file.put', [fExpr, charVal]))]
-      }
       // file of record: f^ := r 设置记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
+      const fExpr = compileExpr(fa.object, a, ws)
       if (isRecordFile(objType)) {
         return [evalStmt(syscall('file.rec.setbuf', [fExpr, value]))]
       }
@@ -747,61 +740,34 @@ function compileProcedureCall(
     case 'read':
       return compileReadln(node.arguments, a, ws, true)
     case 'reset': {
-      // 对二进制字节文件（file of byte/eight_bits，elem 为 subrange）用 file.reset.binary，
-      // 使 runtime 读取时不把 10/13 当作行结束符，正确处理 TFM/DVI 等二进制文件。
+      // ISO 6.6.5.2 reset(f)：1-arg 形式。
+      // 若源码写了 reset(f, name) 2-arg 形式（非 ISO），name 参数被编译但
+      // runtime 的 file.reset 忽略之（file.url 必须已通过 program-param 绑定）。
+      // file of record 走 file.rec.reset（传元素类型描述，用于 reset 后创建默认缓冲区）。
       const resetArgs = node.arguments.map((x) => compileExpr(x, a, ws))
       if (node.arguments.length > 0) {
         const fileType = a.typeOf(node.arguments[0])
         if (isRecordFile(fileType)) {
-          // 传元素类型描述，用于 reset 后创建默认缓冲区记录
           const elemTi = fileType.fileElem!
           resetArgs.push(typeDescLiteral(elemTi))
           return [evalStmt(syscall('file.rec.reset', resetArgs))]
-        }
-        const elemTi = fileType.fileElem ?? null
-        if (elemTi !== null && elemTi.tag === 'subrange') {
-          return [evalStmt(syscall('file.reset.binary', resetArgs))]
         }
       }
       return [evalStmt(syscall('file.reset', resetArgs))]
     }
     case 'rewrite': {
-      // 对二进制字节文件（file of byte/eight_bits，elem 为 subrange）用 file.rewrite.binary，
-      // 使 runtime 用 Latin-1 编码写入，避免 UTF-8 破坏 DVI/TFM 等二进制产物。
+      // ISO 6.6.5.2 rewrite(f)：1-arg 形式（同 reset 的处理策略）。
       const rewriteArgs = node.arguments.map((x) => compileExpr(x, a, ws))
       if (node.arguments.length > 0) {
         const fileType = a.typeOf(node.arguments[0])
         if (isRecordFile(fileType)) {
-          // 传元素类型描述，用于 rewrite 后创建默认缓冲区记录
           const elemTi = fileType.fileElem!
           rewriteArgs.push(typeDescLiteral(elemTi))
           return [evalStmt(syscall('file.rec.rewrite', rewriteArgs))]
         }
-        const elemTi = fileType.fileElem ?? null
-        if (elemTi !== null && elemTi.tag === 'subrange') {
-          return [evalStmt(syscall('file.rewrite.binary', rewriteArgs))]
-        }
       }
       return [evalStmt(syscall('file.rewrite', rewriteArgs))]
     }
-    case 'close':
-      return [
-        evalStmt(
-          syscall(
-            'file.close',
-            node.arguments.map((x) => compileExpr(x, a, ws)),
-          ),
-        ),
-      ]
-    case 'assign':
-      return [
-        evalStmt(
-          syscall(
-            'file.assign',
-            node.arguments.map((x) => compileExpr(x, a, ws)),
-          ),
-        ),
-      ]
     case 'get': {
       const getArgs = node.arguments.map((x) => compileExpr(x, a, ws))
       if (node.arguments.length > 0) {
@@ -956,20 +922,13 @@ function compileWriteln(
   // 检查第一个参数是否是文件
   let fileExpr: JsonCode.Expr | null = null
   let argStart = 0
-  let fileElemTi: TypeInfo | null = null
   if (args.length > 0) {
     const firstTi = a.typeOf(args[0])
     if (firstTi.tag === 'file') {
       fileExpr = compileExpr(args[0], a, ws)
-      fileElemTi = firstTi.fileElem ?? null
       argStart = 1
     }
   }
-  // 二进制文件（file of byte / file of eight_bits，elem 为 subrange）：
-  // write(f, x) 应写入单字节（String.fromCharCode(x & 0xff)），
-  // 而非十进制字符串。Knuth TeX 的 DVIFILE: BYTEFILE 即此模式。
-  // file of integer（elem.tag === 'i64'）和 text 文件不在此列，仍按文本写入。
-  const isBinaryByteFile = fileElemTi !== null && fileElemTi.tag === 'subrange'
 
   for (let i = argStart; i < args.length; i++) {
     const arg = args[i]
@@ -999,19 +958,7 @@ function compileWriteln(
     }
 
     const ti = a.typeOf(valueNode)
-    let valExpr = compileExpr(valueNode, a, ws)
-    // 二进制字节文件：把 byte 值转成单字符（String.fromCharCode），
-    // 走 io.write.char.file 写入单字节，避免十进制字符串污染 DVI/TFM 等二进制产物。
-    if (
-      isBinaryByteFile &&
-      widthExpr === null &&
-      (ti.tag === 'i64' || ti.tag === 'subrange' || ti.tag === 'enum')
-    ) {
-      valExpr = syscall('cast.i64.to.char', [valExpr])
-      out.push(evalStmt(syscall('io.write.char.file', [fileExpr!, valExpr])))
-      continue
-    }
-
+    const valExpr = compileExpr(valueNode, a, ws)
     const suffix = typeSuffix(ti)
 
     if (widthExpr !== null) {
@@ -1054,20 +1001,13 @@ function compileReadln(
   // 检查第一个参数是否是文件
   let fileExpr: JsonCode.Expr | null = null
   let argStart = 0
-  let fileElemTi: TypeInfo | null = null
   if (args.length > 0) {
     const firstTi = a.typeOf(args[0])
     if (firstTi.tag === 'file') {
       fileExpr = compileExpr(args[0], a, ws)
-      fileElemTi = firstTi.fileElem ?? null
       argStart = 1
     }
   }
-  // 二进制字节文件（file of byte / file of eight_bits，elem 为 subrange）：
-  // read(f, x) 应读取单字节并按 byte 值赋给 x，
-  // 而非按十进制 token 解析。Knuth TeX 的 TFMFILE/DVIFILE 即此模式。
-  // file of integer（elem.tag === 'i64'）不在此列，仍按文本解析。
-  const isBinaryByteFile = fileElemTi !== null && fileElemTi.tag === 'subrange'
 
   for (let i = argStart; i < args.length; i++) {
     const argNode = args[i]
@@ -1079,17 +1019,6 @@ function compileReadln(
       throw new Error(`readln/read: variable ${argNode.name} not found`)
     }
     const ti = sym.typeInfo
-    // 二进制字节文件：read(f, byte) → 读单字符再转 ord（0..255）
-    if (isBinaryByteFile && (ti.tag === 'i64' || ti.tag === 'subrange' || ti.tag === 'enum')) {
-      const chExpr = syscall('io.read.char.file', [fileExpr!])
-      const valExpr = syscall('cast.char.to.i64', [chExpr])
-      if (sym.isVarParam) {
-        out.push(evalStmt(syscall('cell.set', [ref(sym.varId), valExpr])))
-      } else {
-        out.push(assignStmt(ref(sym.varId), valExpr))
-      }
-      continue
-    }
     const suffix = typeSuffix(ti)
     const key = fileExpr ? `io.read.${suffix}.file` : `io.read.${suffix}`
     const readArgs = fileExpr ? [fileExpr] : []
@@ -1451,21 +1380,11 @@ function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[
       return syscall('ptr.deref', [compileExpr(node.object, a, ws)])
     }
     // 文件缓冲区访问 f^
-    // 二进制字节文件（file of byte/eight_bits，elem 为 subrange）：f^ 返回 byte 值
-    // （0..255 的 integer），而非字符。Knuth TeX 的 TFMFILE^ 即此模式
-    // （`LF := TFMFILE^` 后做 `LF > 127` 比较）。
-    // file of integer（elem.tag === 'i64'）和 text 文件仍返回字符/文本。
-    const peekExpr = syscall('file.peek', [compileExpr(node.object, a, ws)])
-    const elemTi = objType.fileElem ?? null
-    const isBinaryByteFile = elemTi !== null && elemTi.tag === 'subrange'
-    if (isBinaryByteFile) {
-      return syscall('cast.char.to.i64', [peekExpr])
-    }
     // file of record: f^ 返回记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
     if (isRecordFile(objType)) {
       return syscall('file.rec.peek', [compileExpr(node.object, a, ws)])
     }
-    return peekExpr
+    return syscall('file.peek', [compileExpr(node.object, a, ws)])
   }
   const obj = compileExpr(node.object, a, ws)
   return syscall('rec.field', [obj, litStr(node.field.name.toLowerCase())])

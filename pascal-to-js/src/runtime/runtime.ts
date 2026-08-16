@@ -27,7 +27,6 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     outputBuffer: [],
     inputQueue: options.input ? [...options.input] : [],
     files: options.files ?? new Map(),
-    fileStates: new WeakMap(),
     readState: { tokens: [], tokenIdx: 0 },
     steps: 0,
     maxSteps: options.maxSteps ?? Infinity,

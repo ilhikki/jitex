@@ -42,8 +42,8 @@ const programParamTests: PascalTest[] = [
   {
     name: '§6.10 文件参数：恒等映射 programFileUrls（INFILE→INFILE，OUTFILE→OUTFILE）',
     code:
-      `PROGRAM COPYFILE(INFILE,OUTFILE);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN WHILE NOT EOLN(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;WRITELN(OUTFILE);READLN(INFILE);END;CLOSE(OUTFILE);END.`,
-    purpose: 'ISO §6.10: 通过 programFileUrls 精确相等映射绑定外部文件，等价于显式 ASSIGN',
+      `PROGRAM COPYFILE(INFILE,OUTFILE);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN WHILE NOT EOLN(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;WRITELN(OUTFILE);READLN(INFILE);END;END.`,
+    purpose: 'ISO §6.10: 通过 programFileUrls 精确相等映射绑定外部文件',
     files: new Map<string, Uint8Array>([
       ['INFILE', text('ABC\nDEF\n')],
       ['OUTFILE', new Uint8Array(0)],
@@ -58,7 +58,7 @@ const programParamTests: PascalTest[] = [
   {
     name: '§6.10 文件参数：缺省 programFileUrls 时恒等映射（程序参数名即 files 键名）',
     code:
-      `PROGRAM COPY2(F,G);VAR F,G:FILE OF CHAR;BEGIN RESET(F);REWRITE(G);WHILE NOT EOF(F)DO BEGIN G^:=F^;PUT(G);GET(F);END;CLOSE(G);END.`,
+      `PROGRAM COPY2(F,G);VAR F,G:FILE OF CHAR;BEGIN RESET(F);REWRITE(G);WHILE NOT EOF(F)DO BEGIN G^:=F^;PUT(G);GET(F);END;END.`,
     purpose: 'ISO §6.10: 缺省 programFileUrls 时，程序头参数名本身即外部文件键',
     files: new Map<string, Uint8Array>([
       ['F', text('HELLO')],
@@ -70,7 +70,7 @@ const programParamTests: PascalTest[] = [
   {
     name: '§6.10 文件参数：programFileUrls 做重命名映射（F→IN.TXT，G→OUT.TXT）',
     code:
-      `PROGRAM RENAMEMAP(F,G);VAR F,G:FILE OF CHAR;C:CHAR;BEGIN RESET(F);REWRITE(G);WHILE NOT EOF(F)DO BEGIN C:=F^;WRITE(G,C);GET(F);END;CLOSE(G);END.`,
+      `PROGRAM RENAMEMAP(F,G);VAR F,G:FILE OF CHAR;C:CHAR;BEGIN RESET(F);REWRITE(G);WHILE NOT EOF(F)DO BEGIN C:=F^;WRITE(G,C);GET(F);END;END.`,
     purpose: 'ISO §6.10: programFileUrls 可以重命名文件变量→内存文件名，变量名不等于文件名',
     files: new Map<string, Uint8Array>([
       ['IN.TXT', text('MAPPED')],
@@ -81,9 +81,9 @@ const programParamTests: PascalTest[] = [
   },
 
   {
-    name: '§6.10 文件参数：映射只影响 program 头参数，不受局部 ASSIGN 干扰',
+    name: '§6.10 文件参数：映射只影响 program 头参数',
     code: `PROGRAM T(IO);VAR IO:FILE OF CHAR;X:INTEGER;BEGIN RESET(IO);READ(IO,X);WRITELN('X=',X);END.`,
-    purpose: 'ISO §6.10: program 头的文件初始化在 algorithm 开始前完成，因此 RESET 之前不需要调用 ASSIGN',
+    purpose: 'ISO §6.10: program 头的文件初始化在 algorithm 开始前完成，因此 RESET 之前不需要绑定文件',
     files: new Map<string, Uint8Array>([['IO', text('7')]]),
     programFileUrls: { IO: 'IO' },
     expectedContains: 'X=7',
@@ -102,7 +102,7 @@ const programParamTests: PascalTest[] = [
   {
     name: '§6.10 文件参数：大小写不敏感映射（inFile → INFILE 命中）',
     code:
-      `PROGRAM MIXED(infile,outfile);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;CLOSE(OUTFILE);END.`,
+      `PROGRAM MIXED(infile,outfile);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;END.`,
     purpose: 'ISO §6.1.2: Pascal 标识符大小写不敏感，programFileUrls 键匹配也应大小写不敏感',
     files: new Map<string, Uint8Array>([
       ['INFILE', text('lowercaseOK')],
@@ -116,7 +116,7 @@ const programParamTests: PascalTest[] = [
   {
     name: '§6.10 编译一次运行两次：不同 programFileUrls 不应污染编译产物',
     code:
-      `PROGRAM ONCE(SRC,DST);VAR SRC,DST:FILE OF CHAR;C:CHAR;BEGIN RESET(SRC);REWRITE(DST);WHILE NOT EOF(SRC)DO BEGIN C:=SRC^;WRITE(DST,C);GET(SRC);END;CLOSE(DST);END.`,
+      `PROGRAM ONCE(SRC,DST);VAR SRC,DST:FILE OF CHAR;C:CHAR;BEGIN RESET(SRC);REWRITE(DST);WHILE NOT EOF(SRC)DO BEGIN C:=SRC^;WRITE(DST,C);GET(SRC);END;END.`,
     purpose:
       '核心断言：programFileUrls 在运行时决定；同一份 Pascal 源码使用不同映射运行两次应读到不同文件，不需要重新编译',
     files: new Map<string, Uint8Array>([
@@ -157,23 +157,13 @@ const inputOutputParamsTests: PascalTest[] = [
   },
 ]
 
-// ============================================================================
-// §6.10.4 program parameter 未声明为 var：应在分析阶段报错吗？
-// 标准允许把非文件变量也作为 program-parameter（binding 是 impl-defined），
-// 这里只验证本工程的行为：声明但未在 var 段定义的 program-param 名被当做未定义实体访问，
-// 会在 analysis 阶段（或运行时）报错。如出现该问题（由本文件暴露），归为"发现的未修复问题"。
-// ============================================================================
 const programParamDeclTests: PascalTest[] = [
-  // 发现的问题（不修复）：PROGRAM T(FOO) 中 FOO 在 var 段未声明类型，
-  // 标准下 program-parameter 是 variable-identifier 的定义点，但本工程当前未对
-  // "作为 program-param 出现但未在 var 段声明类型" 做报错——属于已有未覆盖问题，
-  // 本任务只记录、不修复。作为回归，这里断言其"运行无报错、能输出"（当前行为）。
   {
-    name: '§6.10 program-parameter 未在 var 段声明类型（已知未修复：应报错但实际不报错）',
+    name: '§6.10 program-parameter 未在 var 段声明类型',
     code: `PROGRAM T(FOO);BEGIN WRITELN(42);END.`,
     purpose:
-      '【已发现、不修复问题】ISO §6.10: program-parameters 是 variable-identifier 定义点，但未声明类型的标识符应被拒绝；当前实现不报错，保留为已知不一致',
-    expectedOutput: '42\n',
+      'ISO §6.10: program-parameters 是 variable-identifier 定义点，但未声明类型的标识符应被拒绝；',
+    expectedError: ''
   },
 ]
 

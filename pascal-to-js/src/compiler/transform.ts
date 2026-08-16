@@ -10,7 +10,7 @@
  *   1. parse：Pascal 源码 → AST
  *   2. analyze：AST → Analysis
  *   3. compile：AST + Analysis → JsonCode
- *      （program 头文件参数的 file.assign 由 compileBlock 统一插入，
+ *      （program 头文件参数的 .url 字段由 compileBlock 用 rec.set 统一绑定，
  *       url 通过 program.fileUrl syscall 在运行时从 ctx.programFileUrls 查表，
  *       不在编译期烧死具体 url。）
  *   4. toJs：JsonCode → JS 代码字符串（通过 SemanticCompiler 实现）
