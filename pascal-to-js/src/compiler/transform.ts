@@ -26,11 +26,11 @@ import { type Analysis, analyzeProgram, type VarSymbol } from './analysis.ts'
 import { compileProgram } from './compiler.ts'
 import { toJs } from './json-code-compiler.ts'
 import * as JsonCode from './json-code.ts'
-import type { RunError, RunState } from '../runtime/run-state.ts'
-import { createDispatcher, createRuntimeContext, toRunState } from './runtime.ts'
-import type { RuntimeContext, RuntimeOptions } from './runtime-type.ts'
+import type { RunError, RunState } from '@/runtime/run-state.ts'
+import { createDispatcher, createRuntimeContext, toRunState } from '@/runtime/runtime.ts'
+import type { RuntimeContext, RuntimeOptions } from '@/runtime/runtime-type.ts'
 import type { IlPlugin } from './plugin.ts'
-import { PascalSemanticCompiler } from './sys/pascal-semantic-compiler.ts'
+import { PascalSemanticCompiler } from '@/runtime/sys/pascal-semantic-compiler.ts'
 
 // ============================================================
 // TransformOptions
@@ -203,7 +203,7 @@ function reportErrorAsState(e: unknown, ctx: RuntimeContext) {
   return toRunState(ctx, 'error', error)
 }
 
-function getRunTimeContexFromOptions(options: RuntimeOptions) {
+function getRunTimeContextFromOptions(options: RuntimeOptions) {
   const ctx = createRuntimeContext({
     input: options.input,
     files: options.files,
@@ -217,7 +217,7 @@ function getRunTimeContexFromOptions(options: RuntimeOptions) {
 }
 
 export function runJs(source: string, options: RuntimeOptions): RunState {
-  const ctx = getRunTimeContexFromOptions(options)
+  const ctx = getRunTimeContextFromOptions(options)
   try {
     ctx.jsCode = source
     // __sys dispatcher
@@ -242,7 +242,7 @@ export function run(source: string, options: RunOptions = {}): RunState {
       plugins: options.plugins,
     })
   } catch (e: unknown) {
-    const ctx = getRunTimeContexFromOptions(options)
+    const ctx = getRunTimeContextFromOptions(options)
     return reportErrorAsState(e, ctx)
   }
 

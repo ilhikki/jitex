@@ -14,11 +14,11 @@
  * 哪些走 dispatcher（IO/file/cell/mem/set）。本文件实现所有走 dispatcher 的 key。
  */
 
-import type { RunError, RunState } from '../runtime/run-state.ts'
-import type { PascalFile } from '../runtime/file-model.ts'
-import type { IlPlugin } from './plugin.ts'
+import type { RunError, RunState } from './run-state.ts'
+import type { PascalFile } from './file-model.ts'
+import type { IlPlugin } from '../compiler/plugin.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
-import { FileState, TypeDescriptor } from '@/compiler/runtime-type.ts'
+import { FileState, TypeDescriptor } from '@/runtime/runtime-type.ts'
 import { ioSyscalls } from './sys/io.ts'
 import { formatField, formatReal } from './runtime-util.ts'
 

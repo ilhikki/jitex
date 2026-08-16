@@ -20,8 +20,8 @@
  */
 
 import type { IlPlugin } from '../plugin.ts'
-import type { RuntimeContext } from '../runtime-type.ts'
-import type { PascalFile } from '../../runtime/file-model.ts'
+import type { RuntimeContext } from '@/runtime/runtime-type.ts'
+import type { PascalFile } from '@/runtime/file-model.ts'
 
 /**
  * 文件错误状态记录（按 PascalFile 引用）。

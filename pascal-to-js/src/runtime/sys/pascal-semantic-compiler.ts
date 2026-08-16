@@ -1,5 +1,5 @@
-import type { JsCompiler, SemanticCompiler } from '../json-code-compiler.ts'
-import * as JsonCode from '../json-code.ts'
+import type { JsCompiler, SemanticCompiler } from '../../compiler/json-code-compiler.ts'
+import * as JsonCode from '../../compiler/json-code.ts'
 
 export class PascalSemanticCompiler implements SemanticCompiler {
   literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
