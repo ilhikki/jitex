@@ -3,84 +3,84 @@ import type { FileState, RuntimeContext, SyscallHandler, TypeDescriptor } from '
 import { createDefaultRec, deepCopyValue, formatField, formatReal } from '@/runtime/runtime-util.ts'
 
 export function fileSyscalls(): Record<string, SyscallHandler> {
-  return { // ---------- io.write（带文件）----------
-    'io.write.i64.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, String(args[1]))
+  return {
+    // ---------- io.write（带文件）----------
+    'io.write.i64.file': (ctx, [file, value]) => {
+      writeToFile(ctx, file as PascalFile, String(value))
       return undefined
     },
-    'io.write.f64.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, formatReal(args[1] as number))
+    'io.write.f64.file': (ctx, [file, value]) => {
+      writeToFile(ctx, file as PascalFile, formatReal(value as number))
       return undefined
     },
-    'io.write.bool.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, args[1] ? 'TRUE' : 'FALSE')
+    'io.write.bool.file': (ctx, [file, value]) => {
+      writeToFile(ctx, file as PascalFile, value ? 'TRUE' : 'FALSE')
       return undefined
     },
-    'io.write.char.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, args[1] as string)
+    'io.write.char.file': (ctx, [file, value]) => {
+      writeToFile(ctx, file as PascalFile, value as string)
       return undefined
     },
-    'io.write.str.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, args[1] as string)
+    'io.write.str.file': (ctx, [file, value]) => {
+      writeToFile(ctx, file as PascalFile, value as string)
       return undefined
     },
 
     // ---------- io.write.fmt.file（带文件 + 格式化）----------
-    // [file, value, width, precision?]
-    'io.write.i64.fmt.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, formatField(String(args[1]), args[2] as number))
+    'io.write.i64.fmt.file': (ctx, [file, value, width]) => {
+      writeToFile(ctx, file as PascalFile, formatField(String(value), width as number))
       return undefined
     },
-    'io.write.f64.fmt.file': (ctx, args) => {
+    'io.write.f64.fmt.file': (ctx, [file, value, width, precision]) => {
       writeToFile(
         ctx,
-        args[0] as PascalFile,
+        file as PascalFile,
         formatField(
-          args[3] !== undefined ? (args[1] as number).toFixed(args[3] as number) : formatReal(args[1] as number),
-          args[2] as number,
+          precision !== undefined ? (value as number).toFixed(precision as number) : formatReal(value as number),
+          width as number,
         ),
       )
       return undefined
     },
-    'io.write.bool.fmt.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, formatField(args[1] ? 'TRUE' : 'FALSE', args[2] as number))
+    'io.write.bool.fmt.file': (ctx, [file, value, width]) => {
+      writeToFile(ctx, file as PascalFile, formatField(value ? 'TRUE' : 'FALSE', width as number))
       return undefined
     },
-    'io.write.char.fmt.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, formatField(args[1] as string, args[2] as number))
+    'io.write.char.fmt.file': (ctx, [file, value, width]) => {
+      writeToFile(ctx, file as PascalFile, formatField(value as string, width as number))
       return undefined
     },
-    'io.write.str.fmt.file': (ctx, args) => {
-      writeToFile(ctx, args[0] as PascalFile, formatField(args[1] as string, args[2] as number))
+    'io.write.str.fmt.file': (ctx, [file, value, width]) => {
+      writeToFile(ctx, file as PascalFile, formatField(value as string, width as number))
       return undefined
     },
 
-    'io.writeln.file': (ctx, args) => {
-      writelnToFile(ctx, args[0] as PascalFile)
+    'io.writeln.file': (ctx, [file]) => {
+      writelnToFile(ctx, file as PascalFile)
       return undefined
     },
 
     // ---------- io.read（带文件）----------
-    'io.read.i64.file': (ctx, args) => readFileInt(ctx, args[0] as PascalFile),
-    'io.read.f64.file': (ctx, args) => readFileReal(ctx, args[0] as PascalFile),
-    'io.read.bool.file': (ctx, args) => readFileBool(ctx, args[0] as PascalFile),
-    'io.read.char.file': (ctx, args) => readFileChar(ctx, args[0] as PascalFile),
-    'io.read.str.file': (ctx, args) => readFileStr(ctx, args[0] as PascalFile),
+    'io.read.i64.file': (ctx, [file]) => readFileInt(ctx, file as PascalFile),
+    'io.read.f64.file': (ctx, [file]) => readFileReal(ctx, file as PascalFile),
+    'io.read.bool.file': (ctx, [file]) => readFileBool(ctx, file as PascalFile),
+    'io.read.char.file': (ctx, [file]) => readFileChar(ctx, file as PascalFile),
+    'io.read.str.file': (ctx, [file]) => readFileStr(ctx, file as PascalFile),
 
     // ---------- io.readln.skip ----------
-    'io.readln.skip': (ctx, _args) => {
+    'io.readln.skip': (ctx) => {
       ctx.readState.tokens = []
       ctx.readState.tokenIdx = 0
       return undefined
     },
-    'io.readln.skip.file': (ctx, args) => {
-      readFilelnSkip(ctx, args[0] as PascalFile)
+    'io.readln.skip.file': (ctx, [file]) => {
+      readFilelnSkip(ctx, file as PascalFile)
       return undefined
     },
 
-    'io.page': (ctx, args) => {
-      if (args.length > 0) {
-        writeToFile(ctx, args[0] as PascalFile, '\f')
+    'io.page': (ctx, [file]) => {
+      if (file !== undefined) {
+        writeToFile(ctx, file as PascalFile, '\f')
       } else {
         ctx.outputBuffer.push('\f')
       }
@@ -88,165 +88,168 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- file ----------
-    'file.create': (_ctx, _args) => ({ url: '', offset: 0 } as PascalFile),
-    'file.reset': (ctx, args) => {
-      const file = args[0] as PascalFile
-      if (!args[0]) throw new Error(`file.reset: file is undefined`)
-      // Pascal reset(f, name, ...) — 先设置文件名再打开
-      if (args[1] !== undefined && args[1] !== '') {
-        file.url = fileUrlToString(args[1])
-        ctx.fileStates.delete(file)
+    'file.create': () => ({ url: '', offset: 0 } as PascalFile),
+
+    'file.reset': (ctx, [file, fileName]) => {
+      const f = file as PascalFile
+      if (!f) throw new Error(`file.reset: file is undefined`)
+      if (fileName !== undefined && fileName !== '') {
+        f.url = fileUrlToString(fileName)
+        ctx.fileStates.delete(f)
       }
       ctx.debugLog.push(
-        `[file.reset] url="${file.url}" found=${ctx.files.has(file.url)} contentLen=${
-          ctx.files.get(file.url)?.length ?? -1
-        }`,
+        `[file.reset] url="${f.url}" found=${ctx.files.has(f.url)} contentLen=${ctx.files.get(f.url)?.length ?? -1}`,
       )
-      resetFile(ctx, file, false)
+      resetFile(ctx, f, false)
       return undefined
     },
-    'file.reset.binary': (ctx, args) => {
-      const file = args[0] as PascalFile
-      // 二进制字节文件（file of byte/eight_bits）：不把 10/13 当作行结束符
-      if (!args[0]) throw new Error(`file.reset.binary: file is undefined`)
-      if (args[1] !== undefined && args[1] !== '') {
-        file.url = fileUrlToString(args[1])
-        ctx.fileStates.delete(file)
+
+    'file.reset.binary': (ctx, [file, fileName]) => {
+      const f = file as PascalFile
+      if (!f) throw new Error(`file.reset.binary: file is undefined`)
+      if (fileName !== undefined && fileName !== '') {
+        f.url = fileUrlToString(fileName)
+        ctx.fileStates.delete(f)
       }
       ctx.debugLog.push(
-        `[file.reset.binary] url="${file.url}" found=${ctx.files.has(file.url)} contentLen=${
-          ctx.files.get(file.url)?.length ?? -1
+        `[file.reset.binary] url="${f.url}" found=${ctx.files.has(f.url)} contentLen=${
+          ctx.files.get(f.url)?.length ?? -1
         }`,
       )
-      resetFile(ctx, file, true)
+      resetFile(ctx, f, true)
       return undefined
     },
-    'file.rewrite': (ctx, args) => {
-      const file = args[0] as PascalFile
-      if (!args[0]) throw new Error(`file.rewrite: file is undefined`)
-      // Pascal rewrite(f, name, ...) — 先设置文件名再打开
-      if (args[1] !== undefined && args[1] !== '') {
-        file.url = fileUrlToString(args[1])
-        ctx.fileStates.delete(file)
+
+    'file.rewrite': (ctx, [file, fileName]) => {
+      const f = file as PascalFile
+      if (!f) throw new Error(`file.rewrite: file is undefined`)
+      if (fileName !== undefined && fileName !== '') {
+        f.url = fileUrlToString(fileName)
+        ctx.fileStates.delete(f)
       }
-      rewriteFile(ctx, file, false)
+      rewriteFile(ctx, f, false)
       return undefined
     },
-    'file.rewrite.binary': (ctx, args) => {
-      const file = args[0] as PascalFile
-      // 二进制字节文件（file of byte/eight_bits）：Latin-1 编码写入
-      if (!args[0]) throw new Error(`file.rewrite.binary: file is undefined`)
-      if (args[1] !== undefined && args[1] !== '') {
-        file.url = fileUrlToString(args[1])
-        ctx.fileStates.delete(file)
+
+    'file.rewrite.binary': (ctx, [file, fileName]) => {
+      const f = file as PascalFile
+      if (!f) throw new Error(`file.rewrite.binary: file is undefined`)
+      if (fileName !== undefined && fileName !== '') {
+        f.url = fileUrlToString(fileName)
+        ctx.fileStates.delete(f)
       }
-      rewriteFile(ctx, file, true)
+      rewriteFile(ctx, f, true)
       return undefined
     },
-    'file.close': (ctx, args) => {
-      closeFile(ctx, args[0] as PascalFile)
+
+    'file.close': (ctx, [file]) => {
+      closeFile(ctx, file as PascalFile)
       return undefined
     },
-    'file.assign': (ctx, args) => {
-      if (args[0] === undefined) {
-        throw new Error(`file.assign: file var is undefined (url=${args[1]})`)
+
+    'file.assign': (ctx, [file, url]) => {
+      if (file === undefined) {
+        throw new Error(`file.assign: file var is undefined (url=${url})`)
       }
-      ;(args[0] as PascalFile).url = args[1] as string
-      ctx.fileStates.delete(args[0] as PascalFile)
+      ;(file as PascalFile).url = url as string
+      ctx.fileStates.delete(file as PascalFile)
       return undefined
     },
-    'file.get': (ctx, args) => {
-      getFile(ctx, args[0] as PascalFile)
+
+    'file.get': (ctx, [file]) => {
+      getFile(ctx, file as PascalFile)
       return undefined
     },
-    'file.put': (ctx, args) => {
-      // put(f) 或 put(f, value)
-      // ISO 7185 6.6.5.2 put(f) pre-assertion: f0.M = Generation (i.e., after rewrite)
-      // 违反 pre-assertion 应报错
-      const s = getFileState(ctx, args[0] as PascalFile)
+
+    'file.put': (ctx, [file, value]) => {
+      const s = getFileState(ctx, file as PascalFile)
       if (!s.writable) {
         throw new Error(
           'put(f) before rewrite: pre-assertion violated (ISO 7185 6.6.5.2: f0.M must be Generation)',
         )
       }
-      if (args.length >= 2) {
-        // f^ := x 的语义：直接写入文件
-        writeToFile(ctx, args[0] as PascalFile, typeof args[1] === 'number' ? String(args[1]) : args[1] as string)
+      if (value !== undefined) {
+        writeToFile(ctx, file as PascalFile, typeof value === 'number' ? String(value) : value as string)
       }
       return undefined
     },
-    'file.peek': (ctx, args) => peekFile(ctx, args[0] as PascalFile),
-    'file.eof': (ctx, args) => {
-      if (!args[0]) throw new Error(`file.eof: file is undefined (typeof=${typeof args[0]})`)
-      return isFileEof(ctx, args[0] as PascalFile)
+
+    'file.peek': (ctx, [file]) => peekFile(ctx, file as PascalFile),
+
+    'file.eof': (ctx, [file]) => {
+      if (!file) throw new Error(`file.eof: file is undefined (typeof=${typeof file})`)
+      return isFileEof(ctx, file as PascalFile)
     },
-    'file.eoln': (ctx, args) => isFileEoln(ctx, args[0] as PascalFile),
+
+    'file.eoln': (ctx, [file]) => isFileEoln(ctx, file as PascalFile),
 
     // ---------- file of record（ISO 7185 6.4.3.5）----------
-    // record 文件以 JS 对象数组形式存储，序列化为 JSON（带 magic prefix）。
-    // TeX 格式文件 word_file = file of memory_word 依赖此功能。
-    'file.rec.reset': (ctx, args) => {
-      if (!args[0]) throw new Error(`file.rec.reset: file is undefined`)
-      // 参数布局：[file, name?, typeDesc?] 或 [file, typeDesc]（无 name 时）
-      // name 是 string/数组，typeDesc 是 plain object（含 tag/fields）
+    'file.rec.reset': (ctx, [file, arg1, arg2]) => {
+      if (!file) throw new Error(`file.rec.reset: file is undefined`)
+      const f = file as PascalFile
       let name: string | undefined = undefined
       let typeDesc: TypeDescriptor | undefined = undefined
-      if (args.length >= 3) {
-        name = args[1] as string | undefined
-        typeDesc = args[2] as TypeDescriptor
-      } else if (args.length === 2) {
-        typeDesc = args[1] as TypeDescriptor
+      // 根据参数个数判断：若 arg2 存在则 arg1 为 name，否则 arg1 可能为 typeDesc
+      if (arg2 !== undefined) {
+        name = arg1 as string | undefined
+        typeDesc = arg2 as TypeDescriptor
+      } else if (arg1 !== undefined) {
+        typeDesc = arg1 as TypeDescriptor
       }
       if (name !== undefined && name !== '') {
-        ;(args[0] as PascalFile).url = fileUrlToString(name)
-        ctx.fileStates.delete(args[0] as PascalFile)
+        f.url = fileUrlToString(name)
+        ctx.fileStates.delete(f)
       }
       ctx.debugLog.push(
-        `[file.rec.reset] url="${(args[0] as PascalFile).url}" found=${
-          ctx.files.has((args[0] as PascalFile).url)
-        } contentLen=${ctx.files.get((args[0] as PascalFile).url)?.length ?? -1}`,
+        `[file.rec.reset] url="${f.url}" found=${ctx.files.has(f.url)} contentLen=${
+          ctx.files.get(f.url)?.length ?? -1
+        }`,
       )
-      resetRecFile(ctx, args[0] as PascalFile, typeDesc)
+      resetRecFile(ctx, f, typeDesc)
       return undefined
     },
-    'file.rec.rewrite': (ctx, args) => {
-      if (!args[0]) throw new Error(`file.rec.rewrite: file is undefined`)
+
+    'file.rec.rewrite': (ctx, [file, arg1, arg2]) => {
+      if (!file) throw new Error(`file.rec.rewrite: file is undefined`)
+      const f = file as PascalFile
       let name: string | undefined = undefined
       let typeDesc: TypeDescriptor | undefined = undefined
-      if (args.length >= 3) {
-        name = args[1] as string | undefined
-        typeDesc = args[2] as TypeDescriptor
-      } else if (args.length === 2) {
-        typeDesc = args[1] as TypeDescriptor
+      if (arg2 !== undefined) {
+        name = arg1 as string | undefined
+        typeDesc = arg2 as TypeDescriptor
+      } else if (arg1 !== undefined) {
+        typeDesc = arg1 as TypeDescriptor
       }
       if (name !== undefined && name !== '') {
-        ;(args[0] as PascalFile).url = fileUrlToString(name)
-        ctx.fileStates.delete(args[0] as PascalFile)
+        f.url = fileUrlToString(name)
+        ctx.fileStates.delete(f)
       }
-      rewriteRecFile(ctx, args[0] as PascalFile, typeDesc)
+      rewriteRecFile(ctx, f, typeDesc)
       return undefined
     },
-    'file.rec.setbuf': (ctx, args) => {
-      // f^ := r：设置缓冲区（ISO 7185 6.5.5.2 file-buffer-variable 赋值）
-      setRecBuffer(ctx, args[0] as PascalFile, args[1])
+
+    'file.rec.setbuf': (ctx, [file, value]) => {
+      setRecBuffer(ctx, file as PascalFile, value)
       return undefined
     },
-    'file.rec.peek': (ctx, args) => {
-      // r := f^：返回缓冲区的深拷贝（record 赋值是值拷贝语义）
-      return peekRecFile(ctx, args[0] as PascalFile)
+
+    'file.rec.peek': (ctx, [file]) => {
+      return peekRecFile(ctx, file as PascalFile)
     },
-    'file.rec.put': (ctx, args) => {
-      putRecFile(ctx, args[0] as PascalFile)
+
+    'file.rec.put': (ctx, [file]) => {
+      putRecFile(ctx, file as PascalFile)
       return undefined
     },
-    'file.rec.get': (ctx, args) => {
-      getRecFile(ctx, args[0] as PascalFile)
+
+    'file.rec.get': (ctx, [file]) => {
+      getRecFile(ctx, file as PascalFile)
       return undefined
     },
-    'file.rec.eof': (ctx, args) => isRecFileEof(ctx, args[0] as PascalFile),
+
+    'file.rec.eof': (ctx, [file]) => isRecFileEof(ctx, file as PascalFile),
   }
 }
-
 // ============================================================
 // 文件操作（同步版本，逻辑参考 file-model.ts）
 // ============================================================

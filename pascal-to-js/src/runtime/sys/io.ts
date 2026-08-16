@@ -1,23 +1,26 @@
 import type { RuntimeContext, SyscallHandler } from '../runtime-type.ts'
 import { formatField, formatReal } from '../runtime-util.ts'
 
+const TRUE_STR = 'TRUE'
+const FALSE_STR = 'FALSE'
+
 export function ioSyscalls(): Record<string, SyscallHandler> {
   return {
     // ---------- io.write（无文件）----------
-    'io.write.i64': (ctx, args) => {
-      ctx.outputBuffer.push(String(args[0]))
+    'io.write.i64': (ctx, [value]) => {
+      ctx.outputBuffer.push(String(value))
     },
-    'io.write.f64': (ctx, args) => {
-      ctx.outputBuffer.push(formatReal(args[0] as number))
+    'io.write.f64': (ctx, [value]) => {
+      ctx.outputBuffer.push(formatReal(value as number))
     },
-    'io.write.bool': (ctx, args) => {
-      ctx.outputBuffer.push(args[0] ? 'TRUE' : 'FALSE')
+    'io.write.bool': (ctx, [value]) => {
+      ctx.outputBuffer.push(value ? TRUE_STR : FALSE_STR)
     },
-    'io.write.char': (ctx, args) => {
-      ctx.outputBuffer.push(args[0] as string)
+    'io.write.char': (ctx, [value]) => {
+      ctx.outputBuffer.push(value as string)
     },
-    'io.write.str': (ctx, args) => {
-      ctx.outputBuffer.push(args[0] as string)
+    'io.write.str': (ctx, [value]) => {
+      ctx.outputBuffer.push(value as string)
     },
     // ---------- io.writeln ----------
     'io.writeln.eol': (ctx) => {
@@ -31,33 +34,32 @@ export function ioSyscalls(): Record<string, SyscallHandler> {
     'io.read.str': (ctx) => readStr(ctx),
     // ---------- io.eof / eoln / break ----------
     'io.eof': (ctx) => isInputEof(ctx),
-    'io.eoln': (ctx) => isInputEoln(ctx),
+    'io.eoln': (ctx) => isInputEndOfLine(ctx),
     'io.break': () => undefined,
 
     // 无文件：[value, width, precision?]
-    'io.write.i64.fmt': (ctx, args) => {
-      ctx.outputBuffer.push(formatField(String(args[0]), args[1] as number))
+    'io.write.i64.fmt': (ctx, [value, width]) => {
+      ctx.outputBuffer.push(formatField(String(value), width as number))
     },
-    'io.write.f64.fmt': (ctx, args) => {
-      ctx.outputBuffer.push(
-        formatField(
-          args[2] !== undefined ? (args[0] as number).toFixed(args[2] as number) : formatReal(args[0] as number),
-          args[1] as number,
-        ),
-      )
+    'io.write.f64.fmt': (ctx, [value, width, precision]) => {
+      const formatted = precision !== undefined
+        ? (value as number).toFixed(precision as number)
+        : formatReal(value as number)
+      ctx.outputBuffer.push(formatField(formatted, width as number))
     },
-    'io.write.bool.fmt': (ctx, args) => {
-      ctx.outputBuffer.push(formatField(args[0] ? 'TRUE' : 'FALSE', args[1] as number))
+    'io.write.bool.fmt': (ctx, [value, width]) => {
+      ctx.outputBuffer.push(formatField(value ? TRUE_STR : FALSE_STR, width as number))
     },
-    'io.write.char.fmt': (ctx, args) => {
-      ctx.outputBuffer.push(formatField(args[0] as string, args[1] as number))
+    'io.write.char.fmt': (ctx, [value, width]) => {
+      ctx.outputBuffer.push(formatField(value as string, width as number))
     },
-    'io.write.str.fmt': (ctx, args) => {
-      ctx.outputBuffer.push(formatField(args[0] as string, args[1] as number))
+    'io.write.str.fmt': (ctx, [value, width]) => {
+      ctx.outputBuffer.push(formatField(value as string, width as number))
     },
   }
 }
 
+// ---------- 读取辅助函数 ----------
 function readInt(ctx: RuntimeContext): number {
   const tok = nextToken(ctx)
   return tok ? parseInt(tok, 10) | 0 : 0
@@ -85,24 +87,32 @@ function readStr(ctx: RuntimeContext): string {
   return tok ?? ''
 }
 
+// ---------- 词法分析（从输入队列中取下一个 token）----------
 function nextToken(ctx: RuntimeContext): string | null {
-  if (ctx.readState.tokenIdx >= ctx.readState.tokens.length) {
-    if (ctx.inputQueue.length === 0) {
-      return null
+  // 循环处理，直到成功取出一个 token 或确定无输入
+  while (true) {
+    // 如果当前 tokens 已用完，尝试从 inputQueue 加载下一行
+    if (ctx.readState.tokenIdx >= ctx.readState.tokens.length) {
+      if (ctx.inputQueue.length === 0) {
+        return null
+      }
+      const line = ctx.inputQueue.shift()!
+      ctx.readState.tokens = line.split(/\s+/).filter(s => s.length > 0)
+      ctx.readState.tokenIdx = 0
+      // 如果分割后为空行，继续循环（跳过空行）
+      if (ctx.readState.tokens.length === 0) {
+        continue
+      }
     }
-    const line = ctx.inputQueue.shift()!
-    ctx.readState.tokens = line.split(/\s+/).filter((s) => s.length > 0)
-    ctx.readState.tokenIdx = 0
-    if (ctx.readState.tokens.length === 0) {
-      return nextToken(ctx) // 递归取下一行（空行跳过）
-    }
+    // 返回当前 token 并移动索引
+    return ctx.readState.tokens[ctx.readState.tokenIdx++]
   }
-  return ctx.readState.tokens[ctx.readState.tokenIdx++]
 }
+
 function isInputEof(ctx: RuntimeContext): boolean {
   return ctx.inputQueue.length === 0 && ctx.readState.tokenIdx >= ctx.readState.tokens.length
 }
 
-function isInputEoln(ctx: RuntimeContext): boolean {
+function isInputEndOfLine(ctx: RuntimeContext): boolean {
   return ctx.readState.tokenIdx >= ctx.readState.tokens.length
 }
