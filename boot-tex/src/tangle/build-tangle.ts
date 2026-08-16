@@ -38,7 +38,7 @@ export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   }
   attachText('result.pas', pasFile)
   attach('pool.bin', poolFile)
-  attachText('debugLog.log', debugLog.join('\n'))
+  // attachText('debugLog.log', debugLog.join('\n'))
   assertEquals(state.status, 'terminated')
   return { pasFile, poolFile }
 }

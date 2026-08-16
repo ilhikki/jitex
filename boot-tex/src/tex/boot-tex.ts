@@ -2,7 +2,7 @@ import { attach, attachText, cache, log, stage, suite } from '@jitex/integration
 import { runJs, transform } from '@jitex/pascal-to-js'
 import { pascalHPlugin } from '@jitex/pascal-to-js/src/compiler/plugins/pascal-h.plugin.ts'
 import { runTangleJs, runTanglePascal, validRunTangleResult } from '../tangle/build-tangle.ts'
-import { readFile, readTextFile } from '../utils.ts'
+import { readFile, readTextFile, stringToBytes } from '../utils.ts'
 
 export default suite('boot tex', () => {
   const getTangle = stage('tangle.js', [], async () => {
@@ -66,16 +66,21 @@ export default suite('boot tex', () => {
     files.set('trip.tex', tripTex)
     files.set('TeXformats:TEX.POOL', poolFile)
     files.set('TeXfonts:trip.tfm', tripTfm)
+    files.set('TTY:', stringToBytes('trip'))
+    const debugLog: string[] = []
     const state = runJs(tripJs, {
       input: ['trip'],
       files: files,
       plugins: [pascalHPlugin],
+      extensions: ['string', 'fileEofBufferSpace', 'pascalHFileModel'],
+      debugLog,
     })
 
     for (const [key, value] of files) {
-      log(`fileName = ${key}`)
-      attach(key, value)
+      log(`fileName = ${key} length = ${value.length}`)
+      // attach(key.replaceAll(":", "."), value)
     }
     attachText('output.log', state.outputBuffer.join('\n'))
+    attachText('debug.log', debugLog.join('\n'))
   })
 })
