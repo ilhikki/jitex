@@ -580,7 +580,9 @@ const syscalls: Record<string, SyscallHandler> = {
 
 export function dispatch(ctx: RuntimeContext, key: string, args: unknown[]): unknown {
   const handler = syscalls[key]
-  if (handler) return handler(ctx, args)
+  if (handler) {
+    return handler(ctx, args)
+  }
   // 插件注入的 syscall（AGENTS.md 原则 A.7）
   // key 格式：'plugin.{pluginName}.{procName}'
   if (key.startsWith('plugin.')) {

@@ -1,0 +1,206 @@
+import type { JsCompiler, SemanticCompiler } from '../json-code-compiler.ts'
+import * as JsonCode from '../json-code.ts'
+
+export class PascalSemanticCompiler implements SemanticCompiler {
+  literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
+    switch (literal.key) {
+      case 'i64':
+        return literal.arg // 十进制整数字符串，直接作为 JS 数字
+      case 'f64':
+        return literal.arg // 浮点字符串，直接作为 JS 数字
+      case 'bool':
+        return literal.arg // 'true' 或 'false'
+      case 'str':
+        return JSON.stringify(literal.arg)
+      case 'char':
+        return JSON.stringify(literal.arg)
+      case 'null':
+        // ISO 7185 6.4.4: nil-value → JS null
+        return 'null'
+      case 'type':
+        // 类型描述字面量：arg 已经是 JSON 字符串，直接作为 JS 对象字面量返回。
+        // JSON 是 JS 对象字面量的子集，所以直接嵌入 JS 代码即可。
+        // runtime 中 mem.default.array / mem.default.rec 直接接收对象，不需要 JSON.parse。
+        return literal.arg
+      default:
+        return undefined
+    }
+  }
+
+  syscallToJs(syscall: JsonCode.Syscall, compiler: JsCompiler): string | undefined {
+    const key = syscall.key
+    const args = syscall.args.map((a) => compiler.compileExpr(a))
+
+    // ---------- 算术（inline）----------
+    // i64 — 32 位有符号整数语义（| 0 截断，与原 compiler 一致）
+    switch (key) {
+      case 'i64.add':
+        return `((${args[0]} + ${args[1]}) | 0)`
+      case 'i64.sub':
+        return `((${args[0]} - ${args[1]}) | 0)`
+      case 'i64.mul':
+        return `((${args[0]} * ${args[1]}) | 0)`
+      case 'i64.div':
+        return `(() => { const __d = ${
+          args[1]
+        }; if (__d === 0) throw new Error('JS VM: division by zero'); return (Math.trunc(${args[0]} / __d)) | 0; })()`
+      case 'i64.mod':
+        return `(() => { const __m = ${
+          args[1]
+        }; if (__m === 0) throw new Error('JS VM: division by zero'); const __l = ${
+          args[0]
+        }; return (__l - Math.trunc(__l / __m) * __m) | 0; })()`
+      case 'i64.neg':
+        return `(-${args[0]} | 0)`
+      case 'i64.and':
+        return `((${args[0]} & ${args[1]}) | 0)`
+      case 'i64.or':
+        return `((${args[0]} | ${args[1]}) | 0)`
+      case 'i64.not':
+        return `(~${args[0]} | 0)`
+      case 'i64.abs':
+        return `(Math.abs(${args[0]}) | 0)`
+      case 'i64.odd':
+        return `((${args[0]} % 2) !== 0)`
+
+      // f64
+      case 'f64.add':
+        return `(${args[0]} + ${args[1]})`
+      case 'f64.sub':
+        return `(${args[0]} - ${args[1]})`
+      case 'f64.mul':
+        return `(${args[0]} * ${args[1]})`
+      case 'f64.div':
+        return `(${args[0]} / ${args[1]})`
+      case 'f64.neg':
+        return `(-${args[0]})`
+      case 'f64.abs':
+        return `Math.abs(${args[0]})`
+      case 'f64.sqrt':
+        // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
+        // sqrt(x) for x < 0 is undefined → must throw
+        return `(() => { const __x = ${
+          args[0]
+        }; if (!(__x >= 0)) throw new Error('sqrt: domain error (x < 0)'); return Math.sqrt(__x); })()`
+      case 'f64.sin':
+        return `Math.sin(${args[0]})`
+      case 'f64.cos':
+        return `Math.cos(${args[0]})`
+      case 'f64.exp':
+        return `Math.exp(${args[0]})`
+      case 'f64.ln':
+        // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
+        // ln(x) for x <= 0 is undefined → must throw
+        return `(() => { const __x = ${
+          args[0]
+        }; if (!(__x > 0)) throw new Error('ln: domain error (x <= 0)'); return Math.log(__x); })()`
+      case 'f64.arctan':
+        return `Math.atan(${args[0]})`
+
+      // 布尔
+      case 'bool.and':
+        return `(${args[0]} && ${args[1]})`
+      case 'bool.or':
+        return `(${args[0]} || ${args[1]})`
+      case 'bool.not':
+        return `(!${args[0]})`
+
+      // 比较
+      case 'cmp.eq':
+        return `(${args[0]} === ${args[1]})`
+      case 'cmp.ne':
+        return `(${args[0]} !== ${args[1]})`
+      case 'cmp.lt':
+        return `(${args[0]} < ${args[1]})`
+      case 'cmp.le':
+        return `(${args[0]} <= ${args[1]})`
+      case 'cmp.gt':
+        return `(${args[0]} > ${args[1]})`
+      case 'cmp.ge':
+        return `(${args[0]} >= ${args[1]})`
+
+      // 转换
+      case 'cast.f64.to.i64':
+        return `Math.trunc(${args[0]})`
+      case 'cast.f64.to.i64.round':
+        // ISO 7185 6.6.6.3: round(x) = trunc(x+0.5) if x>=0, trunc(x-0.5) if x<0
+        // JS Math.round 对 -3.5 返回 -3（向 +∞ 舍入），不符合 ISO（ISO 要求 -4）
+        return `(Math.trunc(${args[0]} >= 0 ? ${args[0]} + 0.5 : ${args[0]} - 0.5) | 0)`
+      case 'cast.char.to.i64':
+        return `(${args[0]}.charCodeAt(0))`
+      case 'cast.bool.to.i64':
+        return `(${args[0]} ? 1 : 0)`
+      case 'cast.i64.to.char':
+        return `String.fromCharCode(${args[0]})`
+
+      // 字符串（也可以 inline）
+      case 'str.concat':
+        return `(${args[0]} + ${args[1]})`
+      case 'str.length':
+        return `(${args[0]}.length)`
+
+      // str.to.char.array: args = [low, high, str]
+      // 生成 IIFE 返回 1-based 字符数组对象，避免字符串作为数组索引时 0-based 偏移
+      // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历
+      case 'str.to.char.array':
+        return `(() => { const __low=${args[0]}|0, __high=${args[1]}|0, __s=${
+          args[2]
+        }; const __o={}; for(let __i=__low;__i<=__high;__i++){const __k=__i-__low; __o[__i]=__k<__s.length?__s.charAt(__k):' ';} __o.length=__high-__low+1; return __o; })()`
+
+      // ---------- 数组/记录/cell（inline，符合 JS 语义）----------
+      // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...
+      case 'array.get': {
+        if (args.length < 2) return args[0]
+        return `(${args[0]}${
+          args
+            .slice(1)
+            .map((i) => `[${i}]`)
+            .join('')
+        })`
+      }
+      // array.set: args = [arr, idx1, idx2, ..., val] → arr[idx1][idx2]... = val
+      case 'array.set': {
+        if (args.length < 3) return args[0]
+        const val = args[args.length - 1]
+        const indices = args.slice(1, -1)
+        return `(${args[0]}${indices.map((i) => `[${i}]`).join('')} = ${val})`
+      }
+      // rec.field: args = [obj, fieldName] → obj[fieldName]
+      case 'rec.field':
+        return `(${args[0]}[${args[1]}])`
+      // rec.set: args = [obj, fieldName, val] → obj[fieldName] = val
+      case 'rec.set':
+        return `(${args[0]}[${args[1]}] = ${args[2]})`
+      // cell.create: args = [val] → {v: val}
+      case 'cell.create':
+        return `({v: ${args[0]}})`
+      // cell.get: args = [cell] → cell.v
+      case 'cell.get':
+        return `(${args[0]}.v)`
+      // cell.set: args = [cell, val] → cell.v = val
+      case 'cell.set':
+        return `(${args[0]}.v = ${args[1]})`
+      // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
+      case 'ptr.deref':
+        return `(() => { const __p = ${
+          args[0]
+        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); return __p.v; })()`
+      // p^ := x — nil 解引用是 error
+      case 'ptr.assign':
+        return `(() => { const __p = ${
+          args[0]
+        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.v = ${args[1]}; })()`
+      // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
+      case 'ptr.dispose.check':
+        return `(() => { if (${args[0]} === null) throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)'); })()`
+
+      // io.break: 空操作
+      case 'io.break':
+        return `undefined`
+
+      default:
+        // 走 dispatcher
+        return `__sys(${JSON.stringify(key)}, [${args.join(', ')}])`
+    }
+  }
+}
