@@ -19,7 +19,8 @@ import type { PascalFile } from '../runtime/file-model.ts'
 import type { IlPlugin } from './plugin.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
 import { FileState, TypeDescriptor } from '@/compiler/runtime-type.ts'
-
+import { ioSyscalls } from './sys/io.ts'
+import { formatField, formatReal } from './runtime-util.ts'
 
 export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeContext {
   return {
@@ -145,29 +146,6 @@ const syscalls: Record<string, SyscallHandler> = {
   // ---------- string ----------
   'str.concat': (_ctx, args) => (args[0] as string) + (args[1] as string),
   'str.length': (_ctx, args) => (args[0] as string).length,
-
-  // ---------- io.write（无文件）----------
-  'io.write.i64': (ctx, args) => {
-    ctx.outputBuffer.push(String(args[0]))
-    return undefined
-  },
-  'io.write.f64': (ctx, args) => {
-    ctx.outputBuffer.push(formatReal(args[0] as number))
-    return undefined
-  },
-  'io.write.bool': (ctx, args) => {
-    ctx.outputBuffer.push(args[0] ? 'TRUE' : 'FALSE')
-    return undefined
-  },
-  'io.write.char': (ctx, args) => {
-    ctx.outputBuffer.push(args[0] as string)
-    return undefined
-  },
-  'io.write.str': (ctx, args) => {
-    ctx.outputBuffer.push(args[0] as string)
-    return undefined
-  },
-
   // ---------- io.write（带文件）----------
   'io.write.i64.file': (ctx, args) => {
     writeToFile(ctx, args[0] as PascalFile, String(args[1]))
@@ -187,34 +165,6 @@ const syscalls: Record<string, SyscallHandler> = {
   },
   'io.write.str.file': (ctx, args) => {
     writeToFile(ctx, args[0] as PascalFile, args[1] as string)
-    return undefined
-  },
-
-  // ---------- io.write.fmt（带 width/precision 格式化）----------
-  // 无文件：[value, width, precision?]
-  'io.write.i64.fmt': (ctx, args) => {
-    ctx.outputBuffer.push(formatField(String(args[0]), args[1] as number))
-    return undefined
-  },
-  'io.write.f64.fmt': (ctx, args) => {
-    ctx.outputBuffer.push(
-      formatField(
-        args[2] !== undefined ? (args[0] as number).toFixed(args[2] as number) : formatReal(args[0] as number),
-        args[1] as number,
-      ),
-    )
-    return undefined
-  },
-  'io.write.bool.fmt': (ctx, args) => {
-    ctx.outputBuffer.push(formatField(args[0] ? 'TRUE' : 'FALSE', args[1] as number))
-    return undefined
-  },
-  'io.write.char.fmt': (ctx, args) => {
-    ctx.outputBuffer.push(formatField(args[0] as string, args[1] as number))
-    return undefined
-  },
-  'io.write.str.fmt': (ctx, args) => {
-    ctx.outputBuffer.push(formatField(args[0] as string, args[1] as number))
     return undefined
   },
 
@@ -248,22 +198,10 @@ const syscalls: Record<string, SyscallHandler> = {
     return undefined
   },
 
-  // ---------- io.writeln ----------
-  'io.writeln.eol': (ctx, _args) => {
-    ctx.outputBuffer.push('\n')
-    return undefined
-  },
   'io.writeln.file': (ctx, args) => {
     writelnToFile(ctx, args[0] as PascalFile)
     return undefined
   },
-
-  // ---------- io.read（无文件，从 inputQueue）----------
-  'io.read.i64': (ctx, _args) => readInt(ctx),
-  'io.read.f64': (ctx, _args) => readReal(ctx),
-  'io.read.bool': (ctx, _args) => readBool(ctx),
-  'io.read.char': (ctx, _args) => readChar(ctx),
-  'io.read.str': (ctx, _args) => readStr(ctx),
 
   // ---------- io.read（带文件）----------
   'io.read.i64.file': (ctx, args) => readFileInt(ctx, args[0] as PascalFile),
@@ -283,10 +221,6 @@ const syscalls: Record<string, SyscallHandler> = {
     return undefined
   },
 
-  // ---------- io.eof / eoln / break / page ----------
-  'io.eof': (ctx, _args) => isInputEof(ctx),
-  'io.eoln': (ctx, _args) => isInputEoln(ctx),
-  'io.break': (_ctx, _args) => undefined,
   'io.page': (ctx, args) => {
     if (args.length > 0) {
       writeToFile(ctx, args[0] as PascalFile, '\f')
@@ -472,7 +406,7 @@ const syscalls: Record<string, SyscallHandler> = {
 }
 
 function getDefaultSyscalls(): Record<string, SyscallHandler> {
-  return syscalls
+  return { ...syscalls, ...ioSyscalls() }
 }
 
 export function createDispatcher(plugins: IlPlugin[]): (ctx: RuntimeContext, key: string, args: unknown[]) => unknown {
@@ -492,34 +426,6 @@ export function createDispatcher(plugins: IlPlugin[]): (ctx: RuntimeContext, key
     }
     throw new Error(`Unknown syscall: ${key}`)
   }
-}
-
-// ============================================================
-// 辅助函数：real 格式化
-// ============================================================
-
-function formatReal(n: number): string {
-  if (Number.isInteger(n)) {
-    return `${n}.00000000000000E+000`
-  }
-  const s = n.toExponential(14)
-  const eIdx = s.indexOf('e')
-  if (eIdx < 0) return s
-  const mantissa = s.slice(0, eIdx)
-  const exp = s.slice(eIdx + 1)
-  const sign = exp[0]
-  const digits = exp.slice(1)
-  const padded = digits.padStart(3, '0')
-  return `${mantissa}E${sign}${padded}`
-}
-
-/**
- * 字段格式化：右对齐，左填充空格到 width。
- * Pascal 写参数语义：x:width 表示最小字段宽度，右对齐。
- */
-function formatField(text: string, width: number): string {
-  if (!width || text.length >= width) return text
-  return ' '.repeat(width - text.length) + text
 }
 
 // ============================================================
@@ -1120,60 +1026,6 @@ function readFilelnSkip(ctx: RuntimeContext, file: PascalFile): void {
   if (isPool) {
     __poolLineStart.set(file, s.offset)
   }
-}
-
-// ============================================================
-// 从 inputQueue 读取（同步）
-// ============================================================
-
-function nextToken(ctx: RuntimeContext): string | null {
-  if (ctx.readState.tokenIdx >= ctx.readState.tokens.length) {
-    if (ctx.inputQueue.length === 0) {
-      return null
-    }
-    const line = ctx.inputQueue.shift()!
-    ctx.readState.tokens = line.split(/\s+/).filter((s) => s.length > 0)
-    ctx.readState.tokenIdx = 0
-    if (ctx.readState.tokens.length === 0) {
-      return nextToken(ctx) // 递归取下一行（空行跳过）
-    }
-  }
-  return ctx.readState.tokens[ctx.readState.tokenIdx++]
-}
-
-function readInt(ctx: RuntimeContext): number {
-  const tok = nextToken(ctx)
-  return tok ? parseInt(tok, 10) | 0 : 0
-}
-
-function readReal(ctx: RuntimeContext): number {
-  const tok = nextToken(ctx)
-  return tok ? parseFloat(tok) : 0
-}
-
-function readBool(ctx: RuntimeContext): boolean {
-  const tok = nextToken(ctx)
-  if (!tok) return false
-  const lower = tok.toLowerCase()
-  return lower === 'true' || lower === 't'
-}
-
-function readChar(ctx: RuntimeContext): string {
-  const tok = nextToken(ctx)
-  return tok ? tok.charAt(0) : '\x00'
-}
-
-function readStr(ctx: RuntimeContext): string {
-  const tok = nextToken(ctx)
-  return tok ?? ''
-}
-
-function isInputEof(ctx: RuntimeContext): boolean {
-  return ctx.inputQueue.length === 0 && ctx.readState.tokenIdx >= ctx.readState.tokens.length
-}
-
-function isInputEoln(ctx: RuntimeContext): boolean {
-  return ctx.readState.tokenIdx >= ctx.readState.tokens.length
 }
 
 // ============================================================

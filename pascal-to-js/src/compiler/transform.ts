@@ -27,11 +27,7 @@ import { compileProgram } from './compiler.ts'
 import { toJs } from './json-code-compiler.ts'
 import * as JsonCode from './json-code.ts'
 import type { RunError, RunState } from '../runtime/run-state.ts'
-import {
-  createDispatcher,
-  createRuntimeContext,
-  toRunState,
-} from './runtime.ts'
+import { createDispatcher, createRuntimeContext, toRunState } from './runtime.ts'
 import type { RuntimeContext, RuntimeOptions } from './runtime-type.ts'
 import type { IlPlugin } from './plugin.ts'
 import { PascalSemanticCompiler } from './sys/pascal-semantic-compiler.ts'
