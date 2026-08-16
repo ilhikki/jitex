@@ -22,14 +22,12 @@ import {
   FieldAccessNode,
   ForStatementNode,
   FunctionCallNode,
-  FunctionDeclarationNode,
   GotoStatementNode,
   IdentifierNode,
   IfStatementNode,
   InExpressionNode,
   LabeledStatementNode,
   ProcedureCallNode,
-  ProcedureDeclarationNode,
   ProgramNode,
   RepeatStatementNode,
   SetConstructorNode,
@@ -221,7 +219,7 @@ function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
 // ============================================================
 
 export function compileProgram(program: ProgramNode, a: Analysis): JsonCode.Function {
-  return compileBlock(program.block, a, null)
+  return compileBlock(program.block, a)
 }
 
 // ============================================================
@@ -230,26 +228,27 @@ export function compileProgram(program: ProgramNode, a: Analysis): JsonCode.Func
 
 function compileBlock(
   block: BlockNode,
-  a: Analysis,
-  parentDecl: ProcedureDeclarationNode | FunctionDeclarationNode | null,
+  analysis: Analysis,
 ): JsonCode.Function {
-  const funcId = parentDecl ? a.funcOfDecl(parentDecl) : a.funcOfBlock(block)
-  const info = a.funcInfo(funcId)
+  const funcId = analysis.funcOfBlock(block)
+  const info = analysis.funcInfo(funcId)
 
   const params = info.params.map((p) => p.varId)
   const locals = info.locals.map((l) => l.varId)
-  if (info.retval) locals.push(info.retval.varId)
+  if (info.retval) {
+    locals.push(info.retval.varId)
+  }
 
   // children
   const children: JsonCode.Function[] = []
   for (const p of block.procedureDeclarations) {
     if (p.block) {
-      children.push(compileBlock(p.block, a, p))
+      children.push(compileBlock(p.block, analysis))
     } else {
       // FORWARD 声明：空函数
       children.push({
-        id: a.funcOfDecl(p),
-        params: a.funcInfo(a.funcOfDecl(p)).params.map((x) => x.varId),
+        id: analysis.funcOfDecl(p),
+        params: analysis.funcInfo(analysis.funcOfDecl(p)).params.map((x) => x.varId),
         locals: [],
         children: [],
         body: [returnStmt()],
@@ -258,11 +257,11 @@ function compileBlock(
   }
   for (const f of block.functionDeclarations) {
     if (f.block) {
-      children.push(compileBlock(f.block, a, f))
+      children.push(compileBlock(f.block, analysis))
     } else {
       children.push({
-        id: a.funcOfDecl(f),
-        params: a.funcInfo(a.funcOfDecl(f)).params.map((x) => x.varId),
+        id: analysis.funcOfDecl(f),
+        params: analysis.funcInfo(analysis.funcOfDecl(f)).params.map((x) => x.varId),
         locals: [],
         children: [],
         body: [returnStmt()],
@@ -286,7 +285,7 @@ function compileBlock(
   }
 
   // compound 语句
-  for (const stmt of compileStmt(block.compound, a, funcId, [])) {
+  for (const stmt of compileStmt(block.compound, analysis, funcId, [])) {
     body.push(stmt)
   }
 

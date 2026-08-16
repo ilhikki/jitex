@@ -85,7 +85,7 @@ function basicSyscall(): Record<string, SyscallHandler> {
     // ---------- record ----------
     'rec.field': (_ctx, [record, key]) => (record as Record<string, unknown>)[key as string],
     'rec.set': (_ctx, [record, key, value]) => {
-      (record as Record<string, unknown>)[key as string] = value
+      ;(record as Record<string, unknown>)[key as string] = value
     },
     'rec.copy': (_ctx, [value]) => deepCopyValue(value),
 

@@ -97,7 +97,7 @@ function nextToken(ctx: RuntimeContext): string | null {
         return null
       }
       const line = ctx.inputQueue.shift()!
-      ctx.readState.tokens = line.split(/\s+/).filter(s => s.length > 0)
+      ctx.readState.tokens = line.split(/\s+/).filter((s) => s.length > 0)
       ctx.readState.tokenIdx = 0
       // 如果分割后为空行，继续循环（跳过空行）
       if (ctx.readState.tokens.length === 0) {

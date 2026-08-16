@@ -93,7 +93,6 @@ export function createDefaultArray(typeDesc: TypeDescriptor): unknown[] {
   return arr
 }
 
-
 export function createDefaultRec(typeDesc: TypeDescriptor): Record<string, unknown> {
   const obj: Record<string, unknown> = {}
   if (typeDesc.fields) {
