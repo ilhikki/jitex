@@ -20,7 +20,7 @@
  */
 
 import type { IlPlugin } from '../plugin.ts'
-import type { RuntimeContext } from '../runtime.ts'
+import type { RuntimeContext } from '../runtime-type.ts'
 import type { PascalFile } from '../../runtime/file-model.ts'
 
 /**

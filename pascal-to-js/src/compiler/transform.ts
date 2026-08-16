@@ -30,10 +30,9 @@ import type { RunError, RunState } from '../runtime/run-state.ts'
 import {
   createDispatcher,
   createRuntimeContext,
-  type RuntimeContext,
-  type RuntimeOptions,
   toRunState,
 } from './runtime.ts'
+import type { RuntimeContext, RuntimeOptions } from './runtime-type.ts'
 import type { IlPlugin } from './plugin.ts'
 import { PascalSemanticCompiler } from './sys/pascal-semantic-compiler.ts'
 
