@@ -125,8 +125,7 @@ describe('Phase 3: Array and Record', () => {
     },
     {
       name: 'record as procedure parameter (value)',
-      code:
-        'program test;' +
+      code: 'program test;' +
         ' type Point = record x, y: integer end;' +
         ' var p: Point;' +
         ' procedure printPoint(pt: Point);' +
@@ -199,8 +198,7 @@ describe('Phase 3: Array and Record', () => {
     // Array and Record Combination
     {
       name: 'array of records',
-      code:
-        'program test; type Point = record x, y: integer end;' +
+      code: 'program test; type Point = record x, y: integer end;' +
         ' var arr: array[1..2] of Point;' +
         ' begin arr[1].x := 1;' +
         ' arr[1].y := 2;' +

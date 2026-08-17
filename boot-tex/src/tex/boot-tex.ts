@@ -1,5 +1,5 @@
 import { assertEquals, attach, attachText, cache, log, stage, suite } from '@jitex/integration'
-import { runJs, transform } from '@jitex/pascal-to-js'
+import { runJs } from '@jitex/pascal-to-js'
 import { runTangleJs, runTanglePascal, transformTangle, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { readFile, readTextFile, stringToBytes } from '../utils.ts'
 import { texExtraSyscalls, transformTex } from './build-tex.ts'
@@ -60,18 +60,18 @@ export default suite('boot tex', () => {
 
     const files = new Map<string, Uint8Array>()
     files.set('trip.tex', tripTex)
-    files.set('TeXformats:TEX.POOL', poolFile)
+    files.set('TeXformats:TEX.POOL                     ', poolFile)
     files.set('TeXfonts:trip.tfm', tripTfm)
     files.set('TTY:', stringToBytes('trip'))
     const state = runJs(tripJs, {
       input: ['trip'],
       files: files,
-      extraSyscalls: texExtraSyscalls
+      extraSyscalls: texExtraSyscalls,
     })
 
     for (const [key, value] of state.files) {
       log(`fileName = ${key} length = ${value.length}`)
-      // attach(key.replaceAll(":", "."), value)
+      attach(key.replaceAll(":", "."), value)
     }
     attachText('output.log', state.outputBuffer.join('\n'))
     attachText('debug.log', state.debugLog.join('\n'))

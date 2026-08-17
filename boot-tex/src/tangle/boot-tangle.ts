@@ -1,5 +1,4 @@
 import { assertEquals, attachText, cache, stage, suite } from '@jitex/integration'
-import { transform } from '@jitex/pascal-to-js'
 import { createTangleStage, TangleInput, transformTangle } from './build-tangle.ts'
 import { readTextFile } from '../utils.ts'
 

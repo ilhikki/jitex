@@ -34,7 +34,8 @@ import {
   deepCopyValue,
   fileBufferView,
   formatField,
-  formatReal, getPascalStringValue,
+  formatReal,
+  getPascalStringValue,
   PascalArray,
 } from '@/runtime/runtime-util.ts'
 
@@ -54,7 +55,6 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
     'io.write.char.file': (ctx, [file, value]) => {
-      console.info(file)
       writeBytes(ctx, file as PascalFile, encodeUtf8(value as string))
     },
     'io.write.str.file': (ctx, [file, value]) => {

@@ -36,6 +36,7 @@ export type { RunOptions, TransformOptions } from './compiler/transform.ts'
 export type { RunError, RunState } from './runtime/run-state.ts'
 export type { ExtraCallable } from './compiler/analysis.ts'
 export type { SyscallHandler } from './runtime/runtime-type.ts'
+export * from './runtime/runtime-util.ts'
 // ==========================================================================
 // 便捷函数
 // ==========================================================================

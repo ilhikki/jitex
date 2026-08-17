@@ -69,8 +69,7 @@ const programParamTests: PascalTest[] = [
 
   {
     name: '§6.10 文件参数：programFileUrls 做重命名映射（F→IN.TXT，G→OUT.TXT）',
-    code:
-      `PROGRAM RENAMEMAP(F,G);
+    code: `PROGRAM RENAMEMAP(F,G);
       VAR F,G:FILE OF CHAR;
       C:CHAR;
       BEGIN RESET(F);

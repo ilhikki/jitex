@@ -5,7 +5,8 @@ import {
   createDefaultArray,
   createDefaultRec,
   deepCopyValue,
-  getArrayElement, PascalArray,
+  getArrayElement,
+  PascalArray,
   setArrayElement,
 } from '../runtime-util.ts'
 import { type TypeDescriptor } from '../runtime-type.ts'
@@ -47,7 +48,7 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     // 在 JS 中变成 0-based 字符串索引，导致首字符丢失。
     // args = [low, high, str]；返回对象 {low:ch1, low+1:ch2, ..., high:' '}
     // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历。
-    'str.to.char.array': (_ctx, [l, h, s]) => {
+    'str.to.char.array': (_ctx, [l, _h, s]) => {
       const pascalString = s as PascalArray<string>
       return {
         array: pascalString.array,

@@ -226,8 +226,8 @@ export function getArrayElement(arr: unknown, indices: unknown[]): unknown {
   }
   return cur
 }
-export function getPascalStringValue(pascalString: PascalArray<string>){
-  return pascalString.array.join("")
+export function getPascalStringValue(pascalString: PascalArray<string>) {
+  return pascalString.array.join('')
 }
 export function setArrayElement(arr: unknown, indices: unknown[], value: unknown): void {
   let cur = arr as PascalArray<unknown>
