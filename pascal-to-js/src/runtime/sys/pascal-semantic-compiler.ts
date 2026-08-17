@@ -5,7 +5,7 @@ import {
   createDefaultArray,
   createDefaultRec,
   deepCopyValue,
-  getArrayElement,
+  getArrayElement, PascalArray,
   setArrayElement,
 } from '../runtime-util.ts'
 import { type TypeDescriptor } from '../runtime-type.ts'
@@ -24,7 +24,6 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     'array.get': (_ctx, args) => getArrayElement(args[0], args.slice(1)),
     'array.set': (_ctx, args) => {
       setArrayElement(args[0], args.slice(1, -1), args[args.length - 1])
-      return undefined
     },
 
     // ---------- cast ----------
@@ -49,16 +48,11 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     // args = [low, high, str]；返回对象 {low:ch1, low+1:ch2, ..., high:' '}
     // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历。
     'str.to.char.array': (_ctx, [l, h, s]) => {
-      const low: number = (l as number) | 0
-      const high: number = (h as number) | 0
-      const str: string = typeof s === 'string' ? s : String(s ?? '')
-      const out: Record<number | string, string | number> = {}
-      for (let i = low; i <= high; i++) {
-        const idx = i - low
-        out[i] = idx < str.length ? str.charAt(idx) : ' '
+      const pascalString = s as PascalArray<string>
+      return {
+        array: pascalString.array,
+        low: l,
       }
-      out.length = high - low + 1
-      return out
     },
 
     // ---------- set ----------
@@ -114,21 +108,6 @@ export function basicSyscall(): Record<string, SyscallHandler> {
       }
       return undefined
     },
-
-    // ---------- program（program 头文件参数运行期查表）----------
-    // PROGRAM X(INFILE, OUTFILE); 的参数在编译期无法确定 url，
-    // 编译产物只烧参数名，运行时通过 ctx.programFileUrls 查表。
-    // 缺省为恒等映射（程序参数名即 files 键名）。
-    'program.fileUrl': (ctx, [name]) => {
-      const key = String(name ?? '').toLowerCase()
-      // 大小写不敏感的精确匹配（Pascal 标识符大小写不敏感）
-      for (const [k, v] of Object.entries(ctx.programFileUrls)) {
-        if (k.toLowerCase() === key) {
-          return v
-        }
-      }
-      return String(name ?? '')
-    },
   }
 }
 
@@ -142,19 +121,21 @@ export class PascalSemanticCompiler implements SemanticCompiler {
       case 'bool':
         return literal.arg // 'true' 或 'false'
       case 'str':
-        return JSON.stringify(literal.arg)
+        return JSON.stringify({ array: literal.arg.split(''), low: 0 })
       case 'char':
         return JSON.stringify(literal.arg)
       case 'null':
         // ISO 7185 6.4.4: nil-value → JS null
         return 'null'
+      case 'field':
+        return JSON.stringify(literal.arg)
       case 'type':
         // 类型描述字面量：arg 已经是 JSON 字符串，直接作为 JS 对象字面量返回。
         // JSON 是 JS 对象字面量的子集，所以直接嵌入 JS 代码即可。
         // runtime 中 mem.default.array / mem.default.rec 直接接收对象，不需要 JSON.parse。
         return literal.arg
       default:
-        return undefined
+        throw new Error(`literal kind '${literal.key}' not support`)
     }
   }
 
@@ -263,29 +244,6 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return `(${args[0]} ? 1 : 0)`
       case 'cast.i64.to.char':
         return `String.fromCharCode(${args[0]})`
-
-      // ---------- 数组/记录/cell（inline，符合 JS 语义）----------
-      // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...
-      case 'array.get': {
-        if (args.length < 2) {
-          return args[0]
-        }
-        return `(${args[0]}${
-          args
-            .slice(1)
-            .map((i) => `[${i}]`)
-            .join('')
-        })`
-      }
-      // array.set: args = [arr, idx1, idx2, ..., val] → arr[idx1][idx2]... = val
-      case 'array.set': {
-        if (args.length < 3) {
-          return args[0]
-        }
-        const val = args[args.length - 1]
-        const indices = args.slice(1, -1)
-        return `(${args[0]}${indices.map((i) => `[${i}]`).join('')} = ${val})`
-      }
       // rec.field: args = [obj, fieldName] → obj[fieldName]
       case 'rec.field':
         return `(${args[0]}[${args[1]}])`

@@ -187,6 +187,5 @@ export function run(source: string, options: RunOptions = {}): RunState {
     const ctx = getRunTimeContextFromOptions(options)
     return reportErrorAsState(e, ctx)
   }
-
   return runJs(jsCode, options)
 }

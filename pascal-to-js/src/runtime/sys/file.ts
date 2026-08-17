@@ -8,19 +8,6 @@
  *     write/put 直接把字节追加到 ctx.files.get(url)，不做 string 拼接。
  *     容量不足时翻倍扩容（见 runtime-util.ts appendFileBytes），避免每次写入都整体拷贝数组。
  *   - 仅保留 ISO 标准能力：reset/rewrite/get/put/read/readln/write/writeln/page。
- *     已删除的非 ISO 能力（未用插件标识）：
- *       * assign(f, name) — Borland 扩展，ISO 6.6.5.2 无此过程。
- *         program-parameters 的外部绑定改由 compileBlock 通过 rec.set 设 .url 字段实现。
- *       * close(f) — Borland 扩展，ISO 6.6.5.2 无此过程。
- *         文件内容每次 write/put 同步写回 ctx.files，无需显式 close。
- *       * reset/rewrite 2-arg 形式 reset(f, name) — 非 ISO 6.9.8.1 签名。
- *         file.reset/rewrite 只接受 [file]，忽略多余的 name 参数。
- *       * file.reset.binary / file.rewrite.binary — Knuth TFM/DVI 专用 Latin-1 编码。
- *       * TTY: 终端回显、ttyEolnEchoed — Knuth term_in/term_out 模拟。
- *       * pascalHPreread / pascalHFileModel 扩展 — Knuth RESET 后 GET 预读语义。
- *       * fileEofBufferSpace 扩展 — Borland EOF 时 F^ 返回空格。
- *       * pool/POOL 写入追踪、所有 debugLog.push — debug 代码。
- *       * CRLF 双字符跳过 hack — Windows 特定，get(f) 只前进一字节。
  *
  * ISO 行为锚定：
  *   - reset(f)（6.6.5.2）：f.M=Inspection；若文件非空，f^=首组件，否则 f^ 未定义且 eof=true。
@@ -47,7 +34,8 @@ import {
   deepCopyValue,
   fileBufferView,
   formatField,
-  formatReal,
+  formatReal, getPascalStringValue,
+  PascalArray,
 } from '@/runtime/runtime-util.ts'
 
 export function fileSyscalls(): Record<string, SyscallHandler> {
@@ -66,14 +54,23 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
     'io.write.char.file': (ctx, [file, value]) => {
+      console.info(file)
       writeBytes(ctx, file as PascalFile, encodeUtf8(value as string))
-      return undefined
     },
     'io.write.str.file': (ctx, [file, value]) => {
-      writeBytes(ctx, file as PascalFile, encodeUtf8(value as string))
-      return undefined
+      const charArray = value as PascalArray<string>
+      writeBytes(ctx, file as PascalFile, encodeUtf8(getPascalStringValue(charArray)))
     },
-
+    // ---------- program（program 头文件参数运行期查表）----------
+    // PROGRAM X(INFILE, OUTFILE); 的参数在编译期无法确定 url，
+    // 编译产物只烧参数名，运行时通过 ctx.programFileUrls 查表。
+    // 缺省为恒等映射（程序参数名即 files 键名）。
+    'program.fileUrl': (ctx, [f, name]) => {
+      const file = f as PascalFile
+      const key = name as string
+      const url = ctx.programFileUrls[key] ?? key
+      file.url = url
+    },
     // ---------- io.write.fmt.file（带文件 + 格式化）----------
     'io.write.i64.fmt.file': (ctx, [file, value, width]) => {
       writeBytes(ctx, file as PascalFile, encodeUtf8(formatField(String(value), width as number)))
@@ -95,7 +92,8 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
     'io.write.str.fmt.file': (ctx, [file, value, width]) => {
-      writeBytes(ctx, file as PascalFile, encodeUtf8(formatField(value as string, width as number)))
+      const str = getPascalStringValue(value as PascalArray<string>)
+      writeBytes(ctx, file as PascalFile, encodeUtf8(formatField(str, width as number)))
       return undefined
     },
 

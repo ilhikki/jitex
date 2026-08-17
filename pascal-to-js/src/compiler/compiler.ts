@@ -65,6 +65,10 @@ function litStr(v: string): JsonCode.Literal {
   return { kind: 'literal', key: 'str', arg: v }
 }
 
+function litField(v: string): JsonCode.Literal {
+  return { kind: 'literal', key: 'field', arg: v }
+}
+
 function litChar(v: string): JsonCode.Literal {
   return { kind: 'literal', key: 'char', arg: v }
 }
@@ -297,11 +301,7 @@ function compileBlock(
         const varSym = sym as { varId: number }
         body.push(
           evalStmt(
-            syscall('rec.set', [
-              ref(varSym.varId),
-              litStr('url'),
-              syscall('program.fileUrl', [litStr(p.name)]),
-            ]),
+            syscall('program.fileUrl', [ref(varSym.varId), litField(p.name)]),
           ),
         )
       }
@@ -421,7 +421,7 @@ function compileAssignment(
       const binding = ws[i]
       const fname = node.left.name.toLowerCase()
       if (binding.fields.has(fname)) {
-        return [evalStmt(syscall('rec.set', [ref(binding.tempVarId), litStr(fname), value]))]
+        return [evalStmt(syscall('rec.set', [ref(binding.tempVarId), litField(fname), value]))]
       }
     }
 
@@ -488,7 +488,7 @@ function compileAssignment(
       return [evalStmt(syscall('file.put', [fExpr, value]))]
     }
     const objExpr = compileExpr(fa.object, a, ws)
-    return [evalStmt(syscall('rec.set', [objExpr, litStr(fa.field.name.toLowerCase()), value]))]
+    return [evalStmt(syscall('rec.set', [objExpr, litField(fa.field.name.toLowerCase()), value]))]
   }
 
   throw new Error('compileAssignment: unsupported left-hand side')
@@ -1111,7 +1111,7 @@ function compileIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[])
     const binding = ws[i]
     const fname = node.name.toLowerCase()
     if (binding.fields.has(fname)) {
-      return syscall('rec.field', [ref(binding.tempVarId), litStr(fname)])
+      return syscall('rec.field', [ref(binding.tempVarId), litField(fname)])
     }
   }
 
@@ -1422,7 +1422,7 @@ function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[
     return syscall('file.peek', [compileExpr(node.object, a, ws)])
   }
   const obj = compileExpr(node.object, a, ws)
-  return syscall('rec.field', [obj, litStr(node.field.name.toLowerCase())])
+  return syscall('rec.field', [obj, litField(node.field.name.toLowerCase())])
 }
 
 function compileSetConstructor(

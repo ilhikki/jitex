@@ -126,7 +126,16 @@ describe('Phase 3: Array and Record', () => {
     {
       name: 'record as procedure parameter (value)',
       code:
-        'program test; type Point = record x, y: integer end; var p: Point; procedure printPoint(pt: Point); begin writeln(pt.x); writeln(pt.y); end; begin p.x := 1; p.y := 2; printPoint(p); end.',
+        'program test;' +
+        ' type Point = record x, y: integer end;' +
+        ' var p: Point;' +
+        ' procedure printPoint(pt: Point);' +
+        ' begin writeln(pt.x); writeln(pt.y);' +
+        ' end;' +
+        ' begin p.x := 1;' +
+        ' p.y := 2; ' +
+        'printPoint(p);' +
+        ' end.',
       purpose: '测试记录作为过程参数（值传递）',
       expectedOutput: '1\n2\n',
     },
@@ -191,7 +200,14 @@ describe('Phase 3: Array and Record', () => {
     {
       name: 'array of records',
       code:
-        'program test; type Point = record x, y: integer end; var arr: array[1..2] of Point; begin arr[1].x := 1; arr[1].y := 2; arr[2].x := 3; arr[2].y := 4; writeln(arr[1].x, arr[2].y); end.',
+        'program test; type Point = record x, y: integer end;' +
+        ' var arr: array[1..2] of Point;' +
+        ' begin arr[1].x := 1;' +
+        ' arr[1].y := 2;' +
+        ' arr[2].x := 3;' +
+        ' arr[2].y := 4; ' +
+        'writeln(arr[1].x, arr[2].y);' +
+        ' end.',
       purpose: '测试数组元素为记录',
       expectedOutput: '14\n',
     },

@@ -78,17 +78,22 @@ export function deepCopyValue(v: unknown): unknown {
 // ============================================================
 // 辅助函数：默认值构造
 // ============================================================
-
-export function createDefaultArray(typeDesc: TypeDescriptor): unknown[] {
+export interface PascalArray<T> {
+  array: T[]
+  low: number
+}
+export function createDefaultArray(typeDesc: TypeDescriptor): PascalArray<unknown> {
   // typeDesc = {tag:'array', dims:[{low,high},...], elem:{...}}
   // 支持两种多维形式：
   //   1. 扁平多维：array[1..2,1..2] of integer → dims 有多个，elem 是标量
   //   2. 嵌套多维：array[1..2] of array[1..2] of integer → dims 单个，elem 是 array
   if (!typeDesc.dims || typeDesc.dims.length === 0) {
-    return []
+    return { array: [], low: 0 }
   }
   const dim = typeDesc.dims[0]
   const arr: unknown[] = []
+  const result = { array: arr, low: dim.low }
+  const length = dim.high - dim.low + 1
   if (typeDesc.dims.length > 1) {
     // 扁平多维：剩余维度递归
     const innerDesc: TypeDescriptor = {
@@ -96,20 +101,20 @@ export function createDefaultArray(typeDesc: TypeDescriptor): unknown[] {
       dims: typeDesc.dims.slice(1),
       elem: typeDesc.elem,
     }
-    for (let i = dim.low; i <= dim.high; i++) {
+    for (let i = 0; i < length; i++) {
       arr[i] = createDefaultArray(innerDesc)
     }
   } else if (typeDesc.elem && typeDesc.elem.tag === 'array') {
     // 嵌套多维
-    for (let i = dim.low; i <= dim.high; i++) {
+    for (let i = 0; i < length; i++) {
       arr[i] = createDefaultArray(typeDesc.elem)
     }
   } else {
-    for (let i = dim.low; i <= dim.high; i++) {
+    for (let i = 0; i < length; i++) {
       arr[i] = createDefaultValue(typeDesc.elem ?? { tag: 'i64' })
     }
   }
-  return arr
+  return result
 }
 
 export function createDefaultRec(typeDesc: TypeDescriptor): Record<string, unknown> {
@@ -213,23 +218,25 @@ export function unwrapFileMap(files: Map<string, FileBuffer>): Map<string, Uint8
 // ============================================================
 
 export function getArrayElement(arr: unknown, indices: unknown[]): unknown {
-  let cur = arr as Record<PropertyKey, unknown>
+  let cur = arr as PascalArray<unknown>
   for (const idx of indices) {
     // Pascal char 作为数组索引时是单字符字符串，需转 charCode
-    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx
-    cur = cur[n as PropertyKey] as Record<PropertyKey, unknown>
+    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx as number
+    cur = cur.array[n - cur.low] as PascalArray<unknown>
   }
   return cur
 }
-
+export function getPascalStringValue(pascalString: PascalArray<string>){
+  return pascalString.array.join("")
+}
 export function setArrayElement(arr: unknown, indices: unknown[], value: unknown): void {
-  let cur = arr as Record<PropertyKey, unknown>
+  let cur = arr as PascalArray<unknown>
   for (let i = 0; i < indices.length - 1; i++) {
     const idx = indices[i]
-    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx
-    cur = cur[n as PropertyKey] as Record<PropertyKey, unknown>
+    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx as number
+    cur = cur.array[n - cur.low] as PascalArray<unknown>
   }
   const last = indices[indices.length - 1]
-  const lastN = typeof last === 'string' && last.length === 1 ? last.charCodeAt(0) : last
-  cur[lastN as PropertyKey] = value
+  const lastN = typeof last === 'string' && last.length === 1 ? last.charCodeAt(0) : last as number
+  cur.array[lastN - cur.low] = value
 }

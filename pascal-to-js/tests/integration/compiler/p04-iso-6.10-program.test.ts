@@ -70,7 +70,17 @@ const programParamTests: PascalTest[] = [
   {
     name: '§6.10 文件参数：programFileUrls 做重命名映射（F→IN.TXT，G→OUT.TXT）',
     code:
-      `PROGRAM RENAMEMAP(F,G);VAR F,G:FILE OF CHAR;C:CHAR;BEGIN RESET(F);REWRITE(G);WHILE NOT EOF(F)DO BEGIN C:=F^;WRITE(G,C);GET(F);END;END.`,
+      `PROGRAM RENAMEMAP(F,G);
+      VAR F,G:FILE OF CHAR;
+      C:CHAR;
+      BEGIN RESET(F);
+      REWRITE(G);
+      WHILE NOT EOF(F) DO 
+      BEGIN C:=F^;
+         WRITE(G,C);
+         GET(F);
+      END;
+      END.`,
     purpose: 'ISO §6.10: programFileUrls 可以重命名文件变量→内存文件名，变量名不等于文件名',
     files: new Map<string, Uint8Array>([
       ['IN.TXT', text('MAPPED')],
