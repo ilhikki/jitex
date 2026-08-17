@@ -207,3 +207,29 @@ export function unwrapFileMap(files: Map<string, FileBuffer>): Map<string, Uint8
   }
   return m
 }
+
+// ============================================================
+// 辅助函数：数组
+// ============================================================
+
+export function getArrayElement(arr: unknown, indices: unknown[]): unknown {
+  let cur = arr as Record<PropertyKey, unknown>
+  for (const idx of indices) {
+    // Pascal char 作为数组索引时是单字符字符串，需转 charCode
+    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx
+    cur = cur[n as PropertyKey] as Record<PropertyKey, unknown>
+  }
+  return cur
+}
+
+export function setArrayElement(arr: unknown, indices: unknown[], value: unknown): void {
+  let cur = arr as Record<PropertyKey, unknown>
+  for (let i = 0; i < indices.length - 1; i++) {
+    const idx = indices[i]
+    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx
+    cur = cur[n as PropertyKey] as Record<PropertyKey, unknown>
+  }
+  const last = indices[indices.length - 1]
+  const lastN = typeof last === 'string' && last.length === 1 ? last.charCodeAt(0) : last
+  cur[lastN as PropertyKey] = value
+}

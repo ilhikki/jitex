@@ -1,5 +1,136 @@
 import type { JsCompiler, SemanticCompiler } from '../../compiler/json-code-compiler.ts'
 import * as JsonCode from '../../compiler/json-code.ts'
+import type { SyscallHandler } from '../runtime-type.ts'
+import {
+  createDefaultArray,
+  createDefaultRec,
+  deepCopyValue,
+  getArrayElement,
+  setArrayElement,
+} from '../runtime-util.ts'
+import { type TypeDescriptor } from '../runtime-type.ts'
+
+export function basicSyscall(): Record<string, SyscallHandler> {
+  return {
+    // ---------- cell（var 参数传递）----------
+    'cell.create': (_ctx, [value]) => ({ v: value }),
+    'cell.get': (_ctx, [value]) => (value as { v: unknown }).v,
+    'cell.set': (_ctx, [left, right]) => {
+      ;(left as { v: unknown }).v = right
+      return undefined
+    },
+
+    // ---------- array ----------
+    'array.get': (_ctx, args) => getArrayElement(args[0], args.slice(1)),
+    'array.set': (_ctx, args) => {
+      setArrayElement(args[0], args.slice(1, -1), args[args.length - 1])
+      return undefined
+    },
+
+    // ---------- cast ----------
+    'cast.char.to.i64': (_ctx, [value]) => (typeof value === 'string' ? value.charCodeAt(0) : value),
+
+    // ---------- record ----------
+    'rec.field': (_ctx, [record, key]) => (record as Record<string, unknown>)[key as string],
+    'rec.set': (_ctx, [record, key, value]) => {
+      ;(record as Record<string, unknown>)[key as string] = value
+    },
+    'rec.copy': (_ctx, [value]) => deepCopyValue(value),
+
+    // ---------- mem.default（变量初始化）----------
+    // type 字面量由 literalToJs 直接作为 JS 对象字面量返回，无需 JSON.parse
+    'mem.default.array': (_ctx, [type]) => createDefaultArray(type as TypeDescriptor),
+    'mem.default.rec': (_ctx, [type]) => createDefaultRec(type as TypeDescriptor),
+
+    // ---------- str.to.char.array ----------
+    // Pascal `packed array[low..high] of char` 赋值为字符串字面量时，
+    // 必须展开为 1-based（按 low 起）的字符数组对象，否则后续 `arr[k]`
+    // 在 JS 中变成 0-based 字符串索引，导致首字符丢失。
+    // args = [low, high, str]；返回对象 {low:ch1, low+1:ch2, ..., high:' '}
+    // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历。
+    'str.to.char.array': (_ctx, [l, h, s]) => {
+      const low: number = (l as number) | 0
+      const high: number = (h as number) | 0
+      const str: string = typeof s === 'string' ? s : String(s ?? '')
+      const out: Record<number | string, string | number> = {}
+      for (let i = low; i <= high; i++) {
+        const idx = i - low
+        out[i] = idx < str.length ? str.charAt(idx) : ' '
+      }
+      out.length = high - low + 1
+      return out
+    },
+
+    // ---------- set ----------
+    'set.empty': (_ctx, _args) => new Set<number>(),
+    'set.union': (_ctx, [v1, v2]) => new Set<number>([...(v1 as Set<number>), ...(v2 as Set<number>)]),
+    'set.intersect': (_ctx, [set, value]) =>
+      new Set<number>([...(set as Set<number>)].filter((x) => (value as Set<number>).has(x))),
+    'set.diff': (_ctx, [set, value]) =>
+      new Set<number>([...(set as Set<number>)].filter((x) => !(value as Set<number>).has(x))),
+    'set.eq': (_ctx, [left, right]) =>
+      (left as Set<number>).size === (right as Set<number>).size &&
+      [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+    'set.ne': (_ctx, [left, right]) =>
+      !((left as Set<number>).size === (right as Set<number>).size &&
+        [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x))),
+    'set.le': (_ctx, [left, right]) => [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+    'set.ge': (_ctx, [left, right]) => [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+    'set.range': (_ctx, [start, end]) => {
+      const s = new Set<number>()
+      for (let i = start as number; i <= (end as number); i++) {
+        s.add(i)
+      }
+      return s
+    },
+    'set.elem': (_ctx, [value]) => new Set<number>([value as number]),
+    'set.literal': (_ctx, args) => {
+      const s = new Set<number>()
+      for (const e of args) {
+        if (e instanceof Set) {
+          for (const x of e) {
+            s.add(x as number)
+          }
+        } else {
+          s.add(e as number)
+        }
+      }
+      return s
+    },
+    'set.in': (_ctx, [value, set]) => (set as Set<number>).has(value as number),
+
+    // ---------- steps.check（循环步数限制）----------
+    'steps.check': (ctx, _args) => {
+      if (++ctx.steps > ctx.maxSteps) {
+        throw new Error('step limit exceeded')
+      }
+      return undefined
+    },
+
+    // ---------- range.check（subrange 运行时边界检查）----------
+    'range.check': (_ctx, [index, min, max]) => {
+      if ((index as number) < (min as number) || (index as number) > (max as number)) {
+        throw new Error(`subrange value ${index} out of range ${min}..${max}`)
+      }
+      return undefined
+    },
+
+    // ---------- program（program 头文件参数运行期查表）----------
+    // PROGRAM X(INFILE, OUTFILE); 的参数在编译期无法确定 url，
+    // 编译产物只烧参数名，运行时通过 ctx.programFileUrls 查表。
+    // 缺省为恒等映射（程序参数名即 files 键名）。
+    'program.fileUrl': (ctx, [name]) => {
+      const key = String(name ?? '').toLowerCase()
+      // 大小写不敏感的精确匹配（Pascal 标识符大小写不敏感）
+      for (const [k, v] of Object.entries(ctx.programFileUrls)) {
+        if (k.toLowerCase() === key) {
+          return v
+        }
+      }
+      return String(name ?? '')
+    },
+  }
+}
 
 export class PascalSemanticCompiler implements SemanticCompiler {
   literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
@@ -132,20 +263,6 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return `(${args[0]} ? 1 : 0)`
       case 'cast.i64.to.char':
         return `String.fromCharCode(${args[0]})`
-
-      // 字符串（也可以 inline）
-      case 'str.concat':
-        return `(${args[0]} + ${args[1]})`
-      case 'str.length':
-        return `(${args[0]}.length)`
-
-      // str.to.char.array: args = [low, high, str]
-      // 生成 IIFE 返回 1-based 字符数组对象，避免字符串作为数组索引时 0-based 偏移
-      // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历
-      case 'str.to.char.array':
-        return `(() => { const __low=${args[0]}|0, __high=${args[1]}|0, __s=${
-          args[2]
-        }; const __o={}; for(let __i=__low;__i<=__high;__i++){const __k=__i-__low; __o[__i]=__k<__s.length?__s.charAt(__k):' ';} __o.length=__high-__low+1; return __o; })()`
 
       // ---------- 数组/记录/cell（inline，符合 JS 语义）----------
       // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...

@@ -1188,7 +1188,7 @@ function compileBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding[
 
   // 字符串拼接
   if (lt.tag === 'str' && op === '+') {
-    return syscall('str.concat', [L, R])
+    throw new Error('concat str is not support')
   }
 
   // 布尔逻辑
@@ -1372,8 +1372,6 @@ function compileFunctionCall(
     }
     case 'odd':
       return syscall('i64.odd', argExprs)
-    case 'length':
-      return syscall('str.length', argExprs)
     case 'eof':
       if (args.length > 0) {
         // file of record 用 file.rec.eof（ISO 7185 6.4.3.5）

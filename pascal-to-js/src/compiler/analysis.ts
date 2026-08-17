@@ -125,7 +125,6 @@ const BUILTIN_FUNCTIONS = new Set([
   'pred',
   'succ',
   'odd',
-  'length',
   'eof',
   'eoln',
 ])
