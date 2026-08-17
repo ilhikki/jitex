@@ -1,6 +1,6 @@
 import { assertEquals, attachText, cache, stage, suite } from '@jitex/integration'
 import { transform } from '@jitex/pascal-to-js'
-import { createTangleStage, TangleInput } from './build-tangle.ts'
+import { createTangleStage, TangleInput, transformTangle } from './build-tangle.ts'
 import { readTextFile } from '../utils.ts'
 
 const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
@@ -41,7 +41,7 @@ const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
   })
 
   stage('storeJs', [getTangleV2, valid], (results) => {
-    const tangleJs = transform(results[0].pasFile)
+    const tangleJs = transformTangle(results[0].pasFile)
     attachText('tangle.js', tangleJs)
   })
 })

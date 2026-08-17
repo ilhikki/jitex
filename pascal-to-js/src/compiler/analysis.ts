@@ -861,7 +861,8 @@ export class Analyzer {
     extra: Record<string, ExtraCallable> | undefined,
   ): Map<string, ExtraCallable> | undefined {
     if (!extra) {
-return undefined}
+      return undefined
+    }
     const map = new Map<string, ExtraCallable>()
     for (const [rawName, entry] of Object.entries(extra)) {
       const name = rawName.toLowerCase()

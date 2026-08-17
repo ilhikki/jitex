@@ -1,5 +1,5 @@
 import { bytesToString, stringToBytes } from '../utils.ts'
-import { runJs, RunState, transform } from '@jitex/pascal-to-js'
+import { ExtraCallable, runJs, RunState, SyscallHandler, transform } from '@jitex/pascal-to-js'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
 // noinspection SpellCheckingInspection
@@ -8,6 +8,18 @@ const fileNames = {
   changeFile: 'CHANGEFILE',
   pascalFile: 'PASCALFILE',
   pool: 'POOL',
+}
+const tangleExtraCallables: Record<string, ExtraCallable> = {
+  'BREAK': {
+    sysCallName: 'extra.break',
+    kind: 'procedure',
+    allowOverrideNative: false,
+  },
+}
+
+const tangleExtraSyscalls: Record<string, SyscallHandler> = {
+  'extra.break': () => {
+  },
 }
 
 export type TangleInput = {
@@ -30,6 +42,7 @@ export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   const { state, pasFile, poolFile, debugLog } = result
   log(`state.status = ${state.status}`)
   log(`state.steps = ${state.steps}`)
+  attachText('debugLog.log', debugLog.join('\n'))
   if (state.jsCode) {
     attachText('tangle.js', state.jsCode)
   } else {
@@ -37,7 +50,7 @@ export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   }
   attachText('result.pas', pasFile)
   attach('pool.bin', poolFile)
-  attachText('debugLog.log', debugLog.join('\n'))
+
   assertEquals(state.status, 'terminated')
   return { pasFile, poolFile }
 }
@@ -77,6 +90,7 @@ export function runTangleJs(
     files,
     maxSteps: 1e9,
     debugLog,
+    extraSyscalls: tangleExtraSyscalls,
   })
   const pasFile = bytesToString(state.files.get(fileNames.pascalFile)!)
   const poolFile = state.files.get(fileNames.pool)!
@@ -88,8 +102,15 @@ export function runTangleJs(
   }
 }
 
+export function transformTangle(tangleContent: string) {
+  const jsCode = transform(tangleContent, {
+    extraCallables: tangleExtraCallables,
+  })
+  return jsCode
+}
+
 export function runTangle(input: TangleInput) {
   const { tangleContent, webContent, changeContent } = input
-  const jsCode = transform(tangleContent)
+  const jsCode = transformTangle(tangleContent)
   return runTangleJs(jsCode, webContent, changeContent)
 }
