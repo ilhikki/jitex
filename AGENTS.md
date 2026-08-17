@@ -45,10 +45,14 @@
 
 6. **ISO Pascal 1983 是唯一行为标准**。默认行为必须符合 ISO 标准。
 7. **非标特性默认必须报错**。用户未显式启用的非标特性，遇到即抛错。
-8. **注入优先，无法注入才配置**。启用非标特性时，优先用插件注入（如
-   `plugins: [pascalHPlugin]`），无法用注入实现的才用配置项（如 `extensions: ['fileEofBufferSpace']`）。
-   - **现状**：il 编译器尚未实现插件系统，当前所有非标特性都通过 `extensions: string[]`
-     配置项实现。插件系统是计划中的方向（见 task.md）。
+8. **注入优先，无法注入才配置**。启用非标过程/函数时，优先用"额外 callable"注入： 编译期 `extraCallables`（name →
+   `{ sysCallName, kind: 'function'|'procedure', allowOverrideNative }`） 声明非标过程/函数，运行期
+   `extraSyscalls`（syscallName → `SyscallHandler`）提供实现。 无法用注入实现的非标语义才用配置项（如
+   `extensions: ['fileEofBufferSpace']`）。
+   - **合并与覆盖**：分析阶段把原生内建与 `extraCallables` 合并到同一命名空间；名称冲突时， `allowOverrideNative` 为
+     `false` 则抛错，为 `true` 则外部覆盖原生。
+   - **现状**：`extensions: string[]` 真正强制的只有 `'string'`；Pascal-H 扩展的 handler 实现保留在
+     `pascal-to-js/src/compiler/plugins/pascal-h.plugin.ts`，尚未按新机制重接。
 9. **非标注释引用 ISO 章节**。代码中实现非标特性时，注释必须说明违反了 ISO 7185 的哪个章节。
 10. **非标特性配正反测试**。每个非标特性必须有：
 

@@ -15,7 +15,8 @@
 
 import { run } from '../../../src/compiler/transform.ts'
 import type { RunState } from '../../../src/runtime/run-state.ts'
-import type { IlPlugin } from '../../../src/compiler/plugin.ts'
+import type { ExtraCallable } from '../../../src/compiler/analysis.ts'
+import type { SyscallHandler } from '../../../src/runtime/runtime-type.ts'
 import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
 export { assert, assertEquals, describe, it, test }
 
@@ -62,8 +63,10 @@ export interface PascalTest {
   /** 非标扩展列表，如 ['string', 'allowUndeclaredLabels'] */
   extensions?: Extension[]
 
-  /** 非标特性插件（AGENTS.md 原则 A.7：注入优先） */
-  plugins?: IlPlugin[]
+  /** 额外 callable 注入（编译期声明，AGENTS.md 原则 A.7：注入优先） */
+  extraCallables?: Record<string, ExtraCallable>
+  /** 额外 syscall 实现（运行期，与 extraCallables 的 sysCallName 对应） */
+  extraSyscalls?: Record<string, SyscallHandler>
 
   /** 内存文件系统：文件名 → 文件内容 */
   files?: Map<string, Uint8Array>
@@ -86,7 +89,8 @@ export function runPascal(t: PascalTest): RunState {
     programFileUrls: t.programFileUrls,
     maxSteps: t.maxSteps ?? 1e5,
     extensions: t.extensions,
-    plugins: t.plugins,
+    extraCallables: t.extraCallables,
+    extraSyscalls: t.extraSyscalls,
   })
 }
 

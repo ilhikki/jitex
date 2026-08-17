@@ -2,8 +2,6 @@
 // RuntimeContext
 // ============================================================
 
-import { IlPlugin } from '@/compiler/plugin.ts'
-
 /** 类型描述符（compiler.ts serializeTypeInfo 生成的序列化 TypeInfo，runtime 消费） */
 export interface TypeDescriptor {
   tag: string
@@ -47,8 +45,6 @@ export interface RuntimeContext {
    * 默认未启用的非标特性遇到即抛错。
    */
   extensions: Set<string>
-  /** 编译期注入的插件（运行期提供 syscall 实现，AGENTS.md 原则 A.7） */
-  plugins: IlPlugin[]
   /** 调试日志（e2e 报告消费，不写入临时文件）。
    * file.ts 不再使用；transform.ts 在编译/运行出错时追加诊断信息。 */
   debugLog: string[]
@@ -62,8 +58,8 @@ export interface RuntimeOptions {
   maxSteps?: number
   /** 非标特性扩展列表 */
   extensions?: string[]
-  /** 编译期注入的插件（运行期提供 syscall 实现） */
-  plugins?: IlPlugin[]
+  /** 额外 syscall 实现（key=syscallName，value=SyscallHandler；与编译期 extraCallables 的 sysCallName 对应） */
+  extraSyscalls?: Record<string, SyscallHandler>
   /** 调试日志缓冲区（外部传入以复用，不传则内部新建） */
   debugLog?: string[]
 }

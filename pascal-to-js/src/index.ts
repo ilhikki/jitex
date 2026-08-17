@@ -34,9 +34,8 @@ export { nodeToCode } from './ast/printer.ts'
 export { executeCompiled, run, runJs, transform } from './compiler/transform.ts'
 export type { RunOptions, TransformOptions } from './compiler/transform.ts'
 export type { RunError, RunState } from './runtime/run-state.ts'
-export type { IlPlugin } from './compiler/plugin.ts'
-
-export { pascalHPlugin } from './compiler/plugins/pascal-h.plugin.ts'
+export type { ExtraCallable } from './compiler/analysis.ts'
+export type { SyscallHandler } from './runtime/runtime-type.ts'
 // ==========================================================================
 // 便捷函数
 // ==========================================================================

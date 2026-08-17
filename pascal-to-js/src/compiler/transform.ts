@@ -30,7 +30,7 @@ import { toJs } from './json-code-compiler.ts'
 import type { RunError, RunState } from '@/runtime/run-state.ts'
 import { createDispatcher, createRuntimeContext, toRunState } from '@/runtime/runtime.ts'
 import type { RuntimeContext, RuntimeOptions } from '@/runtime/runtime-type.ts'
-import type { IlPlugin } from './plugin.ts'
+import type { ExtraCallable } from './analysis.ts'
 import { PascalSemanticCompiler } from '@/runtime/sys/pascal-semantic-compiler.ts'
 
 // ============================================================
@@ -40,8 +40,8 @@ import { PascalSemanticCompiler } from '@/runtime/sys/pascal-semantic-compiler.t
 export interface TransformOptions {
   /** 非标特性扩展（传递给 analysis 做语义检查） */
   extensions?: string[]
-  /** 非标特性插件（AGENTS.md 原则 A.7：注入优先） */
-  plugins?: IlPlugin[]
+  /** 额外 callable 注入（编译期声明非标过程/函数，AGENTS.md 原则 A.7：注入优先） */
+  extraCallables?: Record<string, ExtraCallable>
 }
 
 // ============================================================
@@ -72,8 +72,8 @@ export function transform(source: string, options: TransformOptions = {}): strin
   // 1. parse
   const ast = parseSource(source)
 
-  // 2. analyze（传递 extensions 和 plugins）
-  const analysis = analyzeProgram(ast, options.extensions, options.plugins)
+  // 2. analyze（传递 extensions 和 extraCallables）
+  const analysis = analyzeProgram(ast, options.extensions, options.extraCallables)
 
   // 3. compile
   const jsonCode = compileProgram(ast, analysis)
@@ -150,7 +150,6 @@ function getRunTimeContextFromOptions(options: RuntimeOptions) {
     programFileUrls: options.programFileUrls,
     maxSteps: options.maxSteps,
     extensions: options.extensions,
-    plugins: options.plugins,
     debugLog: options.debugLog ?? [],
   })
   return ctx
@@ -161,9 +160,9 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
   try {
     ctx.jsCode = source
     // __sys dispatcher
-    const dispatcher = createDispatcher(options.plugins ?? [])
+    const dispatcher = createDispatcher(options.extraSyscalls ?? {})
     const __sys = (key: string, args: unknown[]): unknown => {
-      if (key.startsWith('io.') || key.startsWith('plugin.') || key.startsWith('file.')) {
+      if (key.startsWith('io.') || key.startsWith('file.')) {
         ctx.debugLog.push(`[${key}] ${JSON.stringify(args)}`)
       }
       return dispatcher(ctx, key, args)
@@ -183,7 +182,7 @@ export function run(source: string, options: RunOptions = {}): RunState {
   try {
     jsCode = transform(source, {
       extensions: options.extensions,
-      plugins: options.plugins,
+      extraCallables: options.extraCallables,
     })
   } catch (e: unknown) {
     const ctx = getRunTimeContextFromOptions(options)

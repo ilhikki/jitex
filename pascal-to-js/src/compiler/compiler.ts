@@ -10,7 +10,6 @@
 
 import * as JsonCode from './json-code.ts'
 import { Analysis, Symbol, TypeInfo } from './analysis.ts'
-import { findFunctionPlugin, findProcedurePlugin, pluginSyscallKey } from './plugin.ts'
 import {
   ArrayAccessNode,
   AssignmentNode,
@@ -741,6 +740,13 @@ function compileProcedureCall(
     return compileUserCallStmt(sym.funcId, node.arguments, a, funcId, ws)
   }
 
+  // 额外 callable 注入的过程（AGENTS.md 原则 A.7：注入优先；原生被允许覆盖时也在此命中）
+  const extraProc = a.extraCallables()?.get(name)
+  if (extraProc?.kind === 'procedure') {
+    const args = node.arguments.map((x) => compileExpr(x, a, ws))
+    return [evalStmt(syscall(extraProc.sysCallName, args))]
+  }
+
   // 内置过程
   switch (name) {
     case 'writeln':
@@ -849,12 +855,6 @@ function compileProcedureCall(
       return [checkStmt, assignStmt(ref(sym.varId), litNull())]
     }
     default: {
-      // 插件注入的非标过程（AGENTS.md 原则 A.7）
-      const found = findProcedurePlugin(a.plugins(), name)
-      if (found) {
-        const args = node.arguments.map((x) => compileExpr(x, a, ws))
-        return [evalStmt(syscall(pluginSyscallKey(found.plugin.name, found.name), args))]
-      }
       throw new Error(`compileProcedureCall: unknown procedure ${name}`)
     }
   }
@@ -1282,6 +1282,12 @@ function compileFunctionCall(
   const args = node.arguments
   const argExprs = args.map((x) => compileExpr(x, a, ws))
 
+  // 额外 callable 注入的函数（AGENTS.md 原则 A.7：注入优先；原生被允许覆盖时也在此命中）
+  const extraFunc = a.extraCallables()?.get(name)
+  if (extraFunc?.kind === 'function') {
+    return syscall(extraFunc.sysCallName, argExprs)
+  }
+
   switch (name) {
     case 'abs': {
       const ti = a.typeOf(args[0])
@@ -1383,11 +1389,6 @@ function compileFunctionCall(
       }
       return syscall('io.eoln', [])
     default: {
-      // 插件注入的非标函数（AGENTS.md 原则 A.7）
-      const found = findFunctionPlugin(a.plugins(), name)
-      if (found) {
-        return syscall(pluginSyscallKey(found.plugin.name, found.name), argExprs)
-      }
       throw new Error(`compileFunctionCall: unknown function ${name}`)
     }
   }

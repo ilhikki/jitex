@@ -29,8 +29,6 @@ import {
   TypeNode,
   WithStatementNode,
 } from '../ast/types.ts'
-import { findFunctionPlugin, findProcedurePlugin } from './plugin.ts'
-import type { IlPlugin } from './plugin.ts'
 
 // ============================================================
 // 类型系统
@@ -132,8 +130,21 @@ const BUILTIN_FUNCTIONS = new Set([
   'eoln',
 ])
 
-/** 内置无参标识符（parser 将无括号调用解析为 Identifier，compileIdentifier 处理） */
+/** 内置无参标识符（parser 将无参调用解析为 Identifier，compileIdentifier 处理） */
 const BUILTIN_IDENTIFIERS = new Set(['maxint', 'nil', 'eof', 'eoln'])
+
+/**
+ * 额外 callable 注入项（编译期声明，AGENTS.md 原则 A.7：注入优先）。
+ * key 为 Pascal 过程/函数名（分析时按小写归一），value 描述对应 syscall 与覆盖许可。
+ */
+export interface ExtraCallable {
+  /** 运行期 syscall 名（由运行期 extraSyscalls 提供 handler） */
+  sysCallName: string
+  /** 'function' = 用于表达式；'procedure' = 用于语句 */
+  kind: 'function' | 'procedure'
+  /** 是否允许覆盖同名原生内建过程/函数；为 false 且与原生冲突时分析期抛错 */
+  allowOverrideNative: boolean
+}
 
 // ============================================================
 // 符号
@@ -216,8 +227,8 @@ export class Analyzer {
   private idNames = new Map<number, string>()
   /** 非标特性扩展（AGENTS.md 原则 A） */
   private extensions: Set<string> = new Set()
-  /** 编译期注入的非标特性插件（AGENTS.md 原则 A.7） */
-  private plugins: IlPlugin[] | undefined
+  /** 额外 callable 注入表（小写名为 key；分析期与原生内建合并做冲突检查） */
+  private extraCallables: Map<string, ExtraCallable> | undefined
   /** 非透明块深度（while/for/if/repeat/case/with 体内部） */
   private nonTransparentDepth = 0
   /** label 出现的非透明块深度（key: labelId，全局唯一） */
@@ -235,11 +246,11 @@ export class Analyzer {
   // 分析入口
   // --------------------------------------------------------
 
-  analyze(program: ProgramNode, extensions?: string[], plugins?: IlPlugin[]): Analysis {
+  analyze(program: ProgramNode, extensions?: string[], extraCallables?: Record<string, ExtraCallable>): Analysis {
     if (extensions) {
       this.extensions = new Set(extensions)
     }
-    this.plugins = plugins
+    this.extraCallables = this.mergeExtraCallables(extraCallables)
     const topFuncId = this.allocFunc(program.block, null, 'program', null)
 
     this.pushScope(topFuncId)
@@ -829,14 +840,43 @@ export class Analyzer {
     throw new Error(`Undefined reference(s):\n${lines.join('\n')}`)
   }
 
-  /** 是否插件注入的过程（AGENTS.md 原则 A.7） */
-  private hasPluginProcedure(name: string): boolean {
-    return findProcedurePlugin(this.plugins, name) !== undefined
+  /** 是否额外 callable 注入的过程（AGENTS.md 原则 A.7） */
+  private hasExtraProcedure(name: string): boolean {
+    const e = this.extraCallables?.get(name.toLowerCase())
+    return e?.kind === 'procedure'
   }
 
-  /** 是否插件注入的函数（AGENTS.md 原则 A.7） */
-  private hasPluginFunction(name: string): boolean {
-    return findFunctionPlugin(this.plugins, name) !== undefined
+  /** 是否额外 callable 注入的函数（AGENTS.md 原则 A.7） */
+  private hasExtraFunction(name: string): boolean {
+    const e = this.extraCallables?.get(name.toLowerCase())
+    return e?.kind === 'function'
+  }
+
+  /**
+   * 把外部 extraCallables（key 可能任意大小写）归一为小写 key 的 Map，
+   * 并与原生内建做冲突检查：同名原生且 allowOverrideNative=false → 抛错。
+   * （AGENTS.md 原则 A.7 注入优先；A.6 非标默认报错。）
+   */
+  private mergeExtraCallables(
+    extra: Record<string, ExtraCallable> | undefined,
+  ): Map<string, ExtraCallable> | undefined {
+    if (!extra) {
+return undefined}
+    const map = new Map<string, ExtraCallable>()
+    for (const [rawName, entry] of Object.entries(extra)) {
+      const name = rawName.toLowerCase()
+      if (map.has(name)) {
+        throw new Error(`Duplicate extra callable '${rawName}' (case-insensitive collision)`)
+      }
+      const native = entry.kind === 'procedure' ? BUILTIN_PROCEDURES.has(name) : BUILTIN_FUNCTIONS.has(name)
+      if (native && !entry.allowOverrideNative) {
+        throw new Error(
+          `Cannot override native ${entry.kind} '${rawName}'; set allowOverrideNative=true to override`,
+        )
+      }
+      map.set(name, entry)
+    }
+    return map.size > 0 ? map : undefined
   }
 
   private declareProcName(decl: ProcedureDeclarationNode): void {
@@ -1106,7 +1146,7 @@ export class Analyzer {
         if (
           !sym &&
           !BUILTIN_PROCEDURES.has(node.name.name.toLowerCase()) &&
-          !this.hasPluginProcedure(node.name.name)
+          !this.hasExtraProcedure(node.name.name)
         ) {
           this.recordUndefinedRef('procedure', node.name.name)
         }
@@ -1241,7 +1281,7 @@ export class Analyzer {
         if (
           !sym &&
           !BUILTIN_FUNCTIONS.has(node.name.name.toLowerCase()) &&
-          !this.hasPluginFunction(node.name.name)
+          !this.hasExtraFunction(node.name.name)
         ) {
           this.recordUndefinedRef('function', node.name.name)
         }
@@ -1439,8 +1479,8 @@ export class Analyzer {
       debugNames: () => {
         return new Map(this.idNames)
       },
-      plugins: () => {
-        return this.plugins
+      extraCallables: () => {
+        return this.extraCallables
       },
     }
   }
@@ -1467,8 +1507,8 @@ export interface Analysis {
   globalSymbolOf(name: string): Symbol | undefined
   /** id → 可读名字映射（调试用，仅 json-code-compiler 读取） */
   debugNames(): Map<number, string>
-  /** 编译期注入的非标特性插件（AGENTS.md 原则 A.7） */
-  plugins(): IlPlugin[] | undefined
+  /** 额外 callable 注入表（小写名为 key；编译期用于查 syscall 名） */
+  extraCallables(): Map<string, ExtraCallable> | undefined
 }
 
 // ============================================================
@@ -1478,7 +1518,7 @@ export interface Analysis {
 export function analyzeProgram(
   program: ProgramNode,
   extensions?: string[],
-  plugins?: IlPlugin[],
+  extraCallables?: Record<string, ExtraCallable>,
 ): Analysis {
-  return new Analyzer().analyze(program, extensions, plugins)
+  return new Analyzer().analyze(program, extensions, extraCallables)
 }

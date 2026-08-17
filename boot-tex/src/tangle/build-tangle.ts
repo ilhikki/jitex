@@ -1,5 +1,4 @@
 import { bytesToString, stringToBytes } from '../utils.ts'
-import { pascalHPlugin } from '@jitex/pascal-to-js'
 import { runJs, RunState, transform } from '@jitex/pascal-to-js'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
@@ -78,7 +77,6 @@ export function runTangleJs(
     files,
     maxSteps: 1e9,
     debugLog,
-    plugins: [pascalHPlugin],
   })
   const pasFile = bytesToString(state.files.get(fileNames.pascalFile)!)
   const poolFile = state.files.get(fileNames.pool)!
@@ -92,8 +90,6 @@ export function runTangleJs(
 
 export function runTangle(input: TangleInput) {
   const { tangleContent, webContent, changeContent } = input
-  const jsCode = transform(tangleContent, {
-    plugins: [pascalHPlugin],
-  })
+  const jsCode = transform(tangleContent)
   return runTangleJs(jsCode, webContent, changeContent)
 }

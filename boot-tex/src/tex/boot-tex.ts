@@ -1,5 +1,5 @@
 import { attach, attachText, cache, log, stage, suite } from '@jitex/integration'
-import { pascalHPlugin, runJs, transform } from '@jitex/pascal-to-js'
+import { runJs, transform } from '@jitex/pascal-to-js'
 import { runTangleJs, runTanglePascal, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { readFile, readTextFile, stringToBytes } from '../utils.ts'
 
@@ -15,9 +15,7 @@ export default suite('boot tex', () => {
       tangleContent: tangleV1.pasFile,
       webContent: tangleWeb,
     })
-    const jsCode = transform(tangleV2.pasFile, {
-      plugins: [pascalHPlugin],
-    })
+    const jsCode = transform(tangleV2.pasFile)
     attachText('tangle.js', jsCode)
     return jsCode
   })
@@ -41,9 +39,7 @@ export default suite('boot tex', () => {
 
   const buildTripTexJs = cache(stage('tex.trip.pas => tex.trip.js', [getTripPas], ([getTripPasResult]) => {
     const texPas = getTripPasResult.pasFile
-    const texTripJs = transform(texPas, {
-      plugins: [pascalHPlugin],
-    })
+    const texTripJs = transform(texPas)
     attachText('tex.trip.js', texTripJs)
     return { texTripJs }
   }))
@@ -70,7 +66,6 @@ export default suite('boot tex', () => {
     const state = runJs(tripJs, {
       input: ['trip'],
       files: files,
-      plugins: [pascalHPlugin],
       extensions: ['string', 'fileEofBufferSpace', 'pascalHFileModel'],
       debugLog,
     })

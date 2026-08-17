@@ -12,14 +12,12 @@
  *   - erstat(f)：返回最近一次 reset/rewrite 的 I/O 错误状态（0=成功，非 0=失败）。
  *     TeX 用 erstat(f)=0 判断文件是否成功打开。
  *
- * 启用方式（AGENTS.md 原则 A.7 注入优先）：
- *   transform(source, { plugins: [pascalHPlugin] })
+ * 现状：handler 实现保留，但尚未按新机制（extraCallables + extraSyscalls）重接。
  *
  * 反测试（AGENTS.md 原则 A.9）：默认配置下（未启用插件），
  * 编译 break/break_in/breakin/erstat 应抛 "unknown procedure/function" 错误。
  */
 
-import type { IlPlugin } from '../plugin.ts'
 import type { RuntimeContext } from '@/runtime/runtime-type.ts'
 import type { PascalFile } from '@/runtime/file-model.ts'
 
@@ -54,7 +52,7 @@ function getFileError(file: PascalFile | undefined): number {
  * 颗粒度：涵盖 Knuth WEB 系统用到的所有非标过程/函数。
  * 未来如需更多 Pascal-H 特性（如 clock、memavail），可继续在此插件中添加。
  */
-export const pascalHPlugin: IlPlugin = {
+export const pascalHPlugin = {
   name: 'pascalH',
 
   // 非标过程（ISO 7185 6.9.8.2 未列出）

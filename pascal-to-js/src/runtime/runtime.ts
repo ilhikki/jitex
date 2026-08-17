@@ -15,7 +15,6 @@
  */
 
 import type { RunError, RunState } from './run-state.ts'
-import type { IlPlugin } from '../compiler/plugin.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
 import { TypeDescriptor } from '@/runtime/runtime-type.ts'
 import { ioSyscalls } from './sys/io.ts'
@@ -32,7 +31,6 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     maxSteps: options.maxSteps ?? Infinity,
     programFileUrls: options.programFileUrls ?? {},
     extensions: new Set(options.extensions ?? []),
-    plugins: options.plugins ?? [],
     debugLog: options.debugLog ?? [],
     jsCode: undefined,
   }
@@ -188,14 +186,13 @@ function basicSyscall(): Record<string, SyscallHandler> {
   }
 }
 
-export function createDispatcher(plugins: IlPlugin[]): (ctx: RuntimeContext, key: string, args: unknown[]) => unknown {
+export function createDispatcher(
+  extraSyscalls: Record<string, SyscallHandler>,
+): (ctx: RuntimeContext, key: string, args: unknown[]) => unknown {
   const syscalls = { ...getDefaultSyscalls() }
-  for (const plugin of plugins) {
-    const pluginName = plugin.name
-    for (const [name, fn] of Object.entries(plugin.syscalls ?? {})) {
-      if (fn) {
-        syscalls[`plugin.${pluginName}.${name}`] = fn
-      }
+  for (const [key, fn] of Object.entries(extraSyscalls)) {
+    if (fn) {
+      syscalls[key] = fn
     }
   }
   return (ctx, key, args) => {
