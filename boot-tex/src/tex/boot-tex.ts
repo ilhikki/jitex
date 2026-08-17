@@ -1,7 +1,8 @@
-import { attach, attachText, cache, log, stage, suite } from '@jitex/integration'
+import { assertEquals, attach, attachText, cache, log, stage, suite } from '@jitex/integration'
 import { runJs, transform } from '@jitex/pascal-to-js'
-import { runTangleJs, runTanglePascal, validRunTangleResult } from '../tangle/build-tangle.ts'
+import { runTangleJs, runTanglePascal, transformTangle, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { readFile, readTextFile, stringToBytes } from '../utils.ts'
+import { texExtraSyscalls, transformTex } from './build-tex.ts'
 
 export default suite('boot tex', () => {
   const getTangle = stage('tangle.js', [], async () => {
@@ -15,7 +16,7 @@ export default suite('boot tex', () => {
       tangleContent: tangleV1.pasFile,
       webContent: tangleWeb,
     })
-    const jsCode = transform(tangleV2.pasFile)
+    const jsCode = transformTangle(tangleV2.pasFile)
     attachText('tangle.js', jsCode)
     return jsCode
   })
@@ -39,7 +40,7 @@ export default suite('boot tex', () => {
 
   const buildTripTexJs = cache(stage('tex.trip.pas => tex.trip.js', [getTripPas], ([getTripPasResult]) => {
     const texPas = getTripPasResult.pasFile
-    const texTripJs = transform(texPas)
+    const texTripJs = transformTex(texPas)
     attachText('tex.trip.js', texTripJs)
     return { texTripJs }
   }))
@@ -62,12 +63,10 @@ export default suite('boot tex', () => {
     files.set('TeXformats:TEX.POOL', poolFile)
     files.set('TeXfonts:trip.tfm', tripTfm)
     files.set('TTY:', stringToBytes('trip'))
-    const debugLog: string[] = []
     const state = runJs(tripJs, {
       input: ['trip'],
       files: files,
-      extensions: ['string', 'fileEofBufferSpace', 'pascalHFileModel'],
-      debugLog,
+      extraSyscalls: texExtraSyscalls
     })
 
     for (const [key, value] of state.files) {
@@ -75,6 +74,7 @@ export default suite('boot tex', () => {
       // attach(key.replaceAll(":", "."), value)
     }
     attachText('output.log', state.outputBuffer.join('\n'))
-    attachText('debug.log', debugLog.join('\n'))
+    attachText('debug.log', state.debugLog.join('\n'))
+    assertEquals(state.status, 'terminated')
   })
 })

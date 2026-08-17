@@ -150,7 +150,6 @@ function getRunTimeContextFromOptions(options: RuntimeOptions) {
     programFileUrls: options.programFileUrls,
     maxSteps: options.maxSteps,
     extensions: options.extensions,
-    debugLog: options.debugLog ?? [],
   })
   return ctx
 }
@@ -162,7 +161,7 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
     // __sys dispatcher
     const dispatcher = createDispatcher(options.extraSyscalls ?? {})
     const __sys = (key: string, args: unknown[]): unknown => {
-      if (key.startsWith('io.') || key.startsWith('file.')) {
+      if (key.startsWith('io.') || key.startsWith('file.') || key.startsWith("extra.")) {
         ctx.debugLog.push(`[${key}] ${JSON.stringify(args)}`)
       }
       return dispatcher(ctx, key, args)

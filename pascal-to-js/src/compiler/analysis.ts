@@ -143,7 +143,7 @@ export interface ExtraCallable {
   /** 'function' = 用于表达式；'procedure' = 用于语句 */
   kind: 'function' | 'procedure'
   /** 是否允许覆盖同名原生内建过程/函数；为 false 且与原生冲突时分析期抛错 */
-  allowOverrideNative: boolean
+  allowOverrideNative?: boolean | undefined
 }
 
 // ============================================================

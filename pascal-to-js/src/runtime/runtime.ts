@@ -31,7 +31,7 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     maxSteps: options.maxSteps ?? Infinity,
     programFileUrls: options.programFileUrls ?? {},
     extensions: new Set(options.extensions ?? []),
-    debugLog: options.debugLog ?? [],
+    debugLog: [],
     jsCode: undefined,
   }
 }
@@ -49,6 +49,7 @@ export function toRunState(
     error: error ?? null,
     jsCode: ctx.jsCode,
     files: unwrapFileMap(ctx.files),
+    debugLog: ctx.debugLog,
   }
 }
 

@@ -60,8 +60,6 @@ export interface RuntimeOptions {
   extensions?: string[]
   /** 额外 syscall 实现（key=syscallName，value=SyscallHandler；与编译期 extraCallables 的 sysCallName 对应） */
   extraSyscalls?: Record<string, SyscallHandler>
-  /** 调试日志缓冲区（外部传入以复用，不传则内部新建） */
-  debugLog?: string[]
 }
 
 /** 单个 syscall 处理器：接收 ctx 与参数列表，返回结果 */

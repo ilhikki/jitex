@@ -13,7 +13,6 @@ const tangleExtraCallables: Record<string, ExtraCallable> = {
   'BREAK': {
     sysCallName: 'extra.break',
     kind: 'procedure',
-    allowOverrideNative: false,
   },
 }
 
@@ -85,13 +84,12 @@ export function runTangleJs(
   files.set(fileNames.pascalFile, new Uint8Array())
   files.set(fileNames.pool, new Uint8Array())
 
-  const debugLog: string[] = []
   const state = runJs(jsCode, {
     files,
     maxSteps: 1e9,
-    debugLog,
     extraSyscalls: tangleExtraSyscalls,
   })
+  const debugLog = state.debugLog
   const pasFile = bytesToString(state.files.get(fileNames.pascalFile)!)
   const poolFile = state.files.get(fileNames.pool)!
   return {

@@ -12,4 +12,5 @@ export interface RunState {
   jsCode: string | undefined
   /** 运行结束后的文件系统内容（url → 字节，已用区域视图）。 */
   files: Map<string, Uint8Array>
+  debugLog: string[]
 }
