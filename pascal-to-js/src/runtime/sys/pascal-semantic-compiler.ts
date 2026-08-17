@@ -150,7 +150,9 @@ export class PascalSemanticCompiler implements SemanticCompiler {
       // ---------- 数组/记录/cell（inline，符合 JS 语义）----------
       // array.get: args = [arr, idx1, idx2, ...] → arr[idx1][idx2]...
       case 'array.get': {
-        if (args.length < 2) return args[0]
+        if (args.length < 2) {
+          return args[0]
+        }
         return `(${args[0]}${
           args
             .slice(1)
@@ -160,7 +162,9 @@ export class PascalSemanticCompiler implements SemanticCompiler {
       }
       // array.set: args = [arr, idx1, idx2, ..., val] → arr[idx1][idx2]... = val
       case 'array.set': {
-        if (args.length < 3) return args[0]
+        if (args.length < 3) {
+          return args[0]
+        }
         const val = args[args.length - 1]
         const indices = args.slice(1, -1)
         return `(${args[0]}${indices.map((i) => `[${i}]`).join('')} = ${val})`

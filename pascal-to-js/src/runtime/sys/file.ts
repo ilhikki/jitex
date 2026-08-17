@@ -138,21 +138,22 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     // 若传了 name 参数（非 ISO 扩展），忽略之；文件 url 必须已通过 program-param 绑定。
     'file.reset': (ctx, [file]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.reset: file is undefined')
+      if (!f) {
+        throw new Error('file.reset: file is undefined')
+      }
       resetFile(ctx, f)
-      return undefined
     },
 
     'file.rewrite': (ctx, [file]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.rewrite: file is undefined')
+      if (!f) {
+        throw new Error('file.rewrite: file is undefined')
+      }
       rewriteFile(ctx, f)
-      return undefined
     },
 
     'file.get': (ctx, [file]) => {
       getFile(ctx, file as PascalFile)
-      return undefined
     },
 
     // put(f, value?)：ISO 6.6.5.2 put(f) 把 f^ 追加到文件。
@@ -160,7 +161,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     // 若未传（裸 put(f)），按 ISO 应写 f^，但本实现视作 no-op（与历史测试一致）。
     'file.put': (ctx, [file, value]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.put: file is undefined')
+      if (!f) {
+        throw new Error('file.put: file is undefined')
+      }
       if (!f.writable) {
         throw new Error('put(f) before rewrite: pre-assertion violated (ISO 7185 6.6.5.2: f0.M must be Generation)')
       }
@@ -168,28 +171,35 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
         const text = typeof value === 'number' ? String(value) : value as string
         writeBytes(ctx, f, encodeUtf8(text))
       }
-      return undefined
     },
 
     'file.peek': (ctx, [file]) => peekFile(ctx, file as PascalFile),
 
     'file.eof': (_ctx, [file]) => {
-      if (!file) throw new Error('file.eof: file is undefined')
+      if (!file) {
+        throw new Error('file.eof: file is undefined')
+      }
       return (file as PascalFile).eof
     },
 
     'file.eoln': (ctx, [file]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.eoln: file is undefined')
+      if (!f) {
+        throw new Error('file.eoln: file is undefined')
+      }
       const content = fileBytes(ctx, f.url)
-      if (f.eof || f.offset >= content.length) return true
+      if (f.eof || f.offset >= content.length) {
+        return true
+      }
       const ch = content[f.offset]
       return ch === 10 || ch === 13
     },
 
     // ---------- file of record（ISO 7185 6.4.3.5）----------
     'file.rec.reset': (ctx, [file, arg1, arg2]) => {
-      if (!file) throw new Error('file.rec.reset: file is undefined')
+      if (!file) {
+        throw new Error('file.rec.reset: file is undefined')
+      }
       const f = file as PascalFile
       // arg1 可能是 name（非 ISO，忽略）或 typeDesc；arg2 存在时 arg1 为 name。
       const typeDesc = (arg2 !== undefined ? arg2 : arg1) as TypeDescriptor | undefined
@@ -198,7 +208,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     },
 
     'file.rec.rewrite': (ctx, [file, arg1, arg2]) => {
-      if (!file) throw new Error('file.rec.rewrite: file is undefined')
+      if (!file) {
+        throw new Error('file.rec.rewrite: file is undefined')
+      }
       const f = file as PascalFile
       const typeDesc = (arg2 !== undefined ? arg2 : arg1) as TypeDescriptor | undefined
       rewriteRecFile(ctx, f, typeDesc)
@@ -207,7 +219,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 
     'file.rec.setbuf': (_ctx, [file, value]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.rec.setbuf: file is undefined')
+      if (!f) {
+        throw new Error('file.rec.setbuf: file is undefined')
+      }
       if (!f.writable) {
         throw new Error('f^ := r before rewrite: pre-assertion violated (ISO 7185 6.6.5.2)')
       }
@@ -218,7 +232,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 
     'file.rec.peek': (_ctx, [file]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.rec.peek: file is undefined')
+      if (!f) {
+        throw new Error('file.rec.peek: file is undefined')
+      }
       if (f.recBuffer === undefined) {
         f.recBuffer = f.recTypeDesc ? createDefaultRec(f.recTypeDesc as TypeDescriptor) : {}
       }
@@ -229,7 +245,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 
     'file.rec.put': (ctx, [file]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.rec.put: file is undefined')
+      if (!f) {
+        throw new Error('file.rec.put: file is undefined')
+      }
       if (!f.writable) {
         throw new Error('put(f) before rewrite: pre-assertion violated (ISO 7185 6.6.5.2)')
       }
@@ -245,7 +263,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 
     'file.rec.get': (_ctx, [file]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.rec.get: file is undefined')
+      if (!f) {
+        throw new Error('file.rec.get: file is undefined')
+      }
       if (f.eof) {
         throw new Error('get(f) at EOF: pre-assertion violated (ISO 7185 6.6.5.2)')
       }
@@ -262,7 +282,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 
     'file.rec.eof': (_ctx, [file]) => {
       const f = file as PascalFile
-      if (!f) throw new Error('file.rec.eof: file is undefined')
+      if (!f) {
+        throw new Error('file.rec.eof: file is undefined')
+      }
       return f.eof
     },
   }
@@ -331,17 +353,23 @@ function peekFile(ctx: RuntimeContext, f: PascalFile): string {
   }
   const ch = content[f.offset] & 0xff
   // ISO Pascal EOLN 时 F^ 返回空格（行结束符视为空格）
-  if (ch === 10 || ch === 13) return ' '
+  if (ch === 10 || ch === 13) {
+    return ' '
+  }
   return String.fromCharCode(ch)
 }
 
 function readFilelnSkip(ctx: RuntimeContext, f: PascalFile): void {
-  if (f.eof) return
+  if (f.eof) {
+    return
+  }
   const content = fileBytes(ctx, f.url)
   while (f.offset < content.length) {
     const ch = content[f.offset]
     f.offset++
-    if (ch === 10 || ch === 13) break
+    if (ch === 10 || ch === 13) {
+      break
+    }
   }
   if (f.offset >= content.length) {
     f.eof = true
@@ -367,7 +395,9 @@ function readFileToken(ctx: RuntimeContext, f: PascalFile): string {
   const chars: string[] = []
   while (f.offset < content.length) {
     const ch = content[f.offset]
-    if (ch === 32 || ch === 10 || ch === 13 || ch === 9 || ch === 0) break
+    if (ch === 32 || ch === 10 || ch === 13 || ch === 9 || ch === 0) {
+      break
+    }
     chars.push(String.fromCharCode(ch))
     f.offset++
   }
@@ -394,7 +424,9 @@ function readFileBool(ctx: RuntimeContext, f: PascalFile): boolean {
 
 function readFileChar(ctx: RuntimeContext, f: PascalFile): string {
   const content = fileBytes(ctx, f.url)
-  if (f.eof || f.offset >= content.length) return '\x00'
+  if (f.eof || f.offset >= content.length) {
+    return '\x00'
+  }
   const ch = content[f.offset]
   f.offset++
   if (f.offset >= content.length) {
@@ -420,9 +452,13 @@ function serializeRecList(recList: unknown[]): Uint8Array {
 }
 
 function deserializeRecList(content: Uint8Array): unknown[] {
-  if (content.length === 0) return []
+  if (content.length === 0) {
+    return []
+  }
   const text = decodeUtf8(content)
-  if (!text.startsWith(REC_FILE_MAGIC)) return []
+  if (!text.startsWith(REC_FILE_MAGIC)) {
+    return []
+  }
   const json = text.slice(REC_FILE_MAGIC.length)
   try {
     const parsed = JSON.parse(json)

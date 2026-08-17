@@ -31,7 +31,9 @@ function measureExecution(
       const result = fn() as { steps?: number; outputBuffer?: string[] } | undefined
       const end = performance.now()
       times.push(end - start)
-      if (result?.steps !== undefined) totalSteps += result.steps
+      if (result?.steps !== undefined) {
+        totalSteps += result.steps
+      }
       if (result?.outputBuffer !== undefined) {
         outputSize = result.outputBuffer.join('').length
       }

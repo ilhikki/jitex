@@ -72,7 +72,9 @@ function readReal(ctx: RuntimeContext): number {
 
 function readBool(ctx: RuntimeContext): boolean {
   const tok = nextToken(ctx)
-  if (!tok) return false
+  if (!tok) {
+    return false
+  }
   const lower = tok.toLowerCase()
   return lower === 'true' || lower === 't'
 }

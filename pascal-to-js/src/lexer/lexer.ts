@@ -121,14 +121,18 @@ export function tokenize(input: LexerInput): Token[] {
         while (pos < src.length && src[pos] !== '}') {
           pos++
         }
-        if (pos < src.length) pos++
+        if (pos < src.length) {
+          pos++
+        }
         continue
       }
       // Regular comment
       while (pos < src.length && src[pos] !== '}') {
         pos++
       }
-      if (pos < src.length) pos++
+      if (pos < src.length) {
+        pos++
+      }
       continue
     }
 
@@ -321,9 +325,13 @@ export function tokenize(input: LexerInput): Token[] {
         pos++
         if (pos < src.length && src[pos] === '$') {
           pos++
-          while (pos < src.length && isHexDigit(src[pos])) pos++
+          while (pos < src.length && isHexDigit(src[pos])) {
+            pos++
+          }
         } else {
-          while (pos < src.length && isDigit(src[pos])) pos++
+          while (pos < src.length && isDigit(src[pos])) {
+            pos++
+          }
         }
         tokens.push({
           type: 'CHAR_CODE',
@@ -335,7 +343,9 @@ export function tokenize(input: LexerInput): Token[] {
       case '$':
         // Hex number: $1A2B
         pos++
-        while (pos < src.length && isHexDigit(src[pos])) pos++
+        while (pos < src.length && isHexDigit(src[pos])) {
+          pos++
+        }
         tokens.push({
           type: 'HEX_NUMBER',
           content: src.substring(start, pos),

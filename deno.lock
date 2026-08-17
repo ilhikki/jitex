@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@aireone/deno-lint-curly@*": "0.2.0",
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/fs@*": "1.0.24",
     "jsr:@std/internal@^1.0.12": "1.0.14",
@@ -8,6 +9,9 @@
     "jsr:@std/path@^1.1.5": "1.1.6"
   },
   "jsr": {
+    "@aireone/deno-lint-curly@0.2.0": {
+      "integrity": "c182ea5d2ed999c06ffa88a21aac2aed3cf0d14a1128d7fad3034337f7822b48"
+    },
     "@std/assert@1.0.19": {
       "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
       "dependencies": [

@@ -74,14 +74,18 @@ function parseRangeOrSimpleType(input: ParserInput): ParseResult<TypeNode> {
   const startPos = peek(input).start
 
   const startResult = parseExpression(input)
-  if (!startResult.success) return startResult
+  if (!startResult.success) {
+    return startResult
+  }
 
   let pos = startResult.newPosition
 
   if (peek({ tokens: input.tokens, position: pos }).type === 'DOTDOT') {
     pos++
     const endResult = parseExpression({ tokens: input.tokens, position: pos })
-    if (!endResult.success) return fail(endResult.error, endResult.position)
+    if (!endResult.success) {
+      return fail(endResult.error, endResult.position)
+    }
     return ok(
       endResult.newPosition,
       withLoc(
@@ -149,23 +153,33 @@ function parseArrayType(
   let pos = input.position + 1 // skip ARRAY
 
   const openResult = expectType({ tokens: input.tokens, position: pos }, 'LBRACKET')
-  if (!openResult.success) return fail(openResult.error, openResult.position)
+  if (!openResult.success) {
+    return fail(openResult.error, openResult.position)
+  }
   pos = openResult.newPosition
 
   const indexResult = parseList({ tokens: input.tokens, position: pos }, parseType, 'COMMA')
-  if (!indexResult.success) return fail(indexResult.error, indexResult.position)
+  if (!indexResult.success) {
+    return fail(indexResult.error, indexResult.position)
+  }
   pos = indexResult.newPosition
 
   const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RBRACKET')
-  if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+  if (!closeResult.success) {
+    return fail(closeResult.error, closeResult.position)
+  }
   pos = closeResult.newPosition
 
   const ofResult = expectKeyword({ tokens: input.tokens, position: pos }, 'OF')
-  if (!ofResult.success) return fail(ofResult.error, ofResult.position)
+  if (!ofResult.success) {
+    return fail(ofResult.error, ofResult.position)
+  }
   pos = ofResult.newPosition
 
   const elemResult = parseType({ tokens: input.tokens, position: pos })
-  if (!elemResult.success) return fail(elemResult.error, elemResult.position)
+  if (!elemResult.success) {
+    return fail(elemResult.error, elemResult.position)
+  }
   pos = elemResult.newPosition
 
   return ok(
@@ -198,14 +212,18 @@ function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<R
     }
     if (token.type === 'CASE') {
       const variantResult = parseRecordVariantPart({ tokens: input.tokens, position: pos })
-      if (!variantResult.success) return fail(variantResult.error, variantResult.position)
+      if (!variantResult.success) {
+        return fail(variantResult.error, variantResult.position)
+      }
       variant = variantResult.astNode
       pos = variantResult.newPosition
       break
     }
 
     const fieldResult = parseVariableDeclaration({ tokens: input.tokens, position: pos })
-    if (!fieldResult.success) return fail(fieldResult.error, fieldResult.position)
+    if (!fieldResult.success) {
+      return fail(fieldResult.error, fieldResult.position)
+    }
     fields.push(fieldResult.astNode)
     pos = fieldResult.newPosition
 
@@ -215,7 +233,9 @@ function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<R
   }
 
   const endResult = expectKeyword({ tokens: input.tokens, position: pos }, 'END')
-  if (!endResult.success) return fail(endResult.error, endResult.position)
+  if (!endResult.success) {
+    return fail(endResult.error, endResult.position)
+  }
   pos = endResult.newPosition
 
   return ok(
@@ -239,22 +259,30 @@ function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPa
     const nextNextToken = peek({ tokens: input.tokens, position: pos + 1 })
     if (nextNextToken.type === 'COLON') {
       const idResult = parseIdentifier({ tokens: input.tokens, position: pos })
-      if (!idResult.success) return fail(idResult.error, idResult.position)
+      if (!idResult.success) {
+        return fail(idResult.error, idResult.position)
+      }
       tagName = idResult.astNode
       pos = idResult.newPosition
 
       const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
-      if (!colonResult.success) return fail(colonResult.error, colonResult.position)
+      if (!colonResult.success) {
+        return fail(colonResult.error, colonResult.position)
+      }
       pos = colonResult.newPosition
     }
   }
 
   const typeResult = parseType({ tokens: input.tokens, position: pos })
-  if (!typeResult.success) return fail(typeResult.error, typeResult.position)
+  if (!typeResult.success) {
+    return fail(typeResult.error, typeResult.position)
+  }
   pos = typeResult.newPosition
 
   const ofResult = expectKeyword({ tokens: input.tokens, position: pos }, 'OF')
-  if (!ofResult.success) return fail(ofResult.error, ofResult.position)
+  if (!ofResult.success) {
+    return fail(ofResult.error, ofResult.position)
+  }
   pos = ofResult.newPosition
 
   const variants: RecordVariantNode[] = []
@@ -269,7 +297,9 @@ function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPa
     }
 
     const variantResult = parseRecordVariant({ tokens: input.tokens, position: pos })
-    if (!variantResult.success) return fail(variantResult.error, variantResult.position)
+    if (!variantResult.success) {
+      return fail(variantResult.error, variantResult.position)
+    }
     variants.push(variantResult.astNode)
     pos = variantResult.newPosition
 
@@ -298,15 +328,21 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
     parseExpression,
     'COMMA',
   )
-  if (!caseLabelsResult.success) return fail(caseLabelsResult.error, caseLabelsResult.position)
+  if (!caseLabelsResult.success) {
+    return fail(caseLabelsResult.error, caseLabelsResult.position)
+  }
   pos = caseLabelsResult.newPosition
 
   const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
-  if (!colonResult.success) return fail(colonResult.error, colonResult.position)
+  if (!colonResult.success) {
+    return fail(colonResult.error, colonResult.position)
+  }
   pos = colonResult.newPosition
 
   const openResult = expectType({ tokens: input.tokens, position: pos }, 'LPAREN')
-  if (!openResult.success) return fail(openResult.error, openResult.position)
+  if (!openResult.success) {
+    return fail(openResult.error, openResult.position)
+  }
   pos = openResult.newPosition
 
   const fields: VariableDeclarationNode[] = []
@@ -319,7 +355,9 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
     }
     if (token.type === 'CASE') {
       const variantResult = parseRecordVariantPart({ tokens: input.tokens, position: pos })
-      if (!variantResult.success) return fail(variantResult.error, variantResult.position)
+      if (!variantResult.success) {
+        return fail(variantResult.error, variantResult.position)
+      }
       variant = variantResult.astNode
       pos = variantResult.newPosition
       if (peek({ tokens: input.tokens, position: pos }).type === 'END') {
@@ -329,7 +367,9 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
     }
 
     const fieldResult = parseVariableDeclaration({ tokens: input.tokens, position: pos })
-    if (!fieldResult.success) return fail(fieldResult.error, fieldResult.position)
+    if (!fieldResult.success) {
+      return fail(fieldResult.error, fieldResult.position)
+    }
     fields.push(fieldResult.astNode)
     pos = fieldResult.newPosition
 
@@ -339,7 +379,9 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
   }
 
   const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RPAREN')
-  if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+  if (!closeResult.success) {
+    return fail(closeResult.error, closeResult.position)
+  }
   pos = closeResult.newPosition
 
   return ok(
@@ -358,7 +400,9 @@ function parsePointerType(input: ParserInput): ParseResult<PointerTypeNode> {
   let pos = input.position + 1 // skip '^'
 
   const domainResult = parseType({ tokens: input.tokens, position: pos })
-  if (!domainResult.success) return fail(domainResult.error, domainResult.position)
+  if (!domainResult.success) {
+    return fail(domainResult.error, domainResult.position)
+  }
   pos = domainResult.newPosition
 
   return ok(
@@ -385,7 +429,9 @@ function parseFileType(
   if (peek({ tokens: input.tokens, position: pos }).type === 'OF') {
     pos++
     const elemResult = parseType({ tokens: input.tokens, position: pos })
-    if (!elemResult.success) return fail(elemResult.error, elemResult.position)
+    if (!elemResult.success) {
+      return fail(elemResult.error, elemResult.position)
+    }
     pos = elemResult.newPosition
     elementType = elemResult.astNode
   }
@@ -410,11 +456,15 @@ function parseSetType(input: ParserInput, startPos?: Position): ParseResult<SetT
   let pos = input.position + 1 // skip SET
 
   const ofResult = expectKeyword({ tokens: input.tokens, position: pos }, 'OF')
-  if (!ofResult.success) return fail(ofResult.error, ofResult.position)
+  if (!ofResult.success) {
+    return fail(ofResult.error, ofResult.position)
+  }
   pos = ofResult.newPosition
 
   const baseResult = parseType({ tokens: input.tokens, position: pos })
-  if (!baseResult.success) return fail(baseResult.error, baseResult.position)
+  if (!baseResult.success) {
+    return fail(baseResult.error, baseResult.position)
+  }
   pos = baseResult.newPosition
 
   return ok(
@@ -430,16 +480,22 @@ function parseSetType(input: ParserInput, startPos?: Position): ParseResult<SetT
 // ( identifier {, identifier} )
 function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNode> {
   const openResult = expectType(input, 'LPAREN')
-  if (!openResult.success) return fail(openResult.error, openResult.position)
+  if (!openResult.success) {
+    return fail(openResult.error, openResult.position)
+  }
   const start = openResult.astNode.start
   let pos = openResult.newPosition
 
   const valuesResult = parseList({ tokens: input.tokens, position: pos }, parseIdentifier, 'COMMA')
-  if (!valuesResult.success) return fail(valuesResult.error, valuesResult.position)
+  if (!valuesResult.success) {
+    return fail(valuesResult.error, valuesResult.position)
+  }
   pos = valuesResult.newPosition
 
   const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RPAREN')
-  if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+  if (!closeResult.success) {
+    return fail(closeResult.error, closeResult.position)
+  }
   pos = closeResult.newPosition
 
   return ok(
@@ -464,15 +520,21 @@ export function parseVariableDeclaration(input: ParserInput): ParseResult<Variab
   const startPos = peek(input).start
 
   const namesResult = parseList(input, parseIdentifier, 'COMMA')
-  if (!namesResult.success) return fail(namesResult.error, namesResult.position)
+  if (!namesResult.success) {
+    return fail(namesResult.error, namesResult.position)
+  }
   let pos = namesResult.newPosition
 
   const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
-  if (!colonResult.success) return fail(colonResult.error, colonResult.position)
+  if (!colonResult.success) {
+    return fail(colonResult.error, colonResult.position)
+  }
   pos = colonResult.newPosition
 
   const typeResult = parseType({ tokens: input.tokens, position: pos })
-  if (!typeResult.success) return fail(typeResult.error, typeResult.position)
+  if (!typeResult.success) {
+    return fail(typeResult.error, typeResult.position)
+  }
   pos = typeResult.newPosition
 
   return ok(

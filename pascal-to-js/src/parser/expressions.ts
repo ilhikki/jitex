@@ -210,7 +210,9 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       const startToken = token
       const afterMinus = { tokens: input.tokens, position: input.position + 1 }
       const operandResult = parseFactor(afterMinus)
-      if (!operandResult.success) return fail(operandResult.error, operandResult.position)
+      if (!operandResult.success) {
+        return fail(operandResult.error, operandResult.position)
+      }
       const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
       return ok(
         operandResult.newPosition,
@@ -231,7 +233,9 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       const startToken = token
       const afterPlus = { tokens: input.tokens, position: input.position + 1 }
       const operandResult = parseFactor(afterPlus)
-      if (!operandResult.success) return fail(operandResult.error, operandResult.position)
+      if (!operandResult.success) {
+        return fail(operandResult.error, operandResult.position)
+      }
       const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
       return ok(
         operandResult.newPosition,
@@ -265,27 +269,35 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
   if (peek({ tokens: input.tokens, position: pos }).type !== 'RBRACKET') {
     while (true) {
       const exprResult = parseExpression({ tokens: input.tokens, position: pos })
-      if (!exprResult.success) return fail(exprResult.error, exprResult.position)
+      if (!exprResult.success) {
+        return fail(exprResult.error, exprResult.position)
+      }
       pos = exprResult.newPosition
 
       let element: [ExpressionNode, ExpressionNode | null] = [exprResult.astNode, null]
       if (peek({ tokens: input.tokens, position: pos }).type === 'DOTDOT') {
         pos++
         const endResult = parseExpression({ tokens: input.tokens, position: pos })
-        if (!endResult.success) return fail(endResult.error, endResult.position)
+        if (!endResult.success) {
+          return fail(endResult.error, endResult.position)
+        }
         pos = endResult.newPosition
         element = [exprResult.astNode, endResult.astNode]
       }
       elements.push(element)
 
       const t = peek({ tokens: input.tokens, position: pos })
-      if (t.type !== 'COMMA') break
+      if (t.type !== 'COMMA') {
+        break
+      }
       pos++
     }
   }
 
   const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RBRACKET')
-  if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+  if (!closeResult.success) {
+    return fail(closeResult.error, closeResult.position)
+  }
   const endToken = closeResult.astNode
   pos = closeResult.newPosition
 
@@ -299,7 +311,9 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
 export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const idResult = parseIdentifier(input)
-  if (!idResult.success) return fail(idResult.error, idResult.position)
+  if (!idResult.success) {
+    return fail(idResult.error, idResult.position)
+  }
 
   let pos = idResult.newPosition
   let expr: ExpressionNode = idResult.astNode
@@ -318,12 +332,16 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
           parseExpression,
           'COMMA',
         )
-        if (!listResult.success) return fail(listResult.error, listResult.position)
+        if (!listResult.success) {
+          return fail(listResult.error, listResult.position)
+        }
         args.push(...listResult.astNode)
         pos = listResult.newPosition
       }
       const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RPAREN')
-      if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+      if (!closeResult.success) {
+        return fail(closeResult.error, closeResult.position)
+      }
       endPos = closeResult.astNode.end
       pos = closeResult.newPosition
       expr = withLoc(
@@ -340,11 +358,15 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
         parseExpression,
         'COMMA',
       )
-      if (!listResult.success) return fail(listResult.error, listResult.position)
+      if (!listResult.success) {
+        return fail(listResult.error, listResult.position)
+      }
       indices.push(...listResult.astNode)
       pos = listResult.newPosition
       const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RBRACKET')
-      if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+      if (!closeResult.success) {
+        return fail(closeResult.error, closeResult.position)
+      }
       endPos = closeResult.astNode.end
       pos = closeResult.newPosition
       expr = withLoc(
@@ -356,7 +378,9 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       // Field access
       pos++
       const fieldResult = parseIdentifier({ tokens: input.tokens, position: pos })
-      if (!fieldResult.success) return fail(fieldResult.error, fieldResult.position)
+      if (!fieldResult.success) {
+        return fail(fieldResult.error, fieldResult.position)
+      }
       endPos = peek({ tokens: input.tokens, position: fieldResult.newPosition - 1 }).end
       pos = fieldResult.newPosition
       expr = withLoc(
@@ -390,7 +414,9 @@ function parseNot(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const afterNot = { tokens: input.tokens, position: input.position + 1 }
   const operandResult = parseFactor(afterNot)
-  if (!operandResult.success) return fail(operandResult.error, operandResult.position)
+  if (!operandResult.success) {
+    return fail(operandResult.error, operandResult.position)
+  }
   const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
   return ok(
     operandResult.newPosition,
@@ -415,7 +441,9 @@ export function parseFactor(input: ParserInput): ParseResult<ExpressionNode> {
 export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const result = parseFactor(input)
-  if (!result.success) return result
+  if (!result.success) {
+    return result
+  }
 
   let pos = result.newPosition
   let left = result.astNode
@@ -443,10 +471,14 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
         break
     }
 
-    if (!operator) break
+    if (!operator) {
+      break
+    }
 
     const rightResult = parseFactor({ tokens: input.tokens, position: pos + 1 })
-    if (!rightResult.success) return fail(rightResult.error, rightResult.position)
+    if (!rightResult.success) {
+      return fail(rightResult.error, rightResult.position)
+    }
 
     const endToken = peek({ tokens: input.tokens, position: rightResult.newPosition - 1 })
     left = withLoc(
@@ -476,7 +508,9 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
   if (sign.type === 'PLUS' || sign.type === 'MINUS') {
     pos++
     const termResult = parseTerm({ tokens: input.tokens, position: pos })
-    if (!termResult.success) return fail(termResult.error, termResult.position)
+    if (!termResult.success) {
+      return fail(termResult.error, termResult.position)
+    }
     pos = termResult.newPosition
     const endToken = peek({ tokens: input.tokens, position: pos - 1 })
     left = withLoc(
@@ -490,7 +524,9 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
     )
   } else {
     const termResult = parseTerm({ tokens: input.tokens, position: pos })
-    if (!termResult.success) return fail(termResult.error, termResult.position)
+    if (!termResult.success) {
+      return fail(termResult.error, termResult.position)
+    }
     pos = termResult.newPosition
     left = termResult.astNode
   }
@@ -511,10 +547,14 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
         break
     }
 
-    if (!operator) break
+    if (!operator) {
+      break
+    }
 
     const rightResult = parseTerm({ tokens: input.tokens, position: pos + 1 })
-    if (!rightResult.success) return fail(rightResult.error, rightResult.position)
+    if (!rightResult.success) {
+      return fail(rightResult.error, rightResult.position)
+    }
 
     const endToken = peek({ tokens: input.tokens, position: rightResult.newPosition - 1 })
     left = withLoc(
@@ -537,7 +577,9 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
 export function parseExpression(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const leftResult = parseSimpleExpression(input)
-  if (!leftResult.success) return leftResult
+  if (!leftResult.success) {
+    return leftResult
+  }
 
   let pos = leftResult.newPosition
   let left = leftResult.astNode
@@ -574,10 +616,14 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
         break
     }
 
-    if (!operator) break
+    if (!operator) {
+      break
+    }
 
     const rightResult = parseSimpleExpression({ tokens: input.tokens, position: pos + 1 })
-    if (!rightResult.success) return fail(rightResult.error, rightResult.position)
+    if (!rightResult.success) {
+      return fail(rightResult.error, rightResult.position)
+    }
 
     const endToken = peek({ tokens: input.tokens, position: rightResult.newPosition - 1 })
     left = withLoc(

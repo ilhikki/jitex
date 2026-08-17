@@ -236,7 +236,9 @@ export class Analyzer {
   // --------------------------------------------------------
 
   analyze(program: ProgramNode, extensions?: string[], plugins?: IlPlugin[]): Analysis {
-    if (extensions) this.extensions = new Set(extensions)
+    if (extensions) {
+      this.extensions = new Set(extensions)
+    }
     this.plugins = plugins
     const topFuncId = this.allocFunc(program.block, null, 'program', null)
 
@@ -290,7 +292,9 @@ export class Analyzer {
   private recordName(id: number, name: string): void {
     // 名字清理：只保留字母数字下划线，转小写
     const cleaned = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
-    if (cleaned) this.idNames.set(id, cleaned)
+    if (cleaned) {
+      this.idNames.set(id, cleaned)
+    }
   }
 
   // --------------------------------------------------------
@@ -311,7 +315,9 @@ export class Analyzer {
 
   private currentScope(): Scope {
     const s = this.scopes[this.scopes.length - 1]
-    if (!s) throw new Error('Analyzer: no active scope')
+    if (!s) {
+      throw new Error('Analyzer: no active scope')
+    }
     return s
   }
 
@@ -325,7 +331,9 @@ export class Analyzer {
     let s: Scope | null = this.currentScope()
     while (s) {
       const v = s.bindings.get(key)
-      if (v) return v
+      if (v) {
+        return v
+      }
       s = s.outer
     }
     return undefined
@@ -359,10 +367,16 @@ export class Analyzer {
     this.funcInfos.set(funcId, info)
     if (parentFuncId !== null) {
       const parent = this.funcInfos.get(parentFuncId)
-      if (parent) parent.children.push(funcId)
+      if (parent) {
+        parent.children.push(funcId)
+      }
     }
-    if (block) this.blockFunc.set(block, funcId)
-    if (decl) this.declFunc.set(decl, funcId)
+    if (block) {
+      this.blockFunc.set(block, funcId)
+    }
+    if (decl) {
+      this.declFunc.set(decl, funcId)
+    }
     return funcId
   }
 
@@ -512,7 +526,9 @@ export class Analyzer {
 
   private resolveTypeInfo(node: TypeNode): TypeInfo {
     const cached = this.typeNodeInfo.get(node)
-    if (cached) return cached
+    if (cached) {
+      return cached
+    }
 
     let info: TypeInfo
     switch (node.kind) {
@@ -566,10 +582,13 @@ export class Analyzer {
             })
           } else if (idx.kind === 'SimpleType') {
             const name = idx.name.name.toLowerCase()
-            if (name === 'char') dims.push({ low: 0, high: 255 })
-            else if (name === 'boolean') dims.push({ low: 0, high: 1 })
-            else if (name === 'integer') dims.push({ low: 0, high: 2147483647 })
-            else {
+            if (name === 'char') {
+              dims.push({ low: 0, high: 255 })
+            } else if (name === 'boolean') {
+              dims.push({ low: 0, high: 1 })
+            } else if (name === 'integer') {
+              dims.push({ low: 0, high: 2147483647 })
+            } else {
               // 类型别名（可能是 subrange 或枚举）
               const alias = this.typeAliases.get(name)
               if (
@@ -684,7 +703,9 @@ export class Analyzer {
       case 'BinaryExpression': {
         const l = this.evalConstInt(node.left)
         const r = this.evalConstInt(node.right)
-        if (l === undefined || r === undefined) return undefined
+        if (l === undefined || r === undefined) {
+          return undefined
+        }
         switch (node.operator) {
           case '+':
             return l + r
@@ -702,8 +723,12 @@ export class Analyzer {
       }
       case 'UnaryExpression': {
         const v = this.evalConstInt(node.operand)
-        if (v === undefined) return undefined
-        if (node.operator === '-') return -v
+        if (v === undefined) {
+          return undefined
+        }
+        if (node.operator === '-') {
+          return -v
+        }
         return v
       }
       case 'Identifier': {
@@ -719,8 +744,12 @@ export class Analyzer {
   }
 
   private evalConstChar(node: ExpressionNode): string | undefined {
-    if (node.kind === 'CharLiteral') return node.value
-    if (node.kind === 'StringLiteral' && node.value.length === 1) return node.value
+    if (node.kind === 'CharLiteral') {
+      return node.value
+    }
+    if (node.kind === 'StringLiteral' && node.value.length === 1) {
+      return node.value
+    }
     return undefined
   }
 
@@ -738,7 +767,9 @@ export class Analyzer {
       const funcLabels = this.labels.get(fid)
       if (funcLabels) {
         const info = funcLabels.get(labelVal)
-        if (info) return info
+        if (info) {
+          return info
+        }
       }
       const finfo = this.funcInfos.get(fid)
       fid = finfo ? finfo.parentFuncId : null
@@ -750,7 +781,9 @@ export class Analyzer {
   private isAncestorFunc(ancestorFuncId: number, descFuncId: number): boolean {
     let fid: number | null = descFuncId
     while (fid !== null) {
-      if (fid === ancestorFuncId) return true
+      if (fid === ancestorFuncId) {
+        return true
+      }
       const finfo = this.funcInfos.get(fid)
       fid = finfo ? finfo.parentFuncId : null
     }
@@ -780,7 +813,9 @@ export class Analyzer {
 
   /** 独立检查阶段：一次性报告所有无定义引用 */
   private checkUndefinedRefs(): void {
-    if (this.undefinedRefs.length === 0) return
+    if (this.undefinedRefs.length === 0) {
+      return
+    }
     const lines = this.undefinedRefs.map((r) => {
       switch (r.kind) {
         case 'procedure':
@@ -812,7 +847,9 @@ export class Analyzer {
       funcId = this.allocFunc(decl.block, decl, 'procedure', parentFuncId)
     } else {
       this.declFunc.set(decl, funcId)
-      if (decl.block) this.blockFunc.set(decl.block, funcId)
+      if (decl.block) {
+        this.blockFunc.set(decl.block, funcId)
+      }
       this.forwardFuncs.delete(declNameLower)
     }
 
@@ -825,7 +862,9 @@ export class Analyzer {
   }
 
   private analyzeProcBody(decl: ProcedureDeclarationNode): void {
-    if (!decl.block) return
+    if (!decl.block) {
+      return
+    }
     const funcId = this.declFunc.get(decl)!
     this.funcInfos.get(funcId)!.hasBody = true
     this.pushScope(funcId)
@@ -842,7 +881,9 @@ export class Analyzer {
       funcId = this.allocFunc(decl.block, decl, 'function', parentFuncId)
     } else {
       this.declFunc.set(decl, funcId)
-      if (decl.block) this.blockFunc.set(decl.block, funcId)
+      if (decl.block) {
+        this.blockFunc.set(decl.block, funcId)
+      }
       this.forwardFuncs.delete(declNameLower)
     }
 
@@ -859,7 +900,9 @@ export class Analyzer {
   }
 
   private analyzeFuncBody(decl: FunctionDeclarationNode): void {
-    if (!decl.block) return
+    if (!decl.block) {
+      return
+    }
     const funcId = this.declFunc.get(decl)!
     const retTypeInfo = this.resolveTypeInfo(decl.returnType)
     this.funcInfos.get(funcId)!.hasBody = true
@@ -919,7 +962,9 @@ export class Analyzer {
   private analyzeStatement(node: StatementNode): void {
     switch (node.kind) {
       case 'CompoundStatement':
-        for (const s of node.statements) this.analyzeStatement(s)
+        for (const s of node.statements) {
+          this.analyzeStatement(s)
+        }
         return
       case 'Assignment': {
         const lt = this.analyzeExpr(node.left)
@@ -951,7 +996,9 @@ export class Analyzer {
         this.analyzeExpr(node.condition)
         this.nonTransparentDepth++
         this.analyzeStatement(node.thenBranch)
-        if (node.elseBranch) this.analyzeStatement(node.elseBranch)
+        if (node.elseBranch) {
+          this.analyzeStatement(node.elseBranch)
+        }
         this.nonTransparentDepth--
         return
       case 'WhileStatement':
@@ -962,7 +1009,9 @@ export class Analyzer {
         return
       case 'RepeatStatement':
         this.nonTransparentDepth++
-        for (const s of node.statements) this.analyzeStatement(s)
+        for (const s of node.statements) {
+          this.analyzeStatement(s)
+        }
         this.analyzeExpr(node.untilCondition)
         this.nonTransparentDepth--
         return
@@ -978,10 +1027,14 @@ export class Analyzer {
         this.analyzeExpr(node.expression)
         this.nonTransparentDepth++
         for (const br of node.branches) {
-          for (const lbl of br.labels) this.analyzeExpr(lbl)
+          for (const lbl of br.labels) {
+            this.analyzeExpr(lbl)
+          }
           this.analyzeStatement(br.statement)
         }
-        if (node.otherwise) this.analyzeStatement(node.otherwise)
+        if (node.otherwise) {
+          this.analyzeStatement(node.otherwise)
+        }
         this.nonTransparentDepth--
         return
       case 'GotoStatement': {
@@ -1057,7 +1110,9 @@ export class Analyzer {
         ) {
           this.recordUndefinedRef('procedure', node.name.name)
         }
-        for (const a of node.arguments) this.analyzeExpr(a)
+        for (const a of node.arguments) {
+          this.analyzeExpr(a)
+        }
         return
       }
       case 'EmptyStatement':
@@ -1071,7 +1126,9 @@ export class Analyzer {
 
   private analyzeExpr(node: ExpressionNode): TypeInfo {
     const cached = this.exprType.get(node)
-    if (cached) return cached
+    if (cached) {
+      return cached
+    }
 
     let info: TypeInfo
     switch (node.kind) {
@@ -1154,10 +1211,13 @@ export class Analyzer {
           info = { tag: 'i64' }
         } else {
           // + - *
-          if (lt.tag === 'set' && rt.tag === 'set') info = { tag: 'set' }
-          else if (lt.tag === 'str' || rt.tag === 'str') info = { tag: 'str' }
-          else if (lt.tag === 'f64' || rt.tag === 'f64') info = { tag: 'f64' }
-          else info = { tag: 'i64' }
+          if (lt.tag === 'set' && rt.tag === 'set') {
+            info = { tag: 'set' }
+          } else if (lt.tag === 'str' || rt.tag === 'str') {
+            info = { tag: 'str' }
+          } else if (lt.tag === 'f64' || rt.tag === 'f64') {
+            info = { tag: 'f64' }
+          } else info = { tag: 'i64' }
         }
         break
       }
@@ -1185,7 +1245,9 @@ export class Analyzer {
         ) {
           this.recordUndefinedRef('function', node.name.name)
         }
-        for (const a of node.arguments) this.analyzeExpr(a)
+        for (const a of node.arguments) {
+          this.analyzeExpr(a)
+        }
         if (sym?.kind === 'func') {
           info = sym.retTypeInfo ?? { tag: 'unknown' }
         } else {
@@ -1211,7 +1273,9 @@ export class Analyzer {
             }
           }
         }
-        for (const idx of node.indices) this.analyzeExpr(idx)
+        for (const idx of node.indices) {
+          this.analyzeExpr(idx)
+        }
         // 递归取元素类型
         info = this.arrayElemType(arrType, node.indices.length)
         break
@@ -1236,7 +1300,9 @@ export class Analyzer {
       case 'SetConstructor':
         for (const [s, e] of node.elements) {
           this.analyzeExpr(s)
-          if (e) this.analyzeExpr(e)
+          if (e) {
+            this.analyzeExpr(e)
+          }
         }
         info = { tag: 'set' }
         break
@@ -1276,10 +1342,18 @@ export class Analyzer {
       }
       return { tag: 'i64' }
     }
-    if (['sqrt', 'sin', 'cos', 'exp', 'ln', 'arctan'].includes(n)) return { tag: 'f64' }
-    if (['trunc', 'round', 'ord', 'length'].includes(n)) return { tag: 'i64' }
-    if (['chr'].includes(n)) return { tag: 'char' }
-    if (['odd', 'eof', 'eoln'].includes(n)) return { tag: 'bool' }
+    if (['sqrt', 'sin', 'cos', 'exp', 'ln', 'arctan'].includes(n)) {
+      return { tag: 'f64' }
+    }
+    if (['trunc', 'round', 'ord', 'length'].includes(n)) {
+      return { tag: 'i64' }
+    }
+    if (['chr'].includes(n)) {
+      return { tag: 'char' }
+    }
+    if (['odd', 'eof', 'eoln'].includes(n)) {
+      return { tag: 'bool' }
+    }
     return { tag: 'unknown' }
   }
 
@@ -1314,7 +1388,9 @@ export class Analyzer {
           const funcLabels = this.labels.get(fid)
           if (funcLabels) {
             const info = funcLabels.get(labelNum)
-            if (info) return info
+            if (info) {
+              return info
+            }
           }
           const finfo = this.funcInfos.get(fid)
           fid = finfo ? finfo.parentFuncId : null
@@ -1326,17 +1402,23 @@ export class Analyzer {
       },
       funcOfBlock: (block) => {
         const r = this.blockFunc.get(block)
-        if (r === undefined) throw new Error('funcOfBlock: not found')
+        if (r === undefined) {
+          throw new Error('funcOfBlock: not found')
+        }
         return r
       },
       funcOfDecl: (decl) => {
         const r = this.declFunc.get(decl)
-        if (r === undefined) throw new Error('funcOfDecl: not found')
+        if (r === undefined) {
+          throw new Error('funcOfDecl: not found')
+        }
         return r
       },
       funcInfo: (id) => {
         const r = this.funcInfos.get(id)
-        if (!r) throw new Error('funcInfo: not found')
+        if (!r) {
+          throw new Error('funcInfo: not found')
+        }
         return r
       },
       withTempsOf: (node) => {

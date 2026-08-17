@@ -140,7 +140,9 @@ function basicSyscall(): Record<string, SyscallHandler> {
       const s = new Set<number>()
       for (const e of args) {
         if (e instanceof Set) {
-          for (const x of e) s.add(x as number)
+          for (const x of e) {
+            s.add(x as number)
+          }
         } else {
           s.add(e as number)
         }
@@ -177,7 +179,9 @@ function basicSyscall(): Record<string, SyscallHandler> {
       const key = String(name ?? '').toLowerCase()
       // 大小写不敏感的精确匹配（Pascal 标识符大小写不敏感）
       for (const [k, v] of Object.entries(ctx.programFileUrls)) {
-        if (k.toLowerCase() === key) return v
+        if (k.toLowerCase() === key) {
+          return v
+        }
       }
       return String(name ?? '')
     },

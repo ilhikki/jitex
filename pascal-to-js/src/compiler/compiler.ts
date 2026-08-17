@@ -123,8 +123,12 @@ function typeSuffix(ti: TypeInfo): string {
     case 'subrange':
       // 子界类型按 baseTag 选择 io.write syscall
       // （boolean 子界输出 TRUE/FALSE，char 子界输出字符）
-      if (ti.baseTag === 'bool') return 'bool'
-      if (ti.baseTag === 'char') return 'char'
+      if (ti.baseTag === 'bool') {
+        return 'bool'
+      }
+      if (ti.baseTag === 'char') {
+        return 'char'
+      }
       return 'i64'
     case 'f64':
       return 'f64'
@@ -431,11 +435,15 @@ function compileAssignment(
         : null
       if (sym.isVarParam) {
         const stmts: JsonCode.Statement[] = [evalStmt(syscall('cell.set', [ref(sym.varId), value]))]
-        if (rangeCheck) stmts.push(rangeCheck)
+        if (rangeCheck) {
+          stmts.push(rangeCheck)
+        }
         return stmts
       }
       const stmts: JsonCode.Statement[] = [assignStmt(ref(sym.varId), value)]
-      if (rangeCheck) stmts.push(rangeCheck)
+      if (rangeCheck) {
+        stmts.push(rangeCheck)
+      }
       return stmts
     }
     // 函数名赋值 → retval（funcName := expr 在函数体内表示给返回值赋值）
@@ -653,7 +661,9 @@ function compileCase(
 
 function compileGoto(node: GotoStatementNode, a: Analysis, funcId: number): JsonCode.Statement[] {
   const info = a.labelInfo(funcId, node.label.value)
-  if (!info) throw new Error(`compileGoto: label ${node.label.value} not declared`)
+  if (!info) {
+    throw new Error(`compileGoto: label ${node.label.value} not declared`)
+  }
   // 决策 13：goto 跳转前插入 steps.check，防止 goto 死循环（steps.check 只在循环回边
   // 插入，goto 跳转不触发回边检查，需单独兜底）
   const check = evalStmt(syscall('steps.check', []))
@@ -680,7 +690,9 @@ function compileLabeled(
   ws: WithBinding[],
 ): JsonCode.Statement[] {
   const info = a.labelInfo(funcId, node.label.value)
-  if (!info) throw new Error(`compileLabeled: label ${node.label.value} not declared`)
+  if (!info) {
+    throw new Error(`compileLabeled: label ${node.label.value} not declared`)
+  }
   return [labelStmt(info.labelId), ...compileStmt(node.statement, a, funcId, ws)]
 }
 
@@ -1124,13 +1136,25 @@ function compileIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[])
 
   // 内置常量
   const name = node.name.toLowerCase()
-  if (name === 'true') return litBool(true)
-  if (name === 'false') return litBool(false)
-  if (name === 'maxint') return litInt(2147483647)
-  if (name === 'nil') return litNull()
+  if (name === 'true') {
+    return litBool(true)
+  }
+  if (name === 'false') {
+    return litBool(false)
+  }
+  if (name === 'maxint') {
+    return litInt(2147483647)
+  }
+  if (name === 'nil') {
+    return litNull()
+  }
   // 内置无参函数（parser 将无括号调用解析为 Identifier）
-  if (name === 'eof') return syscall('io.eof', [])
-  if (name === 'eoln') return syscall('io.eoln', [])
+  if (name === 'eof') {
+    return syscall('io.eof', [])
+  }
+  if (name === 'eoln') {
+    return syscall('io.eoln', [])
+  }
 
   throw new Error(`compileIdentifier: undefined identifier ${node.name}`)
 }
@@ -1169,11 +1193,15 @@ function compileBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding[
 
   // 布尔逻辑
   if (op === 'AND') {
-    if (lt.tag === 'i64') return syscall('i64.and', [L, R])
+    if (lt.tag === 'i64') {
+      return syscall('i64.and', [L, R])
+    }
     return syscall('bool.and', [L, R])
   }
   if (op === 'OR') {
-    if (lt.tag === 'i64') return syscall('i64.or', [L, R])
+    if (lt.tag === 'i64') {
+      return syscall('i64.or', [L, R])
+    }
     return syscall('bool.or', [L, R])
   }
 
@@ -1222,7 +1250,9 @@ function compileUnary(node: UnaryExpressionNode, a: Analysis, ws: WithBinding[])
   const op = node.operator.toUpperCase()
 
   if (op === 'NOT') {
-    if (ti.tag === 'i64') return syscall('i64.not', [X])
+    if (ti.tag === 'i64') {
+      return syscall('i64.not', [X])
+    }
     return syscall('bool.not', [X])
   }
   if (op === '-') {
@@ -1280,8 +1310,12 @@ function compileFunctionCall(
       return syscall('cast.f64.to.i64.round', argExprs)
     case 'ord': {
       const ti = a.typeOf(args[0])
-      if (ti.tag === 'char') return syscall('cast.char.to.i64', argExprs)
-      if (ti.tag === 'bool') return syscall('cast.bool.to.i64', argExprs)
+      if (ti.tag === 'char') {
+        return syscall('cast.char.to.i64', argExprs)
+      }
+      if (ti.tag === 'bool') {
+        return syscall('cast.bool.to.i64', argExprs)
+      }
       return argExprs[0] // integer/enum 已经是 i64
     }
     case 'chr':
@@ -1344,7 +1378,9 @@ function compileFunctionCall(
       }
       return syscall('io.eof', [])
     case 'eoln':
-      if (args.length > 0) return syscall('file.eoln', argExprs)
+      if (args.length > 0) {
+        return syscall('file.eoln', argExprs)
+      }
       return syscall('io.eoln', [])
     default: {
       // 插件注入的非标函数（AGENTS.md 原则 A.7）

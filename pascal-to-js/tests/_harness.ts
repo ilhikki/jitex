@@ -42,7 +42,9 @@ export function describe(name: string, fn: () => void): void {
       const fns = [...frame.afterAllFns]
       const afterName = frame.prefixParts.join(' > ') + ' > [afterAll]'
       Deno.test(afterName, async () => {
-        for (const f of fns) await f()
+        for (const f of fns) {
+          await f()
+        }
       })
     }
     stack.pop()

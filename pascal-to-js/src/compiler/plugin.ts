@@ -67,7 +67,9 @@ export function findProcedurePlugin(
   plugins: IlPlugin[] | undefined,
   procName: string,
 ): { plugin: IlPlugin; name: string } | undefined {
-  if (!plugins) return undefined
+  if (!plugins) {
+    return undefined
+  }
   const name = procName.toLowerCase()
   for (const plugin of plugins) {
     if (plugin.procedures?.includes(name)) {
@@ -84,7 +86,9 @@ export function findFunctionPlugin(
   plugins: IlPlugin[] | undefined,
   funcName: string,
 ): { plugin: IlPlugin; name: string } | undefined {
-  if (!plugins) return undefined
+  if (!plugins) {
+    return undefined
+  }
   const name = funcName.toLowerCase()
   for (const plugin of plugins) {
     if (plugin.functions?.includes(name)) {

@@ -83,7 +83,9 @@ export class RunContext {
 
   currentStage(): StageContext {
     const s = this.stageStack[this.stageStack.length - 1]
-    if (!s) throw new Error('no active stage context: this primitive must be called inside a stage fn')
+    if (!s) {
+      throw new Error('no active stage context: this primitive must be called inside a stage fn')
+    }
     return s
   }
 
@@ -112,7 +114,9 @@ function emitSink(msg: string): void {
 }
 
 export function requireRunContext(): RunContext {
-  if (!globalCtx) throw new Error('no active run context')
+  if (!globalCtx) {
+    throw new Error('no active run context')
+  }
   return globalCtx
 }
 

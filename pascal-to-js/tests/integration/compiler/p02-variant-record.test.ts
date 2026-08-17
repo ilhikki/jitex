@@ -24,7 +24,9 @@ BEGIN
 END.
 `
     const result = parse(source)
-    if (!result.success) console.error('Parse error:', result.error)
+    if (!result.success) {
+      console.error('Parse error:', result.error)
+    }
     assert(result.success, 'expected parse success')
   })
 
@@ -44,7 +46,9 @@ BEGIN
 END.
 `
     const result = parse(source)
-    if (!result.success) console.error('Parse error:', result.error)
+    if (!result.success) {
+      console.error('Parse error:', result.error)
+    }
     assert(result.success, 'expected parse success')
   })
 
@@ -70,7 +74,9 @@ BEGIN
 END.
 `
     const result = parse(source)
-    if (!result.success) console.error('Parse error:', result.error)
+    if (!result.success) {
+      console.error('Parse error:', result.error)
+    }
     assert(result.success, 'expected parse success')
   })
 })

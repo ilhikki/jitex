@@ -89,7 +89,9 @@ function topoSort(
   _suiteName: string,
 ): Stage<unknown>[] {
   const universeByName = new Map<string, Stage<unknown>>()
-  for (const s of universe) universeByName.set(s.name, s)
+  for (const s of universe) {
+    universeByName.set(s.name, s)
+  }
 
   const byId = new Map<string, Stage<unknown>>()
   const indeg = new Map<string, number>()
@@ -106,13 +108,19 @@ function topoSort(
         )
       }
       // dep 不在 active（被 filter 排除）→ 依赖通过缓存满足（不算图中边）
-      if (!byId.has(dep.id)) continue
+      if (!byId.has(dep.id)) {
+        continue
+      }
       indeg.set(s.id, (indeg.get(s.id) ?? 0) + 1)
     }
   }
   // 循环检测
   const queue: string[] = []
-  for (const [id, d] of indeg) if (d === 0) queue.push(id)
+  for (const [id, d] of indeg) {
+    if (d === 0) {
+      queue.push(id)
+    }
+  }
   const order: Stage<unknown>[] = []
   while (queue.length) {
     const id = queue.shift()!
@@ -121,7 +129,9 @@ function topoSort(
       if (s.deps.some((d) => d.id === id)) {
         const nd = (indeg.get(s.id) ?? 0) - 1
         indeg.set(s.id, nd)
-        if (nd === 0) queue.push(s.id)
+        if (nd === 0) {
+          queue.push(s.id)
+        }
       }
     }
   }
@@ -148,8 +158,12 @@ async function preRecoverFilteredDeps(
   },
 ): Promise<void> {
   for (const dep of target.deps) {
-    if (ctx.activeStageNames.has(dep.name)) continue // active：主循环中会处理
-    if (ctx.recovering.has(dep.name)) continue
+    if (ctx.activeStageNames.has(dep.name)) {
+      continue
+    } // active：主循环中会处理
+    if (ctx.recovering.has(dep.name)) {
+      continue
+    }
     ctx.recovering.add(dep.name)
 
     // 先递归处理 dep 的 deps
@@ -169,7 +183,9 @@ async function preRecoverFilteredDeps(
     const depChecksums = new Map<string, string>()
     for (const dd of dep.deps) {
       const c = ctx.checksumByName.get(dd.name)
-      if (c) depChecksums.set(dd.name, c)
+      if (c) {
+        depChecksums.set(dd.name, c)
+      }
     }
 
     const recovered = await tryRecoverCache(
@@ -201,7 +217,9 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
   const args = options.args ?? []
   const purge = options.purge ?? false
 
-  if (purge) await purgeCacheDir(cacheDir)
+  if (purge) {
+    await purgeCacheDir(cacheDir)
+  }
 
   const runCtx = new RunContext(runId, suite.name)
   setGlobalRunContext(runCtx)
@@ -223,12 +241,16 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     if (suite.beforeFn) {
       try {
         const r = suite.beforeFn()
-        if (r instanceof Promise) await r
+        if (r instanceof Promise) {
+          await r
+        }
       } catch (_err) {
         suiteSuccess = false
         // before 失败 → 所有 stage skipped
         for (const s of suite.stages) {
-          if (filter && !filter(s)) continue
+          if (filter && !filter(s)) {
+            continue
+          }
           const sc = new StageContext(s.id, s.name)
           sc.status = 'skipped'
           sc.addLog('skipped: suite before hook failed')
@@ -299,7 +321,9 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
             const depChecksums = new Map<string, string>()
             for (const d of s.deps) {
               const c = checksumByName.get(d.name)
-              if (c) depChecksums.set(d.name, c)
+              if (c) {
+                depChecksums.set(d.name, c)
+              }
             }
             const recovered = await tryRecoverCache(
               cacheDir,
@@ -363,7 +387,9 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
             sc.failWith(err)
             failedIds.add(s.id)
             runCtx.log(`[${s.id}] FAILED: ${err instanceof Error ? err.message : String(err)}`)
-            if (failFast) break
+            if (failFast) {
+              break
+            }
           }
         } finally {
           runCtx.popStage()
@@ -375,7 +401,9 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     if (suite.afterFn) {
       try {
         const r = suite.afterFn()
-        if (r instanceof Promise) await r
+        if (r instanceof Promise) {
+          await r
+        }
       } catch (_err) {
         suiteSuccess = false
         // after 失败不影响已完成 stage 状态

@@ -60,7 +60,9 @@ class JsCompilerImpl implements JsCompiler {
   private functionHeader(fn: JsonCode.Function, top: boolean): string {
     const params = fn.params.map((x) => this.compileId(x))
     // 顶层函数添加 __sys 参数（ES module 导出后由外部注入 dispatcher）
-    if (top) params.unshift('__sys')
+    if (top) {
+      params.unshift('__sys')
+    }
     return `function ${this.compileId(fn.id)}(${params.join(', ')}) {`
   }
 
@@ -157,13 +159,17 @@ class JsCompilerImpl implements JsCompiler {
 
       case 'literal': {
         const semantic = this.options.semantic
-        if (!semantic) throw new Error('semantic compiler required')
+        if (!semantic) {
+          throw new Error('semantic compiler required')
+        }
         return semantic.literalToJs(expr, this) ?? this.error(`Unknown literal ${expr.key}`)
       }
 
       case 'syscall': {
         const semantic = this.options.semantic
-        if (!semantic) throw new Error('semantic compiler required')
+        if (!semantic) {
+          throw new Error('semantic compiler required')
+        }
         return semantic.syscallToJs(expr, this) ?? this.error(`Unknown syscall ${expr.key}`)
       }
 

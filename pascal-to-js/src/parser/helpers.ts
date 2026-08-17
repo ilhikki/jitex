@@ -91,7 +91,9 @@ export function parseList<T>(
   let pos = first.newPosition
 
   while (true) {
-    if (input.tokens[pos]?.type !== separator) break
+    if (input.tokens[pos]?.type !== separator) {
+      break
+    }
     pos++
     const r = parseItem({ tokens: input.tokens, position: pos })
     if (!r.success) {

@@ -162,7 +162,12 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
     ctx.jsCode = source
     // __sys dispatcher
     const dispatcher = createDispatcher(options.plugins ?? [])
-    const __sys = (key: string, args: unknown[]): unknown => dispatcher(ctx, key, args)
+    const __sys = (key: string, args: unknown[]): unknown => {
+      if (key.startsWith('io.') || key.startsWith('plugin.') || key.startsWith('file.')) {
+        ctx.debugLog.push(`[${key}] ${JSON.stringify(args)}`)
+      }
+      return dispatcher(ctx, key, args)
+    }
 
     // 执行（ES module 代码）
     executeCompiled(source, __sys)

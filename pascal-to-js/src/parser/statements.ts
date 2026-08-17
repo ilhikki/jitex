@@ -88,13 +88,17 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
 export function parseCompoundStatement(input: ParserInput): ParseResult<CompoundStatementNode> {
   const startToken = peek(input)
   const beginResult = expectKeyword(input, 'BEGIN')
-  if (!beginResult.success) return fail(beginResult.error, beginResult.position)
+  if (!beginResult.success) {
+    return fail(beginResult.error, beginResult.position)
+  }
   let pos = beginResult.newPosition
   const statements: StatementNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'END') {
     const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
-    if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
+    if (!stmtResult.success) {
+      return fail(stmtResult.error, stmtResult.position)
+    }
     statements.push(stmtResult.astNode)
     pos = stmtResult.newPosition
 
@@ -111,7 +115,9 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
   }
 
   const endResult = expectKeyword({ tokens: input.tokens, position: pos }, 'END')
-  if (!endResult.success) return fail(endResult.error, endResult.position)
+  if (!endResult.success) {
+    return fail(endResult.error, endResult.position)
+  }
   pos = endResult.newPosition
 
   return ok(
@@ -138,11 +144,15 @@ function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
   let pos = input.position + 1
 
   const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
-  if (!colonResult.success) return fail(colonResult.error, colonResult.position)
+  if (!colonResult.success) {
+    return fail(colonResult.error, colonResult.position)
+  }
   pos = colonResult.newPosition
 
   const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
-  if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
+  if (!stmtResult.success) {
+    return fail(stmtResult.error, stmtResult.position)
+  }
 
   return ok(
     stmtResult.newPosition,
@@ -179,7 +189,9 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
 
   // Parse an expression first (handles identifier, array access, field access, function call)
   const exprResult = parsePrimary(input)
-  if (!exprResult.success) return fail(exprResult.error, exprResult.position)
+  if (!exprResult.success) {
+    return fail(exprResult.error, exprResult.position)
+  }
 
   let pos = exprResult.newPosition
   const nextToken = peek({ tokens: input.tokens, position: pos })
@@ -188,7 +200,9 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
     // Assignment statement
     pos++
     const rightResult = parseExpression({ tokens: input.tokens, position: pos })
-    if (!rightResult.success) return fail(rightResult.error, rightResult.position)
+    if (!rightResult.success) {
+      return fail(rightResult.error, rightResult.position)
+    }
     pos = rightResult.newPosition
 
     return ok(
@@ -254,7 +268,9 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
     pos++ // skip (
     while (peek({ tokens: input.tokens, position: pos }).type !== 'RPAREN') {
       const exprResult = parseExpression({ tokens: input.tokens, position: pos })
-      if (!exprResult.success) return fail(exprResult.error, exprResult.position)
+      if (!exprResult.success) {
+        return fail(exprResult.error, exprResult.position)
+      }
       pos = exprResult.newPosition
 
       let arg = exprResult.astNode
@@ -263,7 +279,9 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
       if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
         pos++ // skip :
         const widthResult = parseExpression({ tokens: input.tokens, position: pos })
-        if (!widthResult.success) return fail(widthResult.error, widthResult.position)
+        if (!widthResult.success) {
+          return fail(widthResult.error, widthResult.position)
+        }
         pos = widthResult.newPosition
 
         // Wrap in a special node — use BinaryExpression with ":" operator to represent format
@@ -282,7 +300,9 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
         if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
           pos++
           const precResult = parseExpression({ tokens: input.tokens, position: pos })
-          if (!precResult.success) return fail(precResult.error, precResult.position)
+          if (!precResult.success) {
+            return fail(precResult.error, precResult.position)
+          }
           pos = precResult.newPosition
           arg = loc(
             {
@@ -299,11 +319,15 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
 
       args.push(arg)
 
-      if (peek({ tokens: input.tokens, position: pos }).type !== 'COMMA') break
+      if (peek({ tokens: input.tokens, position: pos }).type !== 'COMMA') {
+        break
+      }
       pos++
     }
     const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RPAREN')
-    if (!closeResult.success) return fail(closeResult.error, closeResult.position)
+    if (!closeResult.success) {
+      return fail(closeResult.error, closeResult.position)
+    }
     pos = closeResult.newPosition
   }
 
@@ -327,22 +351,30 @@ function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
   let pos = input.position + 1 // skip IF
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
-  if (!condResult.success) return fail(condResult.error, condResult.position)
+  if (!condResult.success) {
+    return fail(condResult.error, condResult.position)
+  }
   pos = condResult.newPosition
 
   const thenResult = expectKeyword({ tokens: input.tokens, position: pos }, 'THEN')
-  if (!thenResult.success) return fail(thenResult.error, thenResult.position)
+  if (!thenResult.success) {
+    return fail(thenResult.error, thenResult.position)
+  }
   pos = thenResult.newPosition
 
   const thenStmtResult = parseStatement({ tokens: input.tokens, position: pos })
-  if (!thenStmtResult.success) return fail(thenStmtResult.error, thenStmtResult.position)
+  if (!thenStmtResult.success) {
+    return fail(thenStmtResult.error, thenStmtResult.position)
+  }
   pos = thenStmtResult.newPosition
 
   let elseBranch: StatementNode | null = null
   if (peek({ tokens: input.tokens, position: pos }).type === 'ELSE') {
     pos++
     const elseResult = parseStatement({ tokens: input.tokens, position: pos })
-    if (!elseResult.success) return fail(elseResult.error, elseResult.position)
+    if (!elseResult.success) {
+      return fail(elseResult.error, elseResult.position)
+    }
     elseBranch = elseResult.astNode
     pos = elseResult.newPosition
   }
@@ -368,15 +400,21 @@ function parseWhileStatement(input: ParserInput): ParseResult<WhileStatementNode
   let pos = input.position + 1 // skip WHILE
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
-  if (!condResult.success) return fail(condResult.error, condResult.position)
+  if (!condResult.success) {
+    return fail(condResult.error, condResult.position)
+  }
   pos = condResult.newPosition
 
   const doResult = expectKeyword({ tokens: input.tokens, position: pos }, 'DO')
-  if (!doResult.success) return fail(doResult.error, doResult.position)
+  if (!doResult.success) {
+    return fail(doResult.error, doResult.position)
+  }
   pos = doResult.newPosition
 
   const bodyResult = parseStatement({ tokens: input.tokens, position: pos })
-  if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
+  if (!bodyResult.success) {
+    return fail(bodyResult.error, bodyResult.position)
+  }
   pos = bodyResult.newPosition
 
   return ok(
@@ -401,7 +439,9 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'UNTIL') {
     const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
-    if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
+    if (!stmtResult.success) {
+      return fail(stmtResult.error, stmtResult.position)
+    }
     statements.push(stmtResult.astNode)
     pos = stmtResult.newPosition
 
@@ -417,11 +457,15 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
   }
 
   const untilResult = expectKeyword({ tokens: input.tokens, position: pos }, 'UNTIL')
-  if (!untilResult.success) return fail(untilResult.error, untilResult.position)
+  if (!untilResult.success) {
+    return fail(untilResult.error, untilResult.position)
+  }
   pos = untilResult.newPosition
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
-  if (!condResult.success) return fail(condResult.error, condResult.position)
+  if (!condResult.success) {
+    return fail(condResult.error, condResult.position)
+  }
   pos = condResult.newPosition
 
   return ok(
@@ -444,15 +488,21 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   let pos = input.position + 1 // skip FOR
 
   const varResult = parseIdentifier({ tokens: input.tokens, position: pos })
-  if (!varResult.success) return fail(varResult.error, varResult.position)
+  if (!varResult.success) {
+    return fail(varResult.error, varResult.position)
+  }
   pos = varResult.newPosition
 
   const assignResult = expectType({ tokens: input.tokens, position: pos }, 'ASSIGN')
-  if (!assignResult.success) return fail(assignResult.error, assignResult.position)
+  if (!assignResult.success) {
+    return fail(assignResult.error, assignResult.position)
+  }
   pos = assignResult.newPosition
 
   const initResult = parseExpression({ tokens: input.tokens, position: pos })
-  if (!initResult.success) return fail(initResult.error, initResult.position)
+  if (!initResult.success) {
+    return fail(initResult.error, initResult.position)
+  }
   pos = initResult.newPosition
 
   // TO or DOWNTO
@@ -472,15 +522,21 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   }
 
   const finalResult = parseExpression({ tokens: input.tokens, position: pos })
-  if (!finalResult.success) return fail(finalResult.error, finalResult.position)
+  if (!finalResult.success) {
+    return fail(finalResult.error, finalResult.position)
+  }
   pos = finalResult.newPosition
 
   const doResult = expectKeyword({ tokens: input.tokens, position: pos }, 'DO')
-  if (!doResult.success) return fail(doResult.error, doResult.position)
+  if (!doResult.success) {
+    return fail(doResult.error, doResult.position)
+  }
   pos = doResult.newPosition
 
   const bodyResult = parseStatement({ tokens: input.tokens, position: pos })
-  if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
+  if (!bodyResult.success) {
+    return fail(bodyResult.error, bodyResult.position)
+  }
   pos = bodyResult.newPosition
 
   return ok(
@@ -506,11 +562,15 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   let pos = input.position + 1 // skip CASE
 
   const exprResult = parseExpression({ tokens: input.tokens, position: pos })
-  if (!exprResult.success) return fail(exprResult.error, exprResult.position)
+  if (!exprResult.success) {
+    return fail(exprResult.error, exprResult.position)
+  }
   pos = exprResult.newPosition
 
   const ofResult = expectKeyword({ tokens: input.tokens, position: pos }, 'OF')
-  if (!ofResult.success) return fail(ofResult.error, ofResult.position)
+  if (!ofResult.success) {
+    return fail(ofResult.error, ofResult.position)
+  }
   pos = ofResult.newPosition
 
   const branches: CaseBranchNode[] = []
@@ -530,7 +590,9 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
         pos++
       }
       const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
-      if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
+      if (!stmtResult.success) {
+        return fail(stmtResult.error, stmtResult.position)
+      }
       otherwise = stmtResult.astNode
       pos = stmtResult.newPosition
       // Skip trailing semicolons before END (same as ordinary branches)
@@ -546,15 +608,21 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
       parseExpression,
       'COMMA',
     )
-    if (!labelsResult.success) return fail(labelsResult.error, labelsResult.position)
+    if (!labelsResult.success) {
+      return fail(labelsResult.error, labelsResult.position)
+    }
     pos = labelsResult.newPosition
 
     const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
-    if (!colonResult.success) return fail(colonResult.error, colonResult.position)
+    if (!colonResult.success) {
+      return fail(colonResult.error, colonResult.position)
+    }
     pos = colonResult.newPosition
 
     const stmtResult = parseStatement({ tokens: input.tokens, position: pos })
-    if (!stmtResult.success) return fail(stmtResult.error, stmtResult.position)
+    if (!stmtResult.success) {
+      return fail(stmtResult.error, stmtResult.position)
+    }
     pos = stmtResult.newPosition
 
     branches.push(
@@ -576,7 +644,9 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   }
 
   const endResult = expectKeyword({ tokens: input.tokens, position: pos }, 'END')
-  if (!endResult.success) return fail(endResult.error, endResult.position)
+  if (!endResult.success) {
+    return fail(endResult.error, endResult.position)
+  }
   pos = endResult.newPosition
 
   return ok(
@@ -631,15 +701,21 @@ function parseWithStatement(input: ParserInput): ParseResult<WithStatementNode> 
   let pos = input.position + 1 // skip WITH
 
   const recordsResult = parseList({ tokens: input.tokens, position: pos }, parseExpression, 'COMMA')
-  if (!recordsResult.success) return fail(recordsResult.error, recordsResult.position)
+  if (!recordsResult.success) {
+    return fail(recordsResult.error, recordsResult.position)
+  }
   pos = recordsResult.newPosition
 
   const doResult = expectKeyword({ tokens: input.tokens, position: pos }, 'DO')
-  if (!doResult.success) return fail(doResult.error, doResult.position)
+  if (!doResult.success) {
+    return fail(doResult.error, doResult.position)
+  }
   pos = doResult.newPosition
 
   const bodyResult = parseStatement({ tokens: input.tokens, position: pos })
-  if (!bodyResult.success) return fail(bodyResult.error, bodyResult.position)
+  if (!bodyResult.success) {
+    return fail(bodyResult.error, bodyResult.position)
+  }
   pos = bodyResult.newPosition
 
   return ok(

@@ -190,7 +190,9 @@ function quoteString(raw: string): string {
 
 /** 字符字面量：CHAR_CODE 格式（#开头）直接输出，否则加引号 */
 function quoteChar(raw: string): string {
-  if (raw.startsWith('#')) return raw
+  if (raw.startsWith('#')) {
+    return raw
+  }
   return `'${raw.replace(/'/g, "''")}'`
 }
 
@@ -230,12 +232,16 @@ function printFieldAccess(
 ): string {
   const obj = printExpr(node.object, ctx)
   // Pascal 指针解引用/文件缓冲区：F^ 在 AST 中表示为 FieldAccess(field.name='^')
-  if (node.field.name === '^') return `${obj}^`
+  if (node.field.name === '^') {
+    return `${obj}^`
+  }
   return `${obj}.${node.field.name}`
 }
 
 function printSetConstructor(node: SetConstructorNode, ctx: PrintContext): string {
-  if (node.elements.length === 0) return '[]'
+  if (node.elements.length === 0) {
+    return '[]'
+  }
   const parts = node.elements.map(([start, end]) => {
     const s = printExpr(start, ctx)
     return end ? `${s}..${printExpr(end, ctx)}` : s
@@ -496,7 +502,9 @@ function printArrayType(node: ArrayTypeNode, ctx: PrintContext): string {
 }
 
 function printRecordType(node: RecordTypeNode, ctx: PrintContext): string {
-  if (node.fields.length === 0) return 'record end'
+  if (node.fields.length === 0) {
+    return 'record end'
+  }
   const fields = node.fields.map((f) => printVarDecl(f, ctx)).join('; ')
   return `record ${fields} end`
 }

@@ -11,7 +11,9 @@ export function formatReal(n: number): string {
   }
   const s = n.toExponential(14)
   const eIdx = s.indexOf('e')
-  if (eIdx < 0) return s
+  if (eIdx < 0) {
+    return s
+  }
   const mantissa = s.slice(0, eIdx)
   const exp = s.slice(eIdx + 1)
   const sign = exp[0]
@@ -25,7 +27,9 @@ export function formatReal(n: number): string {
  * Pascal 写参数语义：x:width 表示最小字段宽度，右对齐。
  */
 export function formatField(text: string, width: number): string {
-  if (!width || text.length >= width) return text
+  if (!width || text.length >= width) {
+    return text
+  }
   return ' '.repeat(width - text.length) + text
 }
 
@@ -43,14 +47,26 @@ export function formatField(text: string, width: number): string {
  *   - record（plain object）：递归深拷贝每个字段
  */
 export function deepCopyValue(v: unknown): unknown {
-  if (v === null || v === undefined) return v
-  if (typeof v !== 'object') return v
-  if (v instanceof Set) return new Set(v)
-  if (v instanceof Uint8Array) return new Uint8Array(v)
-  if (Array.isArray(v)) return v.map(deepCopyValue)
+  if (v === null || v === undefined) {
+    return v
+  }
+  if (typeof v !== 'object') {
+    return v
+  }
+  if (v instanceof Set) {
+    return new Set(v)
+  }
+  if (v instanceof Uint8Array) {
+    return new Uint8Array(v)
+  }
+  if (Array.isArray(v)) {
+    return v.map(deepCopyValue)
+  }
   // PascalFile：文件是引用语义，共享引用
   const obj = v as Record<string, unknown>
-  if (typeof obj.url === 'string' && typeof obj.offset === 'number') return v
+  if (typeof obj.url === 'string' && typeof obj.offset === 'number') {
+    return v
+  }
   // record：递归深拷贝每个字段
   const copy: Record<string, unknown> = {}
   for (const k of Object.keys(obj)) {
@@ -68,7 +84,9 @@ export function createDefaultArray(typeDesc: TypeDescriptor): unknown[] {
   // 支持两种多维形式：
   //   1. 扁平多维：array[1..2,1..2] of integer → dims 有多个，elem 是标量
   //   2. 嵌套多维：array[1..2] of array[1..2] of integer → dims 单个，elem 是 array
-  if (!typeDesc.dims || typeDesc.dims.length === 0) return []
+  if (!typeDesc.dims || typeDesc.dims.length === 0) {
+    return []
+  }
   const dim = typeDesc.dims[0]
   const arr: unknown[] = []
   if (typeDesc.dims.length > 1) {
@@ -150,8 +168,12 @@ export function appendFileBytes(buf: FileBuffer, bytes: Uint8Array): void {
   const need = buf.length + bytes.length
   if (need > buf.data.length) {
     let newCap = buf.data.length * 2
-    if (newCap < need) newCap = need
-    if (newCap < 8) newCap = 8
+    if (newCap < need) {
+      newCap = need
+    }
+    if (newCap < 8) {
+      newCap = 8
+    }
     const nd = new Uint8Array(newCap)
     nd.set(buf.data.subarray(0, buf.length))
     buf.data = nd
@@ -169,7 +191,9 @@ export function fileBufferView(buf: FileBuffer): Uint8Array {
 export function wrapFileMap(files?: Map<string, Uint8Array>): Map<string, FileBuffer> {
   const m = new Map<string, FileBuffer>()
   if (files) {
-    for (const [k, v] of files) m.set(k, createFileBuffer(v))
+    for (const [k, v] of files) {
+      m.set(k, createFileBuffer(v))
+    }
   }
   return m
 }
@@ -178,6 +202,8 @@ export function wrapFileMap(files?: Map<string, Uint8Array>): Map<string, FileBu
  *  运行结束后由 toRunState 调用，结果放入 RunState.files。 */
 export function unwrapFileMap(files: Map<string, FileBuffer>): Map<string, Uint8Array> {
   const m = new Map<string, Uint8Array>()
-  for (const [k, v] of files) m.set(k, fileBufferView(v))
+  for (const [k, v] of files) {
+    m.set(k, fileBufferView(v))
+  }
   return m
 }

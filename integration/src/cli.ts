@@ -185,7 +185,9 @@ async function main(argv: string[]): Promise<number> {
       console.log(`           artifact: ${a.name} (${a.size} bytes${a.lines != null ? `, ${a.lines} lines` : ''})`)
     }
     if (s.status === 'failed') {
-      for (const line of s.stackTrace) console.log(`           ${line}`)
+      for (const line of s.stackTrace) {
+        console.log(`           ${line}`)
+      }
     }
   }
 

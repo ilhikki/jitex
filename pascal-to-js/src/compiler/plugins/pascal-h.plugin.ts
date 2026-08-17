@@ -42,7 +42,9 @@ function setFileError(file: PascalFile, error: number): void {
 }
 
 function getFileError(file: PascalFile | undefined): number {
-  if (!file) return 0
+  if (!file) {
+    return 0
+  }
   return fileErrors.get(file) ?? 0
 }
 
@@ -56,7 +58,7 @@ export const pascalHPlugin: IlPlugin = {
   name: 'pascalH',
 
   // 非标过程（ISO 7185 6.9.8.2 未列出）
-  procedures: ['break', 'break_in', 'breakin'],
+  procedures: ['break', 'break_in', 'breakin', 'close'],
 
   // 非标函数（ISO 7185 6.9.8.2 未列出）
   functions: ['erstat'],
@@ -69,7 +71,7 @@ export const pascalHPlugin: IlPlugin = {
     break: (_ctx: RuntimeContext, _args: unknown[]) => undefined,
     break_in: (_ctx: RuntimeContext, _args: unknown[]) => undefined,
     breakin: (_ctx: RuntimeContext, _args: unknown[]) => undefined,
-
+    close: () => undefined,
     /**
      * erstat(f)：返回文件 f 最近一次 reset/rewrite 的错误状态。
      *
@@ -83,9 +85,13 @@ export const pascalHPlugin: IlPlugin = {
      */
     erstat: (ctx: RuntimeContext, args: unknown[]) => {
       const file = args[0] as PascalFile
-      if (!file) return 0
+      if (!file) {
+        return 0
+      }
       // TTY 等特殊文件总是成功
-      if (file.url === 'TTY:' || file.url === '') return 0
+      if (file.url === 'TTY:' || file.url === '') {
+        return 0
+      }
       // 检查文件是否存在
       return ctx.files.has(file.url) ? 0 : 1
     },

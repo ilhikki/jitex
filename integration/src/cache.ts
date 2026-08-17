@@ -80,7 +80,9 @@ function deserializeResults(obj: unknown): CacheableRecord {
 async function sha256Hex(chunks: Uint8Array[]): Promise<string> {
   // 手工拼接 chunks
   let total = 0
-  for (const c of chunks) total += c.length
+  for (const c of chunks) {
+    total += c.length
+  }
   const buf = new Uint8Array(total)
   let off = 0
   for (const c of chunks) {
@@ -98,14 +100,18 @@ async function sha256Hex(chunks: Uint8Array[]): Promise<string> {
 
 function encodeB64(bytes: Uint8Array): string {
   let bin = ''
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i])
+  }
   return btoa(bin)
 }
 
 function decodeB64(s: string): Uint8Array {
   const bin = atob(s)
   const out = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+  for (let i = 0; i < bin.length; i++) {
+    out[i] = bin.charCodeAt(i)
+  }
   return out
 }
 
@@ -219,7 +225,9 @@ export async function tryRecoverCache(
       )
     }
     if (!dep.cacheable) {
-      if (requireCacheStrict) throw new Error('unreachable')
+      if (requireCacheStrict) {
+        throw new Error('unreachable')
+      }
       return null
     }
     const recorded = meta.deps.find((d) => d.stageName === dep.name)
@@ -260,7 +268,9 @@ export async function tryRecoverCache(
     assertions = JSON.parse(dec().decode(await Deno.readFile(`${dir}/assertions.json`))) as AssertionRecord[]
     logs = dec().decode(await Deno.readFile(`${dir}/logs.txt`)).split('\n').filter((_, _i, arr) => {
       // 空文件 split 得到 ['']；过滤掉
-      if (arr.length === 1 && arr[0] === '') return false
+      if (arr.length === 1 && arr[0] === '') {
+        return false
+      }
       return true
     })
     artifacts = []
@@ -272,7 +282,9 @@ export async function tryRecoverCache(
       // 目录不存在 ≡ 无附件
     }
     for (const e of entries) {
-      if (!e.isFile) continue
+      if (!e.isFile) {
+        continue
+      }
       const bytes = await Deno.readFile(`${attachDir}/${e.name}`)
       artifacts.push({ name: e.name, bytes })
     }
@@ -302,6 +314,8 @@ export async function purgeCacheDir(cacheDir: string): Promise<void> {
   try {
     await Deno.remove(cacheDir, { recursive: true })
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) throw err
+    if (!(err instanceof Deno.errors.NotFound)) {
+      throw err
+    }
   }
 }

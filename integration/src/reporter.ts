@@ -8,14 +8,22 @@ import type { RunReport, StageRecord } from './runner.ts'
 const enc = new TextEncoder()
 
 function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  if (n < 1024) {
+    return `${n} B`
+  }
+  if (n < 1024 * 1024) {
+    return `${(n / 1024).toFixed(1)} KB`
+  }
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms} ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(2)} s`
+  if (ms < 1000) {
+    return `${ms} ms`
+  }
+  if (ms < 60_000) {
+    return `${(ms / 1000).toFixed(2)} s`
+  }
   const s = ms / 1000
   const m = Math.floor(s / 60)
   const rs = (s - m * 60).toFixed(2)
@@ -96,7 +104,9 @@ function sanitizeFilename(name: string): string {
   // 保留文件名中的路径分隔符？参考样例是单文件名。这里禁止路径穿越。
   const s = name.replace(/\\/g, '/')
   const base = s.split('/').pop() ?? name
-  if (!base || base === '.' || base === '..') return '__bad_name__'
+  if (!base || base === '.' || base === '..') {
+    return '__bad_name__'
+  }
   return base
 }
 
@@ -184,12 +194,18 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
   try {
     entries = Array.from(Deno.readDirSync(reportDir))
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) throw err
+    if (!(err instanceof Deno.errors.NotFound)) {
+      throw err
+    }
     entries = []
   }
   for (const e of entries) {
-    if (!e.isDirectory) continue
-    if (e.name === '.cache') continue
+    if (!e.isDirectory) {
+      continue
+    }
+    if (e.name === '.cache') {
+      continue
+    }
     let overview: { timestamp: string; success: boolean; duration: number } | undefined
     try {
       const buf = Deno.readFileSync(`${reportDir}/${e.name}/overview.json`)
@@ -245,7 +261,9 @@ export function buildArtifactMap(
 ): Map<string, Array<{ name: string; bytes: Uint8Array }>> {
   const m = new Map<string, Array<{ name: string; bytes: Uint8Array }>>()
   for (const s of stages) {
-    if (s.artifacts.length) m.set(s.id, s.artifacts.slice())
+    if (s.artifacts.length) {
+      m.set(s.id, s.artifacts.slice())
+    }
   }
   return m
 }

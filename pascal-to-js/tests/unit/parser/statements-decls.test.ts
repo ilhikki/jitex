@@ -72,7 +72,9 @@ begin
 end;`
     const r = parseProcedureDeclaration(makeInput(source))
     assert(r.success, 'parse procedure')
-    if (!r.success) return
+    if (!r.success) {
+      return
+    }
     assertEquals(r.astNode.name.name, 'outer', 'outer name')
     assertEquals(r.astNode.block!.procedureDeclarations.length, 1, 'one nested proc')
     assertEquals(r.astNode.block!.procedureDeclarations[0].name.name, 'inner', 'inner name')
@@ -88,7 +90,9 @@ begin
 end;`
     const r = parseFunctionDeclaration(makeInput(source))
     assert(r.success, 'parse function')
-    if (!r.success) return
+    if (!r.success) {
+      return
+    }
     assertEquals(r.astNode.name.name, 'outer', 'outer name')
     assertEquals(r.astNode.block!.procedureDeclarations.length, 1, 'one nested proc')
   })
@@ -103,7 +107,9 @@ begin
 end;`
     const r = parseProcedureDeclaration(makeInput(source))
     assert(r.success, 'parse procedure')
-    if (!r.success) return
+    if (!r.success) {
+      return
+    }
     assertEquals(r.astNode.parameters.length, 1, '1 param')
     assert(r.astNode.block!.labelDeclarations !== null, 'labels present')
     assertEquals(r.astNode.block!.variableDeclarations.length, 1, '1 var')
@@ -127,7 +133,9 @@ begin
 end.`
     const r = parse(source)
     assert(r.success, 'parse program')
-    if (!r.success) return
+    if (!r.success) {
+      return
+    }
     const prog = r.astNode as ProgramNode
     assertEquals(prog.block.variableDeclarations.length, 1, '1 var')
     assertEquals(prog.block.procedureDeclarations.length, 1, '1 proc')
@@ -156,7 +164,9 @@ begin
 end.`
     const r = parse(source)
     assert(r.success, 'parse full program')
-    if (!r.success) return
+    if (!r.success) {
+      return
+    }
     const prog = r.astNode as ProgramNode
     assert(prog.block.labelDeclarations !== null, 'labels present')
     assertEquals(prog.block.constDeclarations.length, 1, '1 const')
