@@ -1,5 +1,5 @@
 import type { RuntimeContext, SyscallHandler } from '../runtime-type.ts'
-import { formatField, formatReal, getPascalStringValue, PascalArray } from '../runtime-util.ts'
+import { formatField, formatReal, PascalArray } from '../runtime-util.ts'
 
 const TRUE_STR = 'TRUE'
 const FALSE_STR = 'FALSE'
@@ -20,7 +20,7 @@ export function ioSyscalls(): Record<string, SyscallHandler> {
       ctx.outputBuffer.push(value as string)
     },
     'io.write.str': (ctx, [value]) => {
-      ctx.outputBuffer.push(getPascalStringValue(value as PascalArray<string>))
+      ctx.outputBuffer.push((value as PascalArray).value.array.join(''))
     },
     // ---------- io.writeln ----------
     'io.writeln.eol': (ctx) => {
@@ -54,7 +54,7 @@ export function ioSyscalls(): Record<string, SyscallHandler> {
       ctx.outputBuffer.push(formatField(value as string, width as number))
     },
     'io.write.str.fmt': (ctx, [value, width]) => {
-      ctx.outputBuffer.push(formatField(getPascalStringValue(value as PascalArray<string>), width as number))
+      ctx.outputBuffer.push(formatField((value as PascalArray).value.array.join(''), width as number))
     },
   }
 }

@@ -76,89 +76,6 @@ export function deepCopyValue(v: unknown): unknown {
 }
 
 // ============================================================
-// 辅助函数：默认值构造
-// ============================================================
-export interface PascalArray<T> {
-  array: T[]
-  low: number
-}
-export function createDefaultArray(typeDesc: TypeDescriptor): PascalArray<unknown> {
-  // typeDesc = {tag:'array', dims:[{low,high},...], elem:{...}}
-  // 支持两种多维形式：
-  //   1. 扁平多维：array[1..2,1..2] of integer → dims 有多个，elem 是标量
-  //   2. 嵌套多维：array[1..2] of array[1..2] of integer → dims 单个，elem 是 array
-  if (!typeDesc.dims || typeDesc.dims.length === 0) {
-    return { array: [], low: 0 }
-  }
-  const dim = typeDesc.dims[0]
-  const arr: unknown[] = []
-  const result = { array: arr, low: dim.low }
-  const length = dim.high - dim.low + 1
-  if (typeDesc.dims.length > 1) {
-    // 扁平多维：剩余维度递归
-    const innerDesc: TypeDescriptor = {
-      tag: 'array',
-      dims: typeDesc.dims.slice(1),
-      elem: typeDesc.elem,
-    }
-    for (let i = 0; i < length; i++) {
-      arr[i] = createDefaultArray(innerDesc)
-    }
-  } else if (typeDesc.elem && typeDesc.elem.tag === 'array') {
-    // 嵌套多维
-    for (let i = 0; i < length; i++) {
-      arr[i] = createDefaultArray(typeDesc.elem)
-    }
-  } else {
-    for (let i = 0; i < length; i++) {
-      arr[i] = createDefaultValue(typeDesc.elem ?? { tag: 'i64' })
-    }
-  }
-  return result
-}
-
-export function createDefaultRec(typeDesc: TypeDescriptor): Record<string, unknown> {
-  const obj: Record<string, unknown> = {}
-  if (typeDesc.fields) {
-    for (const f of typeDesc.fields) {
-      obj[f.name] = createDefaultValue(f.type)
-    }
-  }
-  return obj
-}
-
-function createDefaultValue(ti: TypeDescriptor): unknown {
-  switch (ti.tag) {
-    case 'i64':
-    case 'enum':
-      return 0
-    case 'subrange':
-      return ti.low ?? 0
-    case 'f64':
-      return 0.0
-    case 'bool':
-      return false
-    case 'char':
-      return '\x00'
-    case 'str':
-      return ''
-    case 'set':
-      return new Set<number>()
-    case 'array':
-      if (ti.dims && ti.dims.length > 0) {
-        return createDefaultArray(ti)
-      }
-      return []
-    case 'rec':
-      return createDefaultRec(ti)
-    case 'file':
-      return { url: '', offset: 0 }
-    default:
-      return 0
-  }
-}
-
-// ============================================================
 // 辅助函数：文件字节缓冲（FileBuffer）
 // ============================================================
 // data.length 即容量（limit）；追加时容量不足则翻倍扩容，避免每次写入都整体拷贝数组。
@@ -212,31 +129,44 @@ export function unwrapFileMap(files: Map<string, FileBuffer>): Map<string, Uint8
   }
   return m
 }
-
-// ============================================================
-// 辅助函数：数组
-// ============================================================
-
-export function getArrayElement(arr: unknown, indices: unknown[]): unknown {
-  let cur = arr as PascalArray<unknown>
-  for (const idx of indices) {
-    // Pascal char 作为数组索引时是单字符字符串，需转 charCode
-    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx as number
-    cur = cur.array[n - cur.low] as PascalArray<unknown>
-  }
-  return cur
+export interface DimsLink {
+  next?: DimsLink | undefined
+  low: number
+  high: number
+  deep: number
 }
-export function getPascalStringValue(pascalString: PascalArray<string>) {
-  return pascalString.array.join('')
+export interface DimsLink {
+  next?: DimsLink | undefined
+  low: number
+  high: number
+  deep: number
 }
-export function setArrayElement(arr: unknown, indices: unknown[], value: unknown): void {
-  let cur = arr as PascalArray<unknown>
-  for (let i = 0; i < indices.length - 1; i++) {
-    const idx = indices[i]
-    const n = typeof idx === 'string' && idx.length === 1 ? idx.charCodeAt(0) : idx as number
-    cur = cur.array[n - cur.low] as PascalArray<unknown>
+
+export type PascalObject = PascalArray | PascalRecord | PascalCell | PascalSet
+
+export function getPascalStringValue(str: PascalArray) {
+  return str.value.array.join('')
+}
+export type PascalArray = {
+  kind: 'array'
+  value: {
+    array: unknown[]
+    dims: DimsLink
+    elementType?: TypeDescriptor | undefined
   }
-  const last = indices[indices.length - 1]
-  const lastN = typeof last === 'string' && last.length === 1 ? last.charCodeAt(0) : last as number
-  cur.array[lastN - cur.low] = value
+}
+
+export type PascalRecord = {
+  kind: 'record'
+  value: Record<string, unknown>
+}
+
+export type PascalCell = {
+  kind: 'cell'
+  value: unknown
+}
+
+export type PascalSet = {
+  kind: 'set'
+  value: Set<number>
 }

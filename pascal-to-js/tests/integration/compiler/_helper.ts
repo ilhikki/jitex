@@ -129,6 +129,8 @@ export function runPascalTest(t: PascalTest): void {
 
   // 2. 非预期错误
   if (state.status === 'error') {
+    console.error(state.jsCode)
+    console.error(state.error)
     assert(false, `${prefix}: unexpected error: ${state.error?.message}`)
   }
 
@@ -137,7 +139,7 @@ export function runPascalTest(t: PascalTest): void {
     assertEquals(
       output,
       t.expectedOutput,
-      `${prefix}: output mismatch.\n  expected: ${JSON.stringify(t.expectedOutput)}\n  actual:   ${
+      `${state.jsCode}\n${prefix}: output mismatch.\n  expected: ${JSON.stringify(t.expectedOutput)}\n  actual:   ${
         JSON.stringify(output)
       }`,
     )

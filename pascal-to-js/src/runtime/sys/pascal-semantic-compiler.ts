@@ -2,38 +2,177 @@ import type { JsCompiler, SemanticCompiler } from '../../compiler/json-code-comp
 import * as JsonCode from '../../compiler/json-code.ts'
 import type { SyscallHandler } from '../runtime-type.ts'
 import {
-  createDefaultArray,
-  createDefaultRec,
   deepCopyValue,
-  getArrayElement,
-  PascalArray,
-  setArrayElement,
+  type DimsLink,
+  type PascalArray,
+  type PascalCell,
+  type PascalRecord,
+  type PascalSet,
 } from '../runtime-util.ts'
 import { type TypeDescriptor } from '../runtime-type.ts'
+
+function dimsToLink(dims: Array<{ low: number; high: number }> | undefined): DimsLink {
+  if (dims === undefined || dims.length === 0) {
+    return {
+      low: 0,
+      high: Number.MAX_VALUE,
+      deep: 0,
+    }
+  }
+  let current: DimsLink | undefined = undefined
+  for (let i = dims.length - 1; i >= 0; i--) {
+    const d = dims[i]
+    const deep: number = current ? current.deep + 1 : 0
+    current = {
+      ...d,
+      next: current,
+      deep: deep,
+    }
+  }
+  return current!
+}
+function flattenArrayType(type: TypeDescriptor): { dimsList: Array<{ low: number; high: number }>, elementType: TypeDescriptor } {
+  const dimsList: Array<{ low: number; high: number }> = [];
+  let current = type;
+  while (current.tag === 'array') {
+    if (current.dims) {
+      dimsList.push(...current.dims);
+    }
+    current = current.elem ?? { tag: 'void' };
+  }
+  return { dimsList, elementType: current };
+}
+
+export function createDefaultArray(typeDesc: TypeDescriptor): PascalArray {
+  const { dimsList, elementType } = flattenArrayType(typeDesc);
+  return {
+    kind: 'array',
+    value: {
+      array: [],
+      dims: dimsToLink(dimsList),
+      elementType: elementType,
+    },
+  };
+}
+
+function createDefaultElement(type: TypeDescriptor, require: boolean) {
+  switch (type.tag) {
+    case 'rec':
+      return createDefaultRec(type)
+    case 'array':
+      return createDefaultArray(type)
+    default:
+      if (require) {
+        throw new Error(`element of type ${type.tag} is not defined`)
+      } else {
+        return undefined
+      }
+  }
+}
+
+export function getArrayByIndex(array: PascalArray, indices: number[]): PascalArray {
+  let current = array;
+  for (let i = 0; i < indices.length - 1; i++) {
+    const index = indices[i];
+    const actualIndex = index - (current.value.dims?.low ?? 0);
+    const arr = current.value.array;
+    let element = arr[actualIndex];
+    if (element === undefined && current.value.dims?.next) {
+      // 创建下一维数组，继承父级的 elementType
+      const newArray: PascalArray = {
+        kind: 'array',
+        value: {
+          array: [],
+          dims: current.value.dims.next,
+          elementType: current.value.elementType, // 最终类型不变
+        },
+      };
+      arr[actualIndex] = newArray;
+      current = newArray;
+    } else {
+      current = element as PascalArray;
+    }
+  }
+  return current;
+}
+
+export function getArrayElement(array: PascalArray, indices: number[]) {
+  const pascalArray = getArrayByIndex(array, indices)
+  const lastIndex = indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
+  const element = pascalArray.value.array[lastIndex]
+  if (element === undefined) {
+    if (pascalArray.value.elementType) {
+      const defaultElement = createDefaultElement(pascalArray.value.elementType, true)
+      pascalArray.value.array[lastIndex] = defaultElement
+      return defaultElement
+    } else {
+      throw new Error(`array is not init at ${lastIndex}(${indices.at(-1)})`)
+    }
+  }
+  return element
+}
+
+export function setArrayElement(array: PascalArray, indices: number[], value: unknown): void {
+  const pascalArray = getArrayByIndex(array, indices)
+  const lastIndex =  indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
+  const jsArray: Array<unknown> = pascalArray.value.array
+  jsArray[lastIndex] = value
+}
+
+export function createDefaultRec(typeDesc: TypeDescriptor): PascalRecord {
+  const result: PascalRecord = {
+    kind: 'record',
+    value: {},
+  }
+  for (const { name, type } of typeDesc.fields ?? []) {
+    result.value[name] = createDefaultElement(type, false)
+  }
+  return result
+}
+
+function newPascalSet(set: Set<number>): PascalSet {
+  return {
+    kind: 'set',
+    value: set,
+  }
+}
+
+function unboxPascalSet(set: unknown): Set<number> {
+  return (set as PascalSet).value
+}
 
 export function basicSyscall(): Record<string, SyscallHandler> {
   return {
     // ---------- cell（var 参数传递）----------
-    'cell.create': (_ctx, [value]) => ({ v: value }),
-    'cell.get': (_ctx, [value]) => (value as { v: unknown }).v,
+    'cell.create': (_ctx, [value]): PascalCell => ({
+      kind: 'cell',
+      value: value,
+    }),
+    'cell.get': (_ctx, [value]) => (value as PascalCell).value,
     'cell.set': (_ctx, [left, right]) => {
-      ;(left as { v: unknown }).v = right
-      return undefined
+      ;(left as PascalCell).value = right
     },
 
     // ---------- array ----------
-    'array.get': (_ctx, args) => getArrayElement(args[0], args.slice(1)),
+    'array.get': (_ctx, args) => getArrayElement(args[0] as PascalArray, args.slice(1) as number[]),
     'array.set': (_ctx, args) => {
-      setArrayElement(args[0], args.slice(1, -1), args[args.length - 1])
+      setArrayElement(args[0] as PascalArray, args.slice(1, -1) as number[], args[args.length - 1])
     },
 
     // ---------- cast ----------
     'cast.char.to.i64': (_ctx, [value]) => (typeof value === 'string' ? value.charCodeAt(0) : value),
 
     // ---------- record ----------
-    'rec.field': (_ctx, [record, key]) => (record as Record<string, unknown>)[key as string],
-    'rec.set': (_ctx, [record, key, value]) => {
-      ;(record as Record<string, unknown>)[key as string] = value
+    'rec.field': (_ctx, [record, key]) => {
+      const element = (record as PascalRecord).value[key as string]
+      if (element === undefined) {
+        throw new Error(`get field ${key} not init`)
+      }
+      return element
+    },
+    'rec.set': (_ctx, [r, key, value]) => {
+      const record = r as PascalRecord
+      record.value[key as string] = value
     },
     'rec.copy': (_ctx, [value]) => deepCopyValue(value),
 
@@ -48,51 +187,63 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     // 在 JS 中变成 0-based 字符串索引，导致首字符丢失。
     // args = [low, high, str]；返回对象 {low:ch1, low+1:ch2, ..., high:' '}
     // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历。
-    'str.to.char.array': (_ctx, [l, _h, s]) => {
-      const pascalString = s as PascalArray<string>
+    'str.to.char.array': (_ctx, [l, h, s]) => {
+      const pascalString = s as PascalArray
       return {
-        array: pascalString.array,
-        low: l,
+        kind: 'array',
+        value: {
+          array: pascalString.value.array.join(''),
+          dims: {
+            low: l,
+            high: h,
+            deep: 0,
+          },
+          elementType: { tag: 'char' },
+        },
       }
     },
 
     // ---------- set ----------
-    'set.empty': (_ctx, _args) => new Set<number>(),
-    'set.union': (_ctx, [v1, v2]) => new Set<number>([...(v1 as Set<number>), ...(v2 as Set<number>)]),
-    'set.intersect': (_ctx, [set, value]) =>
-      new Set<number>([...(set as Set<number>)].filter((x) => (value as Set<number>).has(x))),
-    'set.diff': (_ctx, [set, value]) =>
-      new Set<number>([...(set as Set<number>)].filter((x) => !(value as Set<number>).has(x))),
+    'set.empty': (_ctx, _args): PascalSet => newPascalSet(new Set()),
+    'set.union': (_ctx, [v1, v2]): PascalSet => {
+      return newPascalSet(new Set<number>([...unboxPascalSet(v1), ...unboxPascalSet(v2)]))
+    },
+    'set.intersect': (_ctx, [set, other]) => {
+      const jsSet = unboxPascalSet(set)
+      return newPascalSet(new Set([...jsSet].filter((x) => unboxPascalSet(other).has(x))))
+    },
+    'set.diff': (_ctx, [set, other]) =>
+      newPascalSet(new Set([...(unboxPascalSet(set))].filter((x) => !(unboxPascalSet(other)).has(x)))),
     'set.eq': (_ctx, [left, right]) =>
-      (left as Set<number>).size === (right as Set<number>).size &&
-      [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+      (unboxPascalSet(left)).size === (unboxPascalSet(right)).size &&
+      [...unboxPascalSet(left)].every((x: number) => (unboxPascalSet(right)).has(x)),
     'set.ne': (_ctx, [left, right]) =>
-      !((left as Set<number>).size === (right as Set<number>).size &&
-        [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x))),
-    'set.le': (_ctx, [left, right]) => [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
-    'set.ge': (_ctx, [left, right]) => [...(left as Set<number>)].every((x: number) => (right as Set<number>).has(x)),
+      !((unboxPascalSet(left)).size === (unboxPascalSet(right)).size &&
+        [...(unboxPascalSet(left))].every((x: number) => (unboxPascalSet(right)).has(x))),
+    'set.le': (_ctx, [left, right]) => [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x)),
+    'set.ge': (_ctx, [left, right]) => [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x)),
     'set.range': (_ctx, [start, end]) => {
       const s = new Set<number>()
       for (let i = start as number; i <= (end as number); i++) {
         s.add(i)
       }
-      return s
+      return newPascalSet(s)
     },
-    'set.elem': (_ctx, [value]) => new Set<number>([value as number]),
+    'set.elem': (_ctx, [value]) => newPascalSet(new Set<number>([value as number])),
     'set.literal': (_ctx, args) => {
       const s = new Set<number>()
       for (const e of args) {
-        if (e instanceof Set) {
-          for (const x of e) {
+        if (Number.isSafeInteger(e)) {
+          s.add(e as number)
+        } else {
+          for (const x of (e as PascalSet).value) {
             s.add(x as number)
           }
-        } else {
-          s.add(e as number)
         }
       }
-      return s
+      return newPascalSet(s)
     },
-    'set.in': (_ctx, [value, set]) => (set as Set<number>).has(value as number),
+    'set.in': (_ctx, [value, set]) => (unboxPascalSet(set)).has(value as number),
 
     // ---------- steps.check（循环步数限制）----------
     'steps.check': (ctx, _args) => {
@@ -121,8 +272,21 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return literal.arg // 浮点字符串，直接作为 JS 数字
       case 'bool':
         return literal.arg // 'true' 或 'false'
-      case 'str':
-        return JSON.stringify({ array: literal.arg.split(''), low: 0 })
+      case 'str': {
+        const pascalString: PascalArray = {
+          kind: 'array',
+          value: {
+            array: literal.arg.split(''),
+            dims: {
+              low: 0,
+              high: literal.arg.length,
+              deep: 0,
+            },
+          },
+        }
+        return JSON.stringify(pascalString)
+      }
+
       case 'char':
         return JSON.stringify(literal.arg)
       case 'null':
@@ -245,39 +409,19 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return `(${args[0]} ? 1 : 0)`
       case 'cast.i64.to.char':
         return `String.fromCharCode(${args[0]})`
-      // rec.field: args = [obj, fieldName] → obj[fieldName]
-      case 'rec.field':
-        return `(${args[0]}[${args[1]}])`
-      // rec.set: args = [obj, fieldName, val] → obj[fieldName] = val
-      case 'rec.set':
-        return `(${args[0]}[${args[1]}] = ${args[2]})`
-      // cell.create: args = [val] → {v: val}
-      case 'cell.create':
-        return `({v: ${args[0]}})`
-      // cell.get: args = [cell] → cell.v
-      case 'cell.get':
-        return `(${args[0]}.v)`
-      // cell.set: args = [cell, val] → cell.v = val
-      case 'cell.set':
-        return `(${args[0]}.v = ${args[1]})`
       // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
       case 'ptr.deref':
         return `(() => { const __p = ${
           args[0]
-        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); return __p.v; })()`
+        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); return __p.value; })()`
       // p^ := x — nil 解引用是 error
       case 'ptr.assign':
         return `(() => { const __p = ${
           args[0]
-        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.v = ${args[1]}; })()`
+        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.value = ${args[1]}; })()`
       // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
       case 'ptr.dispose.check':
         return `(() => { if (${args[0]} === null) throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)'); })()`
-
-      // io.break: 空操作
-      case 'io.break':
-        return `undefined`
-
       default:
         // 走 dispatcher
         return `__sys(${JSON.stringify(key)}, [${args.join(', ')}])`

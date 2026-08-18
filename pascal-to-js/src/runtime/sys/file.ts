@@ -29,7 +29,6 @@ import type { PascalFile } from '@/runtime/file-model.ts'
 import type { RuntimeContext, SyscallHandler, TypeDescriptor } from '../runtime-type.ts'
 import {
   appendFileBytes,
-  createDefaultRec,
   createFileBuffer,
   deepCopyValue,
   fileBufferView,
@@ -58,7 +57,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       writeBytes(ctx, file as PascalFile, encodeUtf8(value as string))
     },
     'io.write.str.file': (ctx, [file, value]) => {
-      const charArray = value as PascalArray<string>
+      const charArray = value as PascalArray
       writeBytes(ctx, file as PascalFile, encodeUtf8(getPascalStringValue(charArray)))
     },
     // ---------- program（program 头文件参数运行期查表）----------
@@ -92,7 +91,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
     'io.write.str.fmt.file': (ctx, [file, value, width]) => {
-      const str = getPascalStringValue(value as PascalArray<string>)
+      const str = getPascalStringValue(value as PascalArray)
       writeBytes(ctx, file as PascalFile, encodeUtf8(formatField(str, width as number)))
       return undefined
     },
@@ -234,7 +233,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
         throw new Error('file.rec.peek: file is undefined')
       }
       if (f.recBuffer === undefined) {
-        f.recBuffer = f.recTypeDesc ? createDefaultRec(f.recTypeDesc as TypeDescriptor) : {}
+        f.recBuffer = { kind: 'record', value: {} }
       }
       // 返回缓冲区本身（非拷贝），使 f^.field := x 能修改缓冲区。
       // 整记录读 r := f^ 的值拷贝语义由 compiler 的 rec.copy 包装保证。
@@ -493,7 +492,12 @@ function rewriteRecFile(ctx: RuntimeContext, f: PascalFile, typeDesc?: TypeDescr
   f.writable = true
   f.eof = true
 }
-
+function createDefaultRec(f: TypeDescriptor) {
+  return {
+    kind: 'record',
+    value: {},
+  }
+}
 // ============================================================
 // UTF-8 编解码辅助
 // ============================================================
