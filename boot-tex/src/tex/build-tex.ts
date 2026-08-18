@@ -1,10 +1,10 @@
 import {
   ExtraCallable,
-  type PascalFile,
+  getPascalStringValue,
   type PascalArray,
+  type PascalFile,
   SyscallHandler,
   transform,
-  getPascalStringValue,
 } from '@jitex/pascal-to-js'
 // noinspection SpellCheckingInspection
 const texExtraCallables: Record<string, ExtraCallable> = {
@@ -33,14 +33,14 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.erStat': () => 0,
   'file.rewrite': (_ctx, [f, name]) => {
     const file = f as PascalFile
-    file.url = getPascalStringValue((name as PascalArray<string>))
+    file.url = getPascalStringValue(name as PascalArray<string>)
     file.offset = 0
     file.writable = true
     file.eof = false
   },
   'file.reset': (_ctx, [f, name]) => {
     const file = f as PascalFile
-    const url = getPascalStringValue((name as PascalArray<string>))
+    const url = getPascalStringValue(name as PascalArray<string>)
     file.url = url
     file.eof = false
     file.writable = true

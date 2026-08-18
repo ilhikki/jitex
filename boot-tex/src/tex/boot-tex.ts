@@ -71,7 +71,7 @@ export default suite('boot tex', () => {
 
     for (const [key, value] of state.files) {
       log(`fileName = ${key} length = ${value.length}`)
-      attach(key.replaceAll(":", "."), value)
+      attach(key.replaceAll(':', '.'), value)
     }
     attachText('output.log', state.outputBuffer.join('\n'))
     attachText('debug.log', state.debugLog.join('\n'))
