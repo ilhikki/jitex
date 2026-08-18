@@ -154,8 +154,8 @@ function typeSuffix(ti: TypeInfo): string {
  * ISO 7185 6.4.3.5: file-type = 'file' 'of' component-type
  */
 function isRecordFile(fileType: TypeInfo): boolean {
-  const elemTi = fileType.fileElem ?? null
-  return elemTi !== null && elemTi.tag === 'rec'
+  const elemTi = fileType.fileElem ?? undefined
+  return elemTi !== undefined && elemTi.tag === 'rec'
 }
 const syscallKeys = {
   // mem
@@ -672,7 +672,7 @@ function compileAssignment(
       // subrange 运行时边界检查
       const rangeCheck = ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
         ? evalStmt(syscall(syscallKeys.rangeCheck, [ref(sym.varId), litInt(ti.low), litInt(ti.high)]))
-        : null
+        : undefined
       if (sym.isVarParam) {
         const stmts: JsonCode.Statement[] = [evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), value]))]
         if (rangeCheck) {
@@ -1111,7 +1111,7 @@ function compileUserCallStmt(
   const info = a.funcInfo(funcId)
   const out: JsonCode.Statement[] = []
   const argExprs: JsonCode.Expr[] = []
-  const cellVars: { argIdx: number; cellVar: number; targetIsVar: IdentifierNode | null }[] = []
+  const cellVars: { argIdx: number; cellVar: number; targetIsVar: IdentifierNode | undefined }[] = []
 
   for (let i = 0; i < args.length; i++) {
     const param = info.params[i]
@@ -1173,7 +1173,7 @@ function compileWriteln(
   const out: JsonCode.Statement[] = []
 
   // 检查第一个参数是否是文件
-  let fileExpr: JsonCode.Expr | null = null
+  let fileExpr: JsonCode.Expr | undefined = undefined
   let argStart = 0
   if (args.length > 0) {
     const firstTi = a.typeOf(args[0])
@@ -1189,8 +1189,8 @@ function compileWriteln(
     // parser 把 x:w 解析为 BinaryExpression(operator: ':', left: x, right: w)
     // x:w:p 解析为 BinaryExpression(':', BinaryExpression(':', x, w), p)
     let valueNode: ExpressionNode = arg
-    let widthExpr: JsonCode.Expr | null = null
-    let precExpr: JsonCode.Expr | null = null
+    let widthExpr: JsonCode.Expr | undefined = undefined
+    let precExpr: JsonCode.Expr | undefined = undefined
     if (arg.kind === 'BinaryExpression' && (arg as BinaryExpressionNode).operator === ':') {
       const outer = arg as BinaryExpressionNode
       // outer.right 是最外层的 precision（或 width）
@@ -1214,15 +1214,15 @@ function compileWriteln(
     const valExpr = compileExpr(valueNode, a, ws)
     const suffix = typeSuffix(ti)
 
-    if (widthExpr !== null) {
+    if (widthExpr !== undefined) {
       // 带格式化的写入：io.write.{suffix}.fmt [value, width, precision?]
       const fmtArgs = fileExpr
         ? [fileExpr, valExpr, widthExpr, ...(precExpr ? [precExpr] : [])]
         : [valExpr, widthExpr, ...(precExpr ? [precExpr] : [])]
-      out.push(evalStmt(ioWriteSyscall(suffix, fileExpr !== null, true, fmtArgs)))
+      out.push(evalStmt(ioWriteSyscall(suffix, fileExpr !== undefined, true, fmtArgs)))
     } else {
       const callArgs = fileExpr ? [fileExpr, valExpr] : [valExpr]
-      out.push(evalStmt(ioWriteSyscall(suffix, fileExpr !== null, false, callArgs)))
+      out.push(evalStmt(ioWriteSyscall(suffix, fileExpr !== undefined, false, callArgs)))
     }
   }
 
@@ -1250,7 +1250,7 @@ function compileReadln(
   const out: JsonCode.Statement[] = []
 
   // 检查第一个参数是否是文件
-  let fileExpr: JsonCode.Expr | null = null
+  let fileExpr: JsonCode.Expr | undefined = undefined
   let argStart = 0
   if (args.length > 0) {
     const firstTi = a.typeOf(args[0])
@@ -1272,7 +1272,7 @@ function compileReadln(
     const ti = sym.typeInfo
     const suffix = typeSuffix(ti)
     const readArgs = fileExpr ? [fileExpr] : []
-    const valExpr = ioReadSyscall(suffix, fileExpr !== null, readArgs)
+    const valExpr = ioReadSyscall(suffix, fileExpr !== undefined, readArgs)
 
     if (sym.isVarParam) {
       out.push(evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), valExpr])))
