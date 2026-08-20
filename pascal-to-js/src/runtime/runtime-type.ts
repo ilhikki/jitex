@@ -22,10 +22,7 @@ export interface ReadState {
 }
 
 export interface RuntimeContext {
-  outputBuffer: string[]
-  inputQueue: string[]
   files: Map<string, PascalFileStore>
-  readState: ReadState
   steps: number
   maxSteps: number
   programFileUrls: Record<string, string>
@@ -40,7 +37,6 @@ export interface RuntimeContext {
 }
 
 export interface RuntimeOptions {
-  input?: string[]
   files?: Map<string, PascalFileStore>
   programFileUrls?: Record<string, string>
   maxSteps?: number

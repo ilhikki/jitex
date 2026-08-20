@@ -18,7 +18,7 @@ import type { RunState } from '@jitex/pascal-to-js'
 import type { ExtraCallable } from '@jitex/pascal-to-js'
 import type { PascalFileStore, SyscallHandler } from '@jitex/pascal-to-js'
 import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
-import { MemoryTextFile, RecordFile } from '@jitex/pascal-to-js'
+import { encodeUtf8, MemoryTextFile, RecordFile } from '@jitex/pascal-to-js'
 export { assert, assertEquals, describe, it, test }
 
 /** 非标扩展标识符（保留用于类型标注，实际为 string） */
@@ -59,7 +59,7 @@ export interface PascalTest {
   expectedError?: string
 
   /** 模拟输入（按行），供 readln/read 使用 */
-  input?: string[]
+  input?: string
 
   /** 非标扩展列表，如 ['string', 'allowUndeclaredLabels'] */
   extensions?: Extension[]
@@ -81,15 +81,25 @@ export interface PascalTest {
   /** 最大执行步数（覆盖默认 1e9，用于测试死循环场景） */
   maxSteps?: number
 }
-
+function newTextFileWithMode(mode: 'inspection' | 'generation', text: string | undefined = undefined) {
+  let initArray = undefined
+  if (text) {
+    initArray = encodeUtf8(text)
+  }
+  const store = new MemoryTextFile(initArray)
+  store.setMode(mode)
+  return store
+}
 /** 执行单个测试用例，返回 RunState */
 export function runPascal(t: PascalTest): RunState {
   const files = new Map<string, PascalFileStore>()
+  const input = newTextFileWithMode('inspection', t.input)
+  files.set('INPUT', input)
+  files.set('OUTPUT', newTextFileWithMode('generation'))
   t.textFiles?.entries()?.forEach(([key, value]) => files.set(key, new MemoryTextFile(value)))
   t.recordFiles?.entries()?.forEach(([key, value]) => files.set(key, value))
 
   return run(t.code, {
-    input: t.input,
     files: files,
     programFileUrls: t.programFileUrls,
     maxSteps: t.maxSteps ?? 1e5,
@@ -97,11 +107,6 @@ export function runPascal(t: PascalTest): RunState {
     extraCallables: t.extraCallables,
     extraSyscalls: t.extraSyscalls,
   })
-}
-
-/** 从 RunState 提取完整输出字符串 */
-export function getOutput(state: RunState): string {
-  return state.outputBuffer.join('')
 }
 
 /** 批量注册 PascalTest 为独立的 Deno.test 用例 */
@@ -113,7 +118,7 @@ export function runPascalTests(tests: PascalTest[]) {
 
 export function runPascalTest(t: PascalTest): void {
   const state = runPascal(t)
-  const output = getOutput(state)
+  const output = (state.files.get('OUTPUT')! as MemoryTextFile).getContent()
   const prefix = `[${t.name}] ${t.purpose}`
 
   // 1. 预期错误
@@ -152,9 +157,9 @@ export function runPascalTest(t: PascalTest): void {
   if (t.expectedContains !== undefined) {
     assert(
       output.includes(t.expectedContains),
-      `${prefix}: expected output to contain ${JSON.stringify(t.expectedContains)}.\n  actual output: ${
-        JSON.stringify(output)
-      }`,
+      `${state.jsCode}\n${prefix}: expected output to contain ${
+        JSON.stringify(t.expectedContains)
+      }.\n  actual output: ${JSON.stringify(output)}`,
     )
   }
   if (t.expectedNotContains !== undefined) {

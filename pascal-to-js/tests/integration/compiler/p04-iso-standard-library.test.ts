@@ -407,7 +407,6 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.6.5 eof: 正向 - 无参数默认对 input',
       code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOF THEN WRITE('INPUT_EOF');END.`,
       purpose: 'ISO 6.6.6.5 eof: "If parameter omitted, applies to input"',
-      input: [],
       expectedContains: 'INPUT_EOF',
     },
 
@@ -415,7 +414,6 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.6.5 eoln: 正向 - 无参数默认对 input',
       code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOLN THEN WRITE('INPUT_EOLN');END.`,
       purpose: 'ISO 6.6.6.5 eoln: "If parameter omitted, applies to input"',
-      input: [],
       expectedContains: 'INPUT_EOLN',
     },
   ]

@@ -7,8 +7,6 @@ export interface RunError {
 
 export interface RunState {
   status: 'running' | 'terminated' | 'error'
-  outputBuffer: string[]
-  inputQueue: string[]
   steps: number
   error: RunError | null
   jsCode: string | undefined

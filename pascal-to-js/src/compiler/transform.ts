@@ -145,7 +145,6 @@ function reportErrorAsState(e: unknown, ctx: RuntimeContext) {
 
 function getRunTimeContextFromOptions(options: RuntimeOptions) {
   const ctx = createRuntimeContext({
-    input: options.input,
     files: options.files,
     programFileUrls: options.programFileUrls,
     maxSteps: options.maxSteps,

@@ -147,7 +147,7 @@ const inputOutputParamsTests: PascalTest[] = [
     name: '§6.10 input/output 作为 program 头参数：首次访问时为 reset/rewrite 状态',
     code: `PROGRAM ECHO(INPUT,OUTPUT);VAR S:INTEGER;BEGIN READ(S);WRITELN(S*2);END.`,
     purpose: 'ISO §6.10: input/output 列为 program-parameters，首次访问无需显式 RESET/REWRITE',
-    input: ['21'],
+    input: '21',
     expectedOutput: '42\n',
   },
 
@@ -162,7 +162,7 @@ const inputOutputParamsTests: PascalTest[] = [
     name: '§6.10 仅 input 作为参数：输入仍可用',
     code: `PROGRAM ONLYIN(INPUT);VAR X:INTEGER;BEGIN READ(X);END.`,
     purpose: 'ISO §6.10: 仅 input 在参数列表中也能正常 read；不输出即不报错',
-    input: ['3'],
+    input: '3',
   },
 ]
 

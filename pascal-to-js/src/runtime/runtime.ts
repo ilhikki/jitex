@@ -16,16 +16,12 @@
 
 import type { RunError, RunState } from './run-state.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
-import { ioSyscalls } from './sys/io.ts'
 import { fileSyscalls } from './sys/file.ts'
 import { basicSyscall } from './sys/pascal-semantic-compiler.ts'
 
 export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeContext {
   return {
-    outputBuffer: [],
-    inputQueue: options.input ? [...options.input] : [],
     files: options?.files ?? new Map(),
-    readState: { tokens: [], tokenIdx: 0 },
     steps: 0,
     maxSteps: options.maxSteps ?? Infinity,
     programFileUrls: options.programFileUrls ?? {},
@@ -42,8 +38,6 @@ export function toRunState(
 ): RunState {
   return {
     status,
-    outputBuffer: ctx.outputBuffer,
-    inputQueue: ctx.inputQueue,
     steps: ctx.steps,
     error: error ?? null,
     jsCode: ctx.jsCode,
@@ -57,7 +51,7 @@ export function toRunState(
 // ============================================================
 
 function getDefaultSyscalls(): Record<string, SyscallHandler> {
-  return { ...basicSyscall(), ...ioSyscalls(), ...fileSyscalls() }
+  return { ...basicSyscall(), ...fileSyscalls() }
 }
 
 export function createDispatcher(

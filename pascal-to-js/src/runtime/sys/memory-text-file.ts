@@ -16,14 +16,14 @@ export class MemoryTextFile implements TextFile {
   constructor(initialData: Uint8Array | undefined = undefined) {
     const cap = Math.max(MemoryTextFile.INITIAL_CAPACITY, initialData?.length ?? 0)
     this.buffer = new Uint8Array(cap)
+    this.mode = 'inspection'
+    this.pos = 0
     if (initialData !== undefined) {
-      this.buffer.set(initialData)
       this.length = initialData.length
+      this.buffer.set(initialData)
     } else {
       this.length = 0
     }
-    this.pos = 0
-    this.mode = 'inspection'
   }
 
   /**

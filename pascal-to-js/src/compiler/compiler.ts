@@ -215,7 +215,7 @@ const syscallKeys = {
   ioEof: 'io.eof',
   ioEoln: 'io.eoln',
   ioWritelnFile: 'io.writeln.file',
-  ioWritelnEol: 'io.writeln.eol',
+  ioWriteln: 'io.writeln',
   ioReadlnSkipFile: 'io.readln.skip.file',
   ioReadlnSkip: 'io.readln.skip',
   // io.write.${suffix}
@@ -1230,7 +1230,7 @@ function compileWriteln(
     if (fileExpr) {
       out.push(evalStmt(syscall(syscallKeys.ioWritelnFile, [fileExpr])))
     } else {
-      out.push(evalStmt(syscall(syscallKeys.ioWritelnEol, [])))
+      out.push(evalStmt(syscall(syscallKeys.ioWriteln, [])))
     }
   }
 

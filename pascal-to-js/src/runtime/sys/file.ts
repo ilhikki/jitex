@@ -1,6 +1,7 @@
 import {
   createDefaultRec,
   deepCopyValue,
+  encodeUtf8,
   formatField,
   formatReal,
   getPascalStringValue,
@@ -10,6 +11,7 @@ import {
   PascalFile,
   PascalRecord,
   RecordFile,
+  RuntimeContext,
   SyscallHandler,
   TextFile,
   type TypeDescriptor,
@@ -54,6 +56,33 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
+    'io.write.i64': (ctx, [value]) => {
+      const f = getOutput(ctx)
+      f.writeBytes(encodeUtf8(String(value)))
+      return undefined
+    },
+    'io.write.f64': (ctx, [value]) => {
+      const f = getOutput(ctx)
+      f.writeBytes(encodeUtf8(formatReal(value as number)))
+      return undefined
+    },
+    'io.write.bool': (ctx, [value]) => {
+      const f = getOutput(ctx)
+      f.writeBytes(encodeUtf8(value ? 'TRUE' : 'FALSE'))
+      return undefined
+    },
+    'io.write.char': (ctx, [value]) => {
+      const f = getOutput(ctx)
+      f.writeBytes(encodeUtf8(value as string))
+      return undefined
+    },
+    'io.write.str': (ctx, [value]) => {
+      const f = getOutput(ctx)
+      const charArray = value as PascalArray
+      f.writeBytes(encodeUtf8(getPascalStringValue(charArray)))
+      return undefined
+    },
+
     // ---------- io.write.fmt.file（带文本文件 + 格式化）----------
     'io.write.i64.fmt.file': (_ctx, [file, value, width]) => {
       const f = ensureTextFile(file as PascalFile)
@@ -85,9 +114,44 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    'io.writeln.file': (_ctx, [file]) => {
+    'io.writeln.file': (_ctx, [file, str]) => {
       const f = ensureTextFile(file as PascalFile)
       f.value!.writeByte(10) // '\n'
+      return undefined
+    },
+    'io.writeln': (ctx, []) => {
+      const f = getOutput(ctx)
+      f.writeByte(10) // '\n'
+      return undefined
+    },
+
+    'io.write.i64.fmt': (ctx, [value, width]) => {
+      const f = getOutput(ctx)
+      f.writeBytes(encodeUtf8(formatField(String(value), width as number)))
+      return undefined
+    },
+    'io.write.f64.fmt': (ctx, [value, width, precision]) => {
+      const f = getOutput(ctx)
+      const formatted = precision !== undefined
+        ? (value as number).toFixed(precision as number)
+        : formatReal(value as number)
+      f.writeBytes(encodeUtf8(formatField(formatted, width as number)))
+      return undefined
+    },
+    'io.write.bool.fmt': (ctx, [value, width]) => {
+      const f = getOutput(ctx)
+      f.writeBytes(encodeUtf8(formatField(value ? 'TRUE' : 'FALSE', width as number)))
+      return undefined
+    },
+    'io.write.char.fmt': (ctx, [value, width]) => {
+      const f = getOutput(ctx)
+      f.writeBytes(encodeUtf8(formatField(value as string, width as number)))
+      return undefined
+    },
+    'io.write.str.fmt': (ctx, [value, width]) => {
+      const f = getOutput(ctx)
+      const str = getPascalStringValue(value as PascalArray)
+      f.writeBytes(encodeUtf8(formatField(str, width as number)))
       return undefined
     },
 
@@ -113,10 +177,29 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return readFileStr(f.value!)
     },
 
+    'io.read.i64': (ctx) => {
+      const f = getInput(ctx)
+      return readFileInt(f)
+    },
+    'io.read.f64': (ctx) => {
+      const f = getInput(ctx)
+      return readFileReal(f)
+    },
+    'io.read.bool': (ctx) => {
+      const f = getInput(ctx)
+      return readFileBool(f)
+    },
+    'io.read.char': (ctx) => {
+      const f = getInput(ctx)
+      return readFileChar(f)
+    },
+    'io.read.str': (ctx) => {
+      const f = getInput(ctx)
+      return readFileStr(f)
+    },
+
     // ---------- io.readln.skip（无文件 / 带文本文件）----------
     'io.readln.skip': (ctx) => {
-      ctx.readState.tokens = []
-      ctx.readState.tokenIdx = 0
       return undefined
     },
     'io.readln.skip.file': (_ctx, [file]) => {
@@ -128,9 +211,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     'io.page': (ctx, [file]) => {
       if (file !== undefined) {
         const f = ensureTextFile(file as PascalFile)
-        f.value!.writeByte(12) // '\f'
+        f.value!.writeByte(12)
       } else {
-        ctx.outputBuffer.push('\f')
+        getOutput(ctx).writeByte(12)
       }
       return undefined
     },
@@ -193,8 +276,23 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       const f = ensureTextFile(file as PascalFile)
       return !f.value!.hasMore()
     },
+
     'file.eoln': (_ctx, [file]) => {
       const byte = ensureTextFile(file as PascalFile).value.peekByte()
+      return byte === 10 || byte === 13
+    },
+
+    'io.eof': (ctx) => {
+      const f = getInput(ctx)
+      return !f.hasMore()
+    },
+
+    'io.eoln': (ctx) => {
+      const store = getInput(ctx)
+      if (!store.hasMore()) {
+        return true
+      }
+      const byte = store.peekByte()
       return byte === 10 || byte === 13
     },
 
@@ -273,6 +371,21 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
 // ============================================================
 // 辅助：类型守卫（仅在运行时检查，确保类型匹配）
 // ============================================================
+function getInput(ctx: RuntimeContext) {
+  const input = ctx.files.get('INPUT')
+  if (input === undefined) {
+    throw new Error('OUTPUT not defined')
+  }
+  return input as TextFile
+}
+
+function getOutput(ctx: RuntimeContext) {
+  const output = ctx.files.get('OUTPUT')
+  if (output === undefined) {
+    throw new Error('OUTPUT not defined')
+  }
+  return output as TextFile
+}
 
 function ensureTextFile(f: PascalFile): PascalFile & { value: TextFile } {
   if (!f.value) {
@@ -288,9 +401,6 @@ function ensureRecordFile(f: PascalFile): PascalFile & { value: RecordFile } {
   }
   // 假定调用方传入的是 RecordFile，不做类型检查（由外部保证）
   return f as PascalFile & { value: RecordFile }
-}
-function encodeUtf8(s: string): Uint8Array {
-  return new TextEncoder().encode(s)
 }
 
 /**

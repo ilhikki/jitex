@@ -438,7 +438,7 @@ begin
   writeln(r:0:2);
 end.`,
       purpose: 'readln 读取 integer 和 real 混合',
-      input: ['10 3.14'],
+      input: '10\n3.14',
       expectedContains: '10\n3.14',
     },
     {
@@ -450,7 +450,7 @@ begin
   writeln(i);
 end.`,
       purpose: 'readln 空行输入（默认值）',
-      input: [''],
+      input: '',
       expectedContains: '0',
     },
     {
@@ -464,7 +464,7 @@ begin
   writeln(a + b + c);
 end.`,
       purpose: 'readln 多行输入',
-      input: ['10', '20', '30'],
+      input: '10\n20\n30',
       expectedContains: '60',
     },
     {
@@ -480,7 +480,7 @@ begin
   writeln('EOF reached');
 end.`,
       purpose: 'eof 在输入结束时为 true',
-      input: ['1', '2', '3'],
+      input: '1\n2\n3',
       expectedContains: '1\n2\n3\nEOF reached',
     },
     {
