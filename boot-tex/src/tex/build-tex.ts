@@ -6,7 +6,8 @@ import {
   SyscallHandler,
   transform,
 } from '@jitex/pascal-to-js'
-// noinspection SpellCheckingInspection
+import { extraSyscalls } from '../utils.ts'
+
 const texExtraCallables: Record<string, ExtraCallable> = {
   'BREAK': {
     sysCallName: 'extra.break',
@@ -27,25 +28,12 @@ const texExtraCallables: Record<string, ExtraCallable> = {
 }
 
 export const texExtraSyscalls: Record<string, SyscallHandler> = {
-  'extra.break': () => undefined,
   'extra.close': () => undefined,
   'extra.breakIn': () => undefined,
   'extra.erStat': () => 0,
-  'file.rewrite': (_ctx, [f, name]) => {
-    const file = f as PascalFile
-    file.url = getPascalStringValue(name as PascalArray)
-    file.offset = 0
-    file.writable = true
-    file.eof = false
-  },
-  'file.reset': (_ctx, [f, name]) => {
-    const file = f as PascalFile
-    const url = getPascalStringValue(name as PascalArray)
-    file.url = url
-    file.eof = false
-    file.writable = true
-    file.offset = 0
-  },
+  'extra.break': extraSyscalls['extra.break'],
+  'file.reset': extraSyscalls['file.reset'],
+  'file.rewrite': extraSyscalls['file.rewrite'],
 }
 
 export function transformTex(texPascalContent: string) {

@@ -1,5 +1,5 @@
 import { assertEquals, attach, attachText, cache, log, stage, suite } from '@jitex/integration'
-import { runJs } from '@jitex/pascal-to-js'
+import { MemoryTextFile, PascalFileStore, runJs } from '@jitex/pascal-to-js'
 import { runTangleJs, runTanglePascal, transformTangle, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { readFile, readTextFile, stringToBytes } from '../utils.ts'
 import { texExtraSyscalls, transformTex } from './build-tex.ts'
@@ -21,13 +21,6 @@ export default suite('boot tex', () => {
     return jsCode
   })
 
-  // const getPas = cache(stage('tex.web => tex.pas', [getTangle], async ([tangleJs]) => {
-  //   const texWeb = await readTextFile('./resources/kunth/tex/tex.web')
-  //   const runTangleResult = validRunTangleResult(runTangleJs(tangleJs, texWeb))
-  //   attachText('tex.web', runTangleResult.pasFile)
-  //   attach('tex.pool', runTangleResult.poolFile)
-  //   return runTangleResult
-  // }))
 
   const getTripPas = cache(stage('tex.web => tex.trip.pas', [getTangle], async ([tangleJs]) => {
     const texWeb = await readTextFile('./resources/kunth/tex/tex.web')
@@ -58,22 +51,21 @@ export default suite('boot tex', () => {
     const tripTex = result[2].tripTex
     const tripTfm = result[2].tripTfm
 
-    const files = new Map<string, Uint8Array>()
-    files.set('trip.tex', tripTex)
-    files.set('TeXformats:TEX.POOL                     ', poolFile)
-    files.set('TeXfonts:trip.tfm', tripTfm)
-    files.set('TTY:', stringToBytes('trip'))
+    const files = new Map<string, PascalFileStore>()
+    files.set('trip.tex', new MemoryTextFile(tripTex))
+    files.set('trip.tex', new MemoryTextFile(tripTex))
+    files.set('TeXformats:TEX.POOL                     ', new MemoryTextFile(poolFile))
+    files.set('TeXfonts:trip.tfm', new MemoryTextFile(tripTfm))
+    files.set('TTY:', new MemoryTextFile(stringToBytes('trip')))
     const state = runJs(tripJs, {
-      input: ['trip'],
       files: files,
       extraSyscalls: texExtraSyscalls,
     })
 
     for (const [key, value] of state.files) {
       log(`fileName = ${key} length = ${value.length}`)
-      attach(key.replaceAll(':', '.'), value)
+      attach(key.replaceAll(':', '.').replaceAll(' ', ""), (value as MemoryTextFile).getData())
     }
-    attachText('output.log', state.outputBuffer.join('\n'))
     attachText('debug.log', state.debugLog.join('\n'))
     assertEquals(state.status, 'terminated')
   })

@@ -72,7 +72,7 @@ export function basicSyscall(): Record<string, SyscallHandler> {
       return {
         kind: 'array',
         value: {
-          array: pascalString.value.array.join(''),
+          array: pascalString.value.array,
           dims: {
             low: l,
             high: h,

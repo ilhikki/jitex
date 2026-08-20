@@ -19,7 +19,6 @@ export { parseExpression, parseExpressionList, parseIdentifier } from './parser/
 export { parseCompoundStatement, parseStatement } from './parser/statements.ts'
 export { parseType, parseVariableDeclaration } from './parser/types.ts'
 export * from './parser/helpers.ts'
-export type { PascalFile } from './runtime/file-model.ts'
 // ==========================================================================
 // AST
 // ==========================================================================

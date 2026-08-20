@@ -1,4 +1,5 @@
 import type { TextFile } from '../runtime-type.ts'
+import { bytesToString } from '../runtime-util.ts'
 
 /**
  * 纯内存文本文件实现。
@@ -122,6 +123,7 @@ export class MemoryTextFile implements TextFile {
 
   /** 获取内容字符串（方便调试） */
   getContent(): string {
-    return new TextDecoder().decode(this.buffer.slice(0, this.length))
+    return bytesToString(this.getData())
   }
+
 }

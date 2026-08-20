@@ -161,7 +161,15 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
     const dispatcher = createDispatcher(options.extraSyscalls ?? {})
     const __sys = (key: string, args: unknown[]): unknown => {
       if (key.startsWith('io.') || key.startsWith('file.') || key.startsWith('extra.')) {
-        ctx.debugLog.push(`[${key}] ${JSON.stringify(args)}`)
+        ctx.debugLog.push(`[${key}] ${
+          JSON.stringify(args, (key, value) => {
+            if (ArrayBuffer.isView(value)) {
+              return undefined
+            }
+            return value
+          })
+        }`)
+
         if (ctx.debugLog.length >= 3000) {
           ctx.debugLog = ctx.debugLog.slice(2000)
         }

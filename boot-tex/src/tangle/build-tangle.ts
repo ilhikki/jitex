@@ -1,5 +1,16 @@
-import { bytesToString, stringToBytes } from '../utils.ts'
-import { ExtraCallable, runJs, RunState, SyscallHandler, transform } from '@jitex/pascal-to-js'
+import { bytesToString, extraSyscalls, stringToBytes } from '../utils.ts'
+import {
+  ExtraCallable,
+  getPascalStringValue,
+  MemoryTextFile,
+  PascalArray,
+  PascalFile,
+  PascalFileStore,
+  runJs,
+  RunState,
+  SyscallHandler,
+  transform,
+} from '@jitex/pascal-to-js'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
 // noinspection SpellCheckingInspection
@@ -17,8 +28,9 @@ const tangleExtraCallables: Record<string, ExtraCallable> = {
 }
 
 const tangleExtraSyscalls: Record<string, SyscallHandler> = {
-  'extra.break': () => {
-  },
+  'extra.break': extraSyscalls['extra.break'],
+  'file.reset': extraSyscalls['file.reset'],
+  'file.rewrite': extraSyscalls['file.rewrite'],
 }
 
 export type TangleInput = {
@@ -35,13 +47,15 @@ export type RunTangleResult = {
   pasFile: string
   poolFile: Uint8Array
   debugLog: string[]
+  output: string
 }
 
 export function validRunTangleResult(result: RunTangleResult): TangleOutput {
-  const { state, pasFile, poolFile, debugLog } = result
+  const { state, pasFile, poolFile, debugLog, output } = result
   log(`state.status = ${state.status}`)
   log(`state.steps = ${state.steps}`)
   attachText('debugLog.log', debugLog.join('\n'))
+  attachText('output.txt', output)
   if (state.jsCode) {
     attachText('tangle.js', state.jsCode)
   } else {
@@ -49,7 +63,9 @@ export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   }
   attachText('result.pas', pasFile)
   attach('pool.bin', poolFile)
-
+  if (state.error) {
+    console.error(state.error)
+  }
   assertEquals(state.status, 'terminated')
   return { pasFile, poolFile }
 }
@@ -75,14 +91,21 @@ export function runTangleJs(
   webContent: string,
   changeContent: string | undefined = undefined,
 ): RunTangleResult {
-  const files = new Map<string, Uint8Array>()
-  files.set(fileNames.webFile, stringToBytes(webContent))
+  const files = new Map<string, PascalFileStore>()
+  files.set(fileNames.webFile, new MemoryTextFile(stringToBytes(webContent)))
   if (changeContent) {
     const changeBytes = stringToBytes(changeContent)
-    files.set(fileNames.changeFile, changeBytes)
+    files.set(fileNames.changeFile, new MemoryTextFile(changeBytes))
   }
-  files.set(fileNames.pascalFile, new Uint8Array())
-  files.set(fileNames.pool, new Uint8Array())
+  const pascalFile = new MemoryTextFile()
+  pascalFile.setMode('generation')
+  const output = new MemoryTextFile()
+  output.setMode('generation')
+  files.set('TTY:', output)
+  files.set(fileNames.pascalFile, pascalFile)
+  const poolFile = new MemoryTextFile()
+  poolFile.setMode('generation')
+  files.set(fileNames.pool, poolFile)
 
   const state = runJs(jsCode, {
     files,
@@ -90,12 +113,12 @@ export function runTangleJs(
     extraSyscalls: tangleExtraSyscalls,
   })
   const debugLog = state.debugLog
-  const pasFile = bytesToString(state.files.get(fileNames.pascalFile)!)
-  const poolFile = state.files.get(fileNames.pool)!
+  const pasFile = pascalFile.getContent()
   return {
+    output: output.getContent(),
     state,
     pasFile,
-    poolFile,
+    poolFile: poolFile.getData(),
     debugLog,
   }
 }

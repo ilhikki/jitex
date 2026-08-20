@@ -122,7 +122,7 @@ export interface DimsLink {
   deep: number
 }
 
-export type PascalObject = PascalArray | PascalRecord | PascalCell | PascalSet
+export type PascalObject = PascalArray | PascalRecord | PascalCell | PascalSet | PascalFile
 
 export type PascalArray = {
   kind: 'array'

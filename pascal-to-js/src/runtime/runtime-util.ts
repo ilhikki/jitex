@@ -1,7 +1,7 @@
 // ============================================================
 // 辅助函数：real 格式化
 
-import type { DimsLink, PascalArray, PascalRecord, TypeDescriptor } from '@/runtime/runtime-type.ts'
+import type { DimsLink, PascalArray, PascalFile, PascalRecord, TypeDescriptor } from '@/runtime/runtime-type.ts'
 
 // ============================================================
 export function formatReal(n: number): string {
@@ -130,6 +130,10 @@ function createDefaultElement(type: TypeDescriptor, require: boolean) {
       return createDefaultRec(type)
     case 'array':
       return createDefaultArray(type)
+    case 'subrange':
+      return type.low
+    case 'file':
+      return {kind: 'file', value: undefined} as PascalFile
     default:
       if (require) {
         throw new Error(`element of type ${type.tag} is not defined`)
@@ -201,4 +205,8 @@ export function createDefaultRec(typeDesc: TypeDescriptor): PascalRecord {
 
 export function encodeUtf8(s: string): Uint8Array {
   return new TextEncoder().encode(s)
+}
+
+export function bytesToString(bytes: Uint8Array):string{
+  return new TextDecoder().decode(bytes)
 }
