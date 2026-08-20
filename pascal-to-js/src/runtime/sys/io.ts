@@ -1,5 +1,5 @@
-import type { RuntimeContext, SyscallHandler } from '../runtime-type.ts'
-import { formatField, formatReal, PascalArray } from '../runtime-util.ts'
+import type { PascalArray, RuntimeContext, SyscallHandler } from '../runtime-type.ts'
+import { formatField, formatReal } from '../runtime-util.ts'
 
 const TRUE_STR = 'TRUE'
 const FALSE_STR = 'FALSE'

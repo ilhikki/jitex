@@ -111,7 +111,7 @@ end.`,
     },
     {
       name: 'rewrite creates file',
-      code: `program test;
+      code: `program test(f);
 var f: text;
 begin
   rewrite(f);
@@ -121,7 +121,7 @@ end.`,
     },
     {
       name: 'writeln to file',
-      code: `program test;
+      code: `program test(f);
 var f: text;
 begin
   rewrite(f);
@@ -211,7 +211,7 @@ end.`,
     },
     {
       name: 'file does not exist (mock IO does not simulate file errors)',
-      code: `program test;
+      code: `program test(f);
 var f: text;
 begin
   reset(f);
@@ -219,13 +219,14 @@ end.`,
       purpose: 'reset on file with no external association; mock IO does not simulate file-not-found errors',
     },
     {
-      name: 'file write error (mock IO does not simulate file errors)',
-      code: `program test;
+      name: 'file write error (mock IO does simulate file errors)',
+      code: `program test(f);
 var f: text;
 begin
   writeln(f, 'test');
 end.`,
-      purpose: 'writing to unopened file; mock IO does not simulate file-state errors',
+      purpose: 'writing to unopened file; mock IO does  simulate file-state errors',
+      expectedError: 'mode',
     },
     {
       name: 'large output',
@@ -353,7 +354,7 @@ end.`,
     },
     {
       name: 'file eof detection',
-      code: `program test;
+      code: `program test(f);
 var f: text;
 begin
   reset(f);
@@ -484,7 +485,7 @@ end.`,
     },
     {
       name: 'eoln-before-read',
-      code: `program test;
+      code: `program test(f);
 var f: text;
     c: char;
 begin
@@ -507,8 +508,8 @@ end.`,
       expectedContains: 'ab\ncd',
     },
     {
-      name: 'file-write-and-reset',
-      code: `program test;
+      name: 'file-write-and-reset(f)',
+      code: `program test(f);
 var f: text;
     s: char;
 begin
@@ -532,7 +533,7 @@ end.`,
     },
     {
       name: 'file-write-integer-and-read',
-      code: `program test;
+      code: `program test(f);
 var f: text;
     i, j: integer;
     s: char;

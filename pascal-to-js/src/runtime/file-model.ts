@@ -1,18 +1,3 @@
-/**
- * Pascal 文件模型（ISO 7185 6.4.3.5 / 6.6.5.2 / 6.10）。
- *
- * 设计原则（用户指示）：
- *   - 文件状态是句柄的一部分，不放在 ctx 中。
- *   - 底层存储用 bytes（ctx.files 的 value，FileBuffer，见 runtime-type.ts），不用 string 拼接。
- *
- * 一个 PascalFile 实例 = 一个文件句柄（file-variable 的运行时表示）。
- * reset/rewrite/get/put/read/write 等操作直接读写句柄上的状态字段，
- * 并把外部内容同步到 ctx.files.get(url)。
- *
- * file of record 的记录列表、缓冲区也作为句柄字段，避免引入额外的状态表。
- * recTypeDesc 用 unknown 避免 file-model ↔ runtime-type 循环依赖，
- * 实际类型为 TypeDescriptor（由 compiler 传入，runtime 消费）。
- */
 export interface PascalFile {
   /** 外部文件绑定名（ISO 6.10：impl-defined binding；本工程用 ctx.files 的 key） */
   url: string

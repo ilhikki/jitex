@@ -1,134 +1,14 @@
 import type { JsCompiler, SemanticCompiler } from '../../compiler/json-code-compiler.ts'
 import * as JsonCode from '../../compiler/json-code.ts'
-import type { SyscallHandler } from '../runtime-type.ts'
-import {
-  deepCopyValue,
-  type DimsLink,
-  type PascalArray,
-  type PascalCell,
-  type PascalRecord,
-  type PascalSet,
-} from '../runtime-util.ts'
+import type { PascalArray, PascalCell, PascalRecord, PascalSet, SyscallHandler } from '../runtime-type.ts'
 import { type TypeDescriptor } from '../runtime-type.ts'
-
-function dimsToLink(dims: Array<{ low: number; high: number }> | undefined): DimsLink {
-  if (dims === undefined || dims.length === 0) {
-    return {
-      low: 0,
-      high: Number.MAX_VALUE,
-      deep: 0,
-    }
-  }
-  let current: DimsLink | undefined = undefined
-  for (let i = dims.length - 1; i >= 0; i--) {
-    const d = dims[i]
-    const deep: number = current ? current.deep + 1 : 0
-    current = {
-      ...d,
-      next: current,
-      deep: deep,
-    }
-  }
-  return current!
-}
-function flattenArrayType(type: TypeDescriptor): { dimsList: Array<{ low: number; high: number }>, elementType: TypeDescriptor } {
-  const dimsList: Array<{ low: number; high: number }> = [];
-  let current = type;
-  while (current.tag === 'array') {
-    if (current.dims) {
-      dimsList.push(...current.dims);
-    }
-    current = current.elem ?? { tag: 'void' };
-  }
-  return { dimsList, elementType: current };
-}
-
-export function createDefaultArray(typeDesc: TypeDescriptor): PascalArray {
-  const { dimsList, elementType } = flattenArrayType(typeDesc);
-  return {
-    kind: 'array',
-    value: {
-      array: [],
-      dims: dimsToLink(dimsList),
-      elementType: elementType,
-    },
-  };
-}
-
-function createDefaultElement(type: TypeDescriptor, require: boolean) {
-  switch (type.tag) {
-    case 'rec':
-      return createDefaultRec(type)
-    case 'array':
-      return createDefaultArray(type)
-    default:
-      if (require) {
-        throw new Error(`element of type ${type.tag} is not defined`)
-      } else {
-        return undefined
-      }
-  }
-}
-
-export function getArrayByIndex(array: PascalArray, indices: number[]): PascalArray {
-  let current = array;
-  for (let i = 0; i < indices.length - 1; i++) {
-    const index = indices[i];
-    const actualIndex = index - (current.value.dims?.low ?? 0);
-    const arr = current.value.array;
-    let element = arr[actualIndex];
-    if (element === undefined && current.value.dims?.next) {
-      // 创建下一维数组，继承父级的 elementType
-      const newArray: PascalArray = {
-        kind: 'array',
-        value: {
-          array: [],
-          dims: current.value.dims.next,
-          elementType: current.value.elementType, // 最终类型不变
-        },
-      };
-      arr[actualIndex] = newArray;
-      current = newArray;
-    } else {
-      current = element as PascalArray;
-    }
-  }
-  return current;
-}
-
-export function getArrayElement(array: PascalArray, indices: number[]) {
-  const pascalArray = getArrayByIndex(array, indices)
-  const lastIndex = indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
-  const element = pascalArray.value.array[lastIndex]
-  if (element === undefined) {
-    if (pascalArray.value.elementType) {
-      const defaultElement = createDefaultElement(pascalArray.value.elementType, true)
-      pascalArray.value.array[lastIndex] = defaultElement
-      return defaultElement
-    } else {
-      throw new Error(`array is not init at ${lastIndex}(${indices.at(-1)})`)
-    }
-  }
-  return element
-}
-
-export function setArrayElement(array: PascalArray, indices: number[], value: unknown): void {
-  const pascalArray = getArrayByIndex(array, indices)
-  const lastIndex =  indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
-  const jsArray: Array<unknown> = pascalArray.value.array
-  jsArray[lastIndex] = value
-}
-
-export function createDefaultRec(typeDesc: TypeDescriptor): PascalRecord {
-  const result: PascalRecord = {
-    kind: 'record',
-    value: {},
-  }
-  for (const { name, type } of typeDesc.fields ?? []) {
-    result.value[name] = createDefaultElement(type, false)
-  }
-  return result
-}
+import {
+  createDefaultArray,
+  createDefaultRec,
+  deepCopyValue,
+  getArrayElement,
+  setArrayElement,
+} from '../runtime-util.ts'
 
 function newPascalSet(set: Set<number>): PascalSet {
   return {
@@ -418,7 +298,9 @@ export class PascalSemanticCompiler implements SemanticCompiler {
       case 'ptr.assign':
         return `(() => { const __p = ${
           args[0]
-        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.value = ${args[1]}; })()`
+        }; if (__p === null) throw new Error('dereference of nil pointer (ISO 7185 6.4.4)'); __p.value = ${
+          args[1]
+        }; })()`
       // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
       case 'ptr.dispose.check':
         return `(() => { if (${args[0]} === null) throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)'); })()`

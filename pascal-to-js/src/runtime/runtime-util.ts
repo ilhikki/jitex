@@ -1,8 +1,7 @@
 // ============================================================
 // 辅助函数：real 格式化
 
-import { TypeDescriptor } from '@/runtime/runtime-type.ts'
-import type { FileBuffer } from '@/runtime/runtime-type.ts'
+import type { DimsLink, PascalArray, PascalRecord, TypeDescriptor } from '@/runtime/runtime-type.ts'
 
 // ============================================================
 export function formatReal(n: number): string {
@@ -75,98 +74,127 @@ export function deepCopyValue(v: unknown): unknown {
   return copy
 }
 
-// ============================================================
-// 辅助函数：文件字节缓冲（FileBuffer）
-// ============================================================
-// data.length 即容量（limit）；追加时容量不足则翻倍扩容，避免每次写入都整体拷贝数组。
-
-/** 用已有字节（或空）创建缓冲；bytes 提供时零拷贝引用（length=bytes.length）。 */
-export function createFileBuffer(bytes?: Uint8Array): FileBuffer {
-  return bytes ? { data: bytes, length: bytes.length } : { data: new Uint8Array(0), length: 0 }
-}
-
-/** 追加字节；容量不足时扩容为 2 倍（至少满足本次追加）。 */
-export function appendFileBytes(buf: FileBuffer, bytes: Uint8Array): void {
-  const need = buf.length + bytes.length
-  if (need > buf.data.length) {
-    let newCap = buf.data.length * 2
-    if (newCap < need) {
-      newCap = need
-    }
-    if (newCap < 8) {
-      newCap = 8
-    }
-    const nd = new Uint8Array(newCap)
-    nd.set(buf.data.subarray(0, buf.length))
-    buf.data = nd
-  }
-  buf.data.set(bytes, buf.length)
-  buf.length = need
-}
-
-/** 返回已用区域的视图（data.subarray(0, length)），无拷贝。 */
-export function fileBufferView(buf: FileBuffer): Uint8Array {
-  return buf.data.subarray(0, buf.length)
-}
-
-/** 把外部输入 Map<string, Uint8Array> 包装为内部 Map<string, FileBuffer>（零拷贝）。 */
-export function wrapFileMap(files?: Map<string, Uint8Array>): Map<string, FileBuffer> {
-  const m = new Map<string, FileBuffer>()
-  if (files) {
-    for (const [k, v] of files) {
-      m.set(k, createFileBuffer(v))
-    }
-  }
-  return m
-}
-
-/** 把内部 Map<string, FileBuffer> 展开为输出 Map<string, Uint8Array>（已用区域视图）。
- *  运行结束后由 toRunState 调用，结果放入 RunState.files。 */
-export function unwrapFileMap(files: Map<string, FileBuffer>): Map<string, Uint8Array> {
-  const m = new Map<string, Uint8Array>()
-  for (const [k, v] of files) {
-    m.set(k, fileBufferView(v))
-  }
-  return m
-}
-export interface DimsLink {
-  next?: DimsLink | undefined
-  low: number
-  high: number
-  deep: number
-}
-export interface DimsLink {
-  next?: DimsLink | undefined
-  low: number
-  high: number
-  deep: number
-}
-
-export type PascalObject = PascalArray | PascalRecord | PascalCell | PascalSet
-
 export function getPascalStringValue(str: PascalArray) {
   return str.value.array.join('')
 }
-export type PascalArray = {
-  kind: 'array'
-  value: {
-    array: unknown[]
-    dims: DimsLink
-    elementType?: TypeDescriptor | undefined
+
+function dimsToLink(dims: Array<{ low: number; high: number }> | undefined): DimsLink {
+  if (dims === undefined || dims.length === 0) {
+    return {
+      low: 0,
+      high: Number.MAX_VALUE,
+      deep: 0,
+    }
+  }
+  let current: DimsLink | undefined = undefined
+  for (let i = dims.length - 1; i >= 0; i--) {
+    const d = dims[i]
+    const deep: number = current ? current.deep + 1 : 0
+    current = {
+      ...d,
+      next: current,
+      deep: deep,
+    }
+  }
+  return current!
+}
+function flattenArrayType(
+  type: TypeDescriptor,
+): { dimsList: Array<{ low: number; high: number }>; elementType: TypeDescriptor } {
+  const dimsList: Array<{ low: number; high: number }> = []
+  let current = type
+  while (current.tag === 'array') {
+    if (current.dims) {
+      dimsList.push(...current.dims)
+    }
+    current = current.elem ?? { tag: 'void' }
+  }
+  return { dimsList, elementType: current }
+}
+
+export function createDefaultArray(typeDesc: TypeDescriptor): PascalArray {
+  const { dimsList, elementType } = flattenArrayType(typeDesc)
+  return {
+    kind: 'array',
+    value: {
+      array: [],
+      dims: dimsToLink(dimsList),
+      elementType: elementType,
+    },
   }
 }
 
-export type PascalRecord = {
-  kind: 'record'
-  value: Record<string, unknown>
+function createDefaultElement(type: TypeDescriptor, require: boolean) {
+  switch (type.tag) {
+    case 'rec':
+      return createDefaultRec(type)
+    case 'array':
+      return createDefaultArray(type)
+    default:
+      if (require) {
+        throw new Error(`element of type ${type.tag} is not defined`)
+      } else {
+        return undefined
+      }
+  }
 }
 
-export type PascalCell = {
-  kind: 'cell'
-  value: unknown
+export function getArrayByIndex(array: PascalArray, indices: number[]): PascalArray {
+  let current = array
+  for (let i = 0; i < indices.length - 1; i++) {
+    const index = indices[i]
+    const actualIndex = index - (current.value.dims?.low ?? 0)
+    const arr = current.value.array
+    const element = arr[actualIndex]
+    if (element === undefined && current.value.dims?.next) {
+      // 创建下一维数组，继承父级的 elementType
+      const newArray: PascalArray = {
+        kind: 'array',
+        value: {
+          array: [],
+          dims: current.value.dims.next,
+          elementType: current.value.elementType, // 最终类型不变
+        },
+      }
+      arr[actualIndex] = newArray
+      current = newArray
+    } else {
+      current = element as PascalArray
+    }
+  }
+  return current
 }
 
-export type PascalSet = {
-  kind: 'set'
-  value: Set<number>
+export function getArrayElement(array: PascalArray, indices: number[]) {
+  const pascalArray = getArrayByIndex(array, indices)
+  const lastIndex = indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
+  const element = pascalArray.value.array[lastIndex]
+  if (element === undefined) {
+    if (pascalArray.value.elementType) {
+      const defaultElement = createDefaultElement(pascalArray.value.elementType, true)
+      pascalArray.value.array[lastIndex] = defaultElement
+      return defaultElement
+    } else {
+      throw new Error(`array is not init at ${lastIndex}(${indices.at(-1)})`)
+    }
+  }
+  return element
+}
+
+export function setArrayElement(array: PascalArray, indices: number[], value: unknown): void {
+  const pascalArray = getArrayByIndex(array, indices)
+  const lastIndex = indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
+  const jsArray: Array<unknown> = pascalArray.value.array
+  jsArray[lastIndex] = value
+}
+
+export function createDefaultRec(typeDesc: TypeDescriptor): PascalRecord {
+  const result: PascalRecord = {
+    kind: 'record',
+    value: {},
+  }
+  for (const { name, type } of typeDesc.fields ?? []) {
+    result.value[name] = createDefaultElement(type, false)
+  }
+  return result
 }

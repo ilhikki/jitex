@@ -13,7 +13,7 @@ describe('M5 JS - Knuth Pascal Style', () => {
 
     {
       name: 'FILE OF CHAR 等价于 text',
-      code: `PROGRAM TANGLE;
+      code: `PROGRAM TANGLE(F);
 VAR F: FILE OF CHAR;
 BEGIN
   REWRITE(F);
@@ -25,7 +25,7 @@ END.`,
 
     {
       name: 'PACKED FILE OF CHAR 等价于 text',
-      code: `PROGRAM TANGLE;
+      code: `PROGRAM TANGLE(TEXTFILE, TERMOUT);
 TYPE TEXTFILE = PACKED FILE OF CHAR;
 VAR TERMOUT: TEXTFILE;
 BEGIN
@@ -33,12 +33,12 @@ BEGIN
   WRITELN(TERMOUT, 'Hello');
 END.`,
       purpose: 'Knuth 风格：TEXTFILE = PACKED FILE OF CHAR 类型定义（tangle-official.pas 中的定义）',
-      expectedContains: 'Hello',
+      expectedFileContains: [{ url: 'TERMOUT', contains: 'Hello' }],
     },
 
     {
       name: '多个 text 文件变量',
-      code: `PROGRAM TANGLE;
+      code: `PROGRAM TANGLE(WEBFILE, CHANGEFILE, PASCALFILE);
 VAR WEBFILE, CHANGEFILE, PASCALFILE: FILE OF CHAR;
 BEGIN
   REWRITE(WEBFILE);
@@ -49,7 +49,7 @@ BEGIN
   WRITELN(PASCALFILE, 'pascal');
 END.`,
       purpose: 'Knuth 风格：TANGLE 程序头声明的三个文件变量',
-      expectedContains: 'web',
+      expectedFileContains: [{ url: 'WEBFILE', contains: 'web' }],
     },
 
     // ==========================================================================
@@ -139,7 +139,7 @@ END.`,
 
     {
       name: 'PAGE 带文件参数',
-      code: `PROGRAM TANGLE;
+      code: `PROGRAM TANGLE(F);
 VAR F: FILE OF CHAR;
 BEGIN
   REWRITE(F);
@@ -148,7 +148,9 @@ BEGIN
   WRITELN(F, 'after');
 END.`,
       purpose: 'PAGE 带文件参数（Knuth 风格）',
-      expectedContains: 'before',
+      expectedFileContains: [
+        { url: 'F', contains: 'before' },
+      ],
     },
 
     // ==========================================================================

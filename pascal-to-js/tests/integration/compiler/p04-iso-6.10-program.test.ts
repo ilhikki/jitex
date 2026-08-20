@@ -44,7 +44,7 @@ const programParamTests: PascalTest[] = [
     code:
       `PROGRAM COPYFILE(INFILE,OUTFILE);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN WHILE NOT EOLN(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;WRITELN(OUTFILE);READLN(INFILE);END;END.`,
     purpose: 'ISO §6.10: 通过 programFileUrls 精确相等映射绑定外部文件',
-    files: new Map<string, Uint8Array>([
+    textFiles: new Map<string, Uint8Array>([
       ['INFILE', text('ABC\nDEF\n')],
       ['OUTFILE', new Uint8Array(0)],
     ]),
@@ -60,7 +60,7 @@ const programParamTests: PascalTest[] = [
     code:
       `PROGRAM COPY2(F,G);VAR F,G:FILE OF CHAR;BEGIN RESET(F);REWRITE(G);WHILE NOT EOF(F)DO BEGIN G^:=F^;PUT(G);GET(F);END;END.`,
     purpose: 'ISO §6.10: 缺省 programFileUrls 时，程序头参数名本身即外部文件键',
-    files: new Map<string, Uint8Array>([
+    textFiles: new Map<string, Uint8Array>([
       ['F', text('HELLO')],
       ['G', new Uint8Array(0)],
     ]),
@@ -81,7 +81,7 @@ const programParamTests: PascalTest[] = [
       END;
       END.`,
     purpose: 'ISO §6.10: programFileUrls 可以重命名文件变量→内存文件名，变量名不等于文件名',
-    files: new Map<string, Uint8Array>([
+    textFiles: new Map<string, Uint8Array>([
       ['IN.TXT', text('MAPPED')],
       ['OUT.TXT', new Uint8Array(0)],
     ]),
@@ -93,7 +93,7 @@ const programParamTests: PascalTest[] = [
     name: '§6.10 文件参数：映射只影响 program 头参数',
     code: `PROGRAM T(IO);VAR IO:FILE OF CHAR;X:INTEGER;BEGIN RESET(IO);READ(IO,X);WRITELN('X=',X);END.`,
     purpose: 'ISO §6.10: program 头的文件初始化在 algorithm 开始前完成，因此 RESET 之前不需要绑定文件',
-    files: new Map<string, Uint8Array>([['IO', text('7')]]),
+    textFiles: new Map<string, Uint8Array>([['IO', text('7')]]),
     programFileUrls: { IO: 'IO' },
     expectedContains: 'X=7',
   },
@@ -103,7 +103,7 @@ const programParamTests: PascalTest[] = [
     code:
       `PROGRAM SUM(NUMBERS);VAR NUMBERS:FILE OF INTEGER;A,B,S:INTEGER;BEGIN RESET(NUMBERS);READ(NUMBERS,A);READ(NUMBERS,B);S:=A+B;WRITELN('SUM=',S);END.`,
     purpose: 'ISO §6.10: 单一文件参数；FILE OF INTEGER 作为程序头参数同样被绑定',
-    files: new Map<string, Uint8Array>([['NUMBERS', text('11 31')]]),
+    textFiles: new Map<string, Uint8Array>([['NUMBERS', text('11 31')]]),
     programFileUrls: { NUMBERS: 'NUMBERS' },
     expectedContains: 'SUM=42',
   },
@@ -113,7 +113,7 @@ const programParamTests: PascalTest[] = [
     code:
       `PROGRAM MIXED(infile,outfile);VAR INFILE,OUTFILE:FILE OF CHAR;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;END.`,
     purpose: 'ISO §6.1.2: Pascal 标识符大小写不敏感，programFileUrls 键匹配也应大小写不敏感',
-    files: new Map<string, Uint8Array>([
+    textFiles: new Map<string, Uint8Array>([
       ['INFILE', text('lowercaseOK')],
       ['OUTFILE', new Uint8Array(0)],
     ]),
@@ -128,7 +128,7 @@ const programParamTests: PascalTest[] = [
       `PROGRAM ONCE(SRC,DST);VAR SRC,DST:FILE OF CHAR;C:CHAR;BEGIN RESET(SRC);REWRITE(DST);WHILE NOT EOF(SRC)DO BEGIN C:=SRC^;WRITE(DST,C);GET(SRC);END;END.`,
     purpose:
       '核心断言：programFileUrls 在运行时决定；同一份 Pascal 源码使用不同映射运行两次应读到不同文件，不需要重新编译',
-    files: new Map<string, Uint8Array>([
+    textFiles: new Map<string, Uint8Array>([
       ['A', text('FROMA')],
       ['B', text('FROMB')],
       ['OUTA', new Uint8Array(0)],

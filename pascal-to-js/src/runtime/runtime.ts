@@ -17,7 +17,6 @@
 import type { RunError, RunState } from './run-state.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
 import { ioSyscalls } from './sys/io.ts'
-import { unwrapFileMap, wrapFileMap } from './runtime-util.ts'
 import { fileSyscalls } from './sys/file.ts'
 import { basicSyscall } from './sys/pascal-semantic-compiler.ts'
 
@@ -25,7 +24,7 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
   return {
     outputBuffer: [],
     inputQueue: options.input ? [...options.input] : [],
-    files: wrapFileMap(options.files),
+    files: options?.files ?? new Map(),
     readState: { tokens: [], tokenIdx: 0 },
     steps: 0,
     maxSteps: options.maxSteps ?? Infinity,
@@ -48,7 +47,7 @@ export function toRunState(
     steps: ctx.steps,
     error: error ?? null,
     jsCode: ctx.jsCode,
-    files: unwrapFileMap(ctx.files),
+    files: ctx.files,
     debugLog: ctx.debugLog,
   }
 }

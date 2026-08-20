@@ -24,7 +24,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 rewrite(f): 正向 - 创建新文件用于写入',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'HELLO');END.`,
       purpose: 'ISO 6.6.5.2 rewrite(f) post‑assertion',
-      files: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
       expectedFileContains: [{ url: 'F', contains: 'HELLO' }],
     },
 
@@ -33,7 +33,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 put(f): 正向 - 将缓冲区内容追加到文件',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;V:CHAR;BEGIN REWRITE(F);V:='A';F^:=V;PUT(F);END.`,
       purpose: 'ISO 6.6.5.2 put(f) pre‑assertion: f.M = Generation, f^ is not undefined',
-      files: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
       expectedFileContains: [{ url: 'F', contains: 'A' }],
     },
 
@@ -41,7 +41,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 put(f): 反向 - 未 rewrite 直接 put 应失败',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN F^:='A';PUT(F);END.`,
       purpose: 'ISO 6.6.5.2 put(f) pre‑assertion violated: f.M != Generation',
-      files: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
       expectedError: '',
       maxSteps: 1000,
     },
@@ -51,7 +51,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 reset(f): 正向 - 打开文件用于读取，F^ 指向首字符',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);CH:=F^;WRITE(CH);END.`,
       purpose: 'ISO 6.6.5.2 reset(f) post‑assertion',
-      files: new Map<string, Uint8Array>([['F', text('AB')]]),
+      textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
       expectedContains: 'A',
     },
 
@@ -59,7 +59,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 reset(f): 正向 - 空文件 reset 后 EOF 为真',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITE('EMPTY')ELSE WRITE('NOT EMPTY');END.`,
       purpose: 'ISO 6.6.5.2 reset(f) post‑assertion: f.R = S()',
-      files: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
       expectedContains: 'EMPTY',
     },
 
@@ -67,7 +67,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 get(f): 正向 - 推进到下一个组件',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);GET(F);CH:=F^;WRITE(CH);END.`,
       purpose: 'ISO 6.6.5.2 get(f) post‑assertion',
-      files: new Map<string, Uint8Array>([['F', text('AB')]]),
+      textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
       expectedContains: 'B',
     },
 
@@ -75,7 +75,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 get(f): 反向 - EOF 后 get 应失败',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);GET(F);GET(F);GET(F);END.`,
       purpose: 'ISO 6.6.5.2 get(f) pre‑assertion violated: f0.R is S()',
-      files: new Map<string, Uint8Array>([['F', text('AB')]]),
+      textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
       expectedError: '',
       maxSteps: 1000,
     },
@@ -84,7 +84,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 read(f, v): 正向 - 从文件读整数',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;N:INTEGER;BEGIN RESET(F);READ(F,N);WRITE(N);END.`,
       purpose: 'ISO 6.6.5.2 read(f, v) integer case',
-      files: new Map<string, Uint8Array>([['F', text('42')]]),
+      textFiles: new Map<string, Uint8Array>([['F', text('42')]]),
       expectedContains: '42',
     },
 
@@ -92,7 +92,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 read(f, c): 正向 - 读 char 不跳过空格',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITE(ORD(C));END.`,
       purpose: 'ISO 6.6.5.2 read(f, v) char case: s length 1',
-      files: new Map<string, Uint8Array>([['F', text(' A')]]),
+      textFiles: new Map<string, Uint8Array>([['F', text(' A')]]),
       expectedContains: '32',
     },
 
@@ -101,7 +101,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.5.2 page(f): 正向 - 写入 form feed 字符',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);PAGE(F);WRITE(F,'X');END.`,
       purpose: 'ISO 6.6.5.2 page(f) 在文本文件中写入 form feed',
-      files: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
       expectedFileContains: [{ url: 'F', contains: '\f' }],
     },
 
@@ -390,7 +390,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       name: '6.6.6.5 eof(f): 正向 - 文件末尾检测',
       code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITE('EOF');END.`,
       purpose: 'ISO 6.6.6.5 eof(f): "true if f.R is empty sequence"',
-      files: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
       expectedContains: 'EOF',
     },
 
@@ -399,7 +399,7 @@ describe('ISO 7185 Standard Library (6.6.5 / 6.6.6) — compliant', () => {
       code:
         `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITE('EOLN');END.`,
       purpose: 'ISO 6.6.6.5 eoln(f): "true if f^ is end‑of‑line or end‑of‑file"',
-      files: new Map<string, Uint8Array>([['F', text('AB\n')]]),
+      textFiles: new Map<string, Uint8Array>([['F', text('AB\n')]]),
       expectedContains: 'EOLN',
     },
 

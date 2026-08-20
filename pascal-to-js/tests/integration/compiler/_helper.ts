@@ -13,11 +13,12 @@
 // 测试原则见 ../README.md；
 // 执行引擎实现见 pascal-to-js/src/compiler/transform.ts。
 
-import { run } from '../../../src/compiler/transform.ts'
-import type { RunState } from '../../../src/runtime/run-state.ts'
-import type { ExtraCallable } from '../../../src/compiler/analysis.ts'
-import type { SyscallHandler } from '../../../src/runtime/runtime-type.ts'
+import { run } from '@jitex/pascal-to-js'
+import type { RunState } from '@jitex/pascal-to-js'
+import type { ExtraCallable } from '@jitex/pascal-to-js'
+import type { PascalFileStore, SyscallHandler } from '@jitex/pascal-to-js'
 import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
+import { MemoryTextFile, RecordFile } from '@jitex/pascal-to-js'
 export { assert, assertEquals, describe, it, test }
 
 /** 非标扩展标识符（保留用于类型标注，实际为 string） */
@@ -69,8 +70,8 @@ export interface PascalTest {
   extraSyscalls?: Record<string, SyscallHandler>
 
   /** 内存文件系统：文件名 → 文件内容 */
-  files?: Map<string, Uint8Array>
-
+  textFiles?: Map<string, Uint8Array>
+  recordFiles?: Map<string, RecordFile>
   /** 程序文件变量名 → files 中的键名（用于 ASSIGN） */
   programFileUrls?: Record<string, string>
 
@@ -83,9 +84,13 @@ export interface PascalTest {
 
 /** 执行单个测试用例，返回 RunState */
 export function runPascal(t: PascalTest): RunState {
+  const files = new Map<string, PascalFileStore>()
+  t.textFiles?.entries()?.forEach(([key, value]) => files.set(key, new MemoryTextFile(value)))
+  t.recordFiles?.entries()?.forEach(([key, value]) => files.set(key, value))
+
   return run(t.code, {
     input: t.input,
-    files: t.files,
+    files: files,
     programFileUrls: t.programFileUrls,
     maxSteps: t.maxSteps ?? 1e5,
     extensions: t.extensions,
@@ -160,14 +165,13 @@ export function runPascalTest(t: PascalTest): void {
       }`,
     )
   }
-
-  // 4. 文件内容断言（运行结果在 state.files；输入 files 不再被原地修改）
-  if (t.expectedFileContains && t.files) {
+  const files = state.files
+  if (t.expectedFileContains && files) {
     for (const exp of t.expectedFileContains) {
-      const bytes = state.files.get(exp.url)
-      const text = bytes ? new TextDecoder().decode(bytes) : ''
+      const fileStore = state.files.get(exp.url)
+      const text = (fileStore as MemoryTextFile)?.getContent()
       assert(
-        text.includes(exp.contains),
+        text !== undefined && text.includes(exp.contains),
         `${prefix}: expected file "${exp.url}" to contain "${exp.contains}". File content: ${JSON.stringify(text)}`,
       )
     }

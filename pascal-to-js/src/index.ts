@@ -35,8 +35,10 @@ export { executeCompiled, run, runJs, transform } from './compiler/transform.ts'
 export type { RunOptions, TransformOptions } from './compiler/transform.ts'
 export type { RunError, RunState } from './runtime/run-state.ts'
 export type { ExtraCallable } from './compiler/analysis.ts'
-export type { SyscallHandler } from './runtime/runtime-type.ts'
+export type * from './runtime/runtime-type.ts'
 export * from './runtime/runtime-util.ts'
+export { MemoryTextFile } from './runtime/sys/memory-text-file.ts'
+export { MemoryRecordFile } from './runtime/sys/memory-record-file.ts'
 // ==========================================================================
 // 便捷函数
 // ==========================================================================

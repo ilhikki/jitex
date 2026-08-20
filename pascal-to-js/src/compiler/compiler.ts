@@ -531,7 +531,7 @@ function compileBlock(
 
   // program 头的文件参数初始化（ISO 7185 6.10）：
   // PROGRAM X(INFILE, OUTFILE); 中声明的参数必须在算法开始前绑定到外部文件。
-  // 绑定机制是 impl-defined（ISO 6.10）：本工程在运行时用 ctx.programFileUrls
+  // 绑定机制是 impl-defined（ISO 6.10）：本工程在运行时用 ctx.programFileUrl
   // 做映射（缺省为恒等映射），通过 program.fileUrl syscall 取 url，
   // 再用 rec.set 直接把 url 写入文件句柄的 .url 字段。
   // （不使用 file.assign —— 那是 Borland 扩展过程，非 ISO 6.6.5.2。）
