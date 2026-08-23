@@ -133,7 +133,7 @@ function createDefaultElement(type: TypeDescriptor, require: boolean) {
     case 'subrange':
       return type.low
     case 'file':
-      return {kind: 'file', value: undefined} as PascalFile
+      return { kind: 'file', value: undefined } as PascalFile
     default:
       if (require) {
         throw new Error(`element of type ${type.tag} is not defined`)
@@ -207,6 +207,6 @@ export function encodeUtf8(s: string): Uint8Array {
   return new TextEncoder().encode(s)
 }
 
-export function bytesToString(bytes: Uint8Array):string{
+export function bytesToString(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes)
 }

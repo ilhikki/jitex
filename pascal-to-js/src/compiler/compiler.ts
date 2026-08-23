@@ -158,6 +158,7 @@ function isRecordFile(fileType: TypeInfo): boolean {
   return elemTi !== undefined && elemTi.tag === 'rec'
 }
 const syscallKeys = {
+  hookFunctionEnter: 'hook.function.enter',
   // mem
   memDefaultArray: 'mem.default.array',
   memDefaultRec: 'mem.default.rec',
@@ -179,10 +180,12 @@ const syscallKeys = {
   fileReset: 'file.reset',
   fileRewrite: 'file.rewrite',
   fileGet: 'file.get',
+  fileGetChar: 'file.get.char',
   filePut: 'file.put',
   fileEof: 'file.eof',
   fileEoln: 'file.eoln',
   filePeek: 'file.peek',
+  filePeekChar: 'file.peek.char',
   fileRecReset: 'file.rec.reset',
   fileRecRewrite: 'file.rec.rewrite',
   fileRecGet: 'file.rec.get',
@@ -520,7 +523,8 @@ function compileBlock(
 
   // body
   const body: JsonCode.Statement[] = []
-
+  const debugName = analysis.debugNames().get(info.funcId) ?? ''
+  body.push(evalStmt(syscall(syscallKeys.hookFunctionEnter, [litField(info.funcId.toString()), litField(debugName)])))
   // 变量初始化
   for (const local of info.locals) {
     body.push(assignStmt(ref(local.varId), defaultExpr(local.typeInfo)))
@@ -1033,6 +1037,8 @@ function compileProcedureCall(
         const fileType = a.typeOf(node.arguments[0])
         if (isRecordFile(fileType)) {
           return [evalStmt(syscall(syscallKeys.fileRecGet, getArgs))]
+        } else if (fileType.fileElem?.tag === 'char') {
+          return [evalStmt(syscall(syscallKeys.fileGetChar, getArgs))]
         }
       }
       return [evalStmt(syscall(syscallKeys.fileGet, getArgs))]
@@ -1652,6 +1658,8 @@ function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[
     // file of record: f^ 返回记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
     if (isRecordFile(objType)) {
       return syscall(syscallKeys.fileRecPeek, [compileExpr(node.object, a, ws)])
+    } else if (objType.fileElem?.tag === 'char') {
+      return syscall(syscallKeys.filePeekChar, [compileExpr(node.object, a, ws)])
     }
     return syscall(syscallKeys.filePeek, [compileExpr(node.object, a, ws)])
   }

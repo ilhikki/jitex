@@ -55,7 +55,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       f.value!.writeBytes(encodeUtf8(getPascalStringValue(charArray)))
       return undefined
     },
-
+    'hook.function.enter': (_ctx, [_name]) => {
+      return undefined
+    },
     'io.write.i64': (ctx, [value]) => {
       const f = getOutput(ctx)
       f.writeBytes(encodeUtf8(String(value)))
@@ -114,12 +116,12 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    'io.writeln.file': (_ctx, [file, str]) => {
+    'io.writeln.file': (_ctx, [file]) => {
       const f = ensureTextFile(file as PascalFile)
       f.value!.writeByte(10) // '\n'
       return undefined
     },
-    'io.writeln': (ctx, []) => {
+    'io.writeln': (ctx) => {
       const f = getOutput(ctx)
       f.writeByte(10) // '\n'
       return undefined
@@ -199,7 +201,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- io.readln.skip（无文件 / 带文本文件）----------
-    'io.readln.skip': (ctx) => {
+    'io.readln.skip': (_ctx) => {
       return undefined
     },
     'io.readln.skip.file': (_ctx, [file]) => {
@@ -244,6 +246,18 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       }
       f.value!.advance()
     },
+    'file.get.char': (_ctx, [file]) => {
+      const f = ensureTextFile(file as PascalFile)
+      const fileStore = f.value!
+      if (!fileStore.hasMore()) {
+        throw new Error('get(f) at EOF: pre-assertion violated')
+      }
+      const current = fileStore.peekByte()
+      fileStore.advance()
+      if (current === 13 && fileStore.peekByte() === 10) {
+        fileStore.advance()
+      }
+    },
 
     // put(f, value?)：文本文件写入
     'file.put': (_ctx, [file, value]) => {
@@ -265,6 +279,15 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       if (byte === undefined) {
         throw new Error('F^ accessed at EOF: undefined behavior')
       }
+      return byte
+    },
+
+    'file.peek.char': (_ctx, [file]) => {
+      const f = ensureTextFile(file as PascalFile)
+      const byte = f.value!.peekByte()
+      if (byte === undefined) {
+        throw new Error('F^ accessed at EOF: undefined behavior')
+      }
       if (byte === 10 || byte === 13) {
         return ' '
       }
@@ -278,7 +301,11 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     },
 
     'file.eoln': (_ctx, [file]) => {
-      const byte = ensureTextFile(file as PascalFile).value.peekByte()
+      const pascalFile = ensureTextFile(file as PascalFile)
+      if (!pascalFile.value.hasMore()) {
+        return true
+      }
+      const byte = pascalFile.value.peekByte()
       return byte === 10 || byte === 13
     },
 

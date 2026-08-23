@@ -1,11 +1,4 @@
-import {
-  ExtraCallable,
-  getPascalStringValue,
-  type PascalArray,
-  type PascalFile,
-  SyscallHandler,
-  transform,
-} from '@jitex/pascal-to-js'
+import { ExtraCallable, SyscallHandler, transform } from '@jitex/pascal-to-js'
 import { extraSyscalls } from '../utils.ts'
 
 const texExtraCallables: Record<string, ExtraCallable> = {
@@ -34,6 +27,8 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.break': extraSyscalls['extra.break'],
   'file.reset': extraSyscalls['file.reset'],
   'file.rewrite': extraSyscalls['file.rewrite'],
+  'file.peek': extraSyscalls['file.peek'],
+  'file.rec.rewrite': extraSyscalls['file.rec.rewrite'],
 }
 
 export function transformTex(texPascalContent: string) {

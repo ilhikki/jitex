@@ -5,7 +5,7 @@ import { readTextFile } from '../utils.ts'
 const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
   const stageLoadTangleSource = cache(
     stage('load tangle source', [], async () => {
-      const tanglePas = await readTextFile('./resources/kunth/tangle/tangle-official.pas')
+      const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
       const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
       attachText('tangle-v0.pas', tanglePas)
       attachText('tangle.web', tangleWeb)

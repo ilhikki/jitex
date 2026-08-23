@@ -1,10 +1,7 @@
-import { bytesToString, extraSyscalls, stringToBytes } from '../utils.ts'
+import { extraSyscalls, stringToBytes } from '../utils.ts'
 import {
   ExtraCallable,
-  getPascalStringValue,
   MemoryTextFile,
-  PascalArray,
-  PascalFile,
   PascalFileStore,
   runJs,
   RunState,

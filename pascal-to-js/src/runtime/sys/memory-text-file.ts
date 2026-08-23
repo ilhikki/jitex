@@ -125,5 +125,4 @@ export class MemoryTextFile implements TextFile {
   getContent(): string {
     return bytesToString(this.getData())
   }
-
 }

@@ -86,7 +86,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
   })
 
   // 5. 包装为 ES module
-  return `${jsBody}\nexport { ${mainName} };`
+  return `${jsBody}\nexport default ${mainName};`
 }
 
 // ============================================================
@@ -108,14 +108,14 @@ export function executeCompiled(
   __sys: (key: string, args: unknown[]) => unknown,
 ): void {
   // 提取导出的函数名
-  const exportMatch = code.match(/export\s*\{\s*(\w+)\s*\}/)
+  const exportMatch = code.match(/export\s+default\s+(\w+);/)
   if (!exportMatch) {
     throw new Error('executeCompiled: no export found in code')
   }
   const mainName = exportMatch[1]
 
   // 移除 export 语句，添加 return
-  const execCode = code.replace(/export\s*\{[^}]+\};?\s*$/, `return ${mainName};`)
+  const execCode = code.replace(/export.*$/, `return ${mainName};`)
   const factory = new Function(execCode)
   const mainFn = factory()
   mainFn(__sys)
@@ -160,20 +160,6 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
     // __sys dispatcher
     const dispatcher = createDispatcher(options.extraSyscalls ?? {})
     const __sys = (key: string, args: unknown[]): unknown => {
-      if (key.startsWith('io.') || key.startsWith('file.') || key.startsWith('extra.')) {
-        ctx.debugLog.push(`[${key}] ${
-          JSON.stringify(args, (key, value) => {
-            if (ArrayBuffer.isView(value)) {
-              return undefined
-            }
-            return value
-          })
-        }`)
-
-        if (ctx.debugLog.length >= 3000) {
-          ctx.debugLog = ctx.debugLog.slice(2000)
-        }
-      }
       return dispatcher(ctx, key, args)
     }
 
