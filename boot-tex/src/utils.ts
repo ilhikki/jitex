@@ -4,6 +4,7 @@ import {
   MemoryTextFile,
   PascalArray,
   PascalFile,
+  RecordFile,
   SyscallHandler,
   TextFile,
 } from '@jitex/pascal-to-js'
@@ -49,7 +50,7 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     const file = args[0] as PascalFile
     let type
     if (args.length === 4) {
-      const fileName = getPascalStringValue(args[1]).trim()
+      const fileName = getPascalStringValue(args[1] as PascalArray).trim()
       type = args[3]
 
       let fileStore = ctx.files.get(fileName)
@@ -61,7 +62,7 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     } else {
       type = args[1]
     }
-    const value = file.value!
+    const value = file.value! as RecordFile
     value.clear()
     value.seek(0)
     value.setMode('generation')

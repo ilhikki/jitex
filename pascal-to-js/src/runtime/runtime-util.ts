@@ -193,14 +193,26 @@ export function setArrayElement(array: PascalArray, indices: number[], value: un
 }
 
 export function createDefaultRec(typeDesc: TypeDescriptor): PascalRecord {
-  const result: PascalRecord = {
-    kind: 'record',
-    value: {},
-  }
+  const fix: Record<string, unknown> = {}
   for (const { name, type } of typeDesc.fields ?? []) {
-    result.value[name] = createDefaultElement(type, false)
+    fix[name] = createDefaultElement(type, false)
   }
-  return result
+  const keys: Record<string, 'fix' | 'variant'> = {}
+  const variantTypes: Record<string, TypeDescriptor> = {}
+  typeDesc.fields?.forEach((o) => keys[o.name] = 'fix')
+  typeDesc.variantFields?.forEach((o) => {
+    keys[o.name] = 'variant'
+    variantTypes[o.name] = o.type
+  })
+  return {
+    kind: 'record',
+    value: {
+      fix,
+      variant: undefined,
+      keys,
+      variantTypes,
+    },
+  }
 }
 
 export function encodeUtf8(s: string): Uint8Array {

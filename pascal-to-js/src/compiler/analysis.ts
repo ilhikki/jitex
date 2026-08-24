@@ -60,6 +60,7 @@ export interface TypeInfo {
   elem?: TypeInfo
   // record
   fields?: Map<string, TypeInfo>
+  variantFields?: Map<string, TypeInfo>
   // set
   setBase?: TypeInfo
   // file
@@ -638,10 +639,11 @@ export class Analyzer {
           }
         }
         // 变体记录：收集所有变体分支的字段（变体字段共享同一内存空间）
+        const variantFields = new Map<string, TypeInfo>()
         if (node.variant) {
           this.collectVariantFields(node.variant, fields)
         }
-        info = { tag: 'rec', fields }
+        info = { tag: 'rec', fields, variantFields: variantFields }
         break
       }
       case 'SetType': {
@@ -695,9 +697,6 @@ export class Analyzer {
         for (const name of f.names) {
           fields.set(name.name.toLowerCase(), ti)
         }
-      }
-      if (v.variant) {
-        this.collectVariantFields(v.variant, fields)
       }
     }
   }

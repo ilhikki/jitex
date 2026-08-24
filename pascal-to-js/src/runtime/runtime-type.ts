@@ -10,6 +10,7 @@ export interface TypeDescriptor {
   dims?: Array<{ low: number; high: number }>
   elem?: TypeDescriptor
   fields?: Array<{ name: string; type: TypeDescriptor }>
+  variantFields?: Array<{ name: string; type: TypeDescriptor }>
 }
 
 // ============================================================
@@ -135,7 +136,14 @@ export type PascalArray = {
 
 export type PascalRecord = {
   kind: 'record'
-  value: Record<string, unknown>
+  value: RecordValue
+}
+
+export type RecordValue = {
+  fix: Record<string, unknown>
+  variant: { type: TypeDescriptor; value: unknown, name: string } | undefined
+  keys: Record<string, 'fix' | 'variant'>
+  variantTypes: Record<string, TypeDescriptor>
 }
 
 export type PascalCell = {

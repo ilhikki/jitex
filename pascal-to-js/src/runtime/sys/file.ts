@@ -363,7 +363,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
         if (type === undefined) {
           throw new Error('miss record type')
         }
-        const buffer = createDefaultRec(file as TypeDescriptor)
+        const buffer = createDefaultRec(fileStore.getType() as TypeDescriptor)
         fileStore.setBuffer(buffer)
         return buffer
       }

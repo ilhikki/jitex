@@ -42,6 +42,7 @@ import {
 
 interface WithBinding {
   tempVarId: number
+  type: TypeInfo
   fields: Map<string, TypeInfo>
 }
 
@@ -450,6 +451,7 @@ interface TypeDescriptor {
   dims?: Array<{ low: number; high: number }>
   elem?: TypeDescriptor
   fields?: Array<{ name: string; type: TypeDescriptor }>
+  variantFields?: Array<{ name: string; type: TypeDescriptor }>
 }
 
 function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
@@ -459,6 +461,9 @@ function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
     high: ti.high,
     dims: ti.dims,
     elem: ti.elem ? serializeTypeInfo(ti.elem) : undefined,
+    variantFields: ti.variantFields
+      ? Array.from(ti.variantFields.entries()).map(([k, v]) => ({ name: k, type: serializeTypeInfo(v) }))
+      : undefined,
     fields: ti.fields
       ? Array.from(ti.fields.entries()).map(([k, v]) => ({ name: k, type: serializeTypeInfo(v) }))
       : undefined,
@@ -666,7 +671,11 @@ function compileAssignment(
       const binding = ws[i]
       const fname = node.left.name.toLowerCase()
       if (binding.fields.has(fname)) {
-        return [evalStmt(syscall(syscallKeys.recSet, [ref(binding.tempVarId), litField(fname), value]))]
+        const varId = binding.tempVarId
+        const recTypeInfo = binding.type
+        return [
+          evalStmt(syscall(syscallKeys.recSet, [ref(varId), litField(fname), value, typeDescLiteral(recTypeInfo)])),
+        ]
       }
     }
 
@@ -733,7 +742,8 @@ function compileAssignment(
       return [evalStmt(syscall(syscallKeys.filePut, [fExpr, value]))]
     }
     const objExpr = compileExpr(fa.object, a, ws)
-    return [evalStmt(syscall(syscallKeys.recSet, [objExpr, litField(fa.field.name.toLowerCase()), value]))]
+    const recTypeInfo = typeDescLiteral(a.typeOf(fa.object))
+    return [evalStmt(syscall(syscallKeys.recSet, [objExpr, litField(fa.field.name.toLowerCase()), value, recTypeInfo]))]
   }
 
   throw new Error('compileAssignment: unsupported left-hand side')
@@ -958,6 +968,7 @@ function compileWith(
     const ti = temps[i].typeInfo
     newBindings.push({
       tempVarId,
+      type: a.typeOf(recExpr),
       fields: ti.fields ?? new Map(),
     })
   }
@@ -1355,7 +1366,9 @@ function compileIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[])
     const binding = ws[i]
     const fname = node.name.toLowerCase()
     if (binding.fields.has(fname)) {
-      return syscall(syscallKeys.recField, [ref(binding.tempVarId), litField(fname)])
+      const typeInfo = binding.type
+
+      return syscall(syscallKeys.recField, [ref(binding.tempVarId), litField(fname), typeDescLiteral(typeInfo)])
     }
   }
 
@@ -1648,8 +1661,8 @@ function compileArrayAccess(node: ArrayAccessNode, a: Analysis, ws: WithBinding[
 }
 
 function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
+  const objType = a.typeOf(node.object)
   if (node.field.name === '^') {
-    const objType = a.typeOf(node.object)
     if (objType.tag === 'pointer') {
       // ISO 7185 6.5.4: 指针解引用 p^ → cell.get(p)
       return syscall(syscallKeys.ptrDeref, [compileExpr(node.object, a, ws)])
@@ -1664,7 +1677,7 @@ function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[
     return syscall(syscallKeys.filePeek, [compileExpr(node.object, a, ws)])
   }
   const obj = compileExpr(node.object, a, ws)
-  return syscall(syscallKeys.recField, [obj, litField(node.field.name.toLowerCase())])
+  return syscall(syscallKeys.recField, [obj, litField(node.field.name.toLowerCase()), typeDescLiteral(objType)])
 }
 
 function compileSetConstructor(

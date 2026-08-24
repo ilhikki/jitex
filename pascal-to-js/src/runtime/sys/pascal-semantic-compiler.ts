@@ -44,15 +44,40 @@ export function basicSyscall(): Record<string, SyscallHandler> {
 
     // ---------- record ----------
     'rec.field': (_ctx, [record, key]) => {
-      const element = (record as PascalRecord).value[key as string]
-      if (element === undefined) {
-        throw new Error(`get field ${key} not init`)
+      const recordValue = (record as PascalRecord).value
+      const keyText = key as string
+
+      const keyKind = recordValue.keys[keyText]
+      if (keyKind === 'fix') {
+        return recordValue.fix[keyText]
+      } else if (keyKind === 'variant') {
+        const variantElement = recordValue.variant
+        if (variantElement === undefined) {
+          throw new Error(`field(variant) is unset ${keyText}`)
+        }
+        if (variantElement.name !== keyText) {
+          throw new Error(`field(variant) set ${variantElement.name} but get ${keyText}`)
+        }
+        return variantElement.value
+      } else {
+        throw new Error(`record not contains field ${keyText}`)
       }
-      return element
     },
     'rec.set': (_ctx, [r, key, value]) => {
       const record = r as PascalRecord
-      record.value[key as string] = value
+      const keyText = key as string
+      const keyKind = record.value.keys[keyText]
+      if (keyKind === 'fix') {
+        record.value.fix[keyText] = value
+      } else if (keyKind === 'variant') {
+        record.value.variant = {
+          type: record.value.variantTypes[keyText],
+          value: value,
+          name: keyText,
+        }
+      } else {
+        throw new Error(`record not contains field ${keyText}`)
+      }
     },
     'rec.copy': (_ctx, [value]) => deepCopyValue(value),
 
