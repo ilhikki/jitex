@@ -141,7 +141,7 @@ export type PascalRecord = {
 
 export type RecordValue = {
   fix: Record<string, unknown>
-  variant: { type: TypeDescriptor; value: unknown, name: string } | undefined
+  variant: { type: TypeDescriptor; value: unknown; name: string } | undefined
   keys: Record<string, 'fix' | 'variant'>
   variantTypes: Record<string, TypeDescriptor>
 }
