@@ -9,7 +9,7 @@
  */
 
 import * as JsonCode from './json-code.ts'
-import { Analysis, Symbol, TypeInfo } from './analysis.ts'
+import { Analysis, Symbol, TypeInfo, VariantPartInfo } from './analysis.ts'
 import {
   ArrayAccessNode,
   AssignmentNode,
@@ -42,7 +42,6 @@ import {
 
 interface WithBinding {
   tempVarId: number
-  type: TypeInfo
   fields: Map<string, TypeInfo>
 }
 
@@ -55,7 +54,7 @@ function ref(varId: number): JsonCode.Ref {
 }
 
 function litInt(v: number | string): JsonCode.Literal {
-  return { kind: 'literal', key: 'i64', arg: String(v) }
+  return { kind: 'literal', key: 'i32', arg: String(v) }
 }
 
 function litReal(v: string): JsonCode.Literal {
@@ -121,9 +120,9 @@ function returnStmt(value?: JsonCode.Expr): JsonCode.Return {
 
 function typeSuffix(ti: TypeInfo): string {
   switch (ti.tag) {
-    case 'i64':
+    case 'i32':
     case 'enum':
-      return 'i64'
+      return 'i32'
     case 'subrange':
       // 子界类型按 baseTag 选择 io.write syscall
       // （boolean 子界输出 TRUE/FALSE，char 子界输出字符）
@@ -133,7 +132,7 @@ function typeSuffix(ti: TypeInfo): string {
       if (ti.baseTag === 'char') {
         return 'char'
       }
-      return 'i64'
+      return 'i32'
     case 'f64':
       return 'f64'
     case 'bool':
@@ -145,7 +144,7 @@ function typeSuffix(ti: TypeInfo): string {
     case 'set':
       return 'set'
     default:
-      return 'i64'
+      return 'i32'
   }
 }
 
@@ -223,42 +222,42 @@ const syscallKeys = {
   ioReadlnSkipFile: 'io.readln.skip.file',
   ioReadlnSkip: 'io.readln.skip',
   // io.write.${suffix}
-  ioWriteI64: 'io.write.i64',
+  ioWritei32: 'io.write.i32',
   ioWriteF64: 'io.write.f64',
   ioWriteBool: 'io.write.bool',
   ioWriteChar: 'io.write.char',
   ioWriteStr: 'io.write.str',
   ioWriteSet: 'io.write.set',
   // io.write.${suffix}.file
-  ioWriteI64File: 'io.write.i64.file',
+  ioWritei32File: 'io.write.i32.file',
   ioWriteF64File: 'io.write.f64.file',
   ioWriteBoolFile: 'io.write.bool.file',
   ioWriteCharFile: 'io.write.char.file',
   ioWriteStrFile: 'io.write.str.file',
   ioWriteSetFile: 'io.write.set.file',
   // io.write.${suffix}.fmt
-  ioWriteI64Fmt: 'io.write.i64.fmt',
+  ioWritei32Fmt: 'io.write.i32.fmt',
   ioWriteF64Fmt: 'io.write.f64.fmt',
   ioWriteBoolFmt: 'io.write.bool.fmt',
   ioWriteCharFmt: 'io.write.char.fmt',
   ioWriteStrFmt: 'io.write.str.fmt',
   ioWriteSetFmt: 'io.write.set.fmt',
   // io.write.${suffix}.fmt.file
-  ioWriteI64FmtFile: 'io.write.i64.fmt.file',
+  ioWritei32FmtFile: 'io.write.i32.fmt.file',
   ioWriteF64FmtFile: 'io.write.f64.fmt.file',
   ioWriteBoolFmtFile: 'io.write.bool.fmt.file',
   ioWriteCharFmtFile: 'io.write.char.fmt.file',
   ioWriteStrFmtFile: 'io.write.str.fmt.file',
   ioWriteSetFmtFile: 'io.write.set.fmt.file',
   // io.read.${suffix}
-  ioReadI64: 'io.read.i64',
+  ioReadi32: 'io.read.i32',
   ioReadF64: 'io.read.f64',
   ioReadBool: 'io.read.bool',
   ioReadChar: 'io.read.char',
   ioReadStr: 'io.read.str',
   ioReadSet: 'io.read.set',
   // io.read.${suffix}.file
-  ioReadI64File: 'io.read.i64.file',
+  ioReadi32File: 'io.read.i32.file',
   ioReadF64File: 'io.read.f64.file',
   ioReadBoolFile: 'io.read.bool.file',
   ioReadCharFile: 'io.read.char.file',
@@ -271,18 +270,18 @@ const syscallKeys = {
   cmpLe: 'cmp.le',
   cmpGt: 'cmp.gt',
   cmpGe: 'cmp.ge',
-  // i64
-  i64Add: 'i64.add',
-  i64Sub: 'i64.sub',
-  i64Mul: 'i64.mul',
-  i64Div: 'i64.div',
-  i64Mod: 'i64.mod',
-  i64And: 'i64.and',
-  i64Or: 'i64.or',
-  i64Not: 'i64.not',
-  i64Neg: 'i64.neg',
-  i64Abs: 'i64.abs',
-  i64Odd: 'i64.odd',
+  // i32
+  i32Add: 'i32.add',
+  i32Sub: 'i32.sub',
+  i32Mul: 'i32.mul',
+  i32Div: 'i32.div',
+  i32Mod: 'i32.mod',
+  i32And: 'i32.and',
+  i32Or: 'i32.or',
+  i32Not: 'i32.not',
+  i32Neg: 'i32.neg',
+  i32Abs: 'i32.abs',
+  i32Odd: 'i32.odd',
   // f64
   f64Add: 'f64.add',
   f64Sub: 'f64.sub',
@@ -301,11 +300,11 @@ const syscallKeys = {
   boolOr: 'bool.or',
   boolNot: 'bool.not',
   // cast
-  castCharToI64: 'cast.char.to.i64',
-  castBoolToI64: 'cast.bool.to.i64',
-  castI64ToChar: 'cast.i64.to.char',
-  castF64ToI64: 'cast.f64.to.i64',
-  castF64ToI64Round: 'cast.f64.to.i64.round',
+  castCharToi32: 'cast.char.to.i32',
+  castBoolToi32: 'cast.bool.to.i32',
+  casti32ToChar: 'cast.i32.to.char',
+  castF64Toi32: 'cast.f64.to.i32',
+  castF64Toi32Round: 'cast.f64.to.i32.round',
 } as const
 type SyscallKey = (typeof syscallKeys)[keyof typeof syscallKeys]
 
@@ -318,10 +317,10 @@ function ioWriteSyscall(
 ): JsonCode.Syscall {
   let key: SyscallKey
   switch (suffix) {
-    case 'i64':
+    case 'i32':
       key = fmt
-        ? (file ? syscallKeys.ioWriteI64FmtFile : syscallKeys.ioWriteI64Fmt)
-        : (file ? syscallKeys.ioWriteI64File : syscallKeys.ioWriteI64)
+        ? (file ? syscallKeys.ioWritei32FmtFile : syscallKeys.ioWritei32Fmt)
+        : (file ? syscallKeys.ioWritei32File : syscallKeys.ioWritei32)
       break
     case 'f64':
       key = fmt
@@ -358,8 +357,8 @@ function ioWriteSyscall(
 function ioReadSyscall(suffix: string, file: boolean, args: JsonCode.Expr[]): JsonCode.Syscall {
   let key: SyscallKey
   switch (suffix) {
-    case 'i64':
-      key = file ? syscallKeys.ioReadI64File : syscallKeys.ioReadI64
+    case 'i32':
+      key = file ? syscallKeys.ioReadi32File : syscallKeys.ioReadi32
       break
     case 'f64':
       key = file ? syscallKeys.ioReadF64File : syscallKeys.ioReadF64
@@ -385,8 +384,8 @@ function ioReadSyscall(suffix: string, file: boolean, args: JsonCode.Expr[]): Js
 // pred/succ fallback：${suffix}.sub / .add —— suffix 来自 typeSuffix
 function typeSubCall(suffix: string, args: JsonCode.Expr[]): JsonCode.Syscall {
   switch (suffix) {
-    case 'i64':
-      return syscall(syscallKeys.i64Sub, args)
+    case 'i32':
+      return syscall(syscallKeys.i32Sub, args)
     case 'f64':
       return syscall(syscallKeys.f64Sub, args)
     default:
@@ -395,8 +394,8 @@ function typeSubCall(suffix: string, args: JsonCode.Expr[]): JsonCode.Syscall {
 }
 function typeAddCall(suffix: string, args: JsonCode.Expr[]): JsonCode.Syscall {
   switch (suffix) {
-    case 'i64':
-      return syscall(syscallKeys.i64Add, args)
+    case 'i32':
+      return syscall(syscallKeys.i32Add, args)
     case 'f64':
       return syscall(syscallKeys.f64Add, args)
     default:
@@ -409,7 +408,7 @@ function typeAddCall(suffix: string, args: JsonCode.Expr[]): JsonCode.Syscall {
 
 function defaultExpr(ti: TypeInfo): JsonCode.Expr {
   switch (ti.tag) {
-    case 'i64':
+    case 'i32':
     case 'enum':
       return litInt(0)
     case 'subrange':
@@ -451,7 +450,18 @@ interface TypeDescriptor {
   dims?: Array<{ low: number; high: number }>
   elem?: TypeDescriptor
   fields?: Array<{ name: string; type: TypeDescriptor }>
-  variantFields?: Array<{ name: string; type: TypeDescriptor }>
+  variant?: VariantPartDescriptor
+}
+
+interface VariantPartDescriptor {
+  tagName?: string
+  branches: VariantBranchDescriptor[]
+}
+
+interface VariantBranchDescriptor {
+  labels: number[]
+  fields: Array<{ name: string; type: TypeDescriptor }>
+  nested?: VariantPartDescriptor
 }
 
 function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
@@ -461,12 +471,24 @@ function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
     high: ti.high,
     dims: ti.dims,
     elem: ti.elem ? serializeTypeInfo(ti.elem) : undefined,
-    variantFields: ti.variantFields
-      ? Array.from(ti.variantFields.entries()).map(([k, v]) => ({ name: k, type: serializeTypeInfo(v) }))
-      : undefined,
     fields: ti.fields
       ? Array.from(ti.fields.entries()).map(([k, v]) => ({ name: k, type: serializeTypeInfo(v) }))
       : undefined,
+    variant: ti.variant ? serializeVariantPart(ti.variant) : undefined,
+  }
+}
+
+function serializeVariantPart(vp: VariantPartInfo): VariantPartDescriptor {
+  return {
+    tagName: vp.tagName,
+    branches: vp.branches.map((b) => ({
+      labels: b.labels,
+      fields: Array.from(b.fields.entries()).map(([k, v]) => ({
+        name: k,
+        type: serializeTypeInfo(v),
+      })),
+      nested: b.nested ? serializeVariantPart(b.nested) : undefined,
+    })),
   }
 }
 
@@ -672,9 +694,8 @@ function compileAssignment(
       const fname = node.left.name.toLowerCase()
       if (binding.fields.has(fname)) {
         const varId = binding.tempVarId
-        const recTypeInfo = binding.type
         return [
-          evalStmt(syscall(syscallKeys.recSet, [ref(varId), litField(fname), value, typeDescLiteral(recTypeInfo)])),
+          evalStmt(syscall(syscallKeys.recSet, [ref(varId), litField(fname), value])),
         ]
       }
     }
@@ -716,7 +737,7 @@ function compileAssignment(
       const expr = compileExpr(i, a, ws)
       const ti = a.typeOf(i)
       if (ti.tag === 'char') {
-        return syscall(syscallKeys.castCharToI64, [expr])
+        return syscall(syscallKeys.castCharToi32, [expr])
       }
       return expr
     })
@@ -742,8 +763,7 @@ function compileAssignment(
       return [evalStmt(syscall(syscallKeys.filePut, [fExpr, value]))]
     }
     const objExpr = compileExpr(fa.object, a, ws)
-    const recTypeInfo = typeDescLiteral(a.typeOf(fa.object))
-    return [evalStmt(syscall(syscallKeys.recSet, [objExpr, litField(fa.field.name.toLowerCase()), value, recTypeInfo]))]
+    return [evalStmt(syscall(syscallKeys.recSet, [objExpr, litField(fa.field.name.toLowerCase()), value]))]
   }
 
   throw new Error('compileAssignment: unsupported left-hand side')
@@ -829,14 +849,14 @@ function compileFor(
   const initE = compileExpr(node.initial, a, ws)
   const finalE = compileExpr(node.final, a, ws)
 
-  const limitVar = a.allocTempLocal(funcId, { tag: 'i64' })
+  const limitVar = a.allocTempLocal(funcId, { tag: 'i32' })
   const L_top = a.nextId()
   const L_body = a.nextId()
   const L_end = a.nextId()
 
   const isDown = node.direction === 'DOWNTO'
   const cmpKey = isDown ? syscallKeys.cmpGe : syscallKeys.cmpLe
-  const stepKey = isDown ? syscallKeys.i64Sub : syscallKeys.i64Add
+  const stepKey = isDown ? syscallKeys.i32Sub : syscallKeys.i32Add
 
   const varRef = varSym.isVarParam ? syscall(syscallKeys.cellGet, [ref(vid)]) : ref(vid)
 
@@ -968,7 +988,6 @@ function compileWith(
     const ti = temps[i].typeInfo
     newBindings.push({
       tempVarId,
-      type: a.typeOf(recExpr),
       fields: ti.fields ?? new Map(),
     })
   }
@@ -1366,9 +1385,9 @@ function compileIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[])
     const binding = ws[i]
     const fname = node.name.toLowerCase()
     if (binding.fields.has(fname)) {
-      const typeInfo = binding.type
-
-      return syscall(syscallKeys.recField, [ref(binding.tempVarId), litField(fname), typeDescLiteral(typeInfo)])
+      // 类型信息已由 mem.default.rec 时构建为 handler 缓存在 record 上，
+      // rec.field 不再需要类型参数
+      return syscall(syscallKeys.recField, [ref(binding.tempVarId), litField(fname)])
     }
   }
 
@@ -1450,14 +1469,14 @@ function compileBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding[
 
   // 布尔逻辑
   if (op === 'AND') {
-    if (lt.tag === 'i64') {
-      return syscall(syscallKeys.i64And, [L, R])
+    if (lt.tag === 'i32') {
+      return syscall(syscallKeys.i32And, [L, R])
     }
     return syscall(syscallKeys.boolAnd, [L, R])
   }
   if (op === 'OR') {
-    if (lt.tag === 'i64') {
-      return syscall(syscallKeys.i64Or, [L, R])
+    if (lt.tag === 'i32') {
+      return syscall(syscallKeys.i32Or, [L, R])
     }
     return syscall(syscallKeys.boolOr, [L, R])
   }
@@ -1483,17 +1502,17 @@ function compileBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding[
 
   switch (op) {
     case '+':
-      return syscall(isReal ? syscallKeys.f64Add : syscallKeys.i64Add, [L, R])
+      return syscall(isReal ? syscallKeys.f64Add : syscallKeys.i32Add, [L, R])
     case '-':
-      return syscall(isReal ? syscallKeys.f64Sub : syscallKeys.i64Sub, [L, R])
+      return syscall(isReal ? syscallKeys.f64Sub : syscallKeys.i32Sub, [L, R])
     case '*':
-      return syscall(isReal ? syscallKeys.f64Mul : syscallKeys.i64Mul, [L, R])
+      return syscall(isReal ? syscallKeys.f64Mul : syscallKeys.i32Mul, [L, R])
     case '/':
       return syscall(syscallKeys.f64Div, [L, R])
     case 'DIV':
-      return syscall(syscallKeys.i64Div, [L, R])
+      return syscall(syscallKeys.i32Div, [L, R])
     case 'MOD':
-      return syscall(syscallKeys.i64Mod, [L, R])
+      return syscall(syscallKeys.i32Mod, [L, R])
     default:
       throw new Error(`compileBinary: unknown operator ${op}`)
   }
@@ -1506,13 +1525,13 @@ function compileUnary(node: UnaryExpressionNode, a: Analysis, ws: WithBinding[])
   const op = node.operator.toUpperCase()
 
   if (op === 'NOT') {
-    if (ti.tag === 'i64') {
-      return syscall(syscallKeys.i64Not, [X])
+    if (ti.tag === 'i32') {
+      return syscall(syscallKeys.i32Not, [X])
     }
     return syscall(syscallKeys.boolNot, [X])
   }
   if (op === '-') {
-    return syscall(ti.tag === 'f64' ? syscallKeys.f64Neg : syscallKeys.i64Neg, [X])
+    return syscall(ti.tag === 'f64' ? syscallKeys.f64Neg : syscallKeys.i32Neg, [X])
   }
   if (op === '+') {
     return X
@@ -1547,11 +1566,11 @@ function compileFunctionCall(
   switch (name) {
     case 'abs': {
       const ti = a.typeOf(args[0])
-      return syscall(ti.tag === 'f64' ? syscallKeys.f64Abs : syscallKeys.i64Abs, argExprs)
+      return syscall(ti.tag === 'f64' ? syscallKeys.f64Abs : syscallKeys.i32Abs, argExprs)
     }
     case 'sqr': {
       const ti = a.typeOf(args[0])
-      return syscall(ti.tag === 'f64' ? syscallKeys.f64Mul : syscallKeys.i64Mul, [argExprs[0], argExprs[0]])
+      return syscall(ti.tag === 'f64' ? syscallKeys.f64Mul : syscallKeys.i32Mul, [argExprs[0], argExprs[0]])
     }
     case 'sqrt':
       return syscall(syscallKeys.f64Sqrt, argExprs)
@@ -1566,38 +1585,38 @@ function compileFunctionCall(
     case 'arctan':
       return syscall(syscallKeys.f64Arctan, argExprs)
     case 'trunc':
-      return syscall(syscallKeys.castF64ToI64, argExprs)
+      return syscall(syscallKeys.castF64Toi32, argExprs)
     case 'round':
-      return syscall(syscallKeys.castF64ToI64Round, argExprs)
+      return syscall(syscallKeys.castF64Toi32Round, argExprs)
     case 'ord': {
       const ti = a.typeOf(args[0])
       if (ti.tag === 'char') {
-        return syscall(syscallKeys.castCharToI64, argExprs)
+        return syscall(syscallKeys.castCharToi32, argExprs)
       }
       if (ti.tag === 'bool') {
-        return syscall(syscallKeys.castBoolToI64, argExprs)
+        return syscall(syscallKeys.castBoolToi32, argExprs)
       }
-      return argExprs[0] // integer/enum 已经是 i64
+      return argExprs[0] // integer/enum 已经是 i32
     }
     case 'chr':
-      return syscall(syscallKeys.castI64ToChar, argExprs)
+      return syscall(syscallKeys.casti32ToChar, argExprs)
     case 'pred': {
       const ti = a.typeOf(args[0])
       // ISO 7185 6.6.6.4: pred(x) = value whose ordinal number is one less than x
       // "error if none" — 对枚举首值/子界下界必须报错
       // char 类型需先转 ord 再运算再转回 char
       if (ti.tag === 'char') {
-        return syscall(syscallKeys.castI64ToChar, [
-          syscall(syscallKeys.i64Sub, [syscall(syscallKeys.castCharToI64, argExprs), litInt(1)]),
+        return syscall(syscallKeys.casti32ToChar, [
+          syscall(syscallKeys.i32Sub, [syscall(syscallKeys.castCharToi32, argExprs), litInt(1)]),
         ])
       }
       if (ti.tag === 'enum' && ti.enumCount !== undefined) {
         // 枚举范围 0..enumCount-1，pred 后检查 < 0
-        const result = syscall(syscallKeys.i64Sub, [argExprs[0], litInt(1)])
+        const result = syscall(syscallKeys.i32Sub, [argExprs[0], litInt(1)])
         return syscall(syscallKeys.rangeCheck, [result, litInt(0), litInt(ti.enumCount - 1)])
       }
       if (ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined) {
-        const result = syscall(syscallKeys.i64Sub, [argExprs[0], litInt(1)])
+        const result = syscall(syscallKeys.i32Sub, [argExprs[0], litInt(1)])
         return syscall(syscallKeys.rangeCheck, [result, litInt(ti.low), litInt(ti.high)])
       }
       return typeSubCall(typeSuffix(ti), [argExprs[0], litInt(1)])
@@ -1608,23 +1627,23 @@ function compileFunctionCall(
       // "error if none" — 对枚举末值/子界上界必须报错
       // char 类型需先转 ord 再运算再转回 char
       if (ti.tag === 'char') {
-        return syscall(syscallKeys.castI64ToChar, [
-          syscall(syscallKeys.i64Add, [syscall(syscallKeys.castCharToI64, argExprs), litInt(1)]),
+        return syscall(syscallKeys.casti32ToChar, [
+          syscall(syscallKeys.i32Add, [syscall(syscallKeys.castCharToi32, argExprs), litInt(1)]),
         ])
       }
       if (ti.tag === 'enum' && ti.enumCount !== undefined) {
         // 枚举范围 0..enumCount-1，succ 后检查 > enumCount-1
-        const result = syscall(syscallKeys.i64Add, [argExprs[0], litInt(1)])
+        const result = syscall(syscallKeys.i32Add, [argExprs[0], litInt(1)])
         return syscall(syscallKeys.rangeCheck, [result, litInt(0), litInt(ti.enumCount - 1)])
       }
       if (ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined) {
-        const result = syscall(syscallKeys.i64Add, [argExprs[0], litInt(1)])
+        const result = syscall(syscallKeys.i32Add, [argExprs[0], litInt(1)])
         return syscall(syscallKeys.rangeCheck, [result, litInt(ti.low), litInt(ti.high)])
       }
       return typeAddCall(typeSuffix(ti), [argExprs[0], litInt(1)])
     }
     case 'odd':
-      return syscall(syscallKeys.i64Odd, argExprs)
+      return syscall(syscallKeys.i32Odd, argExprs)
     case 'eof':
       if (args.length > 0) {
         // file of record 用 file.rec.eof（ISO 7185 6.4.3.5）
@@ -1653,7 +1672,7 @@ function compileArrayAccess(node: ArrayAccessNode, a: Analysis, ws: WithBinding[
     // 否则 JS 中 arr['A'] 访问属性而非 arr[65]
     const ti = a.typeOf(i)
     if (ti.tag === 'char') {
-      return syscall(syscallKeys.castCharToI64, [expr])
+      return syscall(syscallKeys.castCharToi32, [expr])
     }
     return expr
   })
@@ -1677,7 +1696,7 @@ function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[
     return syscall(syscallKeys.filePeek, [compileExpr(node.object, a, ws)])
   }
   const obj = compileExpr(node.object, a, ws)
-  return syscall(syscallKeys.recField, [obj, litField(node.field.name.toLowerCase()), typeDescLiteral(objType)])
+  return syscall(syscallKeys.recField, [obj, litField(node.field.name.toLowerCase())])
 }
 
 function compileSetConstructor(

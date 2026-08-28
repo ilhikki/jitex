@@ -1,11 +1,4 @@
-import {
-  createDefaultRec,
-  deepCopyValue,
-  encodeUtf8,
-  formatField,
-  formatReal,
-  getPascalStringValue,
-} from '@/runtime/runtime-util.ts'
+import { encodeUtf8, formatField, formatReal, getPascalStringValue } from '@/runtime/runtime-util.ts'
 import {
   PascalArray,
   PascalFile,
@@ -14,7 +7,6 @@ import {
   RuntimeContext,
   SyscallHandler,
   TextFile,
-  type TypeDescriptor,
 } from '@/runtime/runtime-type.ts'
 import { MemoryTextFile } from './memory-text-file.ts'
 
@@ -29,7 +21,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       ctx.files.set(key, fileStore)
     },
     // ---------- io.write（带文本文件）----------
-    'io.write.i64.file': (_ctx, [file, value]) => {
+    'io.write.i32.file': (_ctx, [file, value]) => {
       const f = ensureTextFile(file as PascalFile)
       f.value!.writeBytes(encodeUtf8(String(value)))
       return undefined
@@ -58,7 +50,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     'hook.function.enter': (_ctx, [_name]) => {
       return undefined
     },
-    'io.write.i64': (ctx, [value]) => {
+    'io.write.i32': (ctx, [value]) => {
       const f = getOutput(ctx)
       f.writeBytes(encodeUtf8(String(value)))
       return undefined
@@ -86,7 +78,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- io.write.fmt.file（带文本文件 + 格式化）----------
-    'io.write.i64.fmt.file': (_ctx, [file, value, width]) => {
+    'io.write.i32.fmt.file': (_ctx, [file, value, width]) => {
       const f = ensureTextFile(file as PascalFile)
       f.value!.writeBytes(encodeUtf8(formatField(String(value), width as number)))
       return undefined
@@ -127,7 +119,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    'io.write.i64.fmt': (ctx, [value, width]) => {
+    'io.write.i32.fmt': (ctx, [value, width]) => {
       const f = getOutput(ctx)
       f.writeBytes(encodeUtf8(formatField(String(value), width as number)))
       return undefined
@@ -158,7 +150,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- io.read（带文本文件）----------
-    'io.read.i64.file': (_ctx, [file]) => {
+    'io.read.i32.file': (_ctx, [file]) => {
       const f = ensureTextFile(file as PascalFile)
       return readFileInt(f.value!)
     },
@@ -179,7 +171,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       return readFileStr(f.value!)
     },
 
-    'io.read.i64': (ctx) => {
+    'io.read.i32': (ctx) => {
       const f = getInput(ctx)
       return readFileInt(f)
     },
@@ -347,11 +339,13 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       if (f.value!.getMode() !== 'generation') {
         throw new Error('f^ := r before rewrite: pre-assertion violated')
       }
-      f.value!.setBuffer(deepCopyValue(value) as PascalRecord)
+      // 用 record.handler.copy 深拷贝（handler 已缓存在 record 上）
+      const rec = value as PascalRecord
+      f.value!.setBuffer(rec.handler.copy(rec.value))
       return undefined
     },
 
-    'file.rec.peek': (_ctx, [file]) => {
+    'file.rec.peek': (ctx, [file]) => {
       const f = ensureRecordFile(file as PascalFile)
       const fileStore = f.value!
       if (fileStore.getMode() === 'inspection') {
@@ -363,7 +357,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
         if (type === undefined) {
           throw new Error('miss record type')
         }
-        const buffer = createDefaultRec(fileStore.getType() as TypeDescriptor)
+        // syscall 间互调走 ctx.dispatch：复用 mem.default.rec 的完整链（factory→handler→create）
+        // createDispatcher 在调用任何 handler 前已 lazy 绑定 ctx.dispatch，这里 ! 断言。
+        const buffer = ctx.dispatch!('mem.default.rec')([type]) as PascalRecord
         fileStore.setBuffer(buffer)
         return buffer
       }

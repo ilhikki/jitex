@@ -242,7 +242,7 @@ export interface Ref {
  * key  分类；arg 具体内容。下游 codegen 负责按 key 解释 arg。
  *
  * 推荐但非强制的 key 集合：
- *   - 'i64'     : arg = 十进制整数字符串（有符号）。
+ *   - 'i32'     : arg = 十进制整数字符串（有符号）。
  *   - 'f64'     : arg = 浮点数字符串。
  *   - 'str'     : arg = 字符串内容（不含边界引号，已还原转义）。
  *   - 'char'    : arg = 单个字符（已还原转义）。
@@ -275,7 +275,7 @@ export interface Call {
  *
  * 所有 JsonCode 自身不表达的语义都走 Syscall。典型类别：
  *
- *   算术与位      : i64.add / i64.sub / i64.mul / i64.div / i64.mod / i64.neg
+ *   算术与位      : i32.add / i32.sub / i32.mul / i32.div / i32.mod / i32.neg
  *                   f64.add / f64.sub / f64.mul / f64.div / f64.neg
  *   布尔          : bool.and / bool.or / bool.not
  *   比较          : cmp.eq / cmp.ne / cmp.lt / cmp.le / cmp.gt / cmp.ge
@@ -283,7 +283,7 @@ export interface Call {
  *   记录/结构体   : rec.field / rec.set
  *   集合          : set.in / set.union / set.diff / set.isect
  *   字符串        : str.cat / str.len
- *   类型转换      : cast.i64->f64 / cast.char->i64 / cast.i64->char …
+ *   类型转换      : cast.i32->f64 / cast.char->i32 / cast.i32->char …
  *   复合类型复制  : mem.copy           （数组/记录整体赋值）
  *   IO            : io.write / io.writeln / io.read / io.readln
  *   文件          : file.reset / file.rewrite / file.get / file.put / file.eof / file.eoln …

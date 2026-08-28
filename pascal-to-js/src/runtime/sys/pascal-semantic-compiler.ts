@@ -1,14 +1,8 @@
 import type { JsCompiler, SemanticCompiler } from '../../compiler/json-code-compiler.ts'
 import * as JsonCode from '../../compiler/json-code.ts'
-import type { PascalArray, PascalCell, PascalRecord, PascalSet, SyscallHandler } from '../runtime-type.ts'
+import type { ArrayHandler, PascalArray, PascalCell, PascalRecord, PascalSet, RecordHandler, RuntimeContext, SyscallHandler, TypeHandler } from '../runtime-type.ts'
 import { type TypeDescriptor } from '../runtime-type.ts'
-import {
-  createDefaultArray,
-  createDefaultRec,
-  deepCopyValue,
-  getArrayElement,
-  setArrayElement,
-} from '../runtime-util.ts'
+import { createArrayHandler, createHandler, createRecHandler, getArrayElement, setArrayElement } from '../runtime-util.ts'
 
 function newPascalSet(set: Set<number>): PascalSet {
   return {
@@ -23,6 +17,24 @@ function unboxPascalSet(set: unknown): Set<number> {
 
 export function basicSyscall(): Record<string, SyscallHandler> {
   return {
+    // ---------- factory.*：handler 构建 impl（可 extraSyscalls 整体替换）----------
+    // syscall 把 ctx 透传到底层 impl，impl 内部再通过 ctx.dispatch 获取子 handler 工厂（递归闭环）
+    // factory.createHandler 默认实现：
+    //   - rec/array → 走对应 factory（createHandler(ctx,type) → dispatch Rec/Array 分支）
+    //   - 标量 → return undefined（严格 ISO 语义：无 handler，读未初始化标量抛未定义行为错误）
+    //   注意：不能无条件调 createHandler(ctx,type)，否则标量类型会 createHandler→dispatch factory.createHandler→createHandler 无限递归
+    'factory.createHandler': (ctx, [type]) => {
+      const td = type as TypeDescriptor
+      if (td.tag === 'rec' || td.tag === 'array') {
+        return createHandler(ctx as RuntimeContext, td) as TypeHandler | undefined
+      }
+      return undefined
+    },
+    'factory.createRecHandler': (ctx, [type]) =>
+      createRecHandler(ctx as RuntimeContext, type as TypeDescriptor) as RecordHandler,
+    'factory.createArrayHandler': (ctx, [type]) =>
+      createArrayHandler(ctx as RuntimeContext, type as TypeDescriptor) as ArrayHandler,
+
     // ---------- cell（var 参数传递）----------
     'cell.create': (_ctx, [value]): PascalCell => ({
       kind: 'cell',
@@ -34,64 +46,61 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     },
 
     // ---------- array ----------
-    'array.get': (_ctx, args) => getArrayElement(args[0] as PascalArray, args.slice(1) as number[]),
+    // 有 handler（mem.default.array 创建）→ 委托 handler（record 元素不存在时复用 handler 创建空 record）
+    // 无 handler（手构，如 str.to.char.array）→ 退回旧路径 getArrayElement/setArrayElement
+    'array.get': (ctx, args) => {
+      const arr = args[0] as PascalArray
+      const indices = args.slice(1) as number[]
+      if (arr.handler) {
+        return arr.handler.get(arr.value, indices)
+      }
+      return getArrayElement(ctx, arr, indices)
+    },
     'array.set': (_ctx, args) => {
-      setArrayElement(args[0] as PascalArray, args.slice(1, -1) as number[], args[args.length - 1])
+      const arr = args[0] as PascalArray
+      const indices = args.slice(1, -1) as number[]
+      const value = args[args.length - 1]
+      if (arr.handler) {
+        arr.handler.set(arr.value, indices, value)
+        return
+      }
+      setArrayElement(arr, indices, value)
     },
 
     // ---------- cast ----------
-    'cast.char.to.i64': (_ctx, [value]) => (typeof value === 'string' ? value.charCodeAt(0) : value),
+    'cast.char.to.i32': (_ctx, [value]) => (typeof value === 'string' ? value.charCodeAt(0) : value),
 
     // ---------- record ----------
+    // rec.field/rec.set：类型信息已由 mem.default.rec 时构建为 handler 缓存在 record 上，
+    // 不再接收类型参数；直接委托 record.handler
     'rec.field': (_ctx, [record, key]) => {
-      const recordValue = (record as PascalRecord).value
-      const keyText = key as string
-
-      const keyKind = recordValue.keys[keyText]
-      if (keyKind === 'fix') {
-        return recordValue.fix[keyText]
-      } else if (keyKind === 'variant') {
-        const variantElement = recordValue.variant
-        if (variantElement === undefined) {
-          throw new Error(`field(variant) is unset ${keyText}`)
-        }
-        if (variantElement.name !== keyText) {
-          throw new Error(`field(variant) set ${variantElement.name} but get ${keyText}`)
-        }
-        return variantElement.value
-      } else {
-        throw new Error(`record not contains field ${keyText}`)
-      }
+      const r = record as PascalRecord
+      return r.handler.get(r.value, key as string)
     },
-    'rec.set': (_ctx, [r, key, value]) => {
-      const record = r as PascalRecord
-      const keyText = key as string
-      const keyKind = record.value.keys[keyText]
-      if (keyKind === 'fix') {
-        record.value.fix[keyText] = value
-      } else if (keyKind === 'variant') {
-        record.value.variant = {
-          type: record.value.variantTypes[keyText],
-          value: value,
-          name: keyText,
-        }
-      } else {
-        throw new Error(`record not contains field ${keyText}`)
-      }
+    'rec.set': (_ctx, [record, key, value]) => {
+      const r = record as PascalRecord
+      r.handler.set(r.value, key as string, value)
     },
-    'rec.copy': (_ctx, [value]) => deepCopyValue(value),
+    'rec.copy': (_ctx, [record]) => {
+      const r = record as PascalRecord
+      return r.handler.copy(r.value)
+    },
 
     // ---------- mem.default（变量初始化）----------
-    // type 字面量由 literalToJs 直接作为 JS 对象字面量返回，无需 JSON.parse
-    'mem.default.array': (_ctx, [type]) => createDefaultArray(type as TypeDescriptor),
-    'mem.default.rec': (_ctx, [type]) => createDefaultRec(type as TypeDescriptor),
+    // syscall 间互调走 ctx.dispatch（柯里化），不裸 import 函数，
+    // 方便 extraSyscalls 替换 factory.* 整套实现。
+    // createDispatcher 在调用 handler 前已 lazy 绑定 ctx.dispatch，这里 ! 断言。
+    'mem.default.array': (ctx, [type]) => {
+      const handler = ctx.dispatch!('factory.createArrayHandler')([type]) as ArrayHandler
+      return handler.create()
+    },
+    'mem.default.rec': (ctx, [type]) => {
+      const handler = ctx.dispatch!('factory.createRecHandler')([type]) as RecordHandler
+      return handler.create()
+    },
 
     // ---------- str.to.char.array ----------
-    // Pascal `packed array[low..high] of char` 赋值为字符串字面量时，
-    // 必须展开为 1-based（按 low 起）的字符数组对象，否则后续 `arr[k]`
-    // 在 JS 中变成 0-based 字符串索引，导致首字符丢失。
-    // args = [low, high, str]；返回对象 {low:ch1, low+1:ch2, ..., high:' '}
-    // 同时填充 length 属性（=high-low+1），便于 fileUrlToString 等遍历。
+    // 手构数组（无 handler）：退回旧路径 getArrayElement/setArrayElement 处理
     'str.to.char.array': (_ctx, [l, h, s]) => {
       const pascalString = s as PascalArray
       return {
@@ -105,6 +114,7 @@ export function basicSyscall(): Record<string, SyscallHandler> {
           },
           elementType: { tag: 'char' },
         },
+        handler: undefined,
       }
     },
 
@@ -171,7 +181,7 @@ export function basicSyscall(): Record<string, SyscallHandler> {
 export class PascalSemanticCompiler implements SemanticCompiler {
   literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
     switch (literal.key) {
-      case 'i64':
+      case 'i32':
         return literal.arg // 十进制整数字符串，直接作为 JS 数字
       case 'f64':
         return literal.arg // 浮点字符串，直接作为 JS 数字
@@ -188,6 +198,7 @@ export class PascalSemanticCompiler implements SemanticCompiler {
               deep: 0,
             },
           },
+          handler: undefined,
         }
         return JSON.stringify(pascalString)
       }
@@ -214,35 +225,35 @@ export class PascalSemanticCompiler implements SemanticCompiler {
     const args = syscall.args.map((a) => compiler.compileExpr(a))
 
     // ---------- 算术（inline）----------
-    // i64 — 32 位有符号整数语义（| 0 截断，与原 compiler 一致）
+    // i32 — 32 位有符号整数语义（| 0 截断，与原 compiler 一致）
     switch (key) {
-      case 'i64.add':
+      case 'i32.add':
         return `((${args[0]} + ${args[1]}) | 0)`
-      case 'i64.sub':
+      case 'i32.sub':
         return `((${args[0]} - ${args[1]}) | 0)`
-      case 'i64.mul':
+      case 'i32.mul':
         return `((${args[0]} * ${args[1]}) | 0)`
-      case 'i64.div':
+      case 'i32.div':
         return `(() => { const __d = ${
           args[1]
         }; if (__d === 0) throw new Error('JS VM: division by zero'); return (Math.trunc(${args[0]} / __d)) | 0; })()`
-      case 'i64.mod':
+      case 'i32.mod':
         return `(() => { const __m = ${
           args[1]
         }; if (__m === 0) throw new Error('JS VM: division by zero'); const __l = ${
           args[0]
         }; return (__l - Math.trunc(__l / __m) * __m) | 0; })()`
-      case 'i64.neg':
+      case 'i32.neg':
         return `(-${args[0]} | 0)`
-      case 'i64.and':
+      case 'i32.and':
         return `((${args[0]} & ${args[1]}) | 0)`
-      case 'i64.or':
+      case 'i32.or':
         return `((${args[0]} | ${args[1]}) | 0)`
-      case 'i64.not':
+      case 'i32.not':
         return `(~${args[0]} | 0)`
-      case 'i64.abs':
+      case 'i32.abs':
         return `(Math.abs(${args[0]}) | 0)`
-      case 'i64.odd':
+      case 'i32.odd':
         return `((${args[0]} % 2) !== 0)`
 
       // f64
@@ -302,17 +313,17 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return `(${args[0]} >= ${args[1]})`
 
       // 转换
-      case 'cast.f64.to.i64':
+      case 'cast.f64.to.i32':
         return `Math.trunc(${args[0]})`
-      case 'cast.f64.to.i64.round':
+      case 'cast.f64.to.i32.round':
         // ISO 7185 6.6.6.3: round(x) = trunc(x+0.5) if x>=0, trunc(x-0.5) if x<0
         // JS Math.round 对 -3.5 返回 -3（向 +∞ 舍入），不符合 ISO（ISO 要求 -4）
         return `(Math.trunc(${args[0]} >= 0 ? ${args[0]} + 0.5 : ${args[0]} - 0.5) | 0)`
-      case 'cast.char.to.i64':
+      case 'cast.char.to.i32':
         return `(${args[0]}.charCodeAt(0))`
-      case 'cast.bool.to.i64':
+      case 'cast.bool.to.i32':
         return `(${args[0]} ? 1 : 0)`
-      case 'cast.i64.to.char':
+      case 'cast.i32.to.char':
         return `String.fromCharCode(${args[0]})`
       // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
       case 'ptr.deref':

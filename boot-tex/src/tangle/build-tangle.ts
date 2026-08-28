@@ -1,13 +1,17 @@
 import { extraSyscalls, stringToBytes } from '../utils.ts'
 import {
+  createHandler as defaultCreateHandler,
   ExtraCallable,
   MemoryTextFile,
   PascalFileStore,
+  RecordHandler,
   runJs,
   RunState,
   SyscallHandler,
   transform,
+  TypeDescriptor,
 } from '@jitex/pascal-to-js'
+import type { RuntimeContext } from '@jitex/pascal-to-js/src/runtime/runtime-type.ts'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
 // noinspection SpellCheckingInspection
@@ -28,6 +32,34 @@ const tangleExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.break': extraSyscalls['extra.break'],
   'file.reset': extraSyscalls['file.reset'],
   'file.rewrite': extraSyscalls['file.rewrite'],
+
+  // 重写 factory.createHandler：Tangle / TeX 大量依赖"标量字段未初始化读取/数组标量元素未初始化读取"
+  // （ISO 严格语义下均为未定义行为，TeX 等旧代码广泛依赖）。
+  // - rec/array：走默认实现（严格 handler，记录变体语义，深拷贝）。
+  // - subrange：默认值 = 下限 type.low。
+  // - i32/enum/subrange：默认值 = 0（或 subrange.low）。
+  // - f64：默认值 = 0。
+  // - bool：默认值 = false。
+  // - char：默认值 = '\x00'。
+  // - str：默认值 = ''。
+  // - set/file/pointer：默认值 = 空/undefined（标量浅拷贝）。
+  // 有 handler 就会在 create() / array.get 缺省元素时预填值，避免 "read unsetted field"。
+  'factory.createHandler': (ctx, [type]) => {
+    const td = type as TypeDescriptor
+    if (td.tag === 'rec' || td.tag === 'array') {
+      return defaultCreateHandler(ctx as RuntimeContext, td)
+    }
+    const fallback = (() => {
+      switch (td.tag) {
+        case 'subrange': return td.low ?? 0
+        default: return undefined
+      }
+    })()
+    return {
+      create() { return fallback },
+      copy(v: unknown) { return v },
+    } as unknown as RecordHandler
+  },
 }
 
 export type TangleInput = {

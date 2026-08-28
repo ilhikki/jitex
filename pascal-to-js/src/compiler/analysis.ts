@@ -35,7 +35,7 @@ import {
 // ============================================================
 
 export type TypeTag =
-  | 'i64'
+  | 'i32'
   | 'f64'
   | 'bool'
   | 'char'
@@ -60,7 +60,8 @@ export interface TypeInfo {
   elem?: TypeInfo
   // record
   fields?: Map<string, TypeInfo>
-  variantFields?: Map<string, TypeInfo>
+  /** 变体部分：一棵树，对应 AST 的 RecordVariantPartNode */
+  variant?: VariantPartInfo
   // set
   setBase?: TypeInfo
   // file
@@ -71,13 +72,30 @@ export interface TypeInfo {
   domainType?: TypeInfo
 }
 
+/** 变体部分信息（对应 AST 的 RecordVariantPartNode） */
+export interface VariantPartInfo {
+  /** tag 字段名（小写）；case tag: type 中的 tag，无则 undefined */
+  tagName?: string
+  branches: VariantBranchInfo[]
+}
+
+/** 单个变体分支信息（对应 AST 的 RecordVariantNode） */
+export interface VariantBranchInfo {
+  /** case 标签的 ord 值集合（多标签共享同一分支） */
+  labels: number[]
+  /** 该分支的字段（字段名小写 → 类型） */
+  fields: Map<string, TypeInfo>
+  /** 嵌套变体（分支内还有 case 时） */
+  nested?: VariantPartInfo
+}
+
 const SIMPLE_TYPES: Record<string, TypeInfo> = {
-  integer: { tag: 'i64' },
-  longint: { tag: 'i64' },
-  shortint: { tag: 'i64' },
-  byte: { tag: 'i64' },
-  word: { tag: 'i64' },
-  cardinal: { tag: 'i64' },
+  integer: { tag: 'i32' },
+  longint: { tag: 'i32' },
+  shortint: { tag: 'i32' },
+  byte: { tag: 'i32' },
+  word: { tag: 'i32' },
+  cardinal: { tag: 'i32' },
   real: { tag: 'f64' },
   single: { tag: 'f64' },
   double: { tag: 'f64' },
@@ -500,7 +518,7 @@ export class Analyzer {
   private evalLiteral(node: ExpressionNode): { key: string; arg: string } | undefined {
     switch (node.kind) {
       case 'IntegerLiteral':
-        return { key: 'i64', arg: node.raw }
+        return { key: 'i32', arg: node.raw }
       case 'RealLiteral':
         return { key: 'f64', arg: node.raw }
       case 'StringLiteral':
@@ -516,8 +534,8 @@ export class Analyzer {
 
   private typeInfoOfLiteralKey(key: string): TypeInfo {
     switch (key) {
-      case 'i64':
-        return { tag: 'i64' }
+      case 'i32':
+        return { tag: 'i32' }
       case 'f64':
         return { tag: 'f64' }
       case 'bool':
@@ -574,7 +592,7 @@ export class Analyzer {
       case 'RangeType': {
         const low = this.evalConstInt(node.start)
         const high = this.evalConstInt(node.end)
-        let baseTag: TypeTag = 'i64'
+        let baseTag: TypeTag = 'i32'
         if (node.start.kind === 'CharLiteral' || node.end.kind === 'CharLiteral') {
           baseTag = 'char'
         } else if (node.start.kind === 'BooleanLiteral' || node.end.kind === 'BooleanLiteral') {
@@ -638,12 +656,9 @@ export class Analyzer {
             fields.set(name.name.toLowerCase(), ti)
           }
         }
-        // 变体记录：收集所有变体分支的字段（变体字段共享同一内存空间）
-        const variantFields = new Map<string, TypeInfo>()
-        if (node.variant) {
-          this.collectVariantFields(node.variant, fields)
-        }
-        info = { tag: 'rec', fields, variantFields: variantFields }
+        // 变体记录：构建变体树（保留分支/标签/嵌套结构，不再扁平化到 fields）
+        const variant = node.variant ? this.buildVariantInfo(node.variant) : undefined
+        info = { tag: 'rec', fields, variant }
         break
       }
       case 'SetType': {
@@ -659,12 +674,12 @@ export class Analyzer {
       }
       case 'EnumerationType': {
         info = { tag: 'enum', enumCount: node.values.length }
-        // 绑定枚举值（每个值是 i64 常量）
+        // 绑定枚举值（每个值是 i32 常量）
         for (let i = 0; i < node.values.length; i++) {
           this.bind(node.values[i].name, {
             kind: 'const',
-            literal: { key: 'i64', arg: String(i) },
-            typeInfo: { tag: 'i64' },
+            literal: { key: 'i32', arg: String(i) },
+            typeInfo: { tag: 'i32' },
           })
         }
         break
@@ -683,22 +698,32 @@ export class Analyzer {
   }
 
   /**
-   * 递归收集变体记录的所有字段。
-   * 变体记录中不同分支的字段共享同一内存空间（union semantics），
-   * 因此将所有分支的字段都加入 fields Map，使运行时能正确初始化。
+   * 递归构建变体部分信息树。
+   * 保留 AST 的分支/标签/嵌套结构，供 runtime handler 使用：
+   *   - 每个 case 标签求值为 ord（int/char/bool/enum），多标签共享分支
+   *   - 每个分支可有多个字段声明（每个声明可有多个 names）
+   *   - 分支内可嵌套变体（递归）
    */
-  private collectVariantFields(
-    variant: RecordVariantPartNode,
-    fields: Map<string, TypeInfo>,
-  ): void {
-    for (const v of variant.variants) {
+  private buildVariantInfo(variant: RecordVariantPartNode): VariantPartInfo {
+    const tagName = variant.tagName?.name.toLowerCase()
+    const branches: VariantBranchInfo[] = variant.variants.map((v) => {
+      // case 标签 → ord 值（多标签）
+      const labels = v.caseLabels
+        .map((lbl) => this.evalConstInt(lbl))
+        .filter((x): x is number => x !== undefined)
+      // 分支字段（多字段，每个声明可多 names）
+      const fields = new Map<string, TypeInfo>()
       for (const f of v.fields) {
         const ti = this.resolveTypeInfo(f.type)
         for (const name of f.names) {
           fields.set(name.name.toLowerCase(), ti)
         }
       }
-    }
+      // 嵌套变体
+      const nested = v.variant ? this.buildVariantInfo(v.variant) : undefined
+      return { labels, fields, nested }
+    })
+    return { tagName, branches }
   }
 
   private evalConstInt(node: ExpressionNode): number | undefined {
@@ -742,7 +767,7 @@ export class Analyzer {
       }
       case 'Identifier': {
         const sym = this.lookup(node.name)
-        if (sym?.kind === 'const' && sym.literal.key === 'i64') {
+        if (sym?.kind === 'const' && sym.literal.key === 'i32') {
           return parseInt(sym.literal.arg, 10)
         }
         return undefined
@@ -1172,7 +1197,7 @@ export class Analyzer {
     let info: TypeInfo
     switch (node.kind) {
       case 'IntegerLiteral':
-        info = { tag: 'i64' }
+        info = { tag: 'i32' }
         break
       case 'RealLiteral':
         info = { tag: 'f64' }
@@ -1241,13 +1266,13 @@ export class Analyzer {
         const op = node.operator
         if (op === 'and' || op === 'or') {
           // integer 位运算 vs boolean 逻辑
-          info = lt.tag === 'i64' ? { tag: 'i64' } : { tag: 'bool' }
+          info = lt.tag === 'i32' ? { tag: 'i32' } : { tag: 'bool' }
         } else if (['=', '<>', '<', '<=', '>', '>='].includes(op)) {
           info = { tag: 'bool' }
         } else if (op === '/') {
           info = { tag: 'f64' }
         } else if (op === 'div' || op === 'mod') {
-          info = { tag: 'i64' }
+          info = { tag: 'i32' }
         } else {
           // + - *
           if (lt.tag === 'set' && rt.tag === 'set') {
@@ -1256,7 +1281,7 @@ export class Analyzer {
             info = { tag: 'str' }
           } else if (lt.tag === 'f64' || rt.tag === 'f64') {
             info = { tag: 'f64' }
-          } else info = { tag: 'i64' }
+          } else info = { tag: 'i32' }
         }
         break
       }
@@ -1264,9 +1289,9 @@ export class Analyzer {
       case 'UnaryExpression': {
         const ot = this.analyzeExpr(node.operand)
         if (node.operator === 'not') {
-          info = ot.tag === 'i64' ? { tag: 'i64' } : { tag: 'bool' }
+          info = ot.tag === 'i32' ? { tag: 'i32' } : { tag: 'bool' }
         } else if (node.operator === '-') {
-          info = ot.tag === 'f64' ? { tag: 'f64' } : { tag: 'i64' }
+          info = ot.tag === 'f64' ? { tag: 'f64' } : { tag: 'i32' }
         } else {
           info = ot
         }
@@ -1379,13 +1404,13 @@ export class Analyzer {
         const t = this.analyzeExpr(args[0])
         return t
       }
-      return { tag: 'i64' }
+      return { tag: 'i32' }
     }
     if (['sqrt', 'sin', 'cos', 'exp', 'ln', 'arctan'].includes(n)) {
       return { tag: 'f64' }
     }
     if (['trunc', 'round', 'ord', 'length'].includes(n)) {
-      return { tag: 'i64' }
+      return { tag: 'i32' }
     }
     if (['chr'].includes(n)) {
       return { tag: 'char' }

@@ -64,6 +64,17 @@ export function createDispatcher(
     }
   }
   return (ctx, key, args) => {
+    // lazy 绑定 ctx.dispatch（柯里化）—— runtime 固有能力，syscall 间互调通道。
+    // 绑定后共享 syscalls 闭包：extraSyscalls 覆盖的 key 全部生效。
+    if (!ctx.dispatch) {
+      ctx.dispatch = (k: string) => {
+        const fn = syscalls[k]
+        if (!fn) {
+          throw new Error(`Unknown syscall: ${k}`)
+        }
+        return (a: unknown[]) => fn(ctx, a)
+      }
+    }
     const fn = syscalls[key]
     if (fn) {
       return fn(ctx, args)

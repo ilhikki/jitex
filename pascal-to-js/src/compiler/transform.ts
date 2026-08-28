@@ -17,7 +17,7 @@
  *   5. 包装：返回 ES module 代码（export）
  *
  * SemanticCompiler 实现（决策 6）：
- *   - literalToJs：i64/f64/str/char/bool → JS 字面量
+ *   - literalToJs：i32/f64/str/char/bool → JS 字面量
  *   - syscallToJs：算术/比较/逻辑/转换 inline，IO/file/cell/mem/set 走 __sys dispatcher
  */
 
