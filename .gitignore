@@ -14,3 +14,4 @@ coverage-temp/
 # Logs
 *.log
 !/resources/**/*.log
+/coverage
