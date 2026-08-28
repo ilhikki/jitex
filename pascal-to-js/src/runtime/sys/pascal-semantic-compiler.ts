@@ -100,9 +100,29 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     },
 
     // ---------- str.to.char.array ----------
-    // 手构数组（无 handler）：退回旧路径 getArrayElement/setArrayElement 处理
-    'str.to.char.array': (_ctx, [l, h, s]) => {
-      const pascalString = s as PascalArray
+    // 字符串字面量 → 1-based packed array[1..n] of char（ISO 7185 字符串字面量语义）。
+    // 手构数组（无 handler）：退回旧路径 getArrayElement/setArrayElement 处理。
+    'str.to.char.array': (_ctx, [s]) => {
+      const str = s as string
+      return {
+        kind: 'array',
+        value: {
+          array: str.split(''),
+          dims: {
+            low: 1,
+            high: str.length,
+            deep: 0,
+          },
+          elementType: { tag: 'char' },
+        },
+        handler: undefined,
+      }
+    },
+
+    // ---------- array.char.resize ----------
+    // char 数组边界转换：把 1-based 字符串字面量调整到目标 low/high（如 TeX 0-based）。
+    'array.char.resize': (_ctx, [l, h, src]) => {
+      const pascalString = src as PascalArray
       return {
         kind: 'array',
         value: {
@@ -187,21 +207,10 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return literal.arg // 浮点字符串，直接作为 JS 数字
       case 'bool':
         return literal.arg // 'true' 或 'false'
-      case 'str': {
-        const pascalString: PascalArray = {
-          kind: 'array',
-          value: {
-            array: literal.arg.split(''),
-            dims: {
-              low: 0,
-              high: literal.arg.length,
-              deep: 0,
-            },
-          },
-          handler: undefined,
-        }
-        return JSON.stringify(pascalString)
-      }
+      case 'str':
+        // key 'str' 是字符串内容的字面量编码（非类型）。
+        // 直接产出 JS 字符串；由 str.to.char.array syscall 包装时才转为 PascalArray。
+        return JSON.stringify(literal.arg)
 
       case 'char':
         return JSON.stringify(literal.arg)

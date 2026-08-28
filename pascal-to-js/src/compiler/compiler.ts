@@ -139,8 +139,14 @@ function typeSuffix(ti: TypeInfo): string {
       return 'bool'
     case 'char':
       return 'char'
-    case 'str':
-      return 'str'
+    case 'array': {
+      // ISO 7185：packed array[1..n] of char 作为 write/read 参数时按字符串处理。
+      // 仅一维且元素为 char 的数组走 char.array 路由。
+      if (ti.dims?.length === 1 && ti.elem?.tag === 'char') {
+        return 'char.array'
+      }
+      return 'i32'
+    }
     case 'set':
       return 'set'
     default:
@@ -207,8 +213,10 @@ const syscallKeys = {
   // array
   arrayGet: 'array.get',
   arraySet: 'array.set',
-  // str
+  // str.to.char.array：字符串字面量 → 1-based packed array[1..n] of char
   strToCharArray: 'str.to.char.array',
+  // array.char.resize：char 数组边界转换（目标 low≠1 时使用）
+  arrayCharResize: 'array.char.resize',
   // range / steps / program
   rangeCheck: 'range.check',
   stepsCheck: 'steps.check',
@@ -226,42 +234,42 @@ const syscallKeys = {
   ioWriteF64: 'io.write.f64',
   ioWriteBool: 'io.write.bool',
   ioWriteChar: 'io.write.char',
-  ioWriteStr: 'io.write.str',
+  ioWriteCharArray: 'io.write.char.array',
   ioWriteSet: 'io.write.set',
   // io.write.${suffix}.file
   ioWritei32File: 'io.write.i32.file',
   ioWriteF64File: 'io.write.f64.file',
   ioWriteBoolFile: 'io.write.bool.file',
   ioWriteCharFile: 'io.write.char.file',
-  ioWriteStrFile: 'io.write.str.file',
+  ioWriteCharArrayFile: 'io.write.char.array.file',
   ioWriteSetFile: 'io.write.set.file',
   // io.write.${suffix}.fmt
   ioWritei32Fmt: 'io.write.i32.fmt',
   ioWriteF64Fmt: 'io.write.f64.fmt',
   ioWriteBoolFmt: 'io.write.bool.fmt',
   ioWriteCharFmt: 'io.write.char.fmt',
-  ioWriteStrFmt: 'io.write.str.fmt',
+  ioWriteCharArrayFmt: 'io.write.char.array.fmt',
   ioWriteSetFmt: 'io.write.set.fmt',
   // io.write.${suffix}.fmt.file
   ioWritei32FmtFile: 'io.write.i32.fmt.file',
   ioWriteF64FmtFile: 'io.write.f64.fmt.file',
   ioWriteBoolFmtFile: 'io.write.bool.fmt.file',
   ioWriteCharFmtFile: 'io.write.char.fmt.file',
-  ioWriteStrFmtFile: 'io.write.str.fmt.file',
+  ioWriteCharArrayFmtFile: 'io.write.char.array.fmt.file',
   ioWriteSetFmtFile: 'io.write.set.fmt.file',
   // io.read.${suffix}
   ioReadi32: 'io.read.i32',
   ioReadF64: 'io.read.f64',
   ioReadBool: 'io.read.bool',
   ioReadChar: 'io.read.char',
-  ioReadStr: 'io.read.str',
+  ioReadCharArray: 'io.read.char.array',
   ioReadSet: 'io.read.set',
   // io.read.${suffix}.file
   ioReadi32File: 'io.read.i32.file',
   ioReadF64File: 'io.read.f64.file',
   ioReadBoolFile: 'io.read.bool.file',
   ioReadCharFile: 'io.read.char.file',
-  ioReadStrFile: 'io.read.str.file',
+  ioReadCharArrayFile: 'io.read.char.array.file',
   ioReadSetFile: 'io.read.set.file',
   // cmp
   cmpEq: 'cmp.eq',
@@ -337,10 +345,10 @@ function ioWriteSyscall(
         ? (file ? syscallKeys.ioWriteCharFmtFile : syscallKeys.ioWriteCharFmt)
         : (file ? syscallKeys.ioWriteCharFile : syscallKeys.ioWriteChar)
       break
-    case 'str':
+    case 'char.array':
       key = fmt
-        ? (file ? syscallKeys.ioWriteStrFmtFile : syscallKeys.ioWriteStrFmt)
-        : (file ? syscallKeys.ioWriteStrFile : syscallKeys.ioWriteStr)
+        ? (file ? syscallKeys.ioWriteCharArrayFmtFile : syscallKeys.ioWriteCharArrayFmt)
+        : (file ? syscallKeys.ioWriteCharArrayFile : syscallKeys.ioWriteCharArray)
       break
     case 'set':
       key = fmt
@@ -369,8 +377,8 @@ function ioReadSyscall(suffix: string, file: boolean, args: JsonCode.Expr[]): Js
     case 'char':
       key = file ? syscallKeys.ioReadCharFile : syscallKeys.ioReadChar
       break
-    case 'str':
-      key = file ? syscallKeys.ioReadStrFile : syscallKeys.ioReadStr
+    case 'char.array':
+      key = file ? syscallKeys.ioReadCharArrayFile : syscallKeys.ioReadCharArray
       break
     case 'set':
       key = file ? syscallKeys.ioReadSetFile : syscallKeys.ioReadSet
@@ -420,8 +428,6 @@ function defaultExpr(ti: TypeInfo): JsonCode.Expr {
       return litBool(false)
     case 'char':
       return litChar('\x00')
-    case 'str':
-      return litStr('')
     case 'array':
       return syscall(syscallKeys.memDefaultArray, [typeDescLiteral(ti)])
     case 'rec':
@@ -669,9 +675,10 @@ function compileAssignment(
     value = syscall(syscallKeys.recCopy, [value])
   }
 
-  // Pascal `packed array[low..high] of char` 赋值为字符串字面量或 str 类型时，
-  // 必须转成 1-based 字符数组对象，否则后续 arr[k] 在 JS 中是 0-based 字符串索引，
-  // 导致首字符丢失（Knuth TeX 的 NAMEOFFILE := POOLNAME 即此问题）。
+  // Pascal `packed array[low..high] of char` 赋值为字符串字面量时，
+  // 右值已是 1-based PascalArray（StringLiteral 编译为 str.to.char.array）。
+  // 若目标边界 low≠1（如 TeX 的 0-based NAMEOFFILE），需用 array.char.resize 调整边界。
+  // （Knuth TeX 的 NAMEOFFILE := POOLNAME 即此问题，目标为 0-based。）
   if (
     lvalueType.tag === 'array' &&
     lvalueType.dims &&
@@ -679,10 +686,11 @@ function compileAssignment(
     lvalueType.elem &&
     lvalueType.elem.tag === 'char'
   ) {
-    const rvalueType = a.typeOf(node.right)
-    if (rvalueType.tag === 'str' || node.right.kind === 'StringLiteral') {
+    if (node.right.kind === 'StringLiteral') {
       const dim = lvalueType.dims[0]
-      value = syscall(syscallKeys.strToCharArray, [litInt(dim.low), litInt(dim.high), value])
+      if (dim.low !== 1) {
+        value = syscall(syscallKeys.arrayCharResize, [litInt(dim.low), litInt(dim.high), value])
+      }
     }
   }
 
@@ -1340,7 +1348,10 @@ export function compileExpr(node: ExpressionNode, a: Analysis, ws: WithBinding[]
     case 'RealLiteral':
       return litReal(node.raw)
     case 'StringLiteral':
-      return litStr(node.value)
+      // ISO 7185：字符串字面量是 packed array[1..n] of char。
+      // 编译为 syscall('str.to.char.array', [strLiteral])，runtime 转为 1-based PascalArray。
+      // 字面量用 key:'str' 编码（runtime literalToJs 直接产出 JS 字符串）。
+      return syscall(syscallKeys.strToCharArray, [litStr(node.value)])
     case 'CharLiteral':
       return litChar(node.value)
     case 'BooleanLiteral':
@@ -1401,6 +1412,13 @@ function compileIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[])
   }
 
   if (sym?.kind === 'const') {
+    // const 字符串字面量：key 'str' 编码的需包 str.to.char.array syscall 产出 1-based char 数组。
+    // 其它类型直接用 literal 字面量。
+    if (sym.literal.key === 'str') {
+      return syscall(syscallKeys.strToCharArray, [
+        { kind: 'literal', key: 'str', arg: sym.literal.arg },
+      ])
+    }
     return { kind: 'literal', key: sym.literal.key, arg: sym.literal.arg }
   }
 
@@ -1462,10 +1480,7 @@ function compileBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding[
     }
   }
 
-  // 字符串拼接
-  if (lt.tag === 'str' && op === '+') {
-    throw new Error('concat str is not support')
-  }
+  // 字符串拼接非 ISO 7185 特性，不专门处理（char 数组 + 会落到下方算术报错）。
 
   // 布尔逻辑
   if (op === 'AND') {

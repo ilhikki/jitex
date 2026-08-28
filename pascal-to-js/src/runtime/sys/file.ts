@@ -41,7 +41,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       f.value!.writeBytes(encodeUtf8(value as string))
       return undefined
     },
-    'io.write.str.file': (_ctx, [file, value]) => {
+    'io.write.char.array.file': (_ctx, [file, value]) => {
       const f = ensureTextFile(file as PascalFile)
       const charArray = value as PascalArray
       f.value!.writeBytes(encodeUtf8(getPascalStringValue(charArray)))
@@ -70,7 +70,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       f.writeBytes(encodeUtf8(value as string))
       return undefined
     },
-    'io.write.str': (ctx, [value]) => {
+    'io.write.char.array': (ctx, [value]) => {
       const f = getOutput(ctx)
       const charArray = value as PascalArray
       f.writeBytes(encodeUtf8(getPascalStringValue(charArray)))
@@ -101,7 +101,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       f.value!.writeBytes(encodeUtf8(formatField(value as string, width as number)))
       return undefined
     },
-    'io.write.str.fmt.file': (_ctx, [file, value, width]) => {
+    'io.write.char.array.fmt.file': (_ctx, [file, value, width]) => {
       const f = ensureTextFile(file as PascalFile)
       const str = getPascalStringValue(value as PascalArray)
       f.value!.writeBytes(encodeUtf8(formatField(str, width as number)))
@@ -142,7 +142,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       f.writeBytes(encodeUtf8(formatField(value as string, width as number)))
       return undefined
     },
-    'io.write.str.fmt': (ctx, [value, width]) => {
+    'io.write.char.array.fmt': (ctx, [value, width]) => {
       const f = getOutput(ctx)
       const str = getPascalStringValue(value as PascalArray)
       f.writeBytes(encodeUtf8(formatField(str, width as number)))
@@ -166,9 +166,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       const f = ensureTextFile(file as PascalFile)
       return readFileChar(f.value!)
     },
-    'io.read.str.file': (_ctx, [file]) => {
+    'io.read.char.array.file': (_ctx, [file]) => {
       const f = ensureTextFile(file as PascalFile)
-      return readFileStr(f.value!)
+      return readFileCharArray(f.value!)
     },
 
     'io.read.i32': (ctx) => {
@@ -187,9 +187,9 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       const f = getInput(ctx)
       return readFileChar(f)
     },
-    'io.read.str': (ctx) => {
+    'io.read.char.array': (ctx) => {
       const f = getInput(ctx)
-      return readFileStr(f)
+      return readFileCharArray(f)
     },
 
     // ---------- io.readln.skip（无文件 / 带文本文件）----------
@@ -540,6 +540,16 @@ function readFileBool(file: TextFile): boolean {
   return tok === 'true' || tok === 't'
 }
 
-function readFileStr(file: TextFile): string {
-  return readFileToken(file)
+/** 读取一个字符串 token，返回 1-based packed array[1..n] of char */
+function readFileCharArray(file: TextFile): PascalArray {
+  const str = readFileToken(file)
+  return {
+    kind: 'array',
+    value: {
+      array: str.split(''),
+      dims: { low: 1, high: str.length, deep: 0 },
+      elementType: { tag: 'char' },
+    },
+    handler: undefined,
+  }
 }

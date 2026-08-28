@@ -39,7 +39,6 @@ export type TypeTag =
   | 'f64'
   | 'bool'
   | 'char'
-  | 'str'
   | 'array'
   | 'rec'
   | 'set'
@@ -102,7 +101,9 @@ const SIMPLE_TYPES: Record<string, TypeInfo> = {
   extended: { tag: 'f64' },
   boolean: { tag: 'bool' },
   char: { tag: 'char' },
-  string: { tag: 'str' },
+  // string 是非标扩展（ISO 7185 无 string 类型，只有 packed array[1..n] of char）。
+  // 启用 extension 'string' 时映射为 char 数组（长度不定，dims.high 用 0 占位）。
+  string: { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } },
   text: { tag: 'file', fileElem: { tag: 'char' } },
 }
 
@@ -542,8 +543,11 @@ export class Analyzer {
         return { tag: 'bool' }
       case 'char':
         return { tag: 'char' }
+      // key 'str' 是字符串字面量的编码层 key（非类型），
+      // ISO 7185 中字符串字面量类型为 packed array[1..n] of char。
+      // 此处返回长度未定的 char 数组占位（长度在 analyzeExpr 的 StringLiteral 分支按实际长度给出）。
       case 'str':
-        return { tag: 'str' }
+        return { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } }
       default:
         return { tag: 'unknown' }
     }
@@ -1203,7 +1207,12 @@ export class Analyzer {
         info = { tag: 'f64' }
         break
       case 'StringLiteral':
-        info = { tag: 'str' }
+        // ISO 7185：字符串字面量类型为 packed array[1..n] of char
+        info = {
+          tag: 'array',
+          dims: [{ low: 1, high: node.value.length }],
+          elem: { tag: 'char' },
+        }
         break
       case 'CharLiteral':
         info = { tag: 'char' }
@@ -1277,8 +1286,6 @@ export class Analyzer {
           // + - *
           if (lt.tag === 'set' && rt.tag === 'set') {
             info = { tag: 'set' }
-          } else if (lt.tag === 'str' || rt.tag === 'str') {
-            info = { tag: 'str' }
           } else if (lt.tag === 'f64' || rt.tag === 'f64') {
             info = { tag: 'f64' }
           } else info = { tag: 'i32' }
