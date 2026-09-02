@@ -1,4 +1,10 @@
-import { encodeUtf8, formatField, formatReal, getPascalStringValue } from '@/runtime/runtime-util.ts'
+import {
+  doCreateArrayHandler,
+  encodeUtf8,
+  formatField,
+  formatReal,
+  getPascalStringValue,
+} from '@/runtime/runtime-util.ts'
 import {
   PascalArray,
   PascalFile,
@@ -341,7 +347,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       }
       // 用 record.handler.copy 深拷贝（handler 已缓存在 record 上）
       const rec = value as PascalRecord
-      f.value!.setBuffer(rec.handler.copy(rec.value))
+      f.value!.setBuffer(rec.handler.copy(rec))
       return undefined
     },
 
@@ -543,13 +549,13 @@ function readFileBool(file: TextFile): boolean {
 /** 读取一个字符串 token，返回 1-based packed array[1..n] of char */
 function readFileCharArray(file: TextFile): PascalArray {
   const str = readFileToken(file)
+  const dims = { low: 1, high: str.length, deep: 0 }
   return {
     kind: 'array',
     value: {
       array: str.split(''),
-      dims: { low: 1, high: str.length, deep: 0 },
-      elementType: { tag: 'char' },
+      dims: dims,
     },
-    handler: undefined,
+    handler: doCreateArrayHandler(dims, undefined),
   }
 }

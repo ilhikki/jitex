@@ -44,7 +44,7 @@ export interface VariantBranchDescriptor {
  * create/copy 返回包装后的 PascalRecord（带 handler），以便嵌套 record 字段
  * 能链式 rec.field 访问（内层 record 也持有自己的 handler）。
  */
-export interface RecordHandler {
+export interface RecordHandler extends TypeHandler {
   /** 创建默认空 PascalRecord（fix 字段中 rec/array 用子 handler.create()；标量不初始化） */
   create(): PascalRecord
   /** 读取字段（含 a写b读 未定义行为检测） */
@@ -52,11 +52,11 @@ export interface RecordHandler {
   /** 设置字段（含变体切换时清空旧分支字段） */
   set(value: RecordValue, key: string, val: unknown): void
   /** 深拷贝值，返回带同一 handler 的新 PascalRecord */
-  copy(value: RecordValue): PascalRecord
+  copy(value: PascalRecord): PascalRecord
 }
 
 /** Array 行为 handler */
-export interface ArrayHandler {
+export interface ArrayHandler extends TypeHandler {
   /** 创建默认空 PascalArray */
   create(): PascalArray
   /** 获取元素（record 不存在时用元素 handler 创建） */
@@ -64,11 +64,14 @@ export interface ArrayHandler {
   /** 设置元素 */
   set(value: ArrayValue, indices: number[], val: unknown): void
   /** 深拷贝值，返回带同一 handler 的新 PascalArray */
-  copy(value: ArrayValue): PascalArray
+  copy(value: PascalArray): PascalArray
 }
 
 /** 通用 handler 联合类型 */
-export type TypeHandler = RecordHandler | ArrayHandler
+export interface TypeHandler {
+  create?(): unknown
+  copy?(value: unknown): unknown
+}
 
 // ============================================================
 // 读取状态（维护当前行 tokens）
@@ -195,13 +198,13 @@ export type PascalArray = {
   kind: 'array'
   value: ArrayValue
   /** 大部分由 mem.default.array 创建的数组有 handler；手构数组（如 str.to.char.array）无 */
-  handler: ArrayHandler | undefined
+  handler: ArrayHandler
 }
 
 export type PascalRecord = {
   kind: 'record'
   value: RecordValue
-  /** ✅ handler 在 PascalRecord 上，不在 RecordValue 上 */
+  /** handler 在 PascalRecord 上，不在 RecordValue 上 */
   handler: RecordHandler
 }
 
@@ -209,7 +212,6 @@ export type PascalRecord = {
 export type ArrayValue = {
   array: unknown[]
   dims: DimsLink
-  elementType?: TypeDescriptor | undefined
 }
 
 /** Record 的值结构（纯数据，作为 RecordHandler 方法的参数） */

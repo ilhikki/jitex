@@ -51,13 +51,19 @@ const tangleExtraSyscalls: Record<string, SyscallHandler> = {
     }
     const fallback = (() => {
       switch (td.tag) {
-        case 'subrange': return td.low ?? 0
-        default: return undefined
+        case 'subrange':
+          return td.low ?? 0
+        default:
+          return undefined
       }
     })()
     return {
-      create() { return fallback },
-      copy(v: unknown) { return v },
+      create() {
+        return fallback
+      },
+      copy(v: unknown) {
+        return v
+      },
     } as unknown as RecordHandler
   },
 }

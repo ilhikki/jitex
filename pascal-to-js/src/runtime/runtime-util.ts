@@ -6,7 +6,6 @@ import type {
   ArrayValue,
   DimsLink,
   PascalArray,
-  PascalFile,
   PascalRecord,
   RecordHandler,
   RecordValue,
@@ -45,48 +44,6 @@ export function formatField(text: string, width: number): string {
     return text
   }
   return ' '.repeat(width - text.length) + text
-}
-
-/**
- * 深拷贝 Pascal 值（record 赋值语义）。
- * Pascal 中 record/array 赋值是值拷贝，但 JS 对象赋值是引用。
- * 此函数用于 `rec.copy` syscall，确保 record 赋值时产生独立副本。
- *
- * 规则：
- *   - 标量（number/string/boolean）：直接返回
- *   - Set：返回新 Set（元素是标量，无需递归）
- *   - Uint8Array：返回新 Uint8Array
- *   - Array：递归深拷贝每个元素
- *   - PascalFile（含 url 属性）：共享引用（文件是引用语义）
- *   - record（plain object）：递归深拷贝每个字段
- */
-export function deepCopyValue(v: unknown): unknown {
-  if (v === null || v === undefined) {
-    return v
-  }
-  if (typeof v !== 'object') {
-    return v
-  }
-  if (v instanceof Set) {
-    return new Set(v)
-  }
-  if (v instanceof Uint8Array) {
-    return new Uint8Array(v)
-  }
-  if (Array.isArray(v)) {
-    return v.map(deepCopyValue)
-  }
-  // PascalFile：文件是引用语义，共享引用
-  const obj = v as Record<string, unknown>
-  if (typeof obj.url === 'string' && typeof obj.offset === 'number') {
-    return v
-  }
-  // record：递归深拷贝每个字段
-  const copy: Record<string, unknown> = {}
-  for (const k of Object.keys(obj)) {
-    copy[k] = deepCopyValue(obj[k])
-  }
-  return copy
 }
 
 export function getPascalStringValue(str: PascalArray) {
@@ -129,78 +86,6 @@ function flattenArrayType(
 
 export function createDefaultArray(ctx: RuntimeContext, typeDesc: TypeDescriptor): PascalArray {
   return createArrayHandler(ctx, typeDesc).create()
-}
-
-/** 旧路径默认元素创建（仅用于无 handler 的手构数组，如 str.to.char.array） */
-function createDefaultElement(ctx: RuntimeContext, type: TypeDescriptor, require: boolean) {
-  switch (type.tag) {
-    case 'rec':
-      return createDefaultRec(ctx, type)
-    case 'array':
-      return createDefaultArray(ctx, type)
-    case 'subrange':
-      return type.low
-    case 'file':
-      return { kind: 'file', value: undefined } as PascalFile
-    default:
-      if (require) {
-        throw new Error(`element of type ${type.tag} is not defined`)
-      } else {
-        return undefined
-      }
-  }
-}
-
-export function getArrayByIndex(array: PascalArray, indices: number[]): PascalArray {
-  let current = array
-  for (let i = 0; i < indices.length - 1; i++) {
-    const index = indices[i]
-    const actualIndex = index - (current.value.dims?.low ?? 0)
-    const arr = current.value.array
-    const element = arr[actualIndex]
-    if (element === undefined && current.value.dims?.next) {
-      // 创建下一维数组，继承父级的 elementType
-      const newArray: PascalArray = {
-        kind: 'array',
-        value: {
-          array: [],
-          dims: current.value.dims.next,
-          elementType: current.value.elementType, // 最终类型不变
-        },
-        handler: undefined,
-      }
-      arr[actualIndex] = newArray
-      current = newArray
-    } else {
-      current = element as PascalArray
-    }
-  }
-  return current
-}
-
-/** 无 handler 数组（手构，如 str.to.char.array）的元素获取 */
-export function getArrayElement(ctx: RuntimeContext, array: PascalArray, indices: number[]) {
-  const pascalArray = getArrayByIndex(array, indices)
-  const lastIndex = indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
-  const element = pascalArray.value.array[lastIndex]
-  if (element === undefined) {
-    if (pascalArray.value.elementType) {
-      const defaultElement = createDefaultElement(ctx, pascalArray.value.elementType, true)
-      pascalArray.value.array[lastIndex] = defaultElement
-      return defaultElement
-    } else {
-      throw new Error(`array is not init at ${lastIndex}(${indices.at(-1)})`)
-    }
-  }
-  return element
-}
-
-/** 无 handler 数组的元素设置 */
-export function setArrayElement(array: PascalArray, indices: number[], value: unknown): void {
-  const pascalArray = getArrayByIndex(array, indices)
-  const lastIndex = indices.at(-1)! - (pascalArray.value.dims?.low ?? 0)
-  const jsArray: Array<unknown> = pascalArray.value.array
-  jsArray[lastIndex] = value
 }
 
 // ============================================================
@@ -286,18 +171,6 @@ function findOwnerBranch(layout: VariantLayout, key: string): number {
   )
 }
 
-/**
- * 用对应 handler 拷贝子 record/array。
- * 按 child.kind 路由：record → RecordHandler.copy(RecordValue)，array → ArrayHandler.copy(ArrayValue)。
- * 类型相关性由 create() 保证（rec 字段存 PascalRecord+RecordHandler，array 字段存 PascalArray+ArrayHandler）。
- */
-function copyChild(handler: TypeHandler, child: PascalRecord | PascalArray): PascalRecord | PascalArray {
-  if (child.kind === 'record') {
-    return (handler as RecordHandler).copy(child.value)
-  }
-  return (handler as ArrayHandler).copy(child.value)
-}
-
 /** 创建空变体状态（branchIndex 待由 variantSetState 覆写） */
 function emptyVariantState(): VariantState {
   return { branchIndex: -1, tagValue: undefined, fields: {}, nested: undefined }
@@ -326,7 +199,7 @@ export function createRecHandler(ctx: RuntimeContext, type: TypeDescriptor): Rec
     create(): PascalRecord {
       const fix: Record<string, unknown> = {}
       for (const f of fixFields) {
-        if (f.handler) {
+        if (f.handler?.create !== undefined) {
           // rec/array → 用子 handler.create() 得到带 handler 的包装对象
           fix[f.name] = f.handler.create()
         }
@@ -381,31 +254,26 @@ export function createRecHandler(ctx: RuntimeContext, type: TypeDescriptor): Rec
       variantSetState(variantLayout, value.variant, key, val)
     },
 
-    copy(value) {
+    copy(record) {
+      const value = record.value
       const fix: Record<string, unknown> = {}
       for (const f of fixFields) {
         if (!(f.name in value.fix)) {
           continue
         }
         const v = value.fix[f.name]
-        if (f.handler) {
-          // 子 handler 存在但值是标量：该字段的 handler 可能来自 extraSyscalls（如 subrange/i32 等标量默认值 handler）
-          // 此时用 handler.copy 拷贝标量值；只有当值真的是 PascalRecord/PascalArray 时才走 copyChild。
-          const isComposite = typeof v === 'object' && v !== null && 'kind' in (v as object)
-          if (isComposite) {
-            fix[f.name] = copyChild(f.handler, v as PascalRecord | PascalArray)
-          } else {
-            // 标量 handler（extraSyscalls 注入，如 subrange/i32）copy 参数类型是 unknown，
-            // 与 RecordHandler/ArrayHandler 接口签名不匹配，需要类型断言。
-            fix[f.name] = (f.handler.copy as (x: unknown) => unknown)(v)
-          }
+        if (f.handler?.copy) {
+          fix[f.name] = (f.handler.copy)(v)
         } else {
-          fix[f.name] = copyScalarValue(v)
+          fix[f.name] = v
         }
       }
       return {
         kind: 'record',
-        value: { fix, variant: value.variant ? copyVariantState(value.variant) : undefined },
+        value: {
+          fix,
+          variant: value.variant && variantLayout ? copyVariantState(value.variant, variantLayout) : undefined,
+        },
         handler,
       }
     },
@@ -496,50 +364,24 @@ function switchBranchByTag(value: RecordValue, layout: VariantLayout, tagValue: 
 }
 
 /** 深拷贝变体状态 */
-function copyVariantState(state: VariantState): VariantState {
+function copyVariantState(state: VariantState, layout: VariantLayout): VariantState {
   const fields: Record<string, unknown> = {}
+  const branch = layout.branches[state.branchIndex]
   for (const k in state.fields) {
-    fields[k] = copyScalarValue(state.fields[k])
+    const v = state.fields[k]
+    const fHandler = branch.fieldHandlers.get(k)
+    if (fHandler?.copy) {
+      fields[k] = fHandler.copy(v)
+    } else {
+      fields[k] = v
+    }
   }
   return {
     branchIndex: state.branchIndex,
     tagValue: state.tagValue,
     fields,
-    nested: state.nested ? copyVariantState(state.nested) : undefined,
+    nested: state.nested && branch.nested ? copyVariantState(state.nested, branch.nested) : undefined,
   }
-}
-
-/**
- * 拷贝标量/对象叶子值（用于 record copy 中无 handler 的字段及变体字段）。
- * - 原始值：直接返回
- * - Set / Uint8Array：拷贝
- * - PascalSet：拷贝其 Set
- * - PascalFile / PascalCell：引用语义，共享
- * - 其他对象：浅拷贝属性
- */
-function copyScalarValue(v: unknown): unknown {
-  if (v === null || typeof v !== 'object') {
-    return v
-  }
-  if (v instanceof Set) {
-    return new Set(v)
-  }
-  if (v instanceof Uint8Array) {
-    return new Uint8Array(v)
-  }
-  const obj = v as { kind?: string; value?: unknown }
-  if (obj.kind === 'set' && obj.value instanceof Set) {
-    return { kind: 'set', value: new Set(obj.value) }
-  }
-  if (obj.kind === 'file' || obj.kind === 'cell') {
-    return v // 引用语义
-  }
-  // 兜底：浅拷贝可枚举属性
-  const out: Record<string, unknown> = {}
-  for (const k in obj) {
-    out[k] = (obj as Record<string, unknown>)[k]
-  }
-  return out
 }
 
 // ============================================================
@@ -558,7 +400,6 @@ function getArrayByIndexValue(value: ArrayValue, indices: number[]): ArrayValue 
       const newArray: ArrayValue = {
         array: [],
         dims: current.dims.next,
-        elementType: current.elementType,
       }
       arr[actualIndex] = newArray
       element = newArray
@@ -568,16 +409,12 @@ function getArrayByIndexValue(value: ArrayValue, indices: number[]): ArrayValue 
   return current
 }
 
-export function createArrayHandler(ctx: RuntimeContext, type: TypeDescriptor): ArrayHandler {
-  const { dimsList, elementType } = flattenArrayType(type)
-  const dimsLink = dimsToLink(dimsList)
-  const elemHandler = createHandler(ctx, elementType)
-
+export function doCreateArrayHandler(dimsLink: DimsLink, elemHandler: TypeHandler | undefined) {
   const handler: ArrayHandler = {
     create(): PascalArray {
       return {
         kind: 'array',
-        value: { array: [], dims: dimsLink, elementType },
+        value: { array: [], dims: dimsLink },
         handler,
       }
     },
@@ -587,7 +424,7 @@ export function createArrayHandler(ctx: RuntimeContext, type: TypeDescriptor): A
       let element = leaf.array[lastIndex]
       if (element === undefined) {
         // 元素不存在：有 handler（rec/array）→ 创建默认空值；无 handler → 抛 "read unsetted field"
-        if (elemHandler) {
+        if (elemHandler?.create !== undefined) {
           element = elemHandler.create()
           leaf.array[lastIndex] = element
         } else {
@@ -601,25 +438,33 @@ export function createArrayHandler(ctx: RuntimeContext, type: TypeDescriptor): A
       const lastIndex = indices.at(-1)! - (leaf.dims?.low ?? 0)
       leaf.array[lastIndex] = val
     },
-    copy(value) {
+    copy(pascalArray) {
+      const value = pascalArray.value
       const array = value.array.map((v) => {
-        if (elemHandler && v) {
-          // 元素是 PascalRecord/PascalArray 才走 copyChild；否则用 elemHandler.copy（标量 handler 情况）
-          const isComposite = typeof v === 'object' && 'kind' in (v as object)
-          if (isComposite) {
-            return copyChild(elemHandler, v as PascalRecord | PascalArray)
-          }
-          return (elemHandler.copy as (x: unknown) => unknown)(v)
+        if (v === undefined) {
+          return undefined
         }
-        return copyScalarValue(v)
+        if (elemHandler?.copy === undefined) {
+          return v
+        }
+        return elemHandler.copy(v)
       })
       return {
         kind: 'array',
-        value: { array, dims: value.dims, elementType: value.elementType },
+        value: { array, dims: value.dims },
         handler,
       }
     },
   }
+  return handler
+}
+
+export function createArrayHandler(ctx: RuntimeContext, type: TypeDescriptor): ArrayHandler {
+  const { dimsList, elementType } = flattenArrayType(type)
+  const dimsLink = dimsToLink(dimsList)
+  const elemHandler = createHandler(ctx, elementType)
+
+  const handler = doCreateArrayHandler(dimsLink, elemHandler)
   return handler
 }
 

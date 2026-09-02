@@ -1,8 +1,18 @@
 import type { JsCompiler, SemanticCompiler } from '../../compiler/json-code-compiler.ts'
 import * as JsonCode from '../../compiler/json-code.ts'
-import type { ArrayHandler, PascalArray, PascalCell, PascalRecord, PascalSet, RecordHandler, RuntimeContext, SyscallHandler, TypeHandler } from '../runtime-type.ts'
+import type {
+  ArrayHandler,
+  PascalArray,
+  PascalCell,
+  PascalRecord,
+  PascalSet,
+  RecordHandler,
+  RuntimeContext,
+  SyscallHandler,
+  TypeHandler,
+} from '../runtime-type.ts'
 import { type TypeDescriptor } from '../runtime-type.ts'
-import { createArrayHandler, createHandler, createRecHandler, getArrayElement, setArrayElement } from '../runtime-util.ts'
+import { createArrayHandler, createHandler, createRecHandler, doCreateArrayHandler } from '../runtime-util.ts'
 
 function newPascalSet(set: Set<number>): PascalSet {
   return {
@@ -48,23 +58,16 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     // ---------- array ----------
     // 有 handler（mem.default.array 创建）→ 委托 handler（record 元素不存在时复用 handler 创建空 record）
     // 无 handler（手构，如 str.to.char.array）→ 退回旧路径 getArrayElement/setArrayElement
-    'array.get': (ctx, args) => {
+    'array.get': (_ctx, args) => {
       const arr = args[0] as PascalArray
       const indices = args.slice(1) as number[]
-      if (arr.handler) {
-        return arr.handler.get(arr.value, indices)
-      }
-      return getArrayElement(ctx, arr, indices)
+      return arr.handler.get(arr.value, indices)
     },
     'array.set': (_ctx, args) => {
       const arr = args[0] as PascalArray
       const indices = args.slice(1, -1) as number[]
       const value = args[args.length - 1]
-      if (arr.handler) {
-        arr.handler.set(arr.value, indices, value)
-        return
-      }
-      setArrayElement(arr, indices, value)
+      arr.handler.set(arr.value, indices, value)
     },
 
     // ---------- cast ----------
@@ -83,7 +86,7 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     },
     'rec.copy': (_ctx, [record]) => {
       const r = record as PascalRecord
-      return r.handler.copy(r.value)
+      return r.handler.copy(r)
     },
 
     // ---------- mem.default（变量初始化）----------
@@ -104,18 +107,19 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     // 手构数组（无 handler）：退回旧路径 getArrayElement/setArrayElement 处理。
     'str.to.char.array': (_ctx, [s]) => {
       const str = s as string
+      const dims = {
+        low: 1,
+        high: str.length,
+        deep: 0,
+      }
       return {
         kind: 'array',
         value: {
           array: str.split(''),
-          dims: {
-            low: 1,
-            high: str.length,
-            deep: 0,
-          },
+          dims,
           elementType: { tag: 'char' },
         },
-        handler: undefined,
+        handler: doCreateArrayHandler(dims, undefined),
       }
     },
 
