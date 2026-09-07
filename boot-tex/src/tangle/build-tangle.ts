@@ -1,6 +1,5 @@
 import { extraSyscalls, stringToBytes } from '../utils.ts'
 import {
-  defaultCreateHandler,
   ExtraCallable,
   MemoryTextFile,
   PascalFileStore,
@@ -8,7 +7,6 @@ import {
   RunState,
   SyscallHandler,
   transform,
-  TypeDescriptor,
 } from '@jitex/pascal-to-js'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
@@ -30,21 +28,7 @@ const tangleExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.break': extraSyscalls['extra.break'],
   'file.reset': extraSyscalls['file.reset'],
   'file.rewrite': extraSyscalls['file.rewrite'],
-  'factory.createHandler': (ctx, [type]) => {
-    const td = type as TypeDescriptor
-    // subrange 初始化为 0
-    if (td.tag === 'subrange') {
-      return {
-        create() {
-          return td.low
-        },
-        copy(v: unknown) {
-          return v
-        },
-      }
-    }
-    return defaultCreateHandler(ctx, type as TypeDescriptor)
-  },
+  'factory.createHandler': extraSyscalls['factory.createHandler'],
 }
 
 export type TangleInput = {

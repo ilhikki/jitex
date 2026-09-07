@@ -21,9 +21,9 @@ const texExtraCallables: Record<string, ExtraCallable> = {
 }
 
 export const texExtraSyscalls: Record<string, SyscallHandler> = {
-  'extra.close': () => undefined,
-  'extra.breakIn': () => undefined,
-  'extra.erStat': () => 0,
+  'extra.close': extraSyscalls['extra.close'],
+  'extra.breakIn': extraSyscalls['extra.breakIn'],
+  'extra.erStat': extraSyscalls['extra.erStat'],
   'extra.break': extraSyscalls['extra.break'],
   'file.reset': extraSyscalls['file.reset'],
   'file.rewrite': extraSyscalls['file.rewrite'],

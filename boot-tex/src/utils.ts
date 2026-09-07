@@ -1,4 +1,5 @@
 import {
+  defaultCreateHandler,
   getPascalStringValue,
   MemoryRecordFile,
   MemoryTextFile,
@@ -7,6 +8,7 @@ import {
   RecordFile,
   SyscallHandler,
   TextFile,
+  TypeDescriptor,
 } from '@jitex/pascal-to-js'
 
 export function bytesToString(bytes: Uint8Array): string {
@@ -88,6 +90,24 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     const fileStore = pascalFile.value!
     fileStore.seek(0)
   },
+  'factory.createHandler': (ctx, [type]) => {
+    const td = type as TypeDescriptor
+    // subrange 初始化为 0
+    if (td.tag === 'subrange') {
+      return {
+        create() {
+          return td.low
+        },
+        copy(v: unknown) {
+          return v
+        },
+      }
+    }
+    return defaultCreateHandler(ctx, type as TypeDescriptor)
+  },
+  'extra.close': () => undefined,
+  'extra.breakIn': () => undefined,
+  'extra.erStat': () => 0,
 }
 
 export class ConsoleFile implements TextFile {
