@@ -1,11 +1,13 @@
 // ============================================================
 // 辅助函数：real 格式化
 
-import type {
+import {
   ArrayHandler,
   ArrayValue,
+  DefaultRecordValue,
   DimsLink,
   PascalArray,
+  PascalFile,
   PascalRecord,
   RecordHandler,
   RecordValue,
@@ -205,34 +207,36 @@ export function createRecHandler(ctx: RuntimeContext, type: TypeDescriptor): Rec
     },
 
     get(value, key) {
+      const v = value as DefaultRecordValue
       // 1. 固定字段
       if (fixFieldSet.has(key)) {
-        if (key in value.fix) {
-          return value.fix[key]
+        if (key in v.fix) {
+          return v.fix[key]
         }
         throw new Error(`read unsetted field: ${key}`)
       }
       // 2. tag 字段
       if (variantLayout?.tagName === key) {
-        if (!value.variant) {
+        if (!v.variant) {
           throw new Error(`read unsetted field: ${key}`)
         }
-        return value.variant.tagValue
+        return v.variant.tagValue
       }
       // 3. 变体字段
       if (!variantLayout) {
         throw new Error(`record not contains field ${key}`)
       }
-      if (!value.variant) {
+      if (!v.variant) {
         throw new Error(`read unsetted field: ${key}`)
       }
-      return variantGet(variantLayout, value.variant, key)
+      return variantGet(variantLayout, v.variant, key)
     },
 
     set(value, key, val) {
+      const v = value as DefaultRecordValue
       // 1. 固定字段
       if (fixFieldSet.has(key)) {
-        value.fix[key] = val
+        v.fix[key] = val
         return
       }
       // 2. tag 字段：设 tag = 切换分支
@@ -244,14 +248,14 @@ export function createRecHandler(ctx: RuntimeContext, type: TypeDescriptor): Rec
       if (!variantLayout) {
         throw new Error(`record not contains field ${key}`)
       }
-      if (!value.variant) {
-        value.variant = emptyVariantState()
+      if (!v.variant) {
+        v.variant = emptyVariantState()
       }
-      variantSetState(variantLayout, value.variant, key, val)
+      variantSetState(variantLayout, v.variant, key, val)
     },
 
     copy(record) {
-      const value = record.value
+      const value = record.value as DefaultRecordValue
       const fix: Record<string, unknown> = {}
       for (const f of fixFields) {
         if (!(f.name in value.fix)) {
@@ -341,17 +345,18 @@ function variantSetState(layout: VariantLayout, state: VariantState, key: string
 
 /** 通过 tag 值切换分支（set tag 字段时调用），清空旧字段 */
 function switchBranchByTag(value: RecordValue, layout: VariantLayout, tagValue: unknown): void {
+  const v = value as DefaultRecordValue
   const idx = layout.branches.findIndex((b) => b.labels.includes(tagValue as number))
   if (idx < 0) {
     throw new Error(`tag value ${tagValue} not match any branch`)
   }
   // 同一分支：仅更新 tag 值，保留字段
-  if (value.variant && value.variant.branchIndex === idx) {
-    value.variant.tagValue = tagValue
+  if (v.variant && v.variant.branchIndex === idx) {
+    v.variant.tagValue = tagValue
     return
   }
   // 切换分支：清空旧字段，初始化新分支
-  value.variant = {
+  v.variant = {
     branchIndex: idx,
     tagValue,
     fields: {},

@@ -214,8 +214,15 @@ export type ArrayValue = {
   dims: DimsLink
 }
 
-/** Record 的值结构（纯数据，作为 RecordHandler 方法的参数） */
-export type RecordValue = {
+/**
+ * Record 的值结构（不透明接口）。
+ * 作为 RecordHandler 方法的参数，隐藏内部存储细节。
+ * 具体实现由各 RecordHandler 自行决定（DefaultRecordValue 等）。
+ */
+export type RecordValue = object
+
+/** 默认 record 值实现：fix map + VariantState */
+export interface DefaultRecordValue {
   /** 固定字段值 */
   fix: Record<string, unknown>
   /** 变体运行时状态；未激活任何分支时为 undefined */
