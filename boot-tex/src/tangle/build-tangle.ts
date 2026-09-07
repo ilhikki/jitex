@@ -1,17 +1,15 @@
 import { extraSyscalls, stringToBytes } from '../utils.ts'
 import {
-  createHandler as defaultCreateHandler,
+  defaultCreateHandler,
   ExtraCallable,
   MemoryTextFile,
   PascalFileStore,
-  RecordHandler,
   runJs,
   RunState,
   SyscallHandler,
   transform,
   TypeDescriptor,
 } from '@jitex/pascal-to-js'
-import type { RuntimeContext } from '@jitex/pascal-to-js/src/runtime/runtime-type.ts'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
 // noinspection SpellCheckingInspection
@@ -34,9 +32,6 @@ const tangleExtraSyscalls: Record<string, SyscallHandler> = {
   'file.rewrite': extraSyscalls['file.rewrite'],
   'factory.createHandler': (ctx, [type]) => {
     const td = type as TypeDescriptor
-    if (td.tag === 'rec' || td.tag === 'array') {
-      return defaultCreateHandler(ctx as RuntimeContext, td)
-    }
     // subrange 初始化为 0
     if (td.tag === 'subrange') {
       return {
@@ -48,7 +43,7 @@ const tangleExtraSyscalls: Record<string, SyscallHandler> = {
         },
       }
     }
-    return undefined
+    return defaultCreateHandler(ctx, type as TypeDescriptor)
   },
 }
 

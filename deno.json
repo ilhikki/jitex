@@ -4,6 +4,7 @@
     "./integration",
     "./boot-tex"
   ],
+  "exclude": ["reports", "resources"],
   "compilerOptions": {
     "strict": true
   },

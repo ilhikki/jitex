@@ -97,18 +97,14 @@ export function createDefaultArray(ctx: RuntimeContext, typeDesc: TypeDescriptor
  * 只有 rec/array 返回 handler；其余标量类型返回 undefined。
  * 子 handler 通过 ctx.dispatch('factory.create*Handler') 获取，形成递归闭环。
  */
-export function createHandler(ctx: RuntimeContext, type: TypeDescriptor): TypeHandler | undefined {
+export function defaultCreateHandler(ctx: RuntimeContext, type: TypeDescriptor): TypeHandler | undefined {
   switch (type.tag) {
     case 'rec':
       return ctx.dispatch!('factory.createRecHandler')([type]) as RecordHandler
     case 'array':
       return ctx.dispatch!('factory.createArrayHandler')([type]) as ArrayHandler
     default:
-      // 标量（i32/f64/bool/char/str/subrange/enum/set/file/pointer/void）
-      // 默认实现返回 undefined（严格 ISO：读未初始化标量 = 未定义行为，抛错）。
-      // 走 ctx.dispatch：extraSyscalls 覆盖 'factory.createHandler' 可为标量返回 handler
-      // （例如 subrange 返回下限默认值，避免 "read unsetted field"）。
-      return ctx.dispatch!('factory.createHandler')([type]) as TypeHandler | undefined
+      return undefined
   }
 }
 
@@ -139,7 +135,7 @@ function buildVariantLayout(ctx: RuntimeContext, vpd: VariantPartDescriptor): Va
     for (const f of b.fields) {
       fieldSet.add(f.name)
       // 子 handler 通过 ctx.dispatch 获取（可 extraSyscalls 替换 factory.*）
-      fieldHandlers.set(f.name, createHandler(ctx, f.type))
+      fieldHandlers.set(f.name, callCreateHandler(ctx, f.type))
     }
     return {
       labels: b.labels,
@@ -189,7 +185,7 @@ export function createRecHandler(ctx: RuntimeContext, type: TypeDescriptor): Rec
   // —— 预编译固定字段 ——
   const fixFields: FixFieldInfo[] = (type.fields ?? []).map((f) => ({
     name: f.name,
-    handler: createHandler(ctx, f.type),
+    handler: callCreateHandler(ctx, f.type),
   }))
   const fixFieldSet = new Set(fixFields.map((f) => f.name))
   // —— 预编译变体布局 ——
@@ -458,11 +454,13 @@ export function doCreateArrayHandler(dimsLink: DimsLink, elemHandler: TypeHandle
   }
   return handler
 }
-
+export function callCreateHandler(ctx: RuntimeContext, type: TypeDescriptor): TypeHandler | undefined {
+  return ctx.dispatch!('factory.createHandler')([type]) as TypeHandler | undefined
+}
 export function createArrayHandler(ctx: RuntimeContext, type: TypeDescriptor): ArrayHandler {
   const { dimsList, elementType } = flattenArrayType(type)
   const dimsLink = dimsToLink(dimsList)
-  const elemHandler = createHandler(ctx, elementType)
+  const elemHandler = callCreateHandler(ctx, elementType)
 
   const handler = doCreateArrayHandler(dimsLink, elemHandler)
   return handler

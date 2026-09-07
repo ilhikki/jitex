@@ -9,10 +9,9 @@ import type {
   RecordHandler,
   RuntimeContext,
   SyscallHandler,
-  TypeHandler,
 } from '../runtime-type.ts'
 import { type TypeDescriptor } from '../runtime-type.ts'
-import { createArrayHandler, createHandler, createRecHandler, doCreateArrayHandler } from '../runtime-util.ts'
+import { createArrayHandler, createRecHandler, defaultCreateHandler, doCreateArrayHandler } from '../runtime-util.ts'
 
 function newPascalSet(set: Set<number>): PascalSet {
   return {
@@ -28,17 +27,8 @@ function unboxPascalSet(set: unknown): Set<number> {
 export function basicSyscall(): Record<string, SyscallHandler> {
   return {
     // ---------- factory.*：handler 构建 impl（可 extraSyscalls 整体替换）----------
-    // syscall 把 ctx 透传到底层 impl，impl 内部再通过 ctx.dispatch 获取子 handler 工厂（递归闭环）
-    // factory.createHandler 默认实现：
-    //   - rec/array → 走对应 factory（createHandler(ctx,type) → dispatch Rec/Array 分支）
-    //   - 标量 → return undefined（严格 ISO 语义：无 handler，读未初始化标量抛未定义行为错误）
-    //   注意：不能无条件调 createHandler(ctx,type)，否则标量类型会 createHandler→dispatch factory.createHandler→createHandler 无限递归
     'factory.createHandler': (ctx, [type]) => {
-      const td = type as TypeDescriptor
-      if (td.tag === 'rec' || td.tag === 'array') {
-        return createHandler(ctx as RuntimeContext, td) as TypeHandler | undefined
-      }
-      return undefined
+      return defaultCreateHandler(ctx, type as TypeDescriptor)
     },
     'factory.createRecHandler': (ctx, [type]) =>
       createRecHandler(ctx as RuntimeContext, type as TypeDescriptor) as RecordHandler,
