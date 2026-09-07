@@ -4,21 +4,17 @@
 
 ## 目录结构
 
-| 目录                                | 层级           | 说明                                                                              |
-| ----------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| `unit/`                             | 单元测试       | lexer/parser 单个模块的独立测试                                                   |
-| `integration/`                      | 集成测试       | 按模块分组的端到端执行测试                                                        |
-| `integration/compiler/`             | 编译器集成测试 | JS 编译器执行 Pascal 程序的测试（原 m5 + m36）                                    |
-| `integration/compiler/nonstandard/` | 非标扩展测试   | 使用 `extensions`/`extraCallables`/`extraSyscalls` 的非标特性测试（正反测试成对） |
-| `integration/parser/`               | 解析器集成测试 | 解析器语法解析测试（原 m3.5）                                                     |
-| `e2e/`                              | 端到端测试     | TEX82 完整编译执行的端到端测试（原 tests-tex）                                    |
-| `e2e/resources/`                    | E2E 外部资源   | TEX82/TANGLE 源码、CM 字体 .tfm、trip 测试套件                                    |
+| 目录                    | 层级           | 说明                                           |
+| ----------------------- | -------------- | ---------------------------------------------- |
+| `unit/`                 | 单元测试       | lexer/parser 单个模块的独立测试                |
+| `integration/`          | 集成测试       | 按模块分组的端到端执行测试                     |
+| `integration/compiler/` | 编译器集成测试 | JS 编译器执行 Pascal 程序的测试（原 m5 + m36） |
+| `integration/parser/`   | 解析器集成测试 | 解析器语法解析测试（原 m3.5）                  |
 
 ## 测试文件命名
 
 - `p{phase}-{feature}.test.ts`：`p` 是 **phase**（同一 phase 可有多个文件，编号可重名），`feature` 是功能。
   - 例：`p01-basics`、`p01-control-flow`、`p03-goto-fix` 中 `01`/`03` 为 phase，`basics`/`goto-fix` 为功能。
-- 非标扩展测试放在 `integration/compiler/nonstandard/` 下，命名同样为 `p{phase}-{feature}.test.ts`。
 
 ## 原则
 

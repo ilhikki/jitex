@@ -1,7 +1,7 @@
 /*
  * IL Runtime — 同步 syscall 实现。
  *
- * 决策依据（见 decide.md）：
+ * 决策依据：
  *   - 决策 7：全部同步，无 async/await
  *   - 决策 8：steps.check 在循环回边由 compiler.ts 插入
  *   - 决策 9：RunState 复用 src/runtime/run-state.ts；

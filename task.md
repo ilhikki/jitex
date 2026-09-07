@@ -18,9 +18,8 @@
 
 ### Phase 6：完全重新写编译器 ✅（明细已删除）
 
-> 旧 Phase 6（性能优化与功能增强）作废。基准测试保留复用。 详见
-> `pascal-to-js/src/compiler/req.md`（需求清单）、`pascal-to-js/src/compiler/decide.md`（决策记录）。 集成测试 1058/1058
-> 全通过，E2E 测试 16/16 全通过（含 TRIP 100%、plain.fmt 生成、tripman.tex 编译）。
+> 旧 Phase 6（性能优化与功能增强）作废。基准测试保留复用。 详见 `pascal-to-js/src/compiler/req.md`（需求清单）。
+> 集成测试 1058/1058 全通过，E2E 测试 16/16 全通过（含 TRIP 100%、plain.fmt 生成、tripman.tex 编译）。
 
 ---
 

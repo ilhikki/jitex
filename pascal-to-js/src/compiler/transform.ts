@@ -1,7 +1,7 @@
 /*
  * IL Transform — 入口：Pascal 源码 → JS 代码字符串。
  *
- * 依赖关系（见 decide.md）：
+ * 依赖关系：
  *   transform → compiler → analysis
  *   transform → json-code-compiler
  *   transform → runtime（执行时）

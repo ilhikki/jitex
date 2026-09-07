@@ -1,6 +1,6 @@
 # IL 编译器需求清单（req.md）
 
-本文件汇总 `tests/integration/compiler/` 下 20 个测试文件覆盖的 Pascal 特性， 作为新 lowering 层（`analysis.ts` +
+本文件汇总 `tests/integration/compiler/` 下测试文件覆盖的 Pascal 特性， 作为新 lowering 层（`analysis.ts` +
 `compiler.ts` → JsonCode）必须支持的需求基线。 来源标注采用 `[文件名]` 形式，便于回溯。
 
 纯解析测试（`tests/integration/parser/`）不在此清单内——它们只验证 parser 不验证执行，新编译器无需关心。
@@ -11,8 +11,7 @@
 
 - **黑盒集成测试**：输入 Pascal 源码，校验执行结果（output / error / files 内容）。 不直接断言 JsonCode 结构。
 - **复用现有用例**：不修改任何 `*.test.ts`，只改 `_helper.ts` 切换执行管线。
-- **运行时选项兼容**：必须保留 `input` / `files` / `programFileUrls` / `sysCalls` / `extensions` / `maxSteps` 全部 6
-  个选项的语义。
+- **运行时选项兼容**：必须保留 `files` / `programFileUrls` / `extensions` / `extraSyscalls` / `maxSteps` 选项的语义。
 - **Pascal82 子集**：默认 ISO 7185 语义；`extensions=['string']` 启用字符串类型。
 
 ---
@@ -24,7 +23,7 @@
 - 整数字面量：零值、负数、大整数、20 位超大数、十六进制 `$1A2B`、前导零
   `[p01-basics][p04-conformance][p01-parser-boundary]`
 - 实数字面量：`3.14`、`1e10` 等浮点形式 `[p01-basics]`
-- 字符串字面量：空串、单字符、长字符串、转义引号（双写单引号 `''`）、特殊字符 `[p01-io][nonstandard/p01-string]`
+- 字符串字面量：空串、单字符、长字符串、转义引号（双写单引号 `''`）、特殊字符 `[p01-io]`
 - 字符字面量：`'a'` 单字符 `[p01-basics]`
 - 布尔字面量：`true` / `false` `[p01-basics]`
 
@@ -46,7 +45,7 @@
 - `real`（科学计数法输出 `5.00000000000000E+000`）`[p01-basics]`
 - `boolean` `[p01-basics]`
 - `char` `[p01-basics]`
-- 非标扩展 `string` 类型（仅 `extensions=['string']` 时启用；否则 `var s: string` 报错）`[nonstandard/p01-string]`
+- 非标扩展 `string` 类型（仅 `extensions=['string']` 时启用；否则 `var s: string` 报错）
 
 ### 2.2 子界类型 `[p02-range]`
 
@@ -399,13 +398,13 @@
 
 ## 11. 非标扩展与合规性
 
-### 11.1 `extensions=['string']` `[nonstandard/p01-string]`
+### 11.1 `extensions=['string']`
 
 - 启用 `string` 类型
 - 字符串 `+` 拼接
 - `length` 函数
 
-### 11.2 默认合规性 `[nonstandard/p01-string]`
+### 11.2 默认合规性
 
 - 不启用 `string` 扩展时，`var s: string` **必须报错**
 - 解释器默认不应支持非标特性
@@ -414,35 +413,30 @@
 
 ## 12. 测试用例分布速查
 
-> `p{phase}-{feature}.test.ts`：`p` 是 phase（同 phase 可有多个文件），`feature` 是功能。 非标扩展测试统一在
-> `integration/compiler/nonstandard/` 目录（正反测试成对）。
+> `p{phase}-{feature}.test.ts`：`p` 是 phase（同 phase 可有多个文件），`feature` 是功能。
 
-| 文件                                | 用例数 | 关键特性                                          |
-| ----------------------------------- | ------ | ------------------------------------------------- |
-| p01-basics                          | 多     | 算术/关系/逻辑/集合/类型转换/内置函数             |
-| p01-control-flow                    | 多     | IF/WHILE/FOR/REPEAT/CASE/WITH/递归                |
-| p01-io                              | 多     | writeln/write/readln/read/格式化/文件 IO/内置函数 |
-| p01-parameters                      | 多     | 值参/var 参/类型组合/边界                         |
-| p01-procedures                      | 6      | 过程/函数/参数/递归                               |
-| p01-scope                           | 多     | 全局/局部/参数/函数/常量/类型作用域               |
-| p02-array-record                    | 多     | 数组/记录/WITH/组合                               |
-| p02-file                            | 多     | FILE OF CHAR/ASSIGN/RESET/REWRITE/F^/GET/EOLN     |
-| p02-file-of-record                  | 多     | FILE OF RECORD 读写                               |
-| p02-range                           | 多     | 子界/边界检查/类型兼容                            |
-| p02-variant-record                  | 3      | 变体记录（仅解析）                                |
-| p03-goto                            | 多     | 基础 goto/跨结构/递归/透明块                      |
-| p03-goto-advanced                   | 多     | 嵌套 goto/防死循环                                |
-| p03-goto-critical                   | 多     | 跨过程 goto/标号作用域/标号值范围                 |
-| p03-goto-fix                        | 5      | 嵌套循环 goto 跳出                                |
-| p03-goto-label-in-block             | 4      | 跳入非透明块报错                                  |
-| p03-goto-scope-repro                | 3      | tangle DEBUGHELP 复现                             |
-| p04-conformance                     | 多     | 解析边界/运算符/作用域/过程/递归/类型/控制流      |
-| p04-iso-6.10-program                | 多     | ISO 6.10 程序参数                                 |
-| p04-iso-standard-library            | 多     | ISO 标准库                                        |
-| p04-knuth-pascal                    | 多     | Knuth 风格/FILE/OTHERS/PAGE                       |
-| p04-pascal82-conformance            | 多     | ARRAY[CHAR/BOOLEAN/ENUM]                          |
-| nonstandard/p01-string              | 5      | string 类型（正反测试）                           |
-| nonstandard/p02-pascal-h            | 多     | Pascal-H 插件 BREAK/BREAK_IN/ERSTAT（正反）       |
-| nonstandard/p03-file-eof            | 4      | fileEofBufferSpace F^（正反）                     |
-| nonstandard/p04-knuth-file-model    | 多     | Knuth 文件模型（正反）                            |
-| nonstandard/p05-pascal-h-file-model | 多     | Pascal-H 文件模型（正反）                         |
+| 文件                     | 用例数 | 关键特性                                          |
+| ------------------------ | ------ | ------------------------------------------------- |
+| p01-basics               | 多     | 算术/关系/逻辑/集合/类型转换/内置函数             |
+| p01-control-flow         | 多     | IF/WHILE/FOR/REPEAT/CASE/WITH/递归                |
+| p01-io                   | 多     | writeln/write/readln/read/格式化/文件 IO/内置函数 |
+| p01-parameters           | 多     | 值参/var 参/类型组合/边界                         |
+| p01-procedures           | 6      | 过程/函数/参数/递归                               |
+| p01-scope                | 多     | 全局/局部/参数/函数/常量/类型作用域               |
+| p02-array-record         | 多     | 数组/记录/WITH/组合                               |
+| p02-file                 | 多     | FILE OF CHAR/ASSIGN/RESET/REWRITE/F^/GET/EOLN     |
+| p02-file-of-record       | 多     | FILE OF RECORD 读写                               |
+| p02-range                | 多     | 子界/边界检查/类型兼容                            |
+| p02-variant-record       | 3      | 变体记录（仅解析）                                |
+| p03-goto                 | 多     | 基础 goto/跨结构/递归/透明块                      |
+| p03-goto-advanced        | 多     | 嵌套 goto/防死循环                                |
+| p03-goto-critical        | 多     | 跨过程 goto/标号作用域/标号值范围                 |
+| p03-goto-fix             | 5      | 嵌套循环 goto 跳出                                |
+| p03-goto-label-in-block  | 4      | 跳入非透明块报错                                  |
+| p03-goto-scope-repro     | 3      | tangle DEBUGHELP 复现                             |
+| p04-conformance          | 多     | 解析边界/运算符/作用域/过程/递归/类型/控制流      |
+| p04-iso-6.10-program     | 多     | ISO 6.10 程序参数                                 |
+| p04-iso-standard-library | 多     | ISO 标准库                                        |
+| p04-knuth-pascal         | 多     | Knuth 风格/FILE/OTHERS/PAGE                       |
+| p04-pascal82-conformance | 多     | ARRAY[CHAR/BOOLEAN/ENUM]                          |
+| p04-undefined-reference  | 多     | 无定义引用报错                                    |

@@ -1,3 +1,3 @@
 - ./knuth/tex is downloaded from https://ctan.org/tex-archive/systems/knuth/dist (at 2026-08-23)
 - ./knuth/web is downloaded from https://ctan.org/tex-archive/systems/knuth/dist (at 2026-08-23)
-- ./jitex/tangle/trip.ch is created by ./knuth/web/tripman.tex
+- ./jitex/trip.ch is created by ./knuth/tex/tripman.tex
