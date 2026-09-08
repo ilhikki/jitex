@@ -539,7 +539,15 @@ export class ConsoleFile implements TextFile {
   }
 
   getOutput() {
-    return this.output.join('')
+    const out = this.output.join('')
+    // Simulate terminal auto-newline: real terminals return to the line
+    // start when a program ends. TeX's close_files_and_terminate outputs
+    // "Transcript written on trip.log." via print_nl + print_char(".")
+    // without a trailing print_ln.
+    if (out.length > 0 && out[out.length - 1] !== '\n') {
+      return out + '\n'
+    }
+    return out
   }
   constructor(input: string) {
     this.input = {

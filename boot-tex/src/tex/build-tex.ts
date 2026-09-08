@@ -1,5 +1,5 @@
 import { ExtraCallable, SyscallHandler, transform } from '@jitex/pascal-to-js'
-import { extraSyscalls } from '../utils.ts'
+import { ConsoleFile, extraSyscalls } from '../utils.ts'
 
 const texExtraCallables: Record<string, ExtraCallable> = {
   'BREAK': {
@@ -33,6 +33,22 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'factory.createHandler': extraSyscalls['factory.createHandler'],
   'factory.createRecHandler': extraSyscalls['factory.createRecHandler'],
   'io.write.i32.file': extraSyscalls['io.write.i32.file'],
+  'file.eoln': (ctx, [file]) => {
+    const f = file as PascalFile
+    const store = f.value
+    if (!store || !store.hasMore()) {
+      return true
+    }
+    const byte = store.peekByte()
+    const isEoln = byte === 10 || byte === 13
+    // ConsoleFile: simulate terminal echo of the return key.
+    // input_ln stops at eoln without consuming it; the real terminal would
+    // echo the newline. advance() consumes and echoes it.
+    if (isEoln && store instanceof ConsoleFile) {
+      store.advance()
+    }
+    return isEoln
+  },
 }
 
 export function transformTex(texPascalContent: string) {

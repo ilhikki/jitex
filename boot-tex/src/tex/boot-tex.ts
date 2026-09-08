@@ -188,7 +188,7 @@ export default suite('boot tex', () => {
       poolFile,
       tripTex,
       tripTfm,
-      ttyInput: ' &trip  trip ',
+      ttyInput: ' &trip  trip \n',
       extraFiles,
     })
 
