@@ -9,7 +9,7 @@
  */
 
 import * as JsonCode from './json-code.ts'
-import { Analysis, Symbol, TypeInfo, VariantPartInfo, VarSymbol } from './analysis.ts'
+import { Analysis, AnalysisSymbol, TypeInfo, VariantPartInfo, VarSymbol } from './analysis.ts'
 import {
   ArrayAccessNode,
   AssignmentNode,
@@ -1754,6 +1754,6 @@ function compileInExpression(
 // 符号解析（含 with 重写）
 // ============================================================
 
-function resolveSymbol(node: IdentifierNode, a: Analysis, _ws: WithBinding[]): Symbol | undefined {
+function resolveSymbol(node: IdentifierNode, a: Analysis, _ws: WithBinding[]): AnalysisSymbol | undefined {
   return a.symbolOf(node)
 }

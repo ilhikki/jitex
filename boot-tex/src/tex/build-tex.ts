@@ -1,4 +1,4 @@
-import { ExtraCallable, SyscallHandler, transform } from '@jitex/pascal-to-js'
+import { ExtraCallable, PascalFile, SyscallHandler, TextFile, transform } from '@jitex/pascal-to-js'
 import { ConsoleFile, extraSyscalls } from '../utils.ts'
 
 const texExtraCallables: Record<string, ExtraCallable> = {
@@ -35,7 +35,7 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'io.write.i32.file': extraSyscalls['io.write.i32.file'],
   'file.eoln': (_ctx, [file]) => {
     const f = file as PascalFile
-    const store = f.value
+    const store = f.value as (TextFile | undefined)
     if (!store || !store.hasMore()) {
       return true
     }

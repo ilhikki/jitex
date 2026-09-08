@@ -191,7 +191,7 @@ export interface TypeSymbol {
   typeInfo: TypeInfo
 }
 
-export type Symbol = VarSymbol | FuncSymbol | ConstSymbol | TypeSymbol
+export type AnalysisSymbol = VarSymbol | FuncSymbol | ConstSymbol | TypeSymbol
 
 // ============================================================
 // 函数信息
@@ -216,7 +216,7 @@ export interface FuncInfo {
 // ============================================================
 
 interface Scope {
-  bindings: Map<string, Symbol>
+  bindings: Map<string, AnalysisSymbol>
   funcId: number
   outer: Scope | null
 }
@@ -235,11 +235,11 @@ export class Analyzer {
   private forwardFuncs = new Map<string, number>()
   private withTemps = new Map<WithStatementNode, VarSymbol[]>()
   private withStack: { fields: Map<string, TypeInfo> }[] = []
-  private symbolCache = new Map<IdentifierNode, Symbol | undefined>()
+  private symbolCache = new Map<IdentifierNode, AnalysisSymbol | undefined>()
   private exprType = new Map<ExpressionNode, TypeInfo>()
   private typeNodeInfo = new Map<TypeNode, TypeInfo>()
   private typeAliases = new Map<string, TypeInfo>()
-  private globalBindings = new Map<string, Symbol>()
+  private globalBindings = new Map<string, AnalysisSymbol>()
   /** id → 可读名字（调试用，仅 json-code-compiler 读取） */
   private idNames = new Map<number, string>()
   /** 非标特性扩展（AGENTS.md 原则 A） */
@@ -350,11 +350,11 @@ export class Analyzer {
   }
 
   // 决策 12：Pascal 标识符大小写不敏感，所有符号绑定/查找用小写 key
-  private bind(name: string, sym: Symbol): void {
+  private bind(name: string, sym: AnalysisSymbol): void {
     this.currentScope().bindings.set(name.toLowerCase(), sym)
   }
 
-  private lookup(name: string): Symbol | undefined {
+  private lookup(name: string): AnalysisSymbol | undefined {
     const key = name.toLowerCase()
     let s: Scope | null = this.currentScope()
     while (s) {
@@ -1522,7 +1522,7 @@ export class Analyzer {
 export interface Analysis {
   nextId(): number
   allocTempLocal(funcId: number, typeInfo: TypeInfo): number
-  symbolOf(node: IdentifierNode): Symbol | undefined
+  symbolOf(node: IdentifierNode): AnalysisSymbol | undefined
   labelInfo(funcId: number, labelNum: number): { labelId: number; funcId: number } | undefined
   /** label 使用位置的 funcId（longJump 目标）。label 可能在祖先函数声明但在后代函数使用 */
   labelUseFuncOf(labelId: number): number | undefined
@@ -1533,7 +1533,7 @@ export interface Analysis {
   typeOf(node: ExpressionNode): TypeInfo
   typeTagOfTypeNode(node: TypeNode): TypeInfo
   evalConstInt(node: ExpressionNode): number | undefined
-  globalSymbolOf(name: string): Symbol | undefined
+  globalSymbolOf(name: string): AnalysisSymbol | undefined
   /** id → 可读名字映射（调试用，仅 json-code-compiler 读取） */
   debugNames(): Map<number, string>
   /** 额外 callable 注入表（小写名为 key；编译期用于查 syscall 名） */
