@@ -579,7 +579,11 @@ function compileBlock(
         const varSym = sym as VarSymbol
         body.push(
           evalStmt(
-            syscall(syscallKeys.programFileUrl, [ref(varSym.varId), litField(p.name), typeDescLiteral(varSym.typeInfo)]),
+            syscall(syscallKeys.programFileUrl, [
+              ref(varSym.varId),
+              litField(p.name),
+              typeDescLiteral(varSym.typeInfo),
+            ]),
           ),
         )
       }

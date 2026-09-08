@@ -670,7 +670,7 @@ export class Analyzer {
       case 'FileType': {
         info = {
           tag: 'file',
-          elem: node.elementType ? this.resolveTypeInfo(node.elementType) : null,
+          elem: node.elementType ? this.resolveTypeInfo(node.elementType) : undefined,
         }
         break
       }

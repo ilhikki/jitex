@@ -381,7 +381,6 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     const pascalFile = file as PascalFile
     if (fileName) {
       const fileNameArg = fileName as PascalArray
-      const rawArray = fileNameArg.value.array
       const nameText = getPascalStringValue(fileNameArg)?.trim()
       ctx.debugLog.push('file.rewrite ' + nameText)
       let fileStore = ctx.files.get(nameText)
@@ -438,7 +437,6 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     let type
     if (args.length === 4) {
       const fileNameArg = args[1] as PascalArray
-      const rawArray = fileNameArg.value.array
       const fileName = getPascalStringValue(fileNameArg).trim()
       ctx.debugLog.push('file.rec.reset ' + fileName)
       type = args[3]
@@ -449,7 +447,6 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
         ctx.files.set(fileName, fileStore)
       }
       file.value = fileStore
-      const records = (fileStore as MemoryRecordFile).getRecords()
     } else {
       type = args[1]
     }
@@ -468,7 +465,7 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
       const pascalString = fileName as PascalArray
       const nameText = getPascalStringValue(pascalString)?.trim()
       ctx.debugLog.push('file.reset ' + nameText)
-      let fileStore = ctx.files.get(nameText)
+      const fileStore = ctx.files.get(nameText)
       if (fileStore === undefined) {
         pascalFile.value = undefined
         return

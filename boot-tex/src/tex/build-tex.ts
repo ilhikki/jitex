@@ -33,7 +33,7 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'factory.createHandler': extraSyscalls['factory.createHandler'],
   'factory.createRecHandler': extraSyscalls['factory.createRecHandler'],
   'io.write.i32.file': extraSyscalls['io.write.i32.file'],
-  'file.eoln': (ctx, [file]) => {
+  'file.eoln': (_ctx, [file]) => {
     const f = file as PascalFile
     const store = f.value
     if (!store || !store.hasMore()) {
