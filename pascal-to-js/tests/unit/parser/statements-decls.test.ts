@@ -1,9 +1,11 @@
-import { lex } from '../../../src/lexer/lexer.ts'
-import { CaseStatementNode, ParserInput, ProgramNode } from '../../../src/ast/types.ts'
-import { parseStatement } from '../../../src/parser/statements.ts'
-import { parseFunctionDeclaration, parseProcedureDeclaration } from '../../../src/parser/declarations.ts'
-import { parse } from '../../../src/index.ts'
+import { lex } from '@/parsing/lexer/lexer.ts'
+import { CaseStatementNode, ParserInput, ProgramNode } from '@/mod.ts'
+
 import { assert, assertEquals, describe, test } from '../../_harness.ts'
+
+import { parseFunctionDeclaration, parseProcedureDeclaration } from '@/parsing/parser/declarations.ts'
+import { parse } from '@/run.ts'
+import { parseStatement } from '@/parsing/parser/statements.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

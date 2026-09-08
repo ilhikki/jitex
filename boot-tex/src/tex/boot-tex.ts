@@ -168,7 +168,11 @@ export default suite('boot tex', () => {
     assertEquals(status, 'terminated')
     log(`[pass1 verify] assert trip.fmt exists, tripFmt defined = ${tripFmt !== undefined}`)
     assert(tripFmt !== undefined, 'trip.fmt not found')
-    log(`[pass1 verify] assert trip.log === tripin.log, tripLog length = ${tripLog?.length ?? 'undefined'}, tripinLog length = ${tripinLog.length}`)
+    log(
+      `[pass1 verify] assert trip.log === tripin.log, tripLog length = ${
+        tripLog?.length ?? 'undefined'
+      }, tripinLog length = ${tripinLog.length}`,
+    )
     assertEquals(tripLog, tripinLog, 'output should equal tripin.log')
   })
 
@@ -259,7 +263,11 @@ export default suite('boot tex', () => {
       assert(divMismatchCount === 0, `mismatch ${divMismatchCount}`)
 
       // tripos.tex 直接比较
-      log(`[pass2 verify] assert tripos.tex match, actual length = ${triposTex?.length ?? 'undefined'}, expected length = ${masterTriposTex.length}`)
+      log(
+        `[pass2 verify] assert tripos.tex match, actual length = ${
+          triposTex?.length ?? 'undefined'
+        }, expected length = ${masterTriposTex.length}`,
+      )
       assertEquals(triposTex, masterTriposTex, 'tripos.tex mismatch')
 
       // 8terminal.tex 应为空
@@ -271,10 +279,16 @@ export default suite('boot tex', () => {
       // trip.log 比较：tripman Step 5 允许若干例外（日期、glue set、accent kern、
       // 容量值、help messages、strings 总数/长度、内存统计）。
       // 第一版先做严格断言，暴露差异后再做归一化。
-      log(`[pass2 verify] assert trip.log match, actual length = ${tripLog?.length ?? 'undefined'}, expected length = ${masterTripLog.length}`)
+      log(
+        `[pass2 verify] assert trip.log match, actual length = ${
+          tripLog?.length ?? 'undefined'
+        }, expected length = ${masterTripLog.length}`,
+      )
       assertEquals(tripLog, masterTripLog, 'trip.log mismatch (may need normalization per tripman Step 5)')
       // 终端输出 == trip.fot
-      log(`[pass2 verify] assert console output === trip.fot, actual length = ${consoleOutput.length}, expected length = ${tripFot.length}`)
+      log(
+        `[pass2 verify] assert console output === trip.fot, actual length = ${consoleOutput.length}, expected length = ${tripFot.length}`,
+      )
       assertEquals(consoleOutput, tripFot, 'terminal output should equal trip.fot')
     },
   )

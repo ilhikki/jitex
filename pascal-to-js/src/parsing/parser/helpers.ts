@@ -1,4 +1,4 @@
-import { AstNode, ParseResult, ParserInput, Position, SourceLocation, Token } from '../ast/types.ts'
+import { AstNode, ParseResult, ParserInput, Position, SourceLocation, Token } from '@/mod.ts'
 
 // ============================================================================
 // Parser helpers — pure functions operating on {tokens, position}

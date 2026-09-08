@@ -12,7 +12,7 @@ import {
   ProgramNode,
   TypeDeclarationNode,
   VariableDeclarationNode,
-} from '../ast/types.ts'
+} from '@/mod.ts'
 import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
 import { parseExpression, parseIdentifier } from './expressions.ts'
 import { parseType, parseVariableDeclaration } from './types.ts'

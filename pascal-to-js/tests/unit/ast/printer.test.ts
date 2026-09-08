@@ -1,11 +1,13 @@
 import { assert, assertEquals, describe, test } from '../../_harness.ts'
-import { lex } from '../../../src/lexer/lexer.ts'
-import { parseBlock, parseProgram } from '../../../src/parser/declarations.ts'
-import { parseExpression } from '../../../src/parser/expressions.ts'
-import { parseCompoundStatement as parseCompound, parseStatement } from '../../../src/parser/statements.ts'
-import { parseType } from '../../../src/parser/types.ts'
-import { nodeToCode } from '../../../src/ast/printer.ts'
-import type { AstNode, ParseResult, ParserInput } from '../../../src/ast/types.ts'
+import { lex } from '@/parsing/lexer/lexer.ts'
+
+import { nodeToCode, parseProgram } from '@/mod.ts'
+import type { AstNode, ParseResult, ParserInput } from '@/mod.ts'
+
+import { parseBlock } from '@/parsing/parser/declarations.ts'
+import { parseExpression } from '@/parsing/parser/expressions.ts'
+import { parseCompoundStatement, parseStatement } from '@/parsing/parser/statements.ts'
+import { parseType } from '@/parsing/parser/types.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }
@@ -117,19 +119,19 @@ runExact('Printer: Statements', [
   {
     name: 'empty compound statement',
     src: 'BEGIN END',
-    parser: parseCompound,
+    parser: parseCompoundStatement,
     expected: 'begin\nend',
   },
   {
     name: 'single statement compound',
     src: 'BEGIN x := 1 END',
-    parser: parseCompound,
+    parser: parseCompoundStatement,
     expected: 'begin\n  x := 1\nend',
   },
   {
     name: 'multiple statements compound',
     src: 'BEGIN x := 1; y := 2 END',
-    parser: parseCompound,
+    parser: parseCompoundStatement,
     expected: 'begin\n  x := 1;\n  y := 2\nend',
   },
   { name: 'assignment statement', src: 'x := 42', parser: parseStatement, expected: 'x := 42' },
@@ -389,7 +391,7 @@ describe('Printer: Idempotency', () => {
   }
 
   testIdempotent('expression', 'a + b * c', parseExpression)
-  testIdempotent('compound statement', 'BEGIN x := 1; y := 2 END', parseCompound)
+  testIdempotent('compound statement', 'BEGIN x := 1; y := 2 END', parseCompoundStatement)
   testIdempotent('if statement', 'IF x > 0 THEN y := 1 ELSE y := 2', parseStatement)
   testIdempotent('while statement', 'WHILE x > 0 DO x := x - 1', parseStatement)
   testIdempotent('for statement', 'FOR i := 1 TO 10 DO x := x + i', parseStatement)

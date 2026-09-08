@@ -1,4 +1,4 @@
-import { parse } from '../../../src/index.ts'
+import { parse } from '@/run.ts'
 import { assert, describe, test } from '../../_harness.ts'
 
 describe('ISSUE-026: Variant record parsing', () => {

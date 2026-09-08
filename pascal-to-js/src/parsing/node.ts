@@ -1,54 +1,9 @@
-// AST Node Types — FP style: plain records with duck-typed `kind` field
-
-// ============================================================================
-// Position & Token Types
-// ============================================================================
-
-export interface Position {
-  line: number
-  column: number
-  offset: number
-}
-
-export interface Token {
-  type: string
-  content: string
-  start: Position
-  end: Position
-}
-
-export interface LexerInput {
-  source: string
-  offset: number
-  offsetToPosition: (offset: number) => Position
-}
-
-// ============================================================================
-// Parser Types
-// ============================================================================
-
-export interface ParserInput {
-  tokens: Token[]
-  position: number
-}
-
-export type ParseResult<T = AstNode> =
-  | { success: true; newPosition: number; astNode: T }
-  | { success: false; error: string; position: number }
-
-// ============================================================================
-// Source Location (用于 AST 节点的行号追溯)
-// ============================================================================
+import { Position } from './token.ts'
 
 export interface SourceLocation {
   start: Position
   end: Position
 }
-
-// ============================================================================
-// AST Node Definitions (records, not classes)
-// ============================================================================
-
 export interface AstNode {
   kind: string
   loc: SourceLocation

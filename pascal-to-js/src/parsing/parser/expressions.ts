@@ -15,7 +15,7 @@ import {
   SetConstructorNode,
   StringLiteralNode,
   UnaryExpressionNode,
-} from '../ast/types.ts'
+} from '@/mod.ts'
 import { expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
 
 // ============================================================================

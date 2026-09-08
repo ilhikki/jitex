@@ -28,7 +28,7 @@ import {
   StatementNode,
   TypeNode,
   WithStatementNode,
-} from '../ast/types.ts'
+} from '@/mod.ts'
 
 // ============================================================
 // 类型系统

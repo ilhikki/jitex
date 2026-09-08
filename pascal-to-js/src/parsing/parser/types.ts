@@ -15,7 +15,7 @@ import {
   SimpleTypeNode,
   TypeNode,
   VariableDeclarationNode,
-} from '../ast/types.ts'
+} from '@/mod.ts'
 import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers.ts'
 import { parseExpression, parseIdentifier } from './expressions.ts'
 

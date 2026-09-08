@@ -1,4 +1,5 @@
-import { LexerInput, Position, Token } from '../ast/types.ts'
+import { Position, Token } from '../token.ts'
+import { LexerInput } from '../types.ts'
 
 // ============================================================================
 // Position helpers

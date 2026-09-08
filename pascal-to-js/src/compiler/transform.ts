@@ -21,9 +21,8 @@
  *   - syscallToJs：算术/比较/逻辑/转换 inline，IO/file/cell/mem/set 走 __sys dispatcher
  */
 
-import { lex } from '../lexer/lexer.ts'
-import { parseProgram } from '../parser/declarations.ts'
-import type { ProgramNode } from '../ast/types.ts'
+import { lex } from '@/parsing/lexer/lexer.ts'
+import { parseProgram, type ProgramNode } from '@/mod.ts'
 import { analyzeProgram } from './analysis.ts'
 import { compileProgram } from './compiler.ts'
 import { toJs } from './json-code-compiler.ts'

@@ -20,7 +20,7 @@ import {
   StatementNode,
   WhileStatementNode,
   WithStatementNode,
-} from '../ast/types.ts'
+} from '@/mod.ts'
 import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
 import { parseExpression, parseIdentifier, parsePrimary } from './expressions.ts'
 
