@@ -164,8 +164,11 @@ export default suite('boot tex', () => {
   )
 
   stage('trip pass 1: verify', [pass1RunStage, tripSourcesStage], ([{ tripFmt, tripLog, status }, { tripinLog }]) => {
+    log(`[pass1 verify] assert status === 'terminated', actual = ${JSON.stringify(status)}`)
     assertEquals(status, 'terminated')
+    log(`[pass1 verify] assert trip.fmt exists, tripFmt defined = ${tripFmt !== undefined}`)
     assert(tripFmt !== undefined, 'trip.fmt not found')
+    log(`[pass1 verify] assert trip.log === tripin.log, tripLog length = ${tripLog?.length ?? 'undefined'}, tripinLog length = ${tripinLog.length}`)
     assertEquals(tripLog, tripinLog, 'output should equal tripin.log')
   })
 
@@ -233,10 +236,13 @@ export default suite('boot tex', () => {
         { tripLog: masterTripLog, tripDvi: masterTripDvi, triposTex: masterTriposTex, tripFot },
       ],
     ) => {
+      log(`[pass2 verify] assert status === 'terminated', actual = ${JSON.stringify(status)}`)
       assertEquals(status, 'terminated')
 
       // trip.dvi 字节级比较
+      log(`[pass2 verify] assert trip.dvi exists, tripDvi defined = ${tripDvi !== undefined}`)
       assert(tripDvi !== undefined, 'trip.dvi not found')
+      log(`[pass2 verify] assert trip.dvi length match, actual = ${tripDvi.length}, expected = ${masterTripDvi.length}`)
       assertEquals(
         tripDvi.length,
         masterTripDvi.length,
@@ -249,20 +255,26 @@ export default suite('boot tex', () => {
           divMismatchCount++
         }
       }
+      log(`[pass2 verify] assert trip.dvi bytes match, mismatch count = ${divMismatchCount}`)
       assert(divMismatchCount === 0, `mismatch ${divMismatchCount}`)
 
       // tripos.tex 直接比较
+      log(`[pass2 verify] assert tripos.tex match, actual length = ${triposTex?.length ?? 'undefined'}, expected length = ${masterTriposTex.length}`)
       assertEquals(triposTex, masterTriposTex, 'tripos.tex mismatch')
 
       // 8terminal.tex 应为空
+      log(`[pass2 verify] assert 8terminal.tex exists, terminalTex defined = ${terminalTex !== undefined}`)
       assert(terminalTex !== undefined, '8terminal.tex not found')
+      log(`[pass2 verify] assert 8terminal.tex empty, actual length = ${terminalTex.length}`)
       assertEquals(terminalTex.length, 0, '8terminal.tex should be empty')
 
       // trip.log 比较：tripman Step 5 允许若干例外（日期、glue set、accent kern、
       // 容量值、help messages、strings 总数/长度、内存统计）。
       // 第一版先做严格断言，暴露差异后再做归一化。
+      log(`[pass2 verify] assert trip.log match, actual length = ${tripLog?.length ?? 'undefined'}, expected length = ${masterTripLog.length}`)
       assertEquals(tripLog, masterTripLog, 'trip.log mismatch (may need normalization per tripman Step 5)')
       // 终端输出 == trip.fot
+      log(`[pass2 verify] assert console output === trip.fot, actual length = ${consoleOutput.length}, expected length = ${tripFot.length}`)
       assertEquals(consoleOutput, tripFot, 'terminal output should equal trip.fot')
     },
   )
