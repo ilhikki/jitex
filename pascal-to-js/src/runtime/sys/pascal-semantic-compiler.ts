@@ -261,17 +261,17 @@ export class PascalSemanticCompiler implements SemanticCompiler {
 
       // f64
       case 'f64.add':
-        return `(${args[0]} + ${args[1]})`
+        return `Math.fround(${args[0]} + ${args[1]})`
       case 'f64.sub':
-        return `(${args[0]} - ${args[1]})`
+        return `Math.fround(${args[0]} - ${args[1]})`
       case 'f64.mul':
-        return `(${args[0]} * ${args[1]})`
+        return `Math.fround(${args[0]} * ${args[1]})`
       case 'f64.div':
-        return `(${args[0]} / ${args[1]})`
+        return `Math.fround(${args[0]} / ${args[1]})`
       case 'f64.neg':
-        return `(-${args[0]})`
+        return `Math.fround(-${args[0]})`
       case 'f64.abs':
-        return `Math.abs(${args[0]})`
+        return `Math.fround(Math.abs(${args[0]}))`
       case 'f64.sqrt':
         // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
         // sqrt(x) for x < 0 is undefined → must throw

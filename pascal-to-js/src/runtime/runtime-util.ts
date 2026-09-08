@@ -7,7 +7,6 @@ import {
   DefaultRecordValue,
   DimsLink,
   PascalArray,
-  PascalFile,
   PascalRecord,
   RecordHandler,
   RecordValue,

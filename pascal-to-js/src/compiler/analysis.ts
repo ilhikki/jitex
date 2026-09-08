@@ -63,8 +63,6 @@ export interface TypeInfo {
   variant?: VariantPartInfo
   // set
   setBase?: TypeInfo
-  // file
-  fileElem?: TypeInfo | null
   // enum
   enumCount?: number
   // pointer (ISO 7185 6.4.4)
@@ -104,7 +102,7 @@ const SIMPLE_TYPES: Record<string, TypeInfo> = {
   // string 是非标扩展（ISO 7185 无 string 类型，只有 packed array[1..n] of char）。
   // 启用 extension 'string' 时映射为 char 数组（长度不定，dims.high 用 0 占位）。
   string: { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } },
-  text: { tag: 'file', fileElem: { tag: 'char' } },
+  text: { tag: 'file', elem: { tag: 'char' } },
 }
 
 // ============================================================
@@ -672,7 +670,7 @@ export class Analyzer {
       case 'FileType': {
         info = {
           tag: 'file',
-          fileElem: node.elementType ? this.resolveTypeInfo(node.elementType) : null,
+          elem: node.elementType ? this.resolveTypeInfo(node.elementType) : null,
         }
         break
       }
@@ -1361,7 +1359,7 @@ export class Analyzer {
           info = objType.domainType ?? { tag: 'unknown' }
         } else if (node.field.name === '^' && objType.tag === 'file') {
           // 文件缓冲区访问 F^：返回文件元素类型（text 文件为 char）
-          info = objType.fileElem ?? { tag: 'char' }
+          info = objType.elem ?? { tag: 'char' }
         } else {
           info = { tag: 'unknown' }
         }

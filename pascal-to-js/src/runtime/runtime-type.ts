@@ -122,6 +122,7 @@ export type SyscallHandler = (ctx: RuntimeContext, args: unknown[]) => unknown
 export type PascalFile = {
   kind: 'file'
   value: PascalFileStore | undefined
+  type: TypeDescriptor
 }
 export type PascalFileStore = TextFile | RecordFile
 

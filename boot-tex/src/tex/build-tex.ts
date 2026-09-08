@@ -29,7 +29,10 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'file.rewrite': extraSyscalls['file.rewrite'],
   'file.peek': extraSyscalls['file.peek'],
   'file.rec.rewrite': extraSyscalls['file.rec.rewrite'],
+  'file.rec.reset': extraSyscalls['file.rec.reset'],
   'factory.createHandler': extraSyscalls['factory.createHandler'],
+  'factory.createRecHandler': extraSyscalls['factory.createRecHandler'],
+  'io.write.i32.file': extraSyscalls['io.write.i32.file'],
 }
 
 export function transformTex(texPascalContent: string) {

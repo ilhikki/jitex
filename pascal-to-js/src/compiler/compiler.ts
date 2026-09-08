@@ -9,7 +9,7 @@
  */
 
 import * as JsonCode from './json-code.ts'
-import { Analysis, Symbol, TypeInfo, VariantPartInfo } from './analysis.ts'
+import { Analysis, Symbol, TypeInfo, VariantPartInfo, VarSymbol } from './analysis.ts'
 import {
   ArrayAccessNode,
   AssignmentNode,
@@ -160,7 +160,7 @@ function typeSuffix(ti: TypeInfo): string {
  * ISO 7185 6.4.3.5: file-type = 'file' 'of' component-type
  */
 function isRecordFile(fileType: TypeInfo): boolean {
-  const elemTi = fileType.fileElem ?? undefined
+  const elemTi = fileType.elem ?? undefined
   return elemTi !== undefined && elemTi.tag === 'rec'
 }
 const syscallKeys = {
@@ -433,9 +433,9 @@ function defaultExpr(ti: TypeInfo): JsonCode.Expr {
     case 'rec':
       return syscall(syscallKeys.memDefaultRec, [typeDescLiteral(ti)])
     case 'set':
-      return syscall(syscallKeys.setEmpty, [])
+      return syscall(syscallKeys.setEmpty, [typeDescLiteral(ti)])
     case 'file':
-      return syscall(syscallKeys.fileCreate, [])
+      return syscall(syscallKeys.fileCreate, [typeDescLiteral(ti)])
     case 'pointer':
       // ISO 7185 6.4.4: 指针变量默认为 nil-value
       return litNull()
@@ -576,10 +576,10 @@ function compileBlock(
     for (const p of programParams) {
       const sym = analysis.globalSymbolOf(p.name)
       if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
-        const varSym = sym as { varId: number }
+        const varSym = sym as VarSymbol
         body.push(
           evalStmt(
-            syscall(syscallKeys.programFileUrl, [ref(varSym.varId), litField(p.name)]),
+            syscall(syscallKeys.programFileUrl, [ref(varSym.varId), litField(p.name), typeDescLiteral(varSym.typeInfo)]),
           ),
         )
       }
@@ -1049,7 +1049,7 @@ function compileProcedureCall(
       if (node.arguments.length > 0) {
         const fileType = a.typeOf(node.arguments[0])
         if (isRecordFile(fileType)) {
-          const elemTi = fileType.fileElem!
+          const elemTi = fileType.elem!
           resetArgs.push(typeDescLiteral(elemTi))
           return [evalStmt(syscall(syscallKeys.fileRecReset, resetArgs))]
         }
@@ -1062,7 +1062,7 @@ function compileProcedureCall(
       if (node.arguments.length > 0) {
         const fileType = a.typeOf(node.arguments[0])
         if (isRecordFile(fileType)) {
-          const elemTi = fileType.fileElem!
+          const elemTi = fileType.elem!
           rewriteArgs.push(typeDescLiteral(elemTi))
           return [evalStmt(syscall(syscallKeys.fileRecRewrite, rewriteArgs))]
         }
@@ -1075,7 +1075,7 @@ function compileProcedureCall(
         const fileType = a.typeOf(node.arguments[0])
         if (isRecordFile(fileType)) {
           return [evalStmt(syscall(syscallKeys.fileRecGet, getArgs))]
-        } else if (fileType.fileElem?.tag === 'char') {
+        } else if (fileType.elem?.tag === 'char') {
           return [evalStmt(syscall(syscallKeys.fileGetChar, getArgs))]
         }
       }
@@ -1705,7 +1705,7 @@ function compileFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[
     // file of record: f^ 返回记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
     if (isRecordFile(objType)) {
       return syscall(syscallKeys.fileRecPeek, [compileExpr(node.object, a, ws)])
-    } else if (objType.fileElem?.tag === 'char') {
+    } else if (objType.elem?.tag === 'char') {
       return syscall(syscallKeys.filePeekChar, [compileExpr(node.object, a, ws)])
     }
     return syscall(syscallKeys.filePeek, [compileExpr(node.object, a, ws)])

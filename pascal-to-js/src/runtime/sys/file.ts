@@ -12,7 +12,7 @@ import {
   RecordFile,
   RuntimeContext,
   SyscallHandler,
-  TextFile,
+  TextFile, TypeDescriptor,
 } from '@/runtime/runtime-type.ts'
 import { MemoryTextFile } from './memory-text-file.ts'
 
@@ -219,7 +219,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- 文本文件 file.* ----------
-    'file.create': (): PascalFile => ({ kind: 'file', value: undefined }),
+    'file.create': (_ctx, [type]): PascalFile => ({ kind: 'file', value: undefined , type: type as TypeDescriptor}),
 
     // reset(f)：组合：seek(0) + setMode('inspection')
     'file.reset': (_ctx, [file]) => {
@@ -240,7 +240,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
     'file.get': (_ctx, [file]) => {
       const f = ensureTextFile(file as PascalFile)
       if (!f.value!.hasMore()) {
-        throw new Error('get(f) at EOF: pre-assertion violated')
+        return;
       }
       f.value!.advance()
     },
@@ -275,7 +275,7 @@ export function fileSyscalls(): Record<string, SyscallHandler> {
       const f = ensureTextFile(file as PascalFile)
       const byte = f.value!.peekByte()
       if (byte === undefined) {
-        throw new Error('F^ accessed at EOF: undefined behavior')
+        return 32
       }
       return byte
     },

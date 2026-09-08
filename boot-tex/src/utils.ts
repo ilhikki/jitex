@@ -1,5 +1,6 @@
 import {
   defaultCreateHandler,
+  encodeUtf8,
   getPascalStringValue,
   MemoryRecordFile,
   MemoryTextFile,
@@ -379,7 +380,10 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
   'file.rewrite': (ctx, [file, fileName]) => {
     const pascalFile = file as PascalFile
     if (fileName) {
-      const nameText = getPascalStringValue(fileName as PascalArray)?.trim()
+      const fileNameArg = fileName as PascalArray
+      const rawArray = fileNameArg.value.array
+      const nameText = getPascalStringValue(fileNameArg)?.trim()
+      ctx.debugLog.push('file.rewrite ' + nameText)
       let fileStore = ctx.files.get(nameText)
       if (fileStore === undefined) {
         fileStore = new MemoryTextFile()
@@ -395,11 +399,22 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     fileStore.seek(0)
     fileStore.setMode('generation')
   },
+  'io.write.i32.file': (_ctx, [file, value]) => {
+    const f = file as PascalFile
+    const pascalFileValue = f.value as TextFile
+    if (f.type.elem && f.type.elem.tag !== 'char') {
+      pascalFileValue.writeByte(value as number)
+    } else {
+      pascalFileValue!.writeBytes(encodeUtf8(String(value)))
+    }
+    return undefined
+  },
   'file.rec.rewrite': (ctx, args) => {
     const file = args[0] as PascalFile
     let type
     if (args.length === 4) {
       const fileName = getPascalStringValue(args[1] as PascalArray).trim()
+      ctx.debugLog.push('file.rec.rewrite ' + fileName)
       type = args[3]
 
       let fileStore = ctx.files.get(fileName)
@@ -418,6 +433,32 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     value.setType(type)
     return undefined
   },
+  'file.rec.reset': (ctx, args) => {
+    const file = args[0] as PascalFile
+    let type
+    if (args.length === 4) {
+      const fileNameArg = args[1] as PascalArray
+      const rawArray = fileNameArg.value.array
+      const fileName = getPascalStringValue(fileNameArg).trim()
+      ctx.debugLog.push('file.rec.reset ' + fileName)
+      type = args[3]
+
+      let fileStore = ctx.files.get(fileName)
+      if (fileStore === undefined) {
+        fileStore = new MemoryRecordFile()
+        ctx.files.set(fileName, fileStore)
+      }
+      file.value = fileStore
+      const records = (fileStore as MemoryRecordFile).getRecords()
+    } else {
+      type = args[1]
+    }
+    const value = file.value! as RecordFile
+    value.seek(0)
+    value.setMode('inspection')
+    value.setType(type)
+    return undefined
+  },
   'file.reset': (ctx, [file, fileName]) => {
     const pascalFile = file as PascalFile
     if (file === undefined) {
@@ -426,12 +467,12 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     if (fileName) {
       const pascalString = fileName as PascalArray
       const nameText = getPascalStringValue(pascalString)?.trim()
+      ctx.debugLog.push('file.reset ' + nameText)
       let fileStore = ctx.files.get(nameText)
       if (fileStore === undefined) {
-        fileStore = new MemoryTextFile()
-        ctx.files.set(nameText, fileStore)
+        pascalFile.value = undefined
+        return
       }
-      ctx.debugLog.push(`==> ${nameText}`)
       pascalFile.value = fileStore
     }
     if (!pascalFile.value) {
@@ -456,6 +497,7 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
           const pascalFile: PascalFile = {
             kind: 'file',
             value: undefined,
+            type: td,
           }
           return pascalFile
         },
@@ -467,9 +509,25 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
     }
     return defaultCreateHandler(ctx, type as TypeDescriptor)
   },
-  'extra.close': () => undefined,
-  'extra.breakIn': () => undefined,
-  'extra.erStat': () => 0,
+  // mem.default.rec 实际调用 factory.createRecHandler（非 factory.createHandler），
+  // 必须在此覆盖才能让 binary record handler 生效（a 写 b 读支持）。
+  'factory.createRecHandler': (ctx, [type]) => {
+    const td = type as TypeDescriptor
+    if (isBinaryRecord(td)) {
+      return createBinaryRecordHandler(td)
+    }
+    return defaultCreateHandler(ctx, td)
+  },
+  'extra.close': (ctx) => {
+    ctx.debugLog.push('extra.close')
+  },
+  'extra.breakIn': (ctx) => {
+    ctx.debugLog.push('extra.breakIn')
+  },
+  'extra.erStat': (_ctx, [file]) => {
+    const pascalFile = file as PascalFile
+    return pascalFile.value !== undefined ? 0 : 1
+  },
 }
 
 export class ConsoleFile implements TextFile {
