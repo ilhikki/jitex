@@ -4,7 +4,7 @@ import { lex } from '@/frontend/lexer/lexer.ts'
 import { parseProgram } from '@/frontend/parser/declarations.ts'
 
 import { analyzeProgram } from '@/middle/analysis/analysis.ts'
-import { compileProgram } from '@/middle/lowering/compiler.ts'
+import { loweringProgram } from '@/middle/lowering/lowering.ts'
 import { toJs } from '@/backend/codegen/json-code-compiler.ts'
 import type { RunError, RunState } from '@/backend/runtime/run-state.ts'
 
@@ -46,7 +46,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
 
   const analysis = analyzeProgram(ast, options.extensions, options.extraCallables)
 
-  const jsonCode = compileProgram(ast, analysis)
+  const jsonCode = loweringProgram(ast, analysis)
 
   const semantic = new PascalSemanticCompiler()
   const { code: jsBody, mainName } = toJs(jsonCode, {
