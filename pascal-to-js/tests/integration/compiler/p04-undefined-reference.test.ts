@@ -8,7 +8,7 @@
 
 import { assert, describe, test } from './_helper.ts'
 import { type PascalTest, runPascalTests } from './_helper.ts'
-import { run } from '../../../src/compiler/transform.ts'
+import { run } from '@jitex/pascal-to-js'
 
 const positiveTests: PascalTest[] = [
   {

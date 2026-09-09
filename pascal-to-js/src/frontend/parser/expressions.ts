@@ -1,4 +1,4 @@
-import { ParseResult, ParserInput } from '@/parsing/types.ts'
+import { ParseResult, ParserInput } from '@/frontend/types.ts'
 import { expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
 import {
   ArrayAccessNode,
@@ -15,7 +15,7 @@ import {
   SetConstructorNode,
   StringLiteralNode,
   UnaryExpressionNode,
-} from '@/parsing/node.ts'
+} from '@/frontend/node.ts'
 
 // ============================================================================
 // Expression Parsers

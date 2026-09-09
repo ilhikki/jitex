@@ -4,7 +4,7 @@ import {
   formatField,
   formatReal,
   getPascalStringValue,
-} from '@/runtime/runtime-util.ts'
+} from '@/backend/runtime/runtime-util.ts'
 import {
   PascalArray,
   PascalFile,
@@ -14,7 +14,7 @@ import {
   SyscallHandler,
   TextFile,
   TypeDescriptor,
-} from '@/runtime/runtime-type.ts'
+} from '@/backend/runtime/runtime-type.ts'
 import { MemoryTextFile } from './memory-text-file.ts'
 
 export function fileSyscalls(): Record<string, SyscallHandler> {

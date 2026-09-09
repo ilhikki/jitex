@@ -1,42 +1,16 @@
-/*
- * IL Transform — 入口：Pascal 源码 → JS 代码字符串。
- *
- * 依赖关系：
- *   transform → compiler → analysis
- *   transform → json-code-compiler
- *   transform → runtime（执行时）
- *
- * 职责：
- *   1. parse：Pascal 源码 → AST
- *   2. analyze：AST → Analysis
- *   3. compile：AST + Analysis → JsonCode
- *      （program 头文件参数的 .url 字段由 compileBlock 用 rec.set 统一绑定，
- *       url 通过 program.fileUrl syscall 在运行时从 ctx.programFileUrls 查表，
- *       不在编译期烧死具体 url。）
- *   4. toJs：JsonCode → JS 代码字符串（通过 SemanticCompiler 实现）
- *   5. 包装：返回 ES module 代码（export）
- *
- * SemanticCompiler 实现（决策 6）：
- *   - literalToJs：i32/f64/str/char/bool → JS 字面量
- *   - syscallToJs：算术/比较/逻辑/转换 inline，IO/file/cell/mem/set 走 __sys dispatcher
- */
+import { lex } from '@/frontend/lexer/lexer.ts'
 
-import { lex } from '@/parsing/lexer/lexer.ts'
+import { analyzeProgram } from '@/middle/analysis/analysis.ts'
+import { compileProgram } from '@/middle/lowering/compiler.ts'
+import { toJs } from '@/backend/codegen/json-code-compiler.ts'
+import type { RunError, RunState } from '@/backend/runtime/run-state.ts'
 
-import { analyzeProgram } from './analysis.ts'
-import { compileProgram } from './compiler.ts'
-import { toJs } from './json-code-compiler.ts'
-import type { RunError, RunState } from '@/runtime/run-state.ts'
-import { createDispatcher, createRuntimeContext, toRunState } from '@/runtime/runtime.ts'
-import type { RuntimeContext, RuntimeOptions } from '@/runtime/runtime-type.ts'
-import type { ExtraCallable } from './analysis.ts'
-import { PascalSemanticCompiler } from '@/runtime/sys/pascal-semantic-compiler.ts'
-import { ProgramNode } from '@/parsing/node.ts'
+import type { RuntimeContext, RuntimeOptions } from '@/backend/runtime/runtime-type.ts'
+import type { ExtraCallable } from '@/middle/analysis/analysis.ts'
+import { PascalSemanticCompiler } from '@/backend/runtime/sys/pascal-semantic-compiler.ts'
+import { ProgramNode } from '@/frontend/node.ts'
 import { parseProgram } from '@jitex/pascal-to-js'
-
-// ============================================================
-// TransformOptions
-// ============================================================
+import { createDispatcher, createRuntimeContext, toRunState } from '@/backend/runtime/runtime.ts'
 
 export interface TransformOptions {
   /** 非标特性扩展（传递给 analysis 做语义检查） */
@@ -44,10 +18,6 @@ export interface TransformOptions {
   /** 额外 callable 注入（编译期声明非标过程/函数，AGENTS.md 原则 A.7：注入优先） */
   extraCallables?: Record<string, ExtraCallable>
 }
-
-// ============================================================
-// parseSource：Pascal 源码 → AST
-// ============================================================
 
 function parseSource(source: string): ProgramNode {
   const tokens = lex(source)
@@ -59,51 +29,22 @@ function parseSource(source: string): ProgramNode {
   return result.astNode as ProgramNode
 }
 
-/**
- * 将 Pascal 源码编译为 ES module JS 代码字符串。
- *
- * 输出格式（ES module，非 CommonJS）：
- *   function v1_main(__sys) { ... }
- *   export { v1_main };
- *
- * 变量/函数名携带可读名（v{id}_{name}），便于调试。
- * __sys 作为顶层函数参数，由 executeCompiled 或 import 后调用时注入。
- */
 export function transform(source: string, options: TransformOptions = {}): string {
-  // 1. parse
   const ast = parseSource(source)
 
-  // 2. analyze（传递 extensions 和 extraCallables）
   const analysis = analyzeProgram(ast, options.extensions, options.extraCallables)
 
-  // 3. compile
   const jsonCode = compileProgram(ast, analysis)
 
-  // 4. toJs
   const semantic = new PascalSemanticCompiler()
   const { code: jsBody, mainName } = toJs(jsonCode, {
     semantic,
     debugNames: analysis.debugNames(),
   })
 
-  // 5. 包装为 ES module
   return `${jsBody}\nexport default ${mainName};`
 }
 
-// ============================================================
-// executeCompiled：执行 transform 生成的 ES module 代码
-// ============================================================
-
-/**
- * 执行 transform() 生成的 ES module 代码。
- *
- * 生成的代码格式：
- *   function v1_main(__sys) { ... }
- *   export { v1_main };
- *
- * 执行方式：移除 export 语句，用 new Function 创建并调用顶层函数。
- * __sys dispatcher 作为参数传入。
- */
 export function executeCompiled(
   code: string,
   __sys: (key: string, args: unknown[]) => unknown,
@@ -121,10 +62,6 @@ export function executeCompiled(
   const mainFn = factory()
   mainFn(__sys)
 }
-
-// ============================================================
-// transformAndRun：Pascal 源码 → 执行 → RunState
-// ============================================================
 
 export interface RunOptions extends TransformOptions, RuntimeOptions {}
 

@@ -1,5 +1,5 @@
-import type { JsCompiler, SemanticCompiler } from '../../compiler/json-code-compiler.ts'
-import * as JsonCode from '../../compiler/json-code.ts'
+import type { JsCompiler, SemanticCompiler } from '@/backend/codegen/json-code-compiler.ts'
+import * as JsonCode from '@/middle/ir/json-code.ts'
 import type {
   ArrayHandler,
   PascalArray,

@@ -1,10 +1,10 @@
 import { assert, assertEquals, describe, test } from '../../_harness.ts'
-import { lex } from '@/parsing/lexer/lexer.ts'
+import { lex } from '@/frontend/lexer/lexer.ts'
 
-import { parseBlock, parseProgram } from '@/parsing/parser/declarations.ts'
-import { parseExpression } from '@/parsing/parser/expressions.ts'
-import { parseCompoundStatement, parseStatement } from '@/parsing/parser/statements.ts'
-import { parseType } from '@/parsing/parser/types.ts'
+import { parseBlock, parseProgram } from '@/frontend/parser/declarations.ts'
+import { parseExpression } from '@/frontend/parser/expressions.ts'
+import { parseCompoundStatement, parseStatement } from '@/frontend/parser/statements.ts'
+import { parseType } from '@/frontend/parser/types.ts'
 import { AstNode, nodeToCode, ParseResult, ParserInput } from '@jitex/pascal-to-js'
 
 function makeInput(source: string): ParserInput {

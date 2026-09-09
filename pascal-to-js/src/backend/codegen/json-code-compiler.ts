@@ -1,4 +1,4 @@
-import * as JsonCode from './json-code.ts'
+import * as JsonCode from '@/middle/ir/json-code.ts'
 
 export interface ToJsOptions {
   semantic?: SemanticCompiler

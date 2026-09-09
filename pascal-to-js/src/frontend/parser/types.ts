@@ -14,9 +14,9 @@ import {
   SimpleTypeNode,
   TypeNode,
   VariableDeclarationNode,
-} from '@/parsing/node.ts'
-import { Position } from '@/parsing/token.ts'
-import { ParseResult, ParserInput } from '@/parsing/types.ts'
+} from '@/frontend/node.ts'
+import { Position } from '@/frontend/token.ts'
+import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
 // ============================================================================
 // Type Parsers

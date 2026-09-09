@@ -1,6 +1,6 @@
-import { AstNode, SourceLocation } from '@/parsing/node.ts'
-import { Position, Token } from '@/parsing/token.ts'
-import { ParseResult, ParserInput } from '@/parsing/types.ts'
+import { AstNode, SourceLocation } from '@/frontend/node.ts'
+import { Position, Token } from '@/frontend/token.ts'
+import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
 export function peek(input: ParserInput): Token {
   return input.tokens[input.position]

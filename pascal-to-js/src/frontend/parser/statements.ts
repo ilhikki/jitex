@@ -20,8 +20,8 @@ import {
   StatementNode,
   WhileStatementNode,
   WithStatementNode,
-} from '@/parsing/node.ts'
-import { ParseResult, ParserInput } from '@/parsing/types.ts'
+} from '@/frontend/node.ts'
+import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
 // ============================================================================
 // Statement Parsers

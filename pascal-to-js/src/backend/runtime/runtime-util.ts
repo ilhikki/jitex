@@ -16,7 +16,7 @@ import {
   VariantBranchDescriptor,
   VariantPartDescriptor,
   VariantState,
-} from '@/runtime/runtime-type.ts'
+} from '@/backend/runtime/runtime-type.ts'
 
 // ============================================================
 export function formatReal(n: number): string {

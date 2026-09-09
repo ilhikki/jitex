@@ -8,8 +8,8 @@
  * 计数器属于 Analysis，compiler 不自行维护。
  */
 
-import * as JsonCode from './json-code.ts'
-import { Analysis, AnalysisSymbol, TypeInfo, VariantPartInfo, VarSymbol } from './analysis.ts'
+import * as JsonCode from '@/middle/ir/json-code.ts'
+import { Analysis, AnalysisSymbol, TypeInfo, VariantPartInfo, VarSymbol } from '@/middle/analysis/analysis.ts'
 import {
   ArrayAccessNode,
   AssignmentNode,
@@ -34,7 +34,7 @@ import {
   UnaryExpressionNode,
   WhileStatementNode,
   WithStatementNode,
-} from '@/parsing/node.ts'
+} from '@/frontend/node.ts'
 
 // ============================================================
 // With 绑定上下文

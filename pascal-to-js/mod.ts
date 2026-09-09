@@ -1,4 +1,4 @@
-export { lex } from '@/parsing/lexer/lexer.ts'
+export { lex } from '@/frontend/lexer/lexer.ts'
 export type {
   ArrayAccessNode,
   ArrayTypeNode,
@@ -51,12 +51,12 @@ export type {
   VariableDeclarationNode,
   WhileStatementNode,
   WithStatementNode,
-} from '@/parsing/node.ts'
-export * from '@/parsing/printer/printer.ts'
-export * from '@/parsing/token.ts'
-export type { ParseResult, ParserInput } from '@/parsing/types.ts'
-export { parseProgram } from '@/parsing/parser/declarations.ts'
-export { MemoryRecordFile } from '@/runtime/sys/memory-record-file.ts'
+} from '@/frontend/node.ts'
+export * from '@/frontend/printer/printer.ts'
+export * from '@/frontend/token.ts'
+export type { ParseResult, ParserInput } from '@/frontend/types.ts'
+export { parseProgram } from '@/frontend/parser/declarations.ts'
+export { MemoryRecordFile } from '@/backend/runtime/sys/memory-record-file.ts'
 export type {
   PascalArray,
   PascalFile,
@@ -69,7 +69,7 @@ export type {
   TypeDescriptor,
   TypeHandler,
   VariantPartDescriptor,
-} from '@/runtime/runtime-type.ts'
+} from '@/backend/runtime/runtime-type.ts'
 export {
   callCreateHandler,
   createArrayHandler,
@@ -80,11 +80,11 @@ export {
   doCreateArrayHandler,
   encodeUtf8,
   getPascalStringValue,
-} from '@/runtime/runtime-util.ts'
-export { MemoryTextFile } from '@/runtime/sys/memory-text-file.ts'
+} from '@/backend/runtime/runtime-util.ts'
+export { MemoryTextFile } from '@/backend/runtime/sys/memory-text-file.ts'
 export { parse } from '@/run.ts'
 
-export { executeCompiled, run, runJs, transform } from '@/compiler/transform.ts'
-export type { RunOptions, TransformOptions } from '@/compiler/transform.ts'
-export type { RunError, RunState } from '@/runtime/run-state.ts'
-export type { ExtraCallable } from '@/compiler/analysis.ts'
+export { executeCompiled, run, runJs, transform } from '@/run.ts'
+export type { RunOptions, TransformOptions } from '@/run.ts'
+export type { RunError, RunState } from '@/backend/runtime/run-state.ts'
+export type { ExtraCallable } from '@/middle/analysis/analysis.ts'

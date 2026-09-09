@@ -19,7 +19,7 @@ import type { ExtraCallable } from '@jitex/pascal-to-js'
 import type { PascalFileStore, SyscallHandler } from '@jitex/pascal-to-js'
 import { assert, assertEquals, describe, it, test } from '../../_harness.ts'
 import { MemoryTextFile, RecordFile } from '@jitex/pascal-to-js'
-import { encodeUtf8 } from '@/runtime/runtime-util.ts'
+import { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
 export { assert, assertEquals, describe, it, test }
 
 /** 非标扩展标识符（保留用于类型标注，实际为 string） */
