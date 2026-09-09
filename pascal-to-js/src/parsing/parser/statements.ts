@@ -1,3 +1,5 @@
+import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
+import { parseExpression, parseIdentifier, parsePrimary } from './expressions.ts'
 import {
   AssignmentNode,
   BinaryExpressionNode,
@@ -13,16 +15,13 @@ import {
   IfStatementNode,
   IntegerLiteralNode,
   LabeledStatementNode,
-  ParseResult,
-  ParserInput,
   ProcedureCallNode,
   RepeatStatementNode,
   StatementNode,
   WhileStatementNode,
   WithStatementNode,
-} from '@/mod.ts'
-import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
-import { parseExpression, parseIdentifier, parsePrimary } from './expressions.ts'
+} from '@/parsing/node.ts'
+import { ParseResult, ParserInput } from '@/parsing/types.ts'
 
 // ============================================================================
 // Statement Parsers

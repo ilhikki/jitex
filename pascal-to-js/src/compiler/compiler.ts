@@ -34,7 +34,7 @@ import {
   UnaryExpressionNode,
   WhileStatementNode,
   WithStatementNode,
-} from '@/mod.ts'
+} from '@/parsing/node.ts'
 
 // ============================================================
 // With 绑定上下文

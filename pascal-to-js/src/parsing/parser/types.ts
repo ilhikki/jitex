@@ -1,12 +1,11 @@
+import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers.ts'
+import { parseExpression, parseIdentifier } from './expressions.ts'
 import {
   ArrayTypeNode,
   EnumerationTypeNode,
   FileTypeNode,
   IdentifierNode,
-  ParseResult,
-  ParserInput,
   PointerTypeNode,
-  Position,
   RangeTypeNode,
   RecordTypeNode,
   RecordVariantNode,
@@ -15,9 +14,9 @@ import {
   SimpleTypeNode,
   TypeNode,
   VariableDeclarationNode,
-} from '@/mod.ts'
-import { expectKeyword, expectType, fail, ok, parseList, peek, withLoc } from './helpers.ts'
-import { parseExpression, parseIdentifier } from './expressions.ts'
+} from '@/parsing/node.ts'
+import { Position } from '@/parsing/token.ts'
+import { ParseResult, ParserInput } from '@/parsing/types.ts'
 
 // ============================================================================
 // Type Parsers

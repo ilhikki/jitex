@@ -22,7 +22,7 @@
  */
 
 import { lex } from '@/parsing/lexer/lexer.ts'
-import { parseProgram, type ProgramNode } from '@/mod.ts'
+
 import { analyzeProgram } from './analysis.ts'
 import { compileProgram } from './compiler.ts'
 import { toJs } from './json-code-compiler.ts'
@@ -31,6 +31,8 @@ import { createDispatcher, createRuntimeContext, toRunState } from '@/runtime/ru
 import type { RuntimeContext, RuntimeOptions } from '@/runtime/runtime-type.ts'
 import type { ExtraCallable } from './analysis.ts'
 import { PascalSemanticCompiler } from '@/runtime/sys/pascal-semantic-compiler.ts'
+import { ProgramNode } from '@/parsing/node.ts'
+import { parseProgram } from '@jitex/pascal-to-js'
 
 // ============================================================
 // TransformOptions

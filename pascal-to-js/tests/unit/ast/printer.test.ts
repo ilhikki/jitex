@@ -1,13 +1,11 @@
 import { assert, assertEquals, describe, test } from '../../_harness.ts'
 import { lex } from '@/parsing/lexer/lexer.ts'
 
-import { nodeToCode, parseProgram } from '@/mod.ts'
-import type { AstNode, ParseResult, ParserInput } from '@/mod.ts'
-
-import { parseBlock } from '@/parsing/parser/declarations.ts'
+import { parseBlock, parseProgram } from '@/parsing/parser/declarations.ts'
 import { parseExpression } from '@/parsing/parser/expressions.ts'
 import { parseCompoundStatement, parseStatement } from '@/parsing/parser/statements.ts'
 import { parseType } from '@/parsing/parser/types.ts'
+import { AstNode, nodeToCode, ParseResult, ParserInput } from '@jitex/pascal-to-js'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

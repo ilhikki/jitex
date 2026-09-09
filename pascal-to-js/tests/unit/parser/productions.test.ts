@@ -1,5 +1,4 @@
 import { lex } from '@/parsing/lexer/lexer.ts'
-import { parseProgram, type ParserInput } from '@/mod.ts'
 
 import { assert, assertEquals, assertKind, describe, test } from '../../_harness.ts'
 
@@ -10,12 +9,14 @@ import {
   parseLabelDeclaration,
   parseParameterList,
   parseProcedureDeclaration,
+  parseProgram,
   parseTypeDeclarations,
   parseVariableDeclarations,
 } from '@/parsing/parser/declarations.ts'
 import { parseExpression, parseExpressionList, parseIdentifier } from '@/parsing/parser/expressions.ts'
 import { parseType, parseVariableDeclaration } from '@/parsing/parser/types.ts'
 import { parseCompoundStatement, parseStatement } from '@/parsing/parser/statements.ts'
+import { ParserInput } from '@/parsing/types.ts'
 
 function makeInput(source: string): ParserInput {
   return { tokens: lex(source), position: 0 }

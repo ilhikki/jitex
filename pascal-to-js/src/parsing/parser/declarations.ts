@@ -1,3 +1,7 @@
+import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
+import { parseExpression, parseIdentifier } from './expressions.ts'
+import { parseType, parseVariableDeclaration } from './types.ts'
+import { parseCompoundStatement } from './statements.ts'
 import {
   BlockNode,
   ConstDeclarationNode,
@@ -12,11 +16,7 @@ import {
   ProgramNode,
   TypeDeclarationNode,
   VariableDeclarationNode,
-} from '@/mod.ts'
-import { expectKeyword, expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
-import { parseExpression, parseIdentifier } from './expressions.ts'
-import { parseType, parseVariableDeclaration } from './types.ts'
-import { parseCompoundStatement } from './statements.ts'
+} from '@jitex/pascal-to-js'
 
 // ============================================================================
 // Declaration Parsers

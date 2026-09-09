@@ -1,4 +1,4 @@
-import { lex } from '../../src/index.ts'
+import { lex } from '@jitex/pascal-to-js'
 import { assertEquals, describe, test } from '../_harness.ts'
 
 interface Tok {

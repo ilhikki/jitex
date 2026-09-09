@@ -1,9 +1,8 @@
 {
   "name": "@jitex/pascal-to-js",
   "version": "1.0.0",
-  "exports": "./src/index.ts",
+  "exports": "./mod.ts",
   "imports": {
-    "@/": "./src/",
-    "jsr:@std/assert": "jsr:@std/assert@^1.0.0"
+    "@/": "./src/"
   }
 }

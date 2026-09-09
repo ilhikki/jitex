@@ -1,8 +1,6 @@
-import { AstNode, ParseResult, ParserInput, Position, SourceLocation, Token } from '@/mod.ts'
-
-// ============================================================================
-// Parser helpers — pure functions operating on {tokens, position}
-// ============================================================================
+import { AstNode, SourceLocation } from '@/parsing/node.ts'
+import { Position, Token } from '@/parsing/token.ts'
+import { ParseResult, ParserInput } from '@/parsing/types.ts'
 
 export function peek(input: ParserInput): Token {
   return input.tokens[input.position]

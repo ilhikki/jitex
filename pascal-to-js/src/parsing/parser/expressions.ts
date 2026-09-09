@@ -1,3 +1,5 @@
+import { ParseResult, ParserInput } from '@/parsing/types.ts'
+import { expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
 import {
   ArrayAccessNode,
   BinaryExpressionNode,
@@ -9,14 +11,11 @@ import {
   IdentifierNode,
   IntegerLiteralNode,
   ParenthesizedExpressionNode,
-  ParseResult,
-  ParserInput,
   RealLiteralNode,
   SetConstructorNode,
   StringLiteralNode,
   UnaryExpressionNode,
-} from '@/mod.ts'
-import { expectType, fail, loc, ok, parseList, peek, withLoc } from './helpers.ts'
+} from '@/parsing/node.ts'
 
 // ============================================================================
 // Expression Parsers

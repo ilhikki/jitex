@@ -1,5 +1,5 @@
 import { lex } from '@/parsing/lexer/lexer.ts'
-import { CaseStatementNode, ParserInput, ProgramNode } from '@/mod.ts'
+import { CaseStatementNode, ParserInput, ProgramNode } from '@jitex/pascal-to-js'
 
 import { assert, assertEquals, describe, test } from '../../_harness.ts'
 
