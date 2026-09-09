@@ -52,7 +52,7 @@ export type {
   WhileStatementNode,
   WithStatementNode,
 } from '@/frontend/node.ts'
-export * from '@/frontend/printer/printer.ts'
+export { nodeToCode } from '@/frontend/printer/printer.ts'
 export * from '@/frontend/token.ts'
 export type { ParseResult, ParserInput } from '@/frontend/types.ts'
 export { parseProgram } from '@/frontend/parser/declarations.ts'
@@ -87,4 +87,4 @@ export { parse } from '@/run.ts'
 export { executeCompiled, run, runJs, transform } from '@/run.ts'
 export type { RunOptions, TransformOptions } from '@/run.ts'
 export type { RunError, RunState } from '@/backend/runtime/run-state.ts'
-export type { ExtraCallable } from '@/middle/analysis/analysis.ts'
+export type { ExtraCallable } from '@/middle/analysis/analysis-type.ts'

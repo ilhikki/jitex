@@ -6,7 +6,7 @@
  */
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { Analysis } from '@/middle/analysis/analysis.ts'
+import { Analysis } from '@/middle/analysis/analysis-type.ts'
 import {
   ArrayAccessNode,
   AssignmentNode,

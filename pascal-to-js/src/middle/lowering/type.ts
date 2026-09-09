@@ -6,7 +6,7 @@
  */
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { TypeInfo, VariantPartInfo } from '@/middle/analysis/analysis.ts'
+import { TypeInfo, VariantPartInfo } from '@/middle/analysis/analysis-type.ts'
 import { litBool, litChar, litInt, litNull, litReal, syscall, syscallKeys } from './helpers.ts'
 
 // ============================================================

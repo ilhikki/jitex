@@ -6,7 +6,7 @@
  */
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { TypeInfo } from '@/middle/analysis/analysis.ts'
+import { TypeInfo } from '@/middle/analysis/analysis-type.ts'
 
 // ============================================================
 // With 绑定上下文

@@ -9,9 +9,9 @@ import { toJs } from '@/backend/codegen/json-code-compiler.ts'
 import type { RunError, RunState } from '@/backend/runtime/run-state.ts'
 
 import type { RuntimeContext, RuntimeOptions } from '@/backend/runtime/runtime-type.ts'
-import type { ExtraCallable } from '@/middle/analysis/analysis.ts'
 import { PascalSemanticCompiler } from '@/backend/runtime/sys/pascal-semantic-compiler.ts'
 import { createDispatcher, createRuntimeContext, toRunState } from '@/backend/runtime/runtime.ts'
+import { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
 /**
  * 将 Pascal 源码解析为 AST。
  *

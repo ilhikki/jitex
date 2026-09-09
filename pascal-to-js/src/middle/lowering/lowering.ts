@@ -9,7 +9,7 @@
  */
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { Analysis, VarSymbol } from '@/middle/analysis/analysis.ts'
+import { Analysis, VarSymbol } from '@/middle/analysis/analysis-type.ts'
 import { BlockNode, IdentifierNode, ProgramNode } from '@/frontend/node.ts'
 import { assignStmt, evalStmt, litField, ref, returnStmt, syscall, syscallKeys } from './helpers.ts'
 import { defaultExpr, typeDescLiteral } from './type.ts'

@@ -6,7 +6,7 @@
  */
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { Analysis } from '@/middle/analysis/analysis.ts'
+import { Analysis } from '@/middle/analysis/analysis-type.ts'
 import { BinaryExpressionNode, ExpressionNode } from '@/frontend/node.ts'
 import { assignStmt, evalStmt, ref, syscall, SyscallKey, syscallKeys, WithBinding } from './helpers.ts'
 import { typeSuffix } from './type.ts'
