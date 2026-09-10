@@ -5,6 +5,9 @@ import { parseProgram } from '@/frontend/parser/declarations.ts'
 
 import { analyzeProgram } from '@/middle/analysis/analysis.ts'
 import { loweringProgram } from '@/middle/lowering/lowering.ts'
+import { composeMapping, mergeRewriteTables, rewrite } from '@/middle/rewrite/rewrite.ts'
+import type { SyscallRewriter, SyscallRewriteTable } from '@/middle/rewrite/rewrite.ts'
+import { buildPascalRewriteTable } from '@/middle/rewrite/pascal-rewriters.ts'
 import { toJs } from '@/backend/codegen/json-code-compiler.ts'
 import type { RunError, RunState } from '@/backend/runtime/run-state.ts'
 
@@ -29,6 +32,18 @@ export interface TransformOptions {
   extensions?: string[]
   /** 额外 callable 注入（编译期声明非标过程/函数，AGENTS.md 原则 A.7：注入优先） */
   extraCallables?: Record<string, ExtraCallable>
+  /**
+   * 用户自定义 syscall 重写表。
+   * 与内部 buildPascalRewriteTable() 合并，同 key 覆盖内部表。
+   * 某 key 设为 undefined 可禁用内部对该 key 的重写。
+   * 详见 src/middle/rewrite/rewrite.ts。
+   */
+  syscallRewriters?: SyscallRewriteTable
+  /**
+   * 默认回退重写函数：未命中重写表时调用。
+   * 不传则使用 id 函数（原样返回 syscall）。
+   */
+  defaultRewriter?: SyscallRewriter
 }
 
 function parseSource(source: string): ProgramNode {
@@ -48,8 +63,12 @@ export function transform(source: string, options: TransformOptions = {}): strin
 
   const jsonCode = loweringProgram(ast, analysis)
 
+  // IR 重写：合并内部 pascal 表与用户表，合成单一映射后执行后序 DFS 替换
+  const table = mergeRewriteTables(buildPascalRewriteTable(), options.syscallRewriters)
+  const ir = rewrite(jsonCode, composeMapping(table, options.defaultRewriter))
+
   const semantic = new PascalSemanticCompiler()
-  const { code: jsBody, mainName } = toJs(jsonCode, {
+  const { code: jsBody, mainName } = toJs(ir, {
     semantic,
     debugNames: analysis.debugNames(),
   })

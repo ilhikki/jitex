@@ -53,7 +53,7 @@ export type {
   WithStatementNode,
 } from '@/frontend/node.ts'
 export { nodeToCode } from '@/frontend/printer/printer.ts'
-export * from '@/frontend/token.ts'
+export type { Position, Token } from '@/frontend/token.ts'
 export type { ParseResult, ParserInput } from '@/frontend/types.ts'
 export { parseProgram } from '@/frontend/parser/declarations.ts'
 export { MemoryRecordFile } from '@/backend/runtime/sys/memory-record-file.ts'
