@@ -41,7 +41,7 @@ import {
   syscallKeys,
   WithBinding,
 } from './helpers.ts'
-import { defaultExpr, isRecordFile, typeDescLiteral } from './type.ts'
+import { defaultExpr, typeDescLiteral } from './type.ts'
 import { loweringExpr, resolveSymbol } from './expressions.ts'
 import { loweringReadln, loweringWriteln } from './io.ts'
 
@@ -104,63 +104,71 @@ function loweringAssignment(
   funcId: number,
   ws: WithBinding[],
 ): JsonCode.Statement[] {
-  // Pascal record 赋值是值拷贝语义（ISO 7185），JS 对象赋值是引用。
-  // 若左值类型为 record，用 rec.copy 深拷贝右值，避免别名共享。
-  const lvalueType = a.typeOf(node.left)
-  const needRecCopy = lvalueType.tag === 'rec'
-  let value = loweringExpr(node.right, a, ws)
-  if (needRecCopy) {
-    value = syscall(syscallKeys.recCopy, [value])
-  }
+  return loweringAssignTarget(node.left, loweringExpr(node.right, a, ws), a, funcId, ws)
+}
 
-  // Pascal `packed array[low..high] of char` 赋值为字符串字面量时，
-  // 右值已是 1-based PascalArray（StringLiteral 编译为 str.to.char.array）。
-  // 若目标边界 low≠1（如 TeX 的 0-based NAMEOFFILE），需用 array.char.resize 调整边界。
-  // （Knuth TeX 的 NAMEOFFILE := POOLNAME 即此问题，目标为 0-based。）
-  if (
-    lvalueType.tag === 'array' &&
-    lvalueType.dims &&
-    lvalueType.dims.length === 1 &&
-    lvalueType.elem &&
-    lvalueType.elem.tag === 'char'
-  ) {
-    if (node.right.kind === 'StringLiteral') {
-      const dim = lvalueType.dims[0]
-      if (dim.low !== 1) {
-        value = syscall(syscallKeys.arrayCharResize, [litInt(dim.low), litInt(dim.high), value])
-      }
-    }
-  }
+/**
+ * 把值写入一个 variable-access 目标（ISO 7185 6.5.1）。
+ *
+ * 目标可以是整个变量、数组元素、记录字段、指针解引用、文件缓冲区，
+ * 以及它们的任意嵌套组合。var 实参的写回也复用本函数。
+ */
+function loweringAssignTarget(
+  target: ExpressionNode,
+  value: JsonCode.Expr,
+  a: Analysis,
+  funcId: number,
+  ws: WithBinding[],
+): JsonCode.Statement[] {
+  const lvalueType = a.typeOf(target)
+  const isComposite =
+    lvalueType.tag === 'array' || lvalueType.tag === 'rec' || lvalueType.tag === 'set'
 
   // 简单变量
-  if (node.left.kind === 'Identifier') {
+  if (target.kind === 'Identifier') {
     // with 字段优先（ISO 7185 6.8.3.10）
     for (let i = ws.length - 1; i >= 0; i--) {
       const binding = ws[i]
-      const fname = node.left.name.toLowerCase()
+      const fname = target.name.toLowerCase()
       if (binding.fields.has(fname)) {
-        const varId = binding.tempVarId
         return [
-          evalStmt(syscall(syscallKeys.recSet, [ref(varId), litField(fname), value])),
+          evalStmt(
+            syscall(syscallKeys.recAssign, [
+              ref(binding.tempVarId),
+              litField(fname),
+              value,
+              typeDescLiteral(binding.typeInfo),
+            ]),
+          ),
         ]
       }
     }
 
-    const sym = resolveSymbol(node.left, a, ws)
+    const sym = resolveSymbol(target, a, ws)
     if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
       const ti = sym.typeInfo
       // subrange 运行时边界检查
-      const rangeCheck = ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
-        ? evalStmt(syscall(syscallKeys.rangeCheck, [ref(sym.varId), litInt(ti.low), litInt(ti.high)]))
-        : undefined
-      if (sym.isVarParam) {
-        const stmts: JsonCode.Statement[] = [evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), value]))]
-        if (rangeCheck) {
-          stmts.push(rangeCheck)
-        }
-        return stmts
+      const rangeCheck =
+        ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
+          ? evalStmt(
+              syscall(syscallKeys.rangeCheck, [ref(sym.varId), litInt(ti.low), litInt(ti.high)]),
+            )
+          : undefined
+
+      const stmts: JsonCode.Statement[] = []
+      if (isComposite) {
+        // 复合类型整体赋值 = 字节拷贝（本模型中唯一的显式拷贝点）
+        const target = sym.isVarParam
+          ? syscall(syscallKeys.cellGet, [ref(sym.varId)])
+          : ref(sym.varId)
+        stmts.push(
+          evalStmt(syscall(syscallKeys.memCopy, [target, litInt(0), value, typeDescLiteral(ti)])),
+        )
+      } else if (sym.isVarParam) {
+        stmts.push(evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), value])))
+      } else {
+        stmts.push(assignStmt(ref(sym.varId), value))
       }
-      const stmts: JsonCode.Statement[] = [assignStmt(ref(sym.varId), value)]
       if (rangeCheck) {
         stmts.push(rangeCheck)
       }
@@ -176,8 +184,8 @@ function loweringAssignment(
   }
 
   // 数组元素
-  if (node.left.kind === 'ArrayAccess') {
-    const arr = node.left as ArrayAccessNode
+  if (target.kind === 'ArrayAccess') {
+    const arr = target as ArrayAccessNode
     const arrExpr = loweringExpr(arr.array, a, ws)
     const idxExprs = arr.indices.map((i) => {
       const expr = loweringExpr(i, a, ws)
@@ -187,32 +195,46 @@ function loweringAssignment(
       }
       return expr
     })
-    return [evalStmt(syscall(syscallKeys.arraySet, [arrExpr, ...idxExprs, value]))]
+    return [
+      evalStmt(
+        syscall(syscallKeys.arrayAssign, [
+          arrExpr,
+          ...idxExprs,
+          value,
+          typeDescLiteral(a.typeOf(arr.array)),
+        ]),
+      ),
+    ]
   }
 
   // 记录字段
-  if (node.left.kind === 'FieldAccess') {
-    const fa = node.left as FieldAccessNode
+  if (target.kind === 'FieldAccess') {
+    const fa = target as FieldAccessNode
     if (fa.field.name === '^') {
       const objType = a.typeOf(fa.object)
       if (objType.tag === 'pointer') {
-        // ISO 7185 6.5.4: 指针解引用赋值 p^ := x → cell.set(p, x)
+        // ISO 7185 6.5.4: 指针解引用赋值 p^ := x
         const ptrExpr = loweringExpr(fa.object, a, ws)
         return [evalStmt(syscall(syscallKeys.ptrAssign, [ptrExpr, value]))]
       }
-      // 文件缓冲区赋值 f^ := x → file.put
-      // file of record: f^ := r 设置记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
+      // 文件缓冲区赋值 f^ := x
       const fExpr = loweringExpr(fa.object, a, ws)
-      if (isRecordFile(objType)) {
-        return [evalStmt(syscall(syscallKeys.fileRecSetbuf, [fExpr, value]))]
-      }
-      return [evalStmt(syscall(syscallKeys.filePut, [fExpr, value]))]
+      return [evalStmt(syscall(syscallKeys.filePut, [fExpr, typeDescLiteral(objType), value]))]
     }
     const objExpr = loweringExpr(fa.object, a, ws)
-    return [evalStmt(syscall(syscallKeys.recSet, [objExpr, litField(fa.field.name.toLowerCase()), value]))]
+    return [
+      evalStmt(
+        syscall(syscallKeys.recAssign, [
+          objExpr,
+          litField(fa.field.name.toLowerCase()),
+          value,
+          typeDescLiteral(a.typeOf(fa.object)),
+        ]),
+      ),
+    ]
   }
 
-  throw new Error('loweringAssignment: unsupported left-hand side')
+  throw new Error('loweringAssignTarget: unsupported left-hand side')
 }
 
 function loweringIf(
@@ -437,6 +459,7 @@ function loweringWith(
     const ti = temps[i].typeInfo
     newBindings.push({
       tempVarId,
+      typeInfo: ti,
       fields: ti.fields ?? new Map(),
     })
   }
@@ -482,65 +505,64 @@ function loweringProcedureCall(
     case 'read':
       return loweringReadln(node.arguments, a, ws, true)
     case 'reset': {
-      // ISO 6.6.5.2 reset(f)：1-arg 形式。
-      // 若源码写了 reset(f, name) 2-arg 形式（非 ISO），name 参数被编译但
-      // runtime 的 file.reset 忽略之（file.url 必须已通过 program-param 绑定）。
-      // file of record 走 file.rec.reset（传元素类型描述，用于 reset 后创建默认缓冲区）。
-      const resetArgs = node.arguments.map((x) => loweringExpr(x, a, ws))
-      if (node.arguments.length > 0) {
-        const fileType = a.typeOf(node.arguments[0])
-        if (isRecordFile(fileType)) {
-          const elemTi = fileType.elem!
-          resetArgs.push(typeDescLiteral(elemTi))
-          return [evalStmt(syscall(syscallKeys.fileRecReset, resetArgs))]
-        }
-      }
-      return [evalStmt(syscall(syscallKeys.fileReset, resetArgs))]
-    }
-    case 'rewrite': {
-      // ISO 6.6.5.2 rewrite(f)：1-arg 形式（同 reset 的处理策略）。
-      const rewriteArgs = node.arguments.map((x) => loweringExpr(x, a, ws))
-      if (node.arguments.length > 0) {
-        const fileType = a.typeOf(node.arguments[0])
-        if (isRecordFile(fileType)) {
-          const elemTi = fileType.elem!
-          rewriteArgs.push(typeDescLiteral(elemTi))
-          return [evalStmt(syscall(syscallKeys.fileRecRewrite, rewriteArgs))]
-        }
-      }
-      return [evalStmt(syscall(syscallKeys.fileRewrite, rewriteArgs))]
-    }
-    case 'get': {
-      const getArgs = node.arguments.map((x) => loweringExpr(x, a, ws))
-      if (node.arguments.length > 0) {
-        const fileType = a.typeOf(node.arguments[0])
-        if (isRecordFile(fileType)) {
-          return [evalStmt(syscall(syscallKeys.fileRecGet, getArgs))]
-        } else if (fileType.elem?.tag === 'char') {
-          return [evalStmt(syscall(syscallKeys.fileGetChar, getArgs))]
-        }
-      }
-      return [evalStmt(syscall(syscallKeys.fileGet, getArgs))]
-    }
-    case 'put': {
-      const putArgs = node.arguments.map((x) => loweringExpr(x, a, ws))
-      if (node.arguments.length > 0) {
-        const fileType = a.typeOf(node.arguments[0])
-        if (isRecordFile(fileType)) {
-          return [evalStmt(syscall(syscallKeys.fileRecPut, putArgs))]
-        }
-      }
-      return [evalStmt(syscall(syscallKeys.filePut, putArgs))]
-    }
-    case 'page':
+      // ISO 6.6.5.2 reset(f)：句柄自带类型，rewrite 据此产出 runtime.file.reset
+      const f = loweringExpr(node.arguments[0], a, ws)
+      const extra = node.arguments.slice(1).map((x) => loweringExpr(x, a, ws))
       return [
         evalStmt(
-          syscall(
-            syscallKeys.ioPage,
-            node.arguments.map((x) => loweringExpr(x, a, ws)),
-          ),
+          syscall(syscallKeys.fileReset, [
+            f,
+            typeDescLiteral(a.typeOf(node.arguments[0])),
+            ...extra,
+          ]),
         ),
       ]
+    }
+    case 'rewrite': {
+      const f = loweringExpr(node.arguments[0], a, ws)
+      const extra = node.arguments.slice(1).map((x) => loweringExpr(x, a, ws))
+      return [
+        evalStmt(
+          syscall(syscallKeys.fileRewrite, [
+            f,
+            typeDescLiteral(a.typeOf(node.arguments[0])),
+            ...extra,
+          ]),
+        ),
+      ]
+    }
+    case 'get': {
+      const f = loweringExpr(node.arguments[0], a, ws)
+      return [
+        evalStmt(
+          syscall(syscallKeys.fileGet, [f, typeDescLiteral(a.typeOf(node.arguments[0]))]),
+        ),
+      ]
+    }
+    case 'put': {
+      const f = loweringExpr(node.arguments[0], a, ws)
+      const extra = node.arguments.slice(1).map((x) => loweringExpr(x, a, ws))
+      return [
+        evalStmt(
+          syscall(syscallKeys.filePut, [
+            f,
+            typeDescLiteral(a.typeOf(node.arguments[0])),
+            ...extra,
+          ]),
+        ),
+      ]
+    }
+    case 'page': {
+      if (node.arguments.length === 0) {
+        return [evalStmt(syscall(syscallKeys.ioPage, [litNull(), litNull()]))]
+      }
+      const f = loweringExpr(node.arguments[0], a, ws)
+      return [
+        evalStmt(
+          syscall(syscallKeys.ioPage, [f, typeDescLiteral(a.typeOf(node.arguments[0]))]),
+        ),
+      ]
+    }
     case 'new': {
       // ISO 7185 6.6.5.3: new(p) 创建新变量，p 指向它
       const argNode = node.arguments[0]
@@ -596,7 +618,7 @@ function loweringUserCallStmt(
   const info = a.funcInfo(funcId)
   const out: JsonCode.Statement[] = []
   const argExprs: JsonCode.Expr[] = []
-  const cellVars: { argIdx: number; cellVar: number; targetIsVar: IdentifierNode | undefined }[] = []
+  const cellVars: { cellVar: number; target: ExpressionNode }[] = []
 
   for (let i = 0; i < args.length; i++) {
     const param = info.params[i]
@@ -605,23 +627,21 @@ function loweringUserCallStmt(
       continue
     }
     if (param.isVarParam) {
-      // var 参数：用 cell 包装
+      // ISO 7185 6.6.3.3: var 实参必须是 variable-access（6.5.1）——
+      // 整个变量、数组元素、记录字段、指针解引用、文件缓冲区皆可。
+      // 用 cell 承载实参当前值，调用结束后按目标位置写回。
       const argNode = args[i]
-      if (argNode.kind === 'Identifier') {
-        const sym = resolveSymbol(argNode, a, ws)
-        if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
-          const cellVar = a.allocTempLocal(curFuncId, { tag: 'unknown' })
-          const valExpr = sym.isVarParam ? syscall(syscallKeys.cellGet, [ref(sym.varId)]) : ref(sym.varId)
-          out.push(assignStmt(ref(cellVar), syscall(syscallKeys.cellCreate, [valExpr])))
-          argExprs.push(ref(cellVar))
-          cellVars.push({ argIdx: i, cellVar, targetIsVar: argNode })
-        }
-      }
+      const cellVar = a.allocTempLocal(curFuncId, { tag: 'unknown' })
+      out.push(
+        assignStmt(ref(cellVar), syscall(syscallKeys.cellCreate, [loweringExpr(argNode, a, ws)])),
+      )
+      argExprs.push(ref(cellVar))
+      cellVars.push({ cellVar, target: argNode })
     } else {
       // Pascal value 参数传递是值拷贝语义（ISO 7185），record 类型需深拷贝
       let argExpr = loweringExpr(args[i], a, ws)
       if (param.typeInfo.tag === 'rec') {
-        argExpr = syscall(syscallKeys.recCopy, [argExpr])
+        argExpr = syscall(syscallKeys.recCopy, [argExpr, typeDescLiteral(param.typeInfo)])
       }
       argExprs.push(argExpr)
     }
@@ -631,15 +651,21 @@ function loweringUserCallStmt(
 
   // 写回 var 参数
   for (const cv of cellVars) {
-    const sym = resolveSymbol(cv.targetIsVar!, a, ws)
-    if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
-      const valExpr = syscall(syscallKeys.cellGet, [ref(cv.cellVar)])
-      if (sym.isVarParam) {
-        out.push(evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), valExpr])))
-      } else {
-        out.push(assignStmt(ref(sym.varId), valExpr))
+    const valExpr = syscall(syscallKeys.cellGet, [ref(cv.cellVar)])
+    const tgt = cv.target
+    if (tgt.kind === 'Identifier') {
+      const sym = resolveSymbol(tgt, a, ws)
+      if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
+        if (sym.isVarParam) {
+          out.push(evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), valExpr])))
+        } else {
+          out.push(assignStmt(ref(sym.varId), valExpr))
+        }
+        continue
       }
     }
+    // 非标识符的 variable-access（数组元素 / 记录字段 / 解引用 / 文件缓冲区）
+    out.push(...loweringAssignTarget(tgt, valExpr, a, curFuncId, ws))
   }
 
   return out

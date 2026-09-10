@@ -35,6 +35,14 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     return undefined
   }
 
+  // 循环步数限制
+  const stepsCheck: SyscallHandler = (ctx, _args) => {
+    if (++ctx.steps > ctx.maxSteps) {
+      throw new Error('step limit exceeded')
+    }
+    return undefined
+  }
+
   return {
     // ---------- factory.*：handler 构建 impl（可 extraSyscalls 整体替换）----------
     'factory.createHandler': (ctx, [type]) => {
@@ -186,12 +194,11 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     },
 
     // ---------- steps.check（循环步数限制）----------
-    'steps.check': (ctx, _args) => {
-      if (++ctx.steps > ctx.maxSteps) {
-        throw new Error('step limit exceeded')
-      }
-      return undefined
-    },
+    'steps.check': stepsCheck,
+    'runtime.steps.check': stepsCheck,
+
+    // ---------- hook（调试钩子，no-op）----------
+    'runtime.hook.function.enter': () => undefined,
 
     // ---------- range.check（subrange 运行时边界检查）----------
     'range.check': rangeCheck,
@@ -207,7 +214,11 @@ export class PascalSemanticCompiler implements SemanticCompiler {
       case 'f64':
         return literal.arg // 浮点字符串，直接作为 JS 数字
       case 'bool':
-        return literal.arg // 'true' 或 'false'
+        // boolean 取序数值（ISO 6.4.2.2）：true → 1，false → 0
+        return literal.arg === 'true' ? '1' : '0'
+      case 'bytes':
+        // 字符串字面量（packed array of char）→ Uint8Array 字面量
+        return `new Uint8Array(${literal.arg})`
       case 'str':
         // key 'str' 是字符串内容的字面量编码（非类型）。
         // 直接产出 JS 字符串；由 str.to.char.array syscall 包装时才转为 PascalArray。

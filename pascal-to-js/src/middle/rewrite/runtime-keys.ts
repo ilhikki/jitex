@@ -73,4 +73,64 @@ export const rtKeys = {
 
   // ---------- check ----------
   rangeCheck: 'runtime.range.check',
+
+  // ============================================================
+  // 阶段 2+3：文件 / 转换 / 内存原语
+  // ============================================================
+
+  // ---------- 文件（不接类型参数，按句柄自身状态行事）----------
+  fileReset: 'runtime.file.reset',
+  fileRewrite: 'runtime.file.rewrite',
+  fileGet: 'runtime.file.get',
+  filePeek: 'runtime.file.peek',
+  filePut: 'runtime.file.put',
+  fileReadChar: 'runtime.file.readChar',
+  fileReadToken: 'runtime.file.readToken',
+  fileWrite: 'runtime.file.write',
+  fileReadln: 'runtime.file.readln',
+  fileWriteln: 'runtime.file.writeln',
+  fileEof: 'runtime.file.eof',
+  fileEoln: 'runtime.file.eoln',
+  filePage: 'runtime.file.page',
+  fileCreate: 'runtime.file.create',
+  programFileUrl: 'runtime.program.fileUrl',
+
+  // ---------- 转换（值 ↔ 文件单位）----------
+  i32ToStr: 'runtime.convert.i32.To.str',
+  i32ToBytes: 'runtime.convert.i32.To.bytes',
+  i32ToChar: 'runtime.convert.i32.To.char',
+  f64ToStr: 'runtime.convert.f64.To.str',
+  f64ToBytes: 'runtime.convert.f64.To.bytes',
+  boolToStr: 'runtime.convert.bool.To.str',
+  boolToBytes: 'runtime.convert.bool.To.bytes',
+  strToI32: 'runtime.convert.str.To.i32',
+  strToF64: 'runtime.convert.str.To.f64',
+  strToBool: 'runtime.convert.str.To.bool',
+  bytesToI32: 'runtime.convert.bytes.To.i32',
+  bytesToF64: 'runtime.convert.bytes.To.f64',
+  bytesToBool: 'runtime.convert.bytes.To.bool',
+  charToI32: 'runtime.convert.char.To.i32',
+
+  // ---------- 内存（类型在 get/set 时传入）----------
+  memNew: 'runtime.mem.new',
+  memCopy: 'runtime.mem.copy',
+  memClone: 'runtime.mem.clone',
+  numGet: 'runtime.num.get',
+  numSet: 'runtime.num.set',
+  viewSub: 'runtime.view.sub',
+
+  // ---------- object 数组（元素非字节可寻址，如 file）----------
+  arrNew: 'runtime.arr.new',
+  arrGet: 'runtime.arr.get',
+  arrSet: 'runtime.arr.set',
+
+  // ---------- cell ----------
+  cellNew: 'runtime.cell.new',
+  cellGet: 'runtime.cell.get',
+  cellSet: 'runtime.cell.set',
+
+  // ---------- set（构造类；运算类见上）----------
+  setRange: 'runtime.set.range',
+  setElem: 'runtime.set.elem',
+  setLiteral: 'runtime.set.literal',
 } as const

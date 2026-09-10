@@ -16,6 +16,7 @@ import {
   StatementNode,
   WithStatementNode,
 } from '@/frontend/node.ts'
+import { nodeToCode } from '@/frontend/printer/printer.ts'
 import {
   AnalysisSymbol,
   BUILTIN_FUNCTIONS,
@@ -25,6 +26,7 @@ import {
   evalConstInt,
   TypeInfo,
   VarSymbol,
+  VariantPartInfo,
 } from '../analysis-type.ts'
 import { AnalysisContext, DeclarationResult, GotoRecord, ScopeSnapshot, StatementResult } from '../stage-types.ts'
 
@@ -359,7 +361,7 @@ class StatementPass {
         } else if (sym?.kind === 'const') {
           info = sym.typeInfo
         } else if (sym?.kind === 'func') {
-          info = sym.retTypeInfo ?? { tag: 'unknown' }
+          info = sym.retTypeInfo ?? this.unknown(node, `func '${node.name}' 无返回类型`)
         } else {
           const lower = node.name.toLowerCase()
           if (lower === 'eof' || lower === 'eoln') {
@@ -367,7 +369,7 @@ class StatementPass {
           } else if (lower === 'nil') {
             info = { tag: 'pointer' }
           } else {
-            info = { tag: 'unknown' }
+            info = this.unknown(node, `identifier '${node.name}' 未解析到符号`)
           }
         }
         break
@@ -425,9 +427,12 @@ class StatementPass {
           this.analyzeExpr(a)
         }
         if (sym?.kind === 'func') {
-          info = sym.retTypeInfo ?? { tag: 'unknown' }
+          info = sym.retTypeInfo ?? this.unknown(node, `call '${node.name.name}' 无返回类型`)
         } else {
           info = this.builtinFuncReturnType(node.name.name, node.arguments)
+          if (info.tag === 'unknown') {
+            info = this.unknown(node, `builtin '${node.name.name}' 无已知返回类型`)
+          }
         }
         break
       }
@@ -451,19 +456,30 @@ class StatementPass {
           this.analyzeExpr(idx)
         }
         info = this.arrayElemType(arrType, node.indices.length)
+        if (info.tag === 'unknown') {
+          info = this.unknown(
+            node,
+            `array access 元素类型未知 (base=${arrType.tag}, indices=${node.indices.length})`,
+          )
+        }
         break
       }
 
       case 'FieldAccess': {
         const objType = this.analyzeExpr(node.object)
         if (objType.tag === 'rec' && objType.fields) {
-          info = objType.fields.get(node.field.name.toLowerCase()) ?? { tag: 'unknown' }
+          const f = this.findRecordField(objType, node.field.name.toLowerCase())
+          info = f ?? this.unknown(node, `record 无字段 '${node.field.name}' (objType.tag=rec)`)
         } else if (node.field.name === '^' && objType.tag === 'pointer') {
-          info = objType.domainType ?? { tag: 'unknown' }
+          info = objType.domainType ??
+            this.unknown(node, `pointer 无 domainType（解引用 '^'）`)
         } else if (node.field.name === '^' && objType.tag === 'file') {
           info = objType.elem ?? { tag: 'char' }
         } else {
-          info = { tag: 'unknown' }
+          info = this.unknown(
+            node,
+            `field access 基类型不可解 (objType.tag=${objType.tag}, field='${node.field.name}')`,
+          )
         }
         break
       }
@@ -485,23 +501,69 @@ class StatementPass {
         break
 
       default:
-        info = { tag: 'unknown' }
+        info = this.unknown(node, '未处理的表达式 kind')
     }
 
     this.exprType.set(node, info)
     return info
   }
 
-  private arrayElemType(arrType: TypeInfo, dims: number): TypeInfo {
-    let t = arrType
-    for (let i = 0; i < dims; i++) {
-      if (t.tag === 'array' && t.elem) {
-        t = t.elem
-      } else {
-        return { tag: 'unknown' }
+  /**
+   * 记录一次 unknown 类型推断，打印出触发它的 AST 节点（printer 还原为源码）。
+   * 仅用于定位类型链断点，返回 `{tag:'unknown'}` 本身。
+   */
+  private unknown(node: ExpressionNode, why: string): TypeInfo {
+    let src = `<printer failed: ${node.kind}>`
+    try {
+      src = nodeToCode(node)
+    } catch {
+      // 节点可能不是完整语句，printer 失败时退化为 kind
+    }
+    console.error(`[analysis:unknown] ${why} | kind=${node.kind} | src=${src}`)
+    return { tag: 'unknown' }
+  }
+
+  /**
+   * 在 record 类型中查找字段，含 variant part（含嵌套分支）。
+   * 静态类型检查接受变体字段的并集，实际布局偏移由 rewrite 依据 selector 计算。
+   */
+  private findRecordField(td: TypeInfo, name: string): TypeInfo | undefined {
+    return td.fields?.get(name) ?? this.findInVariant(td.variant, name)
+  }
+
+  private findInVariant(v: VariantPartInfo | undefined, name: string): TypeInfo | undefined {
+    if (!v) {
+      return undefined
+    }
+    for (const b of v.branches) {
+      const f = b.fields.get(name)
+      if (f) {
+        return f
+      }
+      const nested = this.findInVariant(b.nested, name)
+      if (nested) {
+        return nested
       }
     }
-    return t
+    return undefined
+  }
+
+  private arrayElemType(arrType: TypeInfo, dims: number): TypeInfo {
+    let t = arrType
+    let remaining = dims
+    while (remaining > 0 && t.tag === 'array' && t.elem) {
+      // declaration-pass 把 `array[a,b] of T` 展平成 {dims:[a,b], elem:T}，
+      // 因此按维度一次消费整层 dims，而不是逐层下沉 elem。
+      const n = t.dims?.length ?? 1
+      if (remaining >= n) {
+        remaining -= n
+        t = t.elem
+      } else {
+        // 部分索引：返回剩余维度的数组类型
+        return { tag: 'array', dims: (t.dims ?? []).slice(remaining), elem: t.elem }
+      }
+    }
+    return remaining === 0 ? t : { tag: 'unknown' }
   }
 
   private builtinFuncReturnType(name: string, args: ExpressionNode[]): TypeInfo {

@@ -6,7 +6,7 @@
  */
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { Analysis, AnalysisSymbol } from '@/middle/analysis/analysis-type.ts'
+import { Analysis, AnalysisSymbol, TypeInfo } from '@/middle/analysis/analysis-type.ts'
 import {
   ArrayAccessNode,
   BinaryExpressionNode,
@@ -21,19 +21,19 @@ import {
 import {
   callExpr,
   litBool,
+  litBytes,
   litChar,
   litField,
   litInt,
   litNull,
   litReal,
-  litStr,
   ref,
   syscall,
   SyscallKey,
   syscallKeys,
   WithBinding,
 } from './helpers.ts'
-import { isRecordFile, typeDescLiteral } from './type.ts'
+import { typeDescLiteral } from './type.ts'
 
 // ============================================================
 // loweringExpr → Expr
@@ -46,10 +46,8 @@ export function loweringExpr(node: ExpressionNode, a: Analysis, ws: WithBinding[
     case 'RealLiteral':
       return litReal(node.raw)
     case 'StringLiteral':
-      // ISO 7185：字符串字面量是 packed array[1..n] of char。
-      // 编译为 syscall('str.to.char.array', [strLiteral])，runtime 转为 1-based PascalArray。
-      // 字面量用 key:'str' 编码（runtime literalToJs 直接产出 JS 字符串）。
-      return syscall(syscallKeys.strToCharArray, [litStr(node.value)])
+      // ISO 7185 6.1.7: string-literal 的类型是 packed array[1..n] of char → Uint8Array
+      return litBytes(node.value)
     case 'CharLiteral':
       return litChar(node.value)
     case 'BooleanLiteral':
@@ -94,9 +92,11 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
     const binding = ws[i]
     const fname = node.name.toLowerCase()
     if (binding.fields.has(fname)) {
-      // 类型信息已由 mem.default.rec 时构建为 handler 缓存在 record 上，
-      // rec.field 不再需要类型参数
-      return syscall(syscallKeys.recField, [ref(binding.tempVarId), litField(fname)])
+      return syscall(syscallKeys.recAccess, [
+        ref(binding.tempVarId),
+        litField(fname),
+        typeDescLiteral(binding.typeInfo),
+      ])
     }
   }
 
@@ -110,12 +110,12 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
   }
 
   if (sym?.kind === 'const') {
-    // const 字符串字面量：key 'str' 编码的需包 str.to.char.array syscall 产出 1-based char 数组。
-    // 其它类型直接用 literal 字面量。
+    // const 字符串字面量 → Uint8Array；char → ord 值；其它直接用 literal
     if (sym.literal.key === 'str') {
-      return syscall(syscallKeys.strToCharArray, [
-        { kind: 'literal', key: 'str', arg: sym.literal.arg },
-      ])
+      return litBytes(sym.literal.arg)
+    }
+    if (sym.literal.key === 'char') {
+      return litInt(sym.literal.arg.charCodeAt(0))
     }
     return { kind: 'literal', key: sym.literal.key, arg: sym.literal.arg }
   }
@@ -281,11 +281,7 @@ function loweringFunctionCall(
       return syscall(syscallKeys.odd, argExprs)
     case 'eof':
       if (args.length > 0) {
-        // file of record 用 file.rec.eof（ISO 7185 6.4.3.5）
-        if (isRecordFile(a.typeOf(args[0]))) {
-          return syscall(syscallKeys.fileRecEof, argExprs)
-        }
-        return syscall(syscallKeys.fileEof, argExprs)
+        return syscall(syscallKeys.fileEof, [...argExprs, typeDescLiteral(a.typeOf(args[0]))])
       }
       return syscall(syscallKeys.ioEof, [])
     case 'eoln':
@@ -311,27 +307,54 @@ function loweringArrayAccess(node: ArrayAccessNode, a: Analysis, ws: WithBinding
     }
     return expr
   })
-  return syscall(syscallKeys.arrayGet, [arr, ...indices])
+  return syscall(syscallKeys.arrayAccess, [
+    arr,
+    ...indices,
+    typeDescLiteral(a.typeOf(node.array)),
+  ])
+}
+
+/**
+ * 解析字段访问对象的类型；analysis 未推断出（unknown）时，
+ * 回退用符号表推导（数组元素 / 变量声明的类型）。
+ */
+function resolveObjType(node: ExpressionNode, a: Analysis, ws: WithBinding[]): TypeInfo {
+  const ti = a.typeOf(node)
+  if (ti.tag !== 'unknown') {
+    return ti
+  }
+  if (node.kind === 'ArrayAccess') {
+    const base = (node as ArrayAccessNode).array
+    if (base.kind === 'Identifier') {
+      const sym = resolveSymbol(base as IdentifierNode, a, ws)
+      if (sym && (sym.kind === 'var' || sym.kind === 'param') && sym.typeInfo.elem) {
+        return sym.typeInfo.elem
+      }
+    }
+    const inner = resolveObjType(base, a, ws)
+    if (inner.elem) {
+      return inner.elem
+    }
+  }
+  return ti
 }
 
 function loweringFieldAccess(node: FieldAccessNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
-  const objType = a.typeOf(node.object)
+  const objType = resolveObjType(node.object, a, ws)
+  const obj = loweringExpr(node.object, a, ws)
   if (node.field.name === '^') {
     if (objType.tag === 'pointer') {
-      // ISO 7185 6.5.4: 指针解引用 p^ → cell.get(p)
-      return syscall(syscallKeys.ptrDeref, [loweringExpr(node.object, a, ws)])
+      // ISO 7185 6.5.4: 指针解引用 p^
+      return syscall(syscallKeys.ptrDeref, [obj])
     }
-    // 文件缓冲区访问 f^
-    // file of record: f^ 返回记录缓冲区（ISO 7185 6.4.3.5/6.6.5.2）
-    if (isRecordFile(objType)) {
-      return syscall(syscallKeys.fileRecPeek, [loweringExpr(node.object, a, ws)])
-    } else if (objType.elem?.tag === 'char') {
-      return syscall(syscallKeys.filePeekChar, [loweringExpr(node.object, a, ws)])
-    }
-    return syscall(syscallKeys.filePeek, [loweringExpr(node.object, a, ws)])
+    // 文件缓冲区访问 f^（text / record 由句柄类型决定）
+    return syscall(syscallKeys.filePeek, [obj, typeDescLiteral(objType)])
   }
-  const obj = loweringExpr(node.object, a, ws)
-  return syscall(syscallKeys.recField, [obj, litField(node.field.name.toLowerCase())])
+  return syscall(syscallKeys.recAccess, [
+    obj,
+    litField(node.field.name.toLowerCase()),
+    typeDescLiteral(objType),
+  ])
 }
 
 function loweringSetConstructor(
@@ -339,8 +362,9 @@ function loweringSetConstructor(
   a: Analysis,
   ws: WithBinding[],
 ): JsonCode.Expr {
+  const td = typeDescLiteral(a.typeOf(node))
   if (node.elements.length === 0) {
-    return syscall(syscallKeys.setEmpty, [])
+    return syscall(syscallKeys.setEmpty, [td])
   }
 
   const elems: JsonCode.Expr[] = []
@@ -348,12 +372,12 @@ function loweringSetConstructor(
     const sExpr = loweringExpr(start, a, ws)
     if (end) {
       const eExpr = loweringExpr(end, a, ws)
-      elems.push(syscall(syscallKeys.setRange, [sExpr, eExpr]))
+      elems.push(syscall(syscallKeys.setRange, [sExpr, eExpr, td]))
     } else {
-      elems.push(syscall(syscallKeys.setElem, [sExpr]))
+      elems.push(syscall(syscallKeys.setElem, [sExpr, td]))
     }
   }
-  return syscall(syscallKeys.setLiteral, elems)
+  return syscall(syscallKeys.setLiteral, [...elems, td])
 }
 
 function loweringInExpression(

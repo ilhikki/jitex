@@ -691,6 +691,264 @@ end.
       purpose: '测试记录类型参数（Pascal82 标准：var 在 procedure 之前；不使用非标 string[n] 类型）',
       expectedOutput: 'A\n25\n',
     },
+    // --------------------------------------------------------
+    // ISO 7185 6.6.3.3：var 实参必须是 variable-access（6.5.1）
+    //   variable-access = entire-variable | component-variable
+    //                   | identified-variable | buffer-variable
+    //   component-variable = indexed-variable | field-designator
+    // 因此数组元素、记录字段、解引用等「非标识符」实参必须支持，
+    // 且形参的修改要反映到原存储上。
+    // --------------------------------------------------------
+    {
+      name: 'var实参-数组元素 a[i]',
+      code: `
+program Test;
+var arr: array[1..3] of integer;
+procedure SetIt(var x: integer);
+begin
+  x := 42;
+end;
+begin
+  arr[2] := 0;
+  SetIt(arr[2]);
+  writeln(arr[2]);
+end.
+      `,
+      purpose: 'ISO 6.5.1 indexed-variable 作为 var 实参，写回原数组元素',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-记录字段 r.f',
+      code: `
+program Test;
+type Point = record
+  x, y: integer;
+end;
+var p: Point;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  p.x := 0;
+  SetIt(p.x);
+  writeln(p.x);
+end.
+      `,
+      purpose: 'ISO 6.5.1 field-designator 作为 var 实参，写回原字段',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-数组元素的字段 a[i].f（变量下标）',
+      code: `
+program Test;
+type Point = record
+  x, y: integer;
+end;
+var a: array[1..3] of Point;
+    i: integer;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  i := 2;
+  a[i].x := 0;
+  SetIt(a[i].x);
+  writeln(a[i].x);
+end.
+      `,
+      purpose: 'indexed-variable + field-designator 组合，且下标是运行期变量',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-字段的数组元素 r.arr[i]',
+      code: `
+program Test;
+type Bag = record
+  items: array[1..3] of integer;
+end;
+var b: Bag;
+    i: integer;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  i := 3;
+  b.items[i] := 0;
+  SetIt(b.items[i]);
+  writeln(b.items[i]);
+end.
+      `,
+      purpose: 'field-designator + indexed-variable 组合（字段内数组元素）',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-嵌套记录字段 r.inner.v',
+      code: `
+program Test;
+type Inner = record
+  v: integer;
+end;
+     Outer = record
+  inner: Inner;
+end;
+var o: Outer;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  o.inner.v := 0;
+  SetIt(o.inner.v);
+  writeln(o.inner.v);
+end.
+      `,
+      purpose: '多层 field-designator 作为 var 实参',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-二维数组元素 m[i,j]',
+      code: `
+program Test;
+var m: array[1..2, 1..3] of integer;
+    i, j: integer;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  i := 2;
+  j := 3;
+  m[i, j] := 0;
+  SetIt(m[i, j]);
+  writeln(m[i, j]);
+end.
+      `,
+      purpose: '多维 indexed-variable 作为 var 实参（验证展平下标换算）',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-变体记录的变体字段',
+      code: `
+program Test;
+type Kind = (kindA, kindB);
+     Rec = record
+       pad: integer;
+       case k: Kind of
+         kindA: (x: integer);
+         kindB: (y: integer);
+     end;
+var r: Rec;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  r.k := kindA;
+  r.x := 0;
+  SetIt(r.x);
+  writeln(r.x);
+end.
+      `,
+      purpose: '变体分支字段作为 var 实参（验证变体槽位偏移与写回）',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-指针解引用 p^',
+      code: `
+program Test;
+type P = ^integer;
+var p: P;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  new(p);
+  p^ := 0;
+  SetIt(p^);
+  writeln(p^);
+end.
+      `,
+      purpose: 'ISO 6.5.1 identified-variable 作为 var 实参',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-解引用的字段 p^.f',
+      code: `
+program Test;
+type Point = record
+  x, y: integer;
+end;
+     PP = ^Point;
+var p: PP;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  new(p);
+  p^.x := 0;
+  SetIt(p^.x);
+  writeln(p^.x);
+end.
+      `,
+      purpose: 'identified-variable + field-designator 组合',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-with 语句内的字段',
+      code: `
+program Test;
+type Point = record
+  x, y: integer;
+end;
+var p: Point;
+procedure SetIt(var v: integer);
+begin
+  v := 42;
+end;
+begin
+  with p do
+    begin
+      x := 0;
+      SetIt(x);
+    end;
+  writeln(p.x);
+end.
+      `,
+      purpose: 'with 展开后的字段仍属 field-designator，应可作 var 实参',
+      expectedOutput: '42\n',
+    },
+    {
+      name: 'var实参-文件缓冲区 f^',
+      code: `
+program Test(f);
+type R = record
+  x: integer;
+end;
+var f: file of R;
+    r: R;
+procedure SetIt(var v: R);
+begin
+  v.x := 42;
+end;
+begin
+  rewrite(f);
+  r.x := 0;
+  f^ := r;
+  SetIt(f^);
+  put(f);
+  reset(f);
+  r := f^;
+  writeln(r.x);
+end.
+      `,
+      purpose: 'ISO 6.5.1 buffer-variable（f^）作为 var 实参，put 后应写入 42',
+      expectedOutput: '42\n',
+    },
   ]
 
   runPascalTests(tests)

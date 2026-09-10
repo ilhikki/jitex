@@ -65,10 +65,11 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.f32Arctan]: (_ctx, [a]) => Math.atan(a as number),
 
-    // ---------- bool ----------
-    [rtKeys.boolAnd]: (_ctx, [a, b]) => (a as boolean) && (b as boolean),
-    [rtKeys.boolOr]: (_ctx, [a, b]) => (a as boolean) || (b as boolean),
-    [rtKeys.boolNot]: (_ctx, [a]) => !(a as boolean),
+    // ---------- bool（0/1 语义）----------
+    // and / or 用 && / ||：对 0/1 输入结果仍是 0/1，且保短路
+    [rtKeys.boolAnd]: (_ctx, [a, b]) => (a as number) && (b as number),
+    [rtKeys.boolOr]: (_ctx, [a, b]) => (a as number) || (b as number),
+    [rtKeys.boolNot]: (_ctx, [a]) => ((a as number) ? 0 : 1),
 
     // ---------- cmp ----------
     [rtKeys.cmpEq]: (_ctx, [a, b]) => a === b,

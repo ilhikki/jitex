@@ -1,0 +1,291 @@
+/*
+ * 类型布局：TypeDescriptor → 字节大小 / codec / 字段偏移。
+ *
+ * 纯函数，供 rewrite 在编译期计算。
+ * codec 选择与 boot-tex 的 selectCodec 保持一致（二进制布局以 boot-tex 为标准）。
+ *
+ * 布局约定：
+ *   array  —— 扁平化为一维字节序列，offset 由各维 low/stride 算出
+ *   record —— 固定字段顺序排列，其后是 variant 的 tag（4 字节），再是 variant 区
+ *             （各分支共享同一段空间，即 union，取最大值）
+ *   set    —— 位图，字节数由基类型范围决定
+ */
+
+import type { TypeDescriptor, VariantPartDescriptor } from '@/middle/lowering/type.ts'
+
+/** 标量编解码器（f64 表示 8 字节 real，与 boot-tex 一致） */
+export type Codec = 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'f64'
+
+const CODEC_SIZE: Record<Codec, number> = {
+  i8: 1,
+  u8: 1,
+  i16: 2,
+  u16: 2,
+  i32: 4,
+  f64: 8,
+}
+
+/** variant tag 字段占用的字节数（仅**具名** tag 分配空间） */
+const TAG_SIZE = 4
+
+/**
+ * variant 的 tag 槽位数。
+ *
+ * ISO 允许 `case` 不带 tag 字段名；TeX 的 `memory_word` 全是无名 variant，
+ * 实际布局就是各分支的 union（无 tag 空间）——旧 boot-tex 实现亦如此。
+ */
+function tagSize(vp: VariantPartDescriptor | undefined): number {
+  return vp?.tagName !== undefined ? TAG_SIZE : 0
+}
+
+export function codecSize(c: Codec): number {
+  return CODEC_SIZE[c]
+}
+
+/** 序数子界的 codec（与 boot-tex selectCodec 的 subrange 分支一致） */
+function rangeCodec(low: number, high: number): Codec {
+  if (low >= -128 && high <= 127) {
+    return 'i8'
+  }
+  if (low >= 0 && high <= 255) {
+    return 'u8'
+  }
+  if (low >= -32768 && high <= 32767) {
+    return 'i16'
+  }
+  if (low >= 0 && high <= 65535) {
+    return 'u16'
+  }
+  return 'i32'
+}
+
+/** 是否为标量类型 */
+export function isScalar(td: TypeDescriptor): boolean {
+  switch (td.tag) {
+    case 'i32':
+    case 'enum':
+    case 'f64':
+    case 'bool':
+    case 'char':
+      return true
+    default:
+      return false
+  }
+}
+
+/**
+ * 数组的「object 元素」类型。
+ *
+ * file 是 `object`，不能装进 `Uint8Array` 字节视图；这类数组用 JS Array 表示。
+ * 返回摊平后的最内层元素类型（当它是 file 时），否则 undefined。
+ */
+export function objectArrayElem(td: TypeDescriptor): TypeDescriptor | undefined {
+  if (td.tag !== 'array') {
+    return undefined
+  }
+  let cur = td
+  while (cur.tag === 'array' && cur.elem) {
+    cur = cur.elem
+  }
+  return cur.tag === 'file' ? cur : undefined
+}
+
+/** 数组元素个数（各维长度之积）；非数组返回 1 */
+export function arrayCount(td: TypeDescriptor): number {
+  return (td.dims ?? []).reduce((n, d) => n * (d.high - d.low + 1), 1)
+}
+
+/**
+ * 「单字节标量」：`packed file of byte` 这类原始字节文件的元素类型。
+ *
+ * 只有元素的 codec 宽度为 1 才算（`0..255` 子界 / 1 字节 enum / boolean）；
+ * `file of char` 是文本文件，`file of integer`（4 字节）走文本式单位读写。
+ */
+export function isByteScalar(td: TypeDescriptor | undefined): boolean {
+  if (td === undefined) {
+    return false
+  }
+  switch (td.tag) {
+    case 'bool':
+      return true
+    case 'enum':
+      return (td.enumCount ?? 1) - 1 <= 255
+    case 'i32':
+      return td.low !== undefined && td.high !== undefined && td.low >= -128 && td.high <= 255
+    default:
+      return false
+  }
+}
+
+/** 标量类型的 codec；非标量抛错 */
+export function codecOf(td: TypeDescriptor): Codec {
+  switch (td.tag) {
+    case 'i32':
+      // 带 low/high 视为子界，按范围选宽度
+      return td.low !== undefined && td.high !== undefined ? rangeCodec(td.low, td.high) : 'i32'
+    case 'enum':
+      return rangeCodec(0, (td.enumCount ?? 1) - 1)
+    case 'f64':
+      return 'f64'
+    case 'bool':
+    case 'char':
+      return 'u8'
+    default:
+      throw new Error(`codecOf: not a scalar type: ${td.tag}`)
+  }
+}
+
+/** 类型占用的字节数 */
+export function sizeOf(td: TypeDescriptor): number {
+  if (isScalar(td)) {
+    return codecSize(codecOf(td))
+  }
+  switch (td.tag) {
+    case 'array': {
+      let count = 1
+      for (const d of td.dims ?? []) {
+        count *= d.high - d.low + 1
+      }
+      return count * sizeOf(td.elem!)
+    }
+    case 'rec':
+      return recordSize(td)
+    case 'set':
+      return setSize(td)
+    case 'pointer':
+      return 4
+    default:
+      throw new Error(`sizeOf: unsupported type ${td.tag}`)
+  }
+}
+
+/**
+ * set 位图的字节数。
+ *
+ * 统一按 256 位（0..255）分配：位下标即序数值（绝对位），
+ * 这样「set 表达式」与「set 变量」的 size 一定一致，
+ * 也覆盖 char 全域。超出 255 的基类型不支持（与 ISO 实现定义上限一致）。
+ */
+export function setSize(_td: TypeDescriptor): number {
+  return 32
+}
+
+function recordSize(td: TypeDescriptor): number {
+  let offset = 0
+  for (const f of td.fields ?? []) {
+    offset += sizeOf(f.type)
+  }
+  if (td.variant) {
+    offset += tagSize(td.variant)
+    offset += variantSize(td.variant)
+  }
+  return offset
+}
+
+/** variant 区大小：各分支取最大值（union） */
+function variantSize(vp: VariantPartDescriptor): number {
+  let max = 0
+  for (const b of vp.branches) {
+    let size = 0
+    for (const f of b.fields) {
+      size += sizeOf(f.type)
+    }
+    if (b.nested) {
+      size += tagSize(b.nested) + variantSize(b.nested)
+    }
+    if (size > max) {
+      max = size
+    }
+  }
+  return max
+}
+
+// ============================================================
+// 字段槽位
+// ============================================================
+
+export interface FieldSlot {
+  offset: number
+  size: number
+  type: TypeDescriptor
+  /** 是否为 variant 的 tag 字段 */
+  isTag: boolean
+}
+
+/** 取 record 字段的槽位；不存在返回 undefined */
+export function fieldSlot(td: TypeDescriptor, name: string): FieldSlot | undefined {
+  let offset = 0
+  for (const f of td.fields ?? []) {
+    if (f.name === name) {
+      return { offset, size: sizeOf(f.type), type: f.type, isTag: false }
+    }
+    offset += sizeOf(f.type)
+  }
+  if (td.variant) {
+    const tagOff = offset
+    if (td.variant.tagName === name) {
+      return { offset: tagOff, size: TAG_SIZE, type: { tag: 'i32' }, isTag: true }
+    }
+    return variantFieldSlot(td.variant, name, tagOff + tagSize(td.variant))
+  }
+  return undefined
+}
+
+function variantFieldSlot(
+  vp: VariantPartDescriptor,
+  name: string,
+  start: number,
+): FieldSlot | undefined {
+  for (const b of vp.branches) {
+    let off = start
+    for (const f of b.fields) {
+      if (f.name === name) {
+        return { offset: off, size: sizeOf(f.type), type: f.type, isTag: false }
+      }
+      off += sizeOf(f.type)
+    }
+    if (b.nested) {
+      if (b.nested.tagName === name) {
+        return { offset: off, size: TAG_SIZE, type: { tag: 'i32' }, isTag: true }
+      }
+      const nested = variantFieldSlot(b.nested, name, off + tagSize(b.nested))
+      if (nested) {
+        return nested
+      }
+    }
+  }
+  return undefined
+}
+
+// ============================================================
+// 数组槽位
+// ============================================================
+
+export interface ArraySlot {
+  /** 最内层元素类型 */
+  elemType: TypeDescriptor
+  /** 最内层元素字节大小 */
+  elemSize: number
+  /** 各维下界 */
+  lows: number[]
+  /** 各维步长（字节） */
+  strides: number[]
+}
+
+/** 把（可能嵌套的）数组类型摊平成维度 + 步长 */
+export function arraySlot(td: TypeDescriptor): ArraySlot {
+  const dims: { low: number; high: number }[] = []
+  let cur = td
+  while (cur.tag === 'array') {
+    for (const d of cur.dims ?? []) {
+      dims.push(d)
+    }
+    cur = cur.elem!
+  }
+  const elemSize = sizeOf(cur)
+  const strides = new Array<number>(dims.length).fill(elemSize)
+  for (let i = dims.length - 2; i >= 0; i--) {
+    strides[i] = strides[i + 1] * (dims[i + 1].high - dims[i + 1].low + 1)
+  }
+  return { elemType: cur, elemSize, lows: dims.map((d) => d.low), strides }
+}

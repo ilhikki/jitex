@@ -3,6 +3,9 @@
  *
  * 纯函数族，无 mutable state。提供 JsonCode 节点的构造便利函数、
  * syscall key 常量表，以及 With 绑定上下文类型。
+ *
+ * 命名约定：lowering 产出的 key 一律带 `lowering.` 前缀；
+ * rewrite 消费类型后产出 `runtime.` 前缀的终态 key。
  */
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
@@ -14,6 +17,8 @@ import { TypeInfo } from '@/middle/analysis/analysis-type.ts'
 
 export interface WithBinding {
   tempVarId: number
+  /** record 的整体类型（rewrite 算字段 offset 用） */
+  typeInfo: TypeInfo
   fields: Map<string, TypeInfo>
 }
 
@@ -37,16 +42,29 @@ export function litStr(v: string): JsonCode.Literal {
   return { kind: 'literal', key: 'str', arg: v }
 }
 
+/**
+ * 字符串字面量 → `Uint8Array` 字面量（ISO 7185 6.1.7：
+ * string-literal 的类型是 packed array[1..n] of char）。
+ */
+export function litBytes(v: string): JsonCode.Literal {
+  const bytes = Array.from(v, (c) => c.charCodeAt(0))
+  return { kind: 'literal', key: 'bytes', arg: JSON.stringify(bytes) }
+}
+
 export function litField(v: string): JsonCode.Literal {
   return { kind: 'literal', key: 'field', arg: v }
 }
 
+/**
+ * char 字面量 → i32 字面量（char 用 ord 值表示，ISO 6.4.2.3）。
+ */
 export function litChar(v: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'char', arg: v }
+  return { kind: 'literal', key: 'i32', arg: String(v.charCodeAt(0)) }
 }
 
 export function litBool(v: boolean): JsonCode.Literal {
-  return { kind: 'literal', key: 'bool', arg: v ? 'true' : 'false' }
+  // boolean 取序数值 0/1（ISO 6.4.2.2）
+  return { kind: 'literal', key: 'i32', arg: v ? '1' : '0' }
 }
 
 export function litNull(): JsonCode.Literal {
@@ -91,102 +109,51 @@ export function returnStmt(value?: JsonCode.Expr): JsonCode.Return {
 // ============================================================
 
 export const syscallKeys = {
-  hookFunctionEnter: 'hook.function.enter',
-  // mem
-  memDefaultArray: 'mem.default.array',
-  memDefaultRec: 'mem.default.rec',
-  // set（构造类，阶段3 处理；运算类已由 lowering.* 泛型化）
-  setEmpty: 'set.empty',
-  setRange: 'set.range',
-  setElem: 'set.elem',
-  setLiteral: 'set.literal',
-  // file
-  fileCreate: 'file.create',
-  fileReset: 'file.reset',
-  fileRewrite: 'file.rewrite',
-  fileGet: 'file.get',
-  fileGetChar: 'file.get.char',
-  filePut: 'file.put',
-  fileEof: 'file.eof',
-  fileEoln: 'file.eoln',
-  filePeek: 'file.peek',
-  filePeekChar: 'file.peek.char',
-  fileRecReset: 'file.rec.reset',
-  fileRecRewrite: 'file.rec.rewrite',
-  fileRecGet: 'file.rec.get',
-  fileRecPut: 'file.rec.put',
-  fileRecSetbuf: 'file.rec.setbuf',
-  fileRecEof: 'file.rec.eof',
-  fileRecPeek: 'file.rec.peek',
-  // rec
-  recCopy: 'rec.copy',
-  recSet: 'rec.set',
-  recField: 'rec.field',
-  // cell
-  cellCreate: 'cell.create',
-  cellGet: 'cell.get',
-  cellSet: 'cell.set',
-  // array
-  arrayGet: 'array.get',
-  arraySet: 'array.set',
-  // str.to.char.array：字符串字面量 → 1-based packed array[1..n] of char
-  strToCharArray: 'str.to.char.array',
-  // array.char.resize：char 数组边界转换（目标 low≠1 时使用）
-  arrayCharResize: 'array.char.resize',
-  // range / steps / program
-  rangeCheck: 'range.check',
-  stepsCheck: 'steps.check',
-  programFileUrl: 'program.fileUrl',
-  // io
-  ioPage: 'io.page',
-  ioEof: 'io.eof',
-  ioEoln: 'io.eoln',
-  ioWritelnFile: 'io.writeln.file',
-  ioWriteln: 'io.writeln',
-  ioReadlnSkipFile: 'io.readln.skip.file',
-  ioReadlnSkip: 'io.readln.skip',
-  // io.write.${suffix}
-  ioWritei32: 'io.write.i32',
-  ioWriteF64: 'io.write.f64',
-  ioWriteBool: 'io.write.bool',
-  ioWriteChar: 'io.write.char',
-  ioWriteCharArray: 'io.write.char.array',
-  ioWriteSet: 'io.write.set',
-  // io.write.${suffix}.file
-  ioWritei32File: 'io.write.i32.file',
-  ioWriteF64File: 'io.write.f64.file',
-  ioWriteBoolFile: 'io.write.bool.file',
-  ioWriteCharFile: 'io.write.char.file',
-  ioWriteCharArrayFile: 'io.write.char.array.file',
-  ioWriteSetFile: 'io.write.set.file',
-  // io.write.${suffix}.fmt
-  ioWritei32Fmt: 'io.write.i32.fmt',
-  ioWriteF64Fmt: 'io.write.f64.fmt',
-  ioWriteBoolFmt: 'io.write.bool.fmt',
-  ioWriteCharFmt: 'io.write.char.fmt',
-  ioWriteCharArrayFmt: 'io.write.char.array.fmt',
-  ioWriteSetFmt: 'io.write.set.fmt',
-  // io.write.${suffix}.fmt.file
-  ioWritei32FmtFile: 'io.write.i32.fmt.file',
-  ioWriteF64FmtFile: 'io.write.f64.fmt.file',
-  ioWriteBoolFmtFile: 'io.write.bool.fmt.file',
-  ioWriteCharFmtFile: 'io.write.char.fmt.file',
-  ioWriteCharArrayFmtFile: 'io.write.char.array.fmt.file',
-  ioWriteSetFmtFile: 'io.write.set.fmt.file',
-  // io.read.${suffix}
-  ioReadi32: 'io.read.i32',
-  ioReadF64: 'io.read.f64',
-  ioReadBool: 'io.read.bool',
-  ioReadChar: 'io.read.char',
-  ioReadCharArray: 'io.read.char.array',
-  ioReadSet: 'io.read.set',
-  // io.read.${suffix}.file
-  ioReadi32File: 'io.read.i32.file',
-  ioReadF64File: 'io.read.f64.file',
-  ioReadBoolFile: 'io.read.bool.file',
-  ioReadCharFile: 'io.read.char.file',
-  ioReadCharArrayFile: 'io.read.char.array.file',
-  ioReadSetFile: 'io.read.set.file',
+  // ---------- 调试 / 检查 ----------
+  hookFunctionEnter: 'lowering.hook.function.enter', // [id, name]
+  stepsCheck: 'lowering.steps.check', // []
+  rangeCheck: 'lowering.range.check', // [v, lo, hi]
+
+  // ---------- 内存 ----------
+  memDefault: 'lowering.mem.default', // [typeDesc]
+  memCopy: 'lowering.mem.copy', // [dst, dstOffset, src, typeDesc]
+
+  // ---------- set ----------
+  setEmpty: 'lowering.set.empty', // [typeDesc]
+  setRange: 'lowering.set.range', // [lo, hi, typeDesc]
+  setElem: 'lowering.set.elem', // [v, typeDesc]
+  setLiteral: 'lowering.set.literal', // [...elems, typeDesc]
+
+  // ---------- 文件 ----------
+  fileCreate: 'lowering.file.create', // [typeDesc]
+  fileReset: 'lowering.file.reset', // [f, typeDesc, ...src]
+  fileRewrite: 'lowering.file.rewrite', // [f, typeDesc, ...src]
+  fileGet: 'lowering.file.get', // [f, typeDesc]
+  filePut: 'lowering.file.put', // [f, typeDesc, value?]
+  filePeek: 'lowering.file.peek', // [f, typeDesc]
+  fileEof: 'lowering.file.eof', // [f, typeDesc]
+  fileEoln: 'lowering.file.eoln', // [f]
+  programFileUrl: 'lowering.program.fileUrl', // [f, name, typeDesc]
+
+  // ---------- io ----------
+  ioWrite: 'lowering.io.write', // [target, targetType, value, valueType, width, prec]
+  ioWriteln: 'lowering.io.writeln', // [target, targetType]
+  ioRead: 'lowering.io.read', // [target, targetType, valueType]
+  ioReadlnSkip: 'lowering.io.readln.skip', // [target, targetType]
+  ioPage: 'lowering.io.page', // [target, targetType]
+  ioEof: 'lowering.io.eof', // []
+  ioEoln: 'lowering.io.eoln', // []
+
+  // ---------- 记录 / 数组 / cell ----------
+  recAccess: 'lowering.rec.access', // [rec, name, typeDesc]
+  recAssign: 'lowering.rec.assign', // [rec, name, value, typeDesc]
+  recCopy: 'lowering.rec.copy', // [rec, typeDesc]
+  arrayAccess: 'lowering.array.access', // [arr, ...indices, typeDesc]
+  arrayAssign: 'lowering.array.assign', // [arr, ...indices, value, typeDesc]
+  cellCreate: 'lowering.cell.create', // [value]
+  cellGet: 'lowering.cell.get', // [cell]
+  cellSet: 'lowering.cell.set', // [cell, value]
+
   // ============================================================
   // 阶段1：算术 / 逻辑 / 比较 / 转换（泛型，rewrite 消费 type 分发）
   // ============================================================
