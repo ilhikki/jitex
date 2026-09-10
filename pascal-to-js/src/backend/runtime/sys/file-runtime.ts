@@ -323,8 +323,17 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       if (isRec(p)) {
         const rs = recStore(p)
         if (unit !== undefined) {
-          rs.setBuffer(unit as Uint8Array)
+          // ISO 6.6.5.2: 写缓冲区的前置条件是文件处于写状态
+          if (rs.getMode() !== 'generation') {
+            throw new Error('f^ := x before rewrite: pre-assertion violated')
+          }
+          // `f^ := x` 是赋值（值语义），x 可能是共享视图（如 mem[k]），
+          // 必须深拷贝后落缓冲：否则改 x 会连带改掉已写入的缓冲内容。
+          rs.setBuffer((unit as Uint8Array).slice())
         } else {
+          if (rs.getMode() !== 'generation') {
+            throw new Error('put(f) before rewrite: pre-assertion violated')
+          }
           rs.writeRecord()
         }
         return undefined

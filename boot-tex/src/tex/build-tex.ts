@@ -20,6 +20,27 @@ const texExtraCallables: Record<string, ExtraCallable> = {
   },
 }
 
+/**
+ * eoln(f)：ConsoleFile 需要模拟终端对回车键的回显。
+ *
+ * input_ln 读到行结束符就停下、不消费它；真实终端会把那个换行回显出来，
+ * 这里用 advance() 消费并回显。
+ */
+const eolnSyscall: SyscallHandler = (ctx, [file]) => {
+  const f = file as PascalFile | null | undefined
+  const store = (f === null || f === undefined ? ctx.files.get('INPUT') : f.value) as
+    | (TextFile | undefined)
+  if (!store || !store.hasMore()) {
+    return 1
+  }
+  const byte = store.peekByte()
+  const isEoln = byte === 10 || byte === 13
+  if (isEoln && store instanceof ConsoleFile) {
+    store.advance()
+  }
+  return isEoln ? 1 : 0
+}
+
 export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.close': extraSyscalls['extra.close'],
   'extra.breakIn': extraSyscalls['extra.breakIn'],
@@ -33,22 +54,9 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'factory.createHandler': extraSyscalls['factory.createHandler'],
   'factory.createRecHandler': extraSyscalls['factory.createRecHandler'],
   'io.write.i32.file': extraSyscalls['io.write.i32.file'],
-  'file.eoln': (_ctx, [file]) => {
-    const f = file as PascalFile
-    const store = f.value as (TextFile | undefined)
-    if (!store || !store.hasMore()) {
-      return true
-    }
-    const byte = store.peekByte()
-    const isEoln = byte === 10 || byte === 13
-    // ConsoleFile: simulate terminal echo of the return key.
-    // input_ln stops at eoln without consuming it; the real terminal would
-    // echo the newline. advance() consumes and echoes it.
-    if (isEoln && store instanceof ConsoleFile) {
-      store.advance()
-    }
-    return isEoln
-  },
+  'file.eoln': eolnSyscall,
+  // 新链路（runtime.* 前缀）下的同语义覆盖
+  'runtime.file.eoln': eolnSyscall,
 }
 
 export function transformTex(texPascalContent: string) {

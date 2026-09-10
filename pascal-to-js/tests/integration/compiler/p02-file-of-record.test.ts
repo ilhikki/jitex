@@ -93,6 +93,57 @@ describe('ISO 7185 file of record (6.4.3.5 / 6.6.5.2)', () => {
       recordFiles: new Map([['f', new MemoryRecordFile()]]),
       expectedContains: '1234',
     },
+    // ==========================================================================
+    // f^ := x 的赋值语义（ISO 6.6.3.3 赋值 = 值拷贝）
+    //
+    // f^ 是 buffer-variable，`f^ := x` 是赋值语句：写入的是 x 的「值」。
+    // 之后再修改 x，不得影响已写入缓冲区的内容。
+    // ==========================================================================
+
+    {
+      name: 'file of record: 正向 - f^ := r 后再改 r，缓冲区不受影响',
+      code:
+        `program test(f); type rec = record x: integer; end; var f: file of rec; a, b: rec; begin rewrite(f); a.x := 1; f^ := a; a.x := 2; b := f^; write(b.x); end.`,
+      purpose: 'ISO 6.6.3.3: f^ := a 是赋值（值语义），之后改 a 不得改变缓冲区 → 期望读到 1',
+      recordFiles: new Map([['f', new MemoryRecordFile()]]),
+      expectedContains: '1',
+    },
+    {
+      name: 'file of record: 正向 - f^ := mem[k] 后再改 mem[k]，缓冲区不受影响',
+      code:
+        `program test(f); type rec = record x: integer; end; var f: file of rec; mem: array[1..3] of rec; b: rec; begin rewrite(f); mem[2].x := 1; f^ := mem[2]; mem[2].x := 2; b := f^; write(b.x); end.`,
+      purpose: 'ISO 6.6.3.3: TeX dump_wd(mem[k]) 模式，数组元素是共享视图，赋值后改元素不得改变缓冲区 → 期望 1',
+      recordFiles: new Map([['f', new MemoryRecordFile()]]),
+      expectedContains: '1',
+    },
+    {
+      name: 'file of record: 正向 - 写入后改写源，已写入的记录不受影响',
+      code:
+        `program test(f); type rec = record x: integer; end; var f: file of rec; mem: array[1..3] of rec; b: rec; begin rewrite(f); mem[1].x := 1; f^ := mem[1]; put(f); mem[1].x := 9; mem[2].x := 2; f^ := mem[2]; put(f); reset(f); b := f^; write(b.x); get(f); b := f^; write(b.x); end.`,
+      purpose: 'ISO 6.6.3.3: put 之后改写源内存，已落盘的记录必须保持原值 → 期望 12（TeX 格式转储的核心不变量）',
+      recordFiles: new Map([['f', new MemoryRecordFile()]]),
+      expectedContains: '12',
+    },
+
+    // ==========================================================================
+    // 反面：违反 ISO 前置条件应快速失败
+    // ==========================================================================
+
+    {
+      name: 'file of record: 反面 - reset 后写缓冲区应报错',
+      code:
+        `program test(f); type rec = record x: integer; end; var f: file of rec; r: rec; begin rewrite(f); reset(f); f^ := r; end.`,
+      purpose: 'ISO 6.6.5.2: rewrite 之前（读状态）写缓冲区违反前置条件',
+      recordFiles: new Map([['f', new MemoryRecordFile()]]),
+      expectedError: 'pre-assertion',
+    },
+    {
+      name: 'file of record: 反面 - reset 后 put 应报错',
+      code: `program test(f); type rec = record x: integer; end; var f: file of rec; begin rewrite(f); reset(f); put(f); end.`,
+      purpose: 'ISO 6.6.5.2: rewrite 之前（读状态）调用 put 违反前置条件',
+      recordFiles: new Map([['f', new MemoryRecordFile()]]),
+      expectedError: 'pre-assertion',
+    },
   ]
 
   runPascalTests(tests)
