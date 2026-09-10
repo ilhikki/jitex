@@ -470,10 +470,12 @@ export function createArrayHandler(ctx: RuntimeContext, type: TypeDescriptor): A
   return handler
 }
 
-export function encodeUtf8(s: string): Uint8Array {
-  return new TextEncoder().encode(s)
-}
+const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
 
+export function encodeUtf8(s: string): Uint8Array {
+  return textEncoder.encode(s)
+}
 export function bytesToString(bytes: Uint8Array): string {
-  return new TextDecoder().decode(bytes)
+  return textDecoder.decode(bytes)
 }
