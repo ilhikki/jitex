@@ -17,6 +17,7 @@
 import type { RunError, RunState } from './run-state.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
 import { fileSyscalls } from './sys/file.ts'
+import { arithSyscalls } from './sys/arith.ts'
 import { basicSyscall } from './sys/pascal-semantic-compiler.ts'
 
 export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeContext {
@@ -51,7 +52,7 @@ export function toRunState(
 // ============================================================
 
 function getDefaultSyscalls(): Record<string, SyscallHandler> {
-  return { ...basicSyscall(), ...fileSyscalls() }
+  return { ...basicSyscall(), ...arithSyscalls(), ...fileSyscalls() }
 }
 
 export function createDispatcher(

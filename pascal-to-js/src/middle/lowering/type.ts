@@ -109,6 +109,8 @@ export interface TypeDescriptor {
   elem?: TypeDescriptor
   fields?: Array<{ name: string; type: TypeDescriptor }>
   variant?: VariantPartDescriptor
+  /** enum：序数个数（pred/succ 边界检查用） */
+  enumCount?: number
 }
 
 export interface VariantPartDescriptor {
@@ -133,6 +135,7 @@ export function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
       ? Array.from(ti.fields.entries()).map(([k, v]) => ({ name: k, type: serializeTypeInfo(v) }))
       : undefined,
     variant: ti.variant ? serializeVariantPart(ti.variant) : undefined,
+    enumCount: ti.enumCount,
   }
 }
 
@@ -147,31 +150,5 @@ export function serializeVariantPart(vp: VariantPartInfo): VariantPartDescriptor
       })),
       nested: b.nested ? serializeVariantPart(b.nested) : undefined,
     })),
-  }
-}
-
-// ============================================================
-// pred/succ fallback：${suffix}.sub / .add —— suffix 来自 typeSuffix
-// ============================================================
-
-export function typeSubCall(suffix: string, args: JsonCode.Expr[]): JsonCode.Syscall {
-  switch (suffix) {
-    case 'i32':
-      return syscall(syscallKeys.i32Sub, args)
-    case 'f64':
-      return syscall(syscallKeys.f64Sub, args)
-    default:
-      throw new Error(`typeSubCall: unsupported suffix ${suffix}`)
-  }
-}
-
-export function typeAddCall(suffix: string, args: JsonCode.Expr[]): JsonCode.Syscall {
-  switch (suffix) {
-    case 'i32':
-      return syscall(syscallKeys.i32Add, args)
-    case 'f64':
-      return syscall(syscallKeys.f64Add, args)
-    default:
-      throw new Error(`typeAddCall: unsupported suffix ${suffix}`)
   }
 }

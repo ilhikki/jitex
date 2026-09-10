@@ -95,19 +95,11 @@ export const syscallKeys = {
   // mem
   memDefaultArray: 'mem.default.array',
   memDefaultRec: 'mem.default.rec',
-  // set
+  // set（构造类，阶段3 处理；运算类已由 lowering.* 泛型化）
   setEmpty: 'set.empty',
-  setUnion: 'set.union',
-  setIntersect: 'set.intersect',
-  setDiff: 'set.diff',
-  setEq: 'set.eq',
-  setNe: 'set.ne',
-  setLe: 'set.le',
-  setGe: 'set.ge',
   setRange: 'set.range',
   setElem: 'set.elem',
   setLiteral: 'set.literal',
-  setIn: 'set.in',
   // file
   fileCreate: 'file.create',
   fileReset: 'file.reset',
@@ -130,13 +122,10 @@ export const syscallKeys = {
   recCopy: 'rec.copy',
   recSet: 'rec.set',
   recField: 'rec.field',
-  // cell / ptr
+  // cell
   cellCreate: 'cell.create',
   cellGet: 'cell.get',
   cellSet: 'cell.set',
-  ptrAssign: 'ptr.assign',
-  ptrDeref: 'ptr.deref',
-  ptrDisposeCheck: 'ptr.dispose.check',
   // array
   arrayGet: 'array.get',
   arraySet: 'array.set',
@@ -198,47 +187,51 @@ export const syscallKeys = {
   ioReadCharFile: 'io.read.char.file',
   ioReadCharArrayFile: 'io.read.char.array.file',
   ioReadSetFile: 'io.read.set.file',
-  // cmp
-  cmpEq: 'cmp.eq',
-  cmpNe: 'cmp.ne',
-  cmpLt: 'cmp.lt',
-  cmpLe: 'cmp.le',
-  cmpGt: 'cmp.gt',
-  cmpGe: 'cmp.ge',
-  // i32
-  i32Add: 'i32.add',
-  i32Sub: 'i32.sub',
-  i32Mul: 'i32.mul',
-  i32Div: 'i32.div',
-  i32Mod: 'i32.mod',
-  i32And: 'i32.and',
-  i32Or: 'i32.or',
-  i32Not: 'i32.not',
-  i32Neg: 'i32.neg',
-  i32Abs: 'i32.abs',
-  i32Odd: 'i32.odd',
-  // f64
-  f64Add: 'f64.add',
-  f64Sub: 'f64.sub',
-  f64Mul: 'f64.mul',
-  f64Div: 'f64.div',
-  f64Neg: 'f64.neg',
-  f64Abs: 'f64.abs',
-  f64Sqrt: 'f64.sqrt',
-  f64Sin: 'f64.sin',
-  f64Cos: 'f64.cos',
-  f64Exp: 'f64.exp',
-  f64Ln: 'f64.ln',
-  f64Arctan: 'f64.arctan',
-  // bool
-  boolAnd: 'bool.and',
-  boolOr: 'bool.or',
-  boolNot: 'bool.not',
-  // cast
-  castCharToi32: 'cast.char.to.i32',
-  castBoolToi32: 'cast.bool.to.i32',
-  casti32ToChar: 'cast.i32.to.char',
-  castF64Toi32: 'cast.f64.to.i32',
-  castF64Toi32Round: 'cast.f64.to.i32.round',
+  // ============================================================
+  // 阶段1：算术 / 逻辑 / 比较 / 转换（泛型，rewrite 消费 type 分发）
+  // ============================================================
+
+  // 二元运算，args = [left, leftType, right, rightType]
+  add: 'lowering.add',
+  sub: 'lowering.sub',
+  mul: 'lowering.mul',
+  and: 'lowering.and',
+  or: 'lowering.or',
+  // 二元运算（类型固定），args = [left, right]
+  div: 'lowering.div',
+  intDiv: 'lowering.intDiv',
+  mod: 'lowering.mod',
+  // 一元运算，args = [value, type]
+  neg: 'lowering.neg',
+  not: 'lowering.not',
+  abs: 'lowering.abs',
+  // 数学函数
+  sqr: 'lowering.sqr', // [value, type]
+  sqrt: 'lowering.sqrt', // [value]
+  sin: 'lowering.sin',
+  cos: 'lowering.cos',
+  exp: 'lowering.exp',
+  ln: 'lowering.ln',
+  arctan: 'lowering.arctan',
+  odd: 'lowering.odd', // [value]
+  // 转换
+  trunc: 'lowering.trunc', // [value]
+  round: 'lowering.round', // [value]
+  ord: 'lowering.ord', // [value, type]
+  chr: 'lowering.chr', // [value]
+  pred: 'lowering.pred', // [value, type]
+  succ: 'lowering.succ', // [value, type]
+  // 比较，args = [left, leftType, right, rightType]
+  eq: 'lowering.eq',
+  ne: 'lowering.ne',
+  lt: 'lowering.lt',
+  le: 'lowering.le',
+  gt: 'lowering.gt',
+  ge: 'lowering.ge',
+  in: 'lowering.in', // [value, valueType, set, setType]
+  // 指针
+  ptrDeref: 'lowering.ptr.deref',
+  ptrAssign: 'lowering.ptr.assign',
+  ptrDisposeCheck: 'lowering.ptr.dispose.check',
 } as const
 export type SyscallKey = (typeof syscallKeys)[keyof typeof syscallKeys]

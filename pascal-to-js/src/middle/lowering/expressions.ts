@@ -33,7 +33,7 @@ import {
   syscallKeys,
   WithBinding,
 } from './helpers.ts'
-import { isRecordFile, typeAddCall, typeSubCall, typeSuffix } from './type.ts'
+import { isRecordFile, typeDescLiteral } from './type.ts'
 
 // ============================================================
 // loweringExpr → Expr
@@ -155,77 +155,48 @@ function loweringBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding
   const L = loweringExpr(node.left, a, ws)
   const R = loweringExpr(node.right, a, ws)
   const lt = a.typeOf(node.left)
+  const rt = a.typeOf(node.right)
   // parser 输出大写 operator（DIV/MOD/AND/OR/NOT），统一转大写比较
   const op = node.operator.toUpperCase()
 
-  // 集合运算
-  if (lt.tag === 'set') {
-    switch (op) {
-      case '+':
-        return syscall(syscallKeys.setUnion, [L, R])
-      case '*':
-        return syscall(syscallKeys.setIntersect, [L, R])
-      case '-':
-        return syscall(syscallKeys.setDiff, [L, R])
-      case '=':
-        return syscall(syscallKeys.setEq, [L, R])
-      case '<>':
-        return syscall(syscallKeys.setNe, [L, R])
-      case '<=':
-        return syscall(syscallKeys.setLe, [L, R])
-      case '>=':
-        return syscall(syscallKeys.setGe, [L, R])
-    }
-  }
-
-  // 字符串拼接非 ISO 7185 特性，不专门处理（char 数组 + 会落到下方算术报错）。
-
-  // 布尔逻辑
-  if (op === 'AND') {
-    if (lt.tag === 'i32') {
-      return syscall(syscallKeys.i32And, [L, R])
-    }
-    return syscall(syscallKeys.boolAnd, [L, R])
-  }
-  if (op === 'OR') {
-    if (lt.tag === 'i32') {
-      return syscall(syscallKeys.i32Or, [L, R])
-    }
-    return syscall(syscallKeys.boolOr, [L, R])
-  }
-
-  // 比较
-  switch (op) {
-    case '=':
-      return syscall(syscallKeys.cmpEq, [L, R])
-    case '<>':
-      return syscall(syscallKeys.cmpNe, [L, R])
-    case '<':
-      return syscall(syscallKeys.cmpLt, [L, R])
-    case '<=':
-      return syscall(syscallKeys.cmpLe, [L, R])
-    case '>':
-      return syscall(syscallKeys.cmpGt, [L, R])
-    case '>=':
-      return syscall(syscallKeys.cmpGe, [L, R])
-  }
-
-  // 算术
-  const isReal = lt.tag === 'f64' || a.typeOf(node.right).tag === 'f64'
+  // 二元运算统一产泛型 key + 两侧类型，由 rewrite 消费 type 分发到具体 runtime.syscall。
+  // lowering 不做任何类型判断（集合/整数/实数/布尔的分派全部下沉到 rewrite）。
+  const withTypes = (key: SyscallKey): JsonCode.Syscall =>
+    syscall(key, [L, typeDescLiteral(lt), R, typeDescLiteral(rt)])
 
   switch (op) {
+    // 算术与集合（+ - * 对数值是加减乘，对集合是并/差/交，由 rewrite 按 type 分发）
     case '+':
-      return syscall(isReal ? syscallKeys.f64Add : syscallKeys.i32Add, [L, R])
+      return withTypes(syscallKeys.add)
     case '-':
-      return syscall(isReal ? syscallKeys.f64Sub : syscallKeys.i32Sub, [L, R])
+      return withTypes(syscallKeys.sub)
     case '*':
-      return syscall(isReal ? syscallKeys.f64Mul : syscallKeys.i32Mul, [L, R])
+      return withTypes(syscallKeys.mul)
+    // 实数除 / 整除 / 取模（类型固定，无需 type 参数）
     case '/':
-      return syscall(syscallKeys.f64Div, [L, R])
+      return syscall(syscallKeys.div, [L, R])
     case 'DIV':
-      return syscall(syscallKeys.i32Div, [L, R])
+      return syscall(syscallKeys.intDiv, [L, R])
     case 'MOD':
-      return syscall(syscallKeys.i32Mod, [L, R])
+      return syscall(syscallKeys.mod, [L, R])
+    // 布尔/位运算（i32 为位运算，bool 为逻辑，由 rewrite 按 type 分发）
+    case 'AND':
+      return withTypes(syscallKeys.and)
+    case 'OR':
+      return withTypes(syscallKeys.or)
+    // 比较（集合与标量由 rewrite 按 type 分发）
+    case '=':
+      return withTypes(syscallKeys.eq)
+    case '<>':
+      return withTypes(syscallKeys.ne)
+    case '<':
+      return withTypes(syscallKeys.lt)
+    case '<=':
+      return withTypes(syscallKeys.le)
+    case '>':
+      return withTypes(syscallKeys.gt)
+    case '>=':
+      return withTypes(syscallKeys.ge)
     default:
       throw new Error(`loweringBinary: unknown operator ${op}`)
   }
@@ -237,14 +208,14 @@ function loweringUnary(node: UnaryExpressionNode, a: Analysis, ws: WithBinding[]
   // parser 输出大写 operator（NOT），统一转大写比较
   const op = node.operator.toUpperCase()
 
+  // 一元运算统一产泛型 key + 类型，由 rewrite 按 type 分发
+  const withType = (key: SyscallKey): JsonCode.Syscall => syscall(key, [X, typeDescLiteral(ti)])
+
   if (op === 'NOT') {
-    if (ti.tag === 'i32') {
-      return syscall(syscallKeys.i32Not, [X])
-    }
-    return syscall(syscallKeys.boolNot, [X])
+    return withType(syscallKeys.not)
   }
   if (op === '-') {
-    return syscall(ti.tag === 'f64' ? syscallKeys.f64Neg : syscallKeys.i32Neg, [X])
+    return withType(syscallKeys.neg)
   }
   if (op === '+') {
     return X
@@ -277,86 +248,37 @@ function loweringFunctionCall(
   }
 
   switch (name) {
-    case 'abs': {
-      const ti = a.typeOf(args[0])
-      return syscall(ti.tag === 'f64' ? syscallKeys.f64Abs : syscallKeys.i32Abs, argExprs)
-    }
-    case 'sqr': {
-      const ti = a.typeOf(args[0])
-      return syscall(ti.tag === 'f64' ? syscallKeys.f64Mul : syscallKeys.i32Mul, [argExprs[0], argExprs[0]])
-    }
+    // 内置函数统一产泛型 key（带类型的传 type 参数），类型分派下沉到 rewrite
+    case 'abs':
+      return syscall(syscallKeys.abs, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
+    case 'sqr':
+      return syscall(syscallKeys.sqr, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
     case 'sqrt':
-      return syscall(syscallKeys.f64Sqrt, argExprs)
+      return syscall(syscallKeys.sqrt, argExprs)
     case 'sin':
-      return syscall(syscallKeys.f64Sin, argExprs)
+      return syscall(syscallKeys.sin, argExprs)
     case 'cos':
-      return syscall(syscallKeys.f64Cos, argExprs)
+      return syscall(syscallKeys.cos, argExprs)
     case 'exp':
-      return syscall(syscallKeys.f64Exp, argExprs)
+      return syscall(syscallKeys.exp, argExprs)
     case 'ln':
-      return syscall(syscallKeys.f64Ln, argExprs)
+      return syscall(syscallKeys.ln, argExprs)
     case 'arctan':
-      return syscall(syscallKeys.f64Arctan, argExprs)
+      return syscall(syscallKeys.arctan, argExprs)
     case 'trunc':
-      return syscall(syscallKeys.castF64Toi32, argExprs)
+      return syscall(syscallKeys.trunc, argExprs)
     case 'round':
-      return syscall(syscallKeys.castF64Toi32Round, argExprs)
-    case 'ord': {
-      const ti = a.typeOf(args[0])
-      if (ti.tag === 'char') {
-        return syscall(syscallKeys.castCharToi32, argExprs)
-      }
-      if (ti.tag === 'bool') {
-        return syscall(syscallKeys.castBoolToi32, argExprs)
-      }
-      return argExprs[0] // integer/enum 已经是 i32
-    }
+      return syscall(syscallKeys.round, argExprs)
+    case 'ord':
+      return syscall(syscallKeys.ord, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
     case 'chr':
-      return syscall(syscallKeys.casti32ToChar, argExprs)
-    case 'pred': {
-      const ti = a.typeOf(args[0])
-      // ISO 7185 6.6.6.4: pred(x) = value whose ordinal number is one less than x
-      // "error if none" — 对枚举首值/子界下界必须报错
-      // char 类型需先转 ord 再运算再转回 char
-      if (ti.tag === 'char') {
-        return syscall(syscallKeys.casti32ToChar, [
-          syscall(syscallKeys.i32Sub, [syscall(syscallKeys.castCharToi32, argExprs), litInt(1)]),
-        ])
-      }
-      if (ti.tag === 'enum' && ti.enumCount !== undefined) {
-        // 枚举范围 0..enumCount-1，pred 后检查 < 0
-        const result = syscall(syscallKeys.i32Sub, [argExprs[0], litInt(1)])
-        return syscall(syscallKeys.rangeCheck, [result, litInt(0), litInt(ti.enumCount - 1)])
-      }
-      if (ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined) {
-        const result = syscall(syscallKeys.i32Sub, [argExprs[0], litInt(1)])
-        return syscall(syscallKeys.rangeCheck, [result, litInt(ti.low), litInt(ti.high)])
-      }
-      return typeSubCall(typeSuffix(ti), [argExprs[0], litInt(1)])
-    }
-    case 'succ': {
-      const ti = a.typeOf(args[0])
-      // ISO 7185 6.6.6.4: succ(x) = value whose ordinal number is one greater than x
-      // "error if none" — 对枚举末值/子界上界必须报错
-      // char 类型需先转 ord 再运算再转回 char
-      if (ti.tag === 'char') {
-        return syscall(syscallKeys.casti32ToChar, [
-          syscall(syscallKeys.i32Add, [syscall(syscallKeys.castCharToi32, argExprs), litInt(1)]),
-        ])
-      }
-      if (ti.tag === 'enum' && ti.enumCount !== undefined) {
-        // 枚举范围 0..enumCount-1，succ 后检查 > enumCount-1
-        const result = syscall(syscallKeys.i32Add, [argExprs[0], litInt(1)])
-        return syscall(syscallKeys.rangeCheck, [result, litInt(0), litInt(ti.enumCount - 1)])
-      }
-      if (ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined) {
-        const result = syscall(syscallKeys.i32Add, [argExprs[0], litInt(1)])
-        return syscall(syscallKeys.rangeCheck, [result, litInt(ti.low), litInt(ti.high)])
-      }
-      return typeAddCall(typeSuffix(ti), [argExprs[0], litInt(1)])
-    }
+      return syscall(syscallKeys.chr, argExprs)
+    case 'pred':
+      return syscall(syscallKeys.pred, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
+    case 'succ':
+      return syscall(syscallKeys.succ, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
     case 'odd':
-      return syscall(syscallKeys.i32Odd, argExprs)
+      return syscall(syscallKeys.odd, argExprs)
     case 'eof':
       if (args.length > 0) {
         // file of record 用 file.rec.eof（ISO 7185 6.4.3.5）
@@ -385,7 +307,7 @@ function loweringArrayAccess(node: ArrayAccessNode, a: Analysis, ws: WithBinding
     // 否则 JS 中 arr['A'] 访问属性而非 arr[65]
     const ti = a.typeOf(i)
     if (ti.tag === 'char') {
-      return syscall(syscallKeys.castCharToi32, [expr])
+      return syscall(syscallKeys.ord, [expr, typeDescLiteral(ti)])
     }
     return expr
   })
@@ -441,7 +363,13 @@ function loweringInExpression(
 ): JsonCode.Expr {
   const L = loweringExpr(node.left, a, ws)
   const R = loweringExpr(node.right, a, ws)
-  return syscall(syscallKeys.setIn, [L, R])
+  // in 运算：带两侧类型，由 rewrite 按 type 分发到 set.in
+  return syscall(syscallKeys.in, [
+    L,
+    typeDescLiteral(a.typeOf(node.left)),
+    R,
+    typeDescLiteral(a.typeOf(node.right)),
+  ])
 }
 
 // ============================================================

@@ -12,6 +12,8 @@ export interface TypeDescriptor {
   fields?: Array<{ name: string; type: TypeDescriptor }>
   /** 变体部分：一棵树，对应 AST 的 RecordVariantPartNode */
   variant?: VariantPartDescriptor
+  /** enum：序数个数（pred/succ 边界检查用） */
+  enumCount?: number
 }
 
 /** 变体部分描述符（对应 AST 的 RecordVariantPartNode） */

@@ -183,7 +183,7 @@ function loweringAssignment(
       const expr = loweringExpr(i, a, ws)
       const ti = a.typeOf(i)
       if (ti.tag === 'char') {
-        return syscall(syscallKeys.castCharToi32, [expr])
+        return syscall(syscallKeys.ord, [expr, typeDescLiteral(ti)])
       }
       return expr
     })
@@ -301,8 +301,10 @@ function loweringFor(
   const L_end = a.nextId()
 
   const isDown = node.direction === 'DOWNTO'
-  const cmpKey = isDown ? syscallKeys.cmpGe : syscallKeys.cmpLe
-  const stepKey = isDown ? syscallKeys.i32Sub : syscallKeys.i32Add
+  // Pascal for 变量为序数类型；此处比较/步进按 i32 语义，类型分派下沉到 rewrite
+  const cmpKey = isDown ? syscallKeys.ge : syscallKeys.le
+  const stepKey = isDown ? syscallKeys.sub : syscallKeys.add
+  const i32Td = typeDescLiteral({ tag: 'i32' })
 
   const varRef = varSym.isVarParam ? syscall(syscallKeys.cellGet, [ref(vid)]) : ref(vid)
 
@@ -311,10 +313,10 @@ function loweringFor(
     assignStmt(ref(limitVar), finalE),
     labelStmt(L_top),
     evalStmt(syscall(syscallKeys.stepsCheck, [])),
-    jumpIfStmt(syscall(cmpKey, [varRef, ref(limitVar)]), L_body, L_end),
+    jumpIfStmt(syscall(cmpKey, [varRef, i32Td, ref(limitVar), i32Td]), L_body, L_end),
     labelStmt(L_body),
     ...loweringStmt(node.body, a, funcId, ws),
-    assignStmt(ref(vid), syscall(stepKey, [varRef, litInt(1)])),
+    assignStmt(ref(vid), syscall(stepKey, [varRef, i32Td, litInt(1), i32Td])),
     jumpStmt(L_top),
     labelStmt(L_end),
   ]
@@ -327,6 +329,7 @@ function loweringCase(
   ws: WithBinding[],
 ): JsonCode.Statement[] {
   const caseVar = a.allocTempLocal(funcId, a.typeOf(node.expression))
+  const caseTd = typeDescLiteral(a.typeOf(node.expression))
   const L_end = a.nextId()
   const L_otherwise = node.otherwise ? a.nextId() : L_end
   const out: JsonCode.Statement[] = [assignStmt(ref(caseVar), loweringExpr(node.expression, a, ws))]
@@ -353,7 +356,7 @@ function loweringCase(
     const L_next = isLast ? L_otherwise : a.nextId()
     out.push(
       jumpIfStmt(
-        syscall(syscallKeys.cmpEq, [ref(caseVar), checks[i].labelExpr]),
+        syscall(syscallKeys.eq, [ref(caseVar), caseTd, checks[i].labelExpr, caseTd]),
         checks[i].bodyLabel,
         L_next,
       ),
