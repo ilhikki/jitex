@@ -65,8 +65,11 @@ export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   return { pasFile, poolFile }
 }
 
-export function runTanglePascal(tangleInput: TangleInput): TangleOutput {
-  const runTangleOutput = runTangle(tangleInput)
+export function runTanglePascal(
+  tangleInput: TangleInput,
+  inlineSyscalls?: boolean | string[],
+): TangleOutput {
+  const runTangleOutput = runTangle(tangleInput, inlineSyscalls)
   return validRunTangleResult(runTangleOutput)
 }
 
@@ -118,15 +121,16 @@ export function runTangleJs(
   }
 }
 
-export function transformTangle(tangleContent: string) {
+export function transformTangle(tangleContent: string, inlineSyscalls?: boolean | string[]) {
   const jsCode = transform(tangleContent, {
     extraCallables: tangleExtraCallables,
+    inlineSyscalls,
   })
   return jsCode
 }
 
-export function runTangle(input: TangleInput) {
+export function runTangle(input: TangleInput, inlineSyscalls?: boolean | string[]) {
   const { tangleContent, webContent, changeContent } = input
-  const jsCode = transformTangle(tangleContent)
+  const jsCode = transformTangle(tangleContent, inlineSyscalls)
   return runTangleJs(jsCode, webContent, changeContent)
 }

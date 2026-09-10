@@ -84,12 +84,12 @@ export function createBootTexSuite(options: BootTexOptions = {}): Suite {
       const tangleV1 = runTanglePascal({
         tangleContent: tanglePas,
         webContent: tangleWeb,
-      })
+      }, options.inlineSyscalls)
       const tangleV2 = runTanglePascal({
         tangleContent: tangleV1.pasFile,
         webContent: tangleWeb,
-      })
-      const tangleJs = transformTangle(tangleV2.pasFile)
+      }, options.inlineSyscalls)
+      const tangleJs = transformTangle(tangleV2.pasFile, options.inlineSyscalls)
       attachText('tangle.js', tangleJs)
       return { tangleJs }
     }))
