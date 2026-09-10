@@ -44,6 +44,13 @@ export interface TransformOptions {
    * 不传则使用 id 函数（原样返回 syscall）。
    */
   defaultRewriter?: SyscallRewriter
+  /**
+   * syscall 内联开关（性能优化用）。
+   *   - false / undefined：不内联（默认），全部走 __sys dispatcher
+   *   - true：内联所有已实现内联规则的 syscall
+   *   - string[]：只内联列出的 syscall key（逐个评测用）
+   */
+  inlineSyscalls?: boolean | string[]
 }
 
 function parseSource(source: string): ProgramNode {
@@ -67,7 +74,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
   const table = mergeRewriteTables(buildPascalRewriteTable(), options.syscallRewriters)
   const ir = rewrite(jsonCode, composeMapping(table, options.defaultRewriter))
 
-  const semantic = new PascalSemanticCompiler()
+  const semantic = new PascalSemanticCompiler({ inlineSyscalls: options.inlineSyscalls })
   const { code: jsBody, mainName } = toJs(ir, {
     semantic,
     debugNames: analysis.debugNames(),

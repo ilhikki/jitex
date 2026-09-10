@@ -11,50 +11,66 @@ import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
 import type { Codec } from '@/middle/rewrite/type-layout.ts'
 import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
-function dv(b: Uint8Array): DataView {
-  return new DataView(b.buffer, b.byteOffset, b.byteLength)
+/**
+ * DataView 缓存：按底层 ArrayBuffer 复用一个 DataView。
+ *
+ * DataView 的读写偏移是相对其视图窗口的；本模型里 offset 由编译期算出、
+ * 运行时叠加视图的 byteOffset 得到绝对位置，因此窗口参数不承载语义——
+ * 一个覆盖整个 ArrayBuffer 的 DataView 即可，无需每次构造。
+ */
+const dvCache = new WeakMap<ArrayBufferLike, DataView>()
+
+function dv(buffer: ArrayBufferLike): DataView {
+  let d = dvCache.get(buffer)
+  if (d === undefined) {
+    d = new DataView(buffer)
+    dvCache.set(buffer, d)
+  }
+  return d
 }
 
 /** 按 codec 读标量 */
 function getNum(view: Uint8Array, offset: number, codec: Codec): number {
-  const d = dv(view)
+  const d = dv(view.buffer)
+  const o = view.byteOffset + offset
   switch (codec) {
     case 'i8':
-      return d.getInt8(offset)
+      return d.getInt8(o)
     case 'u8':
-      return d.getUint8(offset)
+      return d.getUint8(o)
     case 'i16':
-      return d.getInt16(offset, false)
+      return d.getInt16(o, false)
     case 'u16':
-      return d.getUint16(offset, false)
+      return d.getUint16(o, false)
     case 'i32':
-      return d.getInt32(offset, false)
+      return d.getInt32(o, false)
     case 'f64':
-      return d.getFloat64(offset, false)
+      return d.getFloat64(o, false)
   }
 }
 
 /** 按 codec 写标量 */
 function setNum(view: Uint8Array, offset: number, codec: Codec, v: number): void {
-  const d = dv(view)
+  const d = dv(view.buffer)
+  const o = view.byteOffset + offset
   switch (codec) {
     case 'i8':
-      d.setInt8(offset, v)
+      d.setInt8(o, v)
       return
     case 'u8':
-      d.setUint8(offset, v)
+      d.setUint8(o, v)
       return
     case 'i16':
-      d.setInt16(offset, v, false)
+      d.setInt16(o, v, false)
       return
     case 'u16':
-      d.setUint16(offset, v, false)
+      d.setUint16(o, v, false)
       return
     case 'i32':
-      d.setInt32(offset, v | 0, false)
+      d.setInt32(o, v | 0, false)
       return
     case 'f64':
-      d.setFloat64(offset, v, false)
+      d.setFloat64(o, v, false)
       return
   }
 }

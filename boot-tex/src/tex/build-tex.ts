@@ -48,9 +48,10 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'runtime.file.eoln': eolnSyscall,
 }
 
-export function transformTex(texPascalContent: string) {
+export function transformTex(texPascalContent: string, inlineSyscalls?: boolean | string[]) {
   const jsCode = transform(texPascalContent, {
     extraCallables: texExtraCallables,
+    inlineSyscalls,
   })
   return jsCode
 }

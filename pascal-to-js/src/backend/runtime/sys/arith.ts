@@ -35,7 +35,7 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.i32Or]: (_ctx, [a, b]) => ((a as number) | (b as number)) | 0,
     [rtKeys.i32Not]: (_ctx, [a]) => ~(a as number) | 0,
     [rtKeys.i32Abs]: (_ctx, [a]) => Math.abs(a as number) | 0,
-    [rtKeys.i32Odd]: (_ctx, [a]) => ((a as number) % 2) !== 0,
+    [rtKeys.i32Odd]: (_ctx, [a]) => (((a as number) % 2) !== 0 ? 1 : 0),
 
     // ---------- f32 ----------
     [rtKeys.f32Add]: (_ctx, [a, b]) => Math.fround((a as number) + (b as number)),
@@ -65,19 +65,19 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.f32Arctan]: (_ctx, [a]) => Math.atan(a as number),
 
-    // ---------- bool（0/1 语义）----------
+    // ---------- bool（统一 0/1 语义）----------
     // and / or 用 && / ||：对 0/1 输入结果仍是 0/1，且保短路
     [rtKeys.boolAnd]: (_ctx, [a, b]) => (a as number) && (b as number),
     [rtKeys.boolOr]: (_ctx, [a, b]) => (a as number) || (b as number),
     [rtKeys.boolNot]: (_ctx, [a]) => ((a as number) ? 0 : 1),
 
-    // ---------- cmp ----------
-    [rtKeys.cmpEq]: (_ctx, [a, b]) => a === b,
-    [rtKeys.cmpNe]: (_ctx, [a, b]) => a !== b,
-    [rtKeys.cmpLt]: (_ctx, [a, b]) => (a as number) < (b as number),
-    [rtKeys.cmpLe]: (_ctx, [a, b]) => (a as number) <= (b as number),
-    [rtKeys.cmpGt]: (_ctx, [a, b]) => (a as number) > (b as number),
-    [rtKeys.cmpGe]: (_ctx, [a, b]) => (a as number) >= (b as number),
+    // ---------- cmp（统一 0/1）----------
+    [rtKeys.cmpEq]: (_ctx, [a, b]) => (a === b ? 1 : 0),
+    [rtKeys.cmpNe]: (_ctx, [a, b]) => (a !== b ? 1 : 0),
+    [rtKeys.cmpLt]: (_ctx, [a, b]) => ((a as number) < (b as number) ? 1 : 0),
+    [rtKeys.cmpLe]: (_ctx, [a, b]) => ((a as number) <= (b as number) ? 1 : 0),
+    [rtKeys.cmpGt]: (_ctx, [a, b]) => ((a as number) > (b as number) ? 1 : 0),
+    [rtKeys.cmpGe]: (_ctx, [a, b]) => ((a as number) >= (b as number) ? 1 : 0),
 
     // ---------- cast ----------
     [rtKeys.castF32ToI32]: (_ctx, [a]) => Math.trunc(a as number),

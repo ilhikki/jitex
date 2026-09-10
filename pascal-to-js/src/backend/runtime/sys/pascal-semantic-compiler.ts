@@ -206,7 +206,117 @@ export function basicSyscall(): Record<string, SyscallHandler> {
   }
 }
 
+export interface PascalSemanticCompilerOptions {
+  /**
+   * syscall 内联开关（对应 TransformOptions.inlineSyscalls）：
+   *   - false / undefined：不内联（默认）
+   *   - true：内联所有已实现内联规则的 key
+   *   - string[]：只内联列出的 key
+   */
+  inlineSyscalls?: boolean | string[]
+}
+
+/**
+ * syscall 内联表：key → 「已编译的实参表达式 → 内联 JS 表达式」。
+ *
+ * 语义必须与 sys/arith.ts 等处的 handler 完全一致（返回值、异常、副作用）。
+ * 表达式整体用括号包裹，保证嵌入父表达式时运算符优先级安全。
+ * 未在此表的 key 一律回退 dispatcher。
+ */
+/** 内联表达式生成器：返回 undefined 表示放弃内联、回退 dispatcher */
+type InlineGen = (args: string[]) => string | undefined
+
+/**
+ * 简单表达式：标识符 / 整数字面量 / 字符串字面量。
+ * 只有简单表达式才允许在生成的内联代码里重复出现——
+ * 这样与 dispatcher「实参各求值一次」的语义严格等价。
+ */
+const SIMPLE_EXPR_RE = /^(?:[A-Za-z_$][\w$]*|-?\d+|"[^"]*")$/
+
+const inlineSyscalls: Record<string, InlineGen> = {
+  // ---------- i32 算术 / 位运算 ----------
+  [rtKeys.i32Add]: (a) => `((${a[0]} + ${a[1]}) | 0)`,
+  [rtKeys.i32Sub]: (a) => `((${a[0]} - ${a[1]}) | 0)`,
+  [rtKeys.i32Mul]: (a) => `((${a[0]} * ${a[1]}) | 0)`,
+  [rtKeys.i32Neg]: (a) => `(-(${a[0]}) | 0)`,
+  [rtKeys.i32And]: (a) => `((${a[0]} & ${a[1]}) | 0)`,
+  [rtKeys.i32Or]: (a) => `((${a[0]} | ${a[1]}) | 0)`,
+  [rtKeys.i32Not]: (a) => `(~(${a[0]}) | 0)`,
+  [rtKeys.i32Abs]: (a) => `(Math.abs(${a[0]}) | 0)`,
+  [rtKeys.i32Odd]: (a) => `(((${a[0]}) % 2) !== 0 ? 1 : 0)`,
+
+  // ---------- f32 ----------
+  [rtKeys.f32Add]: (a) => `(Math.fround(${a[0]} + ${a[1]}))`,
+  [rtKeys.f32Sub]: (a) => `(Math.fround(${a[0]} - ${a[1]}))`,
+  [rtKeys.f32Mul]: (a) => `(Math.fround(${a[0]} * ${a[1]}))`,
+  [rtKeys.f32Div]: (a) => `(Math.fround(${a[0]} / ${a[1]}))`,
+  [rtKeys.f32Neg]: (a) => `(Math.fround(-(${a[0]})))`,
+  [rtKeys.f32Abs]: (a) => `(Math.fround(Math.abs(${a[0]})))`,
+  [rtKeys.f32Sin]: (a) => `(Math.sin(${a[0]}))`,
+  [rtKeys.f32Cos]: (a) => `(Math.cos(${a[0]}))`,
+  [rtKeys.f32Exp]: (a) => `(Math.exp(${a[0]}))`,
+  [rtKeys.f32Arctan]: (a) => `(Math.atan(${a[0]}))`,
+
+  // ---------- bool ----------
+  [rtKeys.boolNot]: (a) => `((${a[0]}) ? 0 : 1)`,
+
+  // ---------- cmp（统一 0/1）----------
+  [rtKeys.cmpEq]: (a) => `((${a[0]} === ${a[1]}) ? 1 : 0)`,
+  [rtKeys.cmpNe]: (a) => `((${a[0]} !== ${a[1]}) ? 1 : 0)`,
+  [rtKeys.cmpLt]: (a) => `(((${a[0]}) < (${a[1]})) ? 1 : 0)`,
+  [rtKeys.cmpLe]: (a) => `(((${a[0]}) <= (${a[1]})) ? 1 : 0)`,
+  [rtKeys.cmpGt]: (a) => `(((${a[0]}) > (${a[1]})) ? 1 : 0)`,
+  [rtKeys.cmpGe]: (a) => `(((${a[0]}) >= (${a[1]})) ? 1 : 0)`,
+
+  // ---------- cast ----------
+  // 注：cast.f32.to.i32.round / cast.char.to.i32 的参数在 handler 里被多次使用，
+  // 内联会造成实参重复求值（与 dispatcher 语义不一致），暂不内联。
+  [rtKeys.castF32ToI32]: (a) => `(Math.trunc(${a[0]}))`,
+  [rtKeys.castBoolToI32]: (a) => `((${a[0]}) ? 1 : 0)`,
+  [rtKeys.castI32ToChar]: (a) => `(String.fromCharCode(${a[0]}))`,
+
+  // ---------- 内存原语 ----------
+  // mem.new / mem.clone / mem.copy：每个实参只出现一次
+  [rtKeys.memNew]: (a) => `(new Uint8Array(${a[0]}))`,
+  [rtKeys.memClone]: (a) => `(${a[0]}.slice(0, ${a[1]}))`,
+  [rtKeys.memCopy]: (a) => `(${a[0]}.set(${a[2]}.subarray(0, ${a[3]}), ${a[1]}))`,
+  // view.sub：offset 在生成代码里出现两次，仅当它是简单表达式时才展开
+  [rtKeys.viewSub]: (a) => {
+    if (!SIMPLE_EXPR_RE.test(a[1])) {
+      return undefined
+    }
+    return `(${a[0]}.subarray(${a[1]}, ${a[1]} + ${a[2]}))`
+  },
+  // 注：num.get / num.set 刻意不内联——mem.ts 的 handler 已按 ArrayBuffer 缓存
+  // DataView，内联版每次读写都要 new DataView，反而更慢。
+
+  // ---------- cell ----------
+  [rtKeys.cellNew]: (a) => `({ kind: 'cell', value: ${a[0]} })`,
+  [rtKeys.cellGet]: (a) => `(${a[0]}.value)`,
+  // cell.set 的 handler 返回 undefined，用 void 保持返回值语义
+  [rtKeys.cellSet]: (a) => `(void (${a[0]}.value = ${a[1]}))`,
+
+  // ---------- object 数组 ----------
+  [rtKeys.arrGet]: (a) => `(${a[0]}[${a[1]}])`,
+  [rtKeys.arrSet]: (a) => `(void (${a[0]}[${a[1]}] = ${a[2]}))`,
+}
+
 export class PascalSemanticCompiler implements SemanticCompiler {
+  private readonly inlineMode: true | Set<string>
+
+  constructor(options: PascalSemanticCompilerOptions = {}) {
+    const inline = options.inlineSyscalls
+    this.inlineMode = inline === true ? true : new Set(Array.isArray(inline) ? inline : [])
+  }
+
+  /** 命中内联规则时返回生成函数，否则 undefined */
+  private inlineFor(key: string): InlineGen | undefined {
+    if (this.inlineMode !== true && !this.inlineMode.has(key)) {
+      return undefined
+    }
+    return inlineSyscalls[key]
+  }
+
   literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
     switch (literal.key) {
       case 'i32':
@@ -253,6 +363,15 @@ export class PascalSemanticCompiler implements SemanticCompiler {
     }
     if (key === rtKeys.boolOr) {
       return `(${args[0]} || ${args[1]})`
+    }
+
+    // 内联开关命中 → 展开为内联 JS 表达式（消除 dispatcher 的数组分配 + 两层调用）
+    const inline = this.inlineFor(key)
+    if (inline) {
+      const code = inline(args)
+      if (code !== undefined) {
+        return code
+      }
     }
 
     // 阶段1 起：其余 syscall 一律走 runtime dispatcher，不再 inline。
