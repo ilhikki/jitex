@@ -2,17 +2,10 @@ import type { JsCompiler, SemanticCompiler } from '@/backend/codegen/json-code-c
 import * as JsonCode from '@/middle/ir/json-code.ts'
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
 import type {
-  ArrayHandler,
-  PascalArray,
-  PascalCell,
-  PascalRecord,
   PascalSet,
-  RecordHandler,
-  RuntimeContext,
   SyscallHandler,
 } from '../runtime-type.ts'
-import { type TypeDescriptor } from '../runtime-type.ts'
-import { createArrayHandler, createRecHandler, defaultCreateHandler, doCreateArrayHandler } from '../runtime-util.ts'
+
 
 function newPascalSet(set: Set<number>): PascalSet {
   return {
@@ -44,109 +37,6 @@ export function basicSyscall(): Record<string, SyscallHandler> {
   }
 
   return {
-    // ---------- factory.*：handler 构建 impl（可 extraSyscalls 整体替换）----------
-    'factory.createHandler': (ctx, [type]) => {
-      return defaultCreateHandler(ctx, type as TypeDescriptor)
-    },
-    'factory.createRecHandler': (ctx, [type]) =>
-      createRecHandler(ctx as RuntimeContext, type as TypeDescriptor) as RecordHandler,
-    'factory.createArrayHandler': (ctx, [type]) =>
-      createArrayHandler(ctx as RuntimeContext, type as TypeDescriptor) as ArrayHandler,
-
-    // ---------- cell（var 参数传递）----------
-    'cell.create': (_ctx, [value]): PascalCell => ({
-      kind: 'cell',
-      value: value,
-    }),
-    'cell.get': (_ctx, [value]) => (value as PascalCell).value,
-    'cell.set': (_ctx, [left, right]) => {
-      ;(left as PascalCell).value = right
-    },
-
-    // ---------- array ----------
-    // 有 handler（mem.default.array 创建）→ 委托 handler（record 元素不存在时复用 handler 创建空 record）
-    // 无 handler（手构，如 str.to.char.array）→ 退回旧路径 getArrayElement/setArrayElement
-    'array.get': (_ctx, args) => {
-      const arr = args[0] as PascalArray
-      const indices = args.slice(1) as number[]
-      return arr.handler.get(arr.value, indices)
-    },
-    'array.set': (_ctx, args) => {
-      const arr = args[0] as PascalArray
-      const indices = args.slice(1, -1) as number[]
-      const value = args[args.length - 1]
-      arr.handler.set(arr.value, indices, value)
-    },
-
-    // ---------- record ----------
-    // rec.field/rec.set：类型信息已由 mem.default.rec 时构建为 handler 缓存在 record 上，
-    // 不再接收类型参数；直接委托 record.handler
-    'rec.field': (_ctx, [record, key]) => {
-      const r = record as PascalRecord
-      return r.handler.get(r.value, key as string)
-    },
-    'rec.set': (_ctx, [record, key, value]) => {
-      const r = record as PascalRecord
-      r.handler.set(r.value, key as string, value)
-    },
-    'rec.copy': (_ctx, [record]) => {
-      const r = record as PascalRecord
-      return r.handler.copy(r)
-    },
-
-    // ---------- mem.default（变量初始化）----------
-    // syscall 间互调走 ctx.dispatch（柯里化），不裸 import 函数，
-    // 方便 extraSyscalls 替换 factory.* 整套实现。
-    // createDispatcher 在调用 handler 前已 lazy 绑定 ctx.dispatch，这里 ! 断言。
-    'mem.default.array': (ctx, [type]) => {
-      const handler = ctx.dispatch!('factory.createArrayHandler')([type]) as ArrayHandler
-      return handler.create()
-    },
-    'mem.default.rec': (ctx, [type]) => {
-      const handler = ctx.dispatch!('factory.createRecHandler')([type]) as RecordHandler
-      return handler.create()
-    },
-
-    // ---------- str.to.char.array ----------
-    // 字符串字面量 → 1-based packed array[1..n] of char（ISO 7185 字符串字面量语义）。
-    // 手构数组（无 handler）：退回旧路径 getArrayElement/setArrayElement 处理。
-    'str.to.char.array': (_ctx, [s]) => {
-      const str = s as string
-      const dims = {
-        low: 1,
-        high: str.length,
-        deep: 0,
-      }
-      return {
-        kind: 'array',
-        value: {
-          array: str.split(''),
-          dims,
-          elementType: { tag: 'char' },
-        },
-        handler: doCreateArrayHandler(dims, undefined),
-      }
-    },
-
-    // ---------- array.char.resize ----------
-    // char 数组边界转换：把 1-based 字符串字面量调整到目标 low/high（如 TeX 0-based）。
-    'array.char.resize': (_ctx, [l, h, src]) => {
-      const pascalString = src as PascalArray
-      return {
-        kind: 'array',
-        value: {
-          array: pascalString.value.array,
-          dims: {
-            low: l,
-            high: h,
-            deep: 0,
-          },
-          elementType: { tag: 'char' },
-        },
-        handler: undefined,
-      }
-    },
-
     // ---------- set（运算类：阶段1 起由 rewrite 产 runtime.set.*）----------
     [rtKeys.setUnion]: (_ctx, [v1, v2]): PascalSet => {
       return newPascalSet(new Set<number>([...unboxPascalSet(v1), ...unboxPascalSet(v2)]))
@@ -169,37 +59,9 @@ export function basicSyscall(): Record<string, SyscallHandler> {
       [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x)),
     [rtKeys.setIn]: (_ctx, [value, set]) => (unboxPascalSet(set)).has(value as number),
 
-    // ---------- set（构造类：lowering 仍直接产这些 key，阶段3 处理）----------
-    'set.empty': (_ctx, _args): PascalSet => newPascalSet(new Set()),
-    'set.range': (_ctx, [start, end]) => {
-      const s = new Set<number>()
-      for (let i = start as number; i <= (end as number); i++) {
-        s.add(i)
-      }
-      return newPascalSet(s)
-    },
-    'set.elem': (_ctx, [value]) => newPascalSet(new Set<number>([value as number])),
-    'set.literal': (_ctx, args) => {
-      const s = new Set<number>()
-      for (const e of args) {
-        if (Number.isSafeInteger(e)) {
-          s.add(e as number)
-        } else {
-          for (const x of (e as PascalSet).value) {
-            s.add(x as number)
-          }
-        }
-      }
-      return newPascalSet(s)
-    },
-
-    // ---------- steps.check（循环步数限制）----------
-    'steps.check': stepsCheck,
     'runtime.steps.check': stepsCheck,
-
     // ---------- hook（调试钩子，no-op）----------
     'runtime.hook.function.enter': () => undefined,
-
     // ---------- range.check（subrange 运行时边界检查）----------
     'range.check': rangeCheck,
     [rtKeys.rangeCheck]: rangeCheck,

@@ -71,15 +71,7 @@ export type {
   VariantPartDescriptor,
 } from '@/backend/runtime/runtime-type.ts'
 export {
-  callCreateHandler,
-  createArrayHandler,
-  createDefaultArray,
-  createDefaultRec,
-  createRecHandler,
-  defaultCreateHandler,
-  doCreateArrayHandler,
   encodeUtf8,
-  getPascalStringValue,
 } from '@/backend/runtime/runtime-util.ts'
 export { MemoryTextFile } from '@/backend/runtime/sys/memory-text-file.ts'
 export { parse } from '@/run.ts'

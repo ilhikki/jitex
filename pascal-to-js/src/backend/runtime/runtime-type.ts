@@ -97,15 +97,6 @@ export interface RuntimeContext {
    * file.ts 不再使用；transform.ts 在编译/运行出错时追加诊断信息。 */
   debugLog: string[]
   jsCode: string | undefined
-  /**
-   * runtime 固有能力：柯里化 syscall dispatcher。
-   * 先按 key 取 syscall 函数，再传 args 调用：ctx.dispatch(key)(args)
-   * 由 createDispatcher 反绑回 ctx（每个调用首次 lazy 绑定，共享同一闭包）。
-   * syscall handler 之间互调一律走 ctx.dispatch，不裸 import 函数。
-   * extraSyscalls 替换整套 syscall 实现，无需额外扩展参数。
-   * createRuntimeContext 时为 undefined，由 createDispatcher 首次调用时 lazy 绑定。
-   */
-  dispatch?: (key: string) => (args: unknown[]) => unknown
 }
 
 export interface RuntimeOptions {
