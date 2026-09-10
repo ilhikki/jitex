@@ -16,7 +16,6 @@ import {
   StatementNode,
   WithStatementNode,
 } from '@/frontend/node.ts'
-import { nodeToCode } from '@/frontend/printer/printer.ts'
 import {
   AnalysisSymbol,
   BUILTIN_FUNCTIONS,
@@ -512,14 +511,7 @@ class StatementPass {
    * 记录一次 unknown 类型推断，打印出触发它的 AST 节点（printer 还原为源码）。
    * 仅用于定位类型链断点，返回 `{tag:'unknown'}` 本身。
    */
-  private unknown(node: ExpressionNode, why: string): TypeInfo {
-    let src = `<printer failed: ${node.kind}>`
-    try {
-      src = nodeToCode(node)
-    } catch {
-      // 节点可能不是完整语句，printer 失败时退化为 kind
-    }
-    console.error(`[analysis:unknown] ${why} | kind=${node.kind} | src=${src}`)
+  private unknown(node: ExpressionNode, _why: string): TypeInfo {
     return { tag: 'unknown' }
   }
 
