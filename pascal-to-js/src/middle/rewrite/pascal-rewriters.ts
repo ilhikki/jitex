@@ -459,6 +459,32 @@ function litNullLiteral(): JsonCode.Literal {
   return { kind: 'literal', key: 'null', arg: 'null' }
 }
 
+/**
+ * 折叠 `view.sub` 前缀。
+ *
+ * `mem[i].field` 的 IR 形如 `num.get(view.sub(mem, iOff, size), fOff, codec)`：
+ * view.sub 只是把后续访问的基址前移 iOff。这里把内层偏移提取出来，让上层直接
+ * 把它叠加进自己的 offset，省掉一层子视图（一次 syscall 调用 + 一次 subarray
+ * 分配）。折叠后读写的绝对位置不变，语义等价。
+ */
+function foldViewSub(base: JsonCode.Expr): { base: JsonCode.Expr; delta?: JsonCode.Expr } {
+  if (base.kind === 'syscall' && base.key === rtKeys.viewSub) {
+    return { base: base.args[0], delta: base.args[1] }
+  }
+  return { base }
+}
+
+/** 把折叠出的内层偏移叠加到当前 offset 上（当前 offset 为 0 时直接用 delta） */
+function addOffset(delta: JsonCode.Expr | undefined, offset: JsonCode.Expr): JsonCode.Expr {
+  if (delta === undefined) {
+    return offset
+  }
+  if (offset.kind === 'literal' && offset.key === 'i32' && offset.arg === '0') {
+    return delta
+  }
+  return sc(rtKeys.i32Add, [delta, offset])
+}
+
 /** 取容器内的槽位（数组元素 / 记录字段），产出标量读或子视图 */
 function accessAt(
   base: JsonCode.Expr,
@@ -470,6 +496,7 @@ function accessAt(
     return sc(rtKeys.arrGet, [base, elemIndexExpr(td, indices)])
   }
 
+  const folded = foldViewSub(base)
   let offset: JsonCode.Expr
   let slotType: TypeDescriptor
 
@@ -492,10 +519,11 @@ function accessAt(
     slotType = arr.elemType
   }
 
+  offset = addOffset(folded.delta, offset)
   if (isScalar(slotType)) {
-    return sc(rtKeys.numGet, [base, offset, litStr(codecOf(slotType))])
+    return sc(rtKeys.numGet, [folded.base, offset, litStr(codecOf(slotType))])
   }
-  return sc(rtKeys.viewSub, [base, offset, litInt(sizeOf(slotType))])
+  return sc(rtKeys.viewSub, [folded.base, offset, litInt(sizeOf(slotType))])
 }
 
 /** 写容器内的槽位 */
@@ -510,6 +538,7 @@ function assignAt(
     return sc(rtKeys.arrSet, [base, elemIndexExpr(td, indices), value])
   }
 
+  const folded = foldViewSub(base)
   let offset: JsonCode.Expr
   let slotType: TypeDescriptor
 
@@ -532,8 +561,9 @@ function assignAt(
     slotType = arr.elemType
   }
 
+  offset = addOffset(folded.delta, offset)
   if (isScalar(slotType)) {
-    return sc(rtKeys.numSet, [base, offset, litStr(codecOf(slotType)), value])
+    return sc(rtKeys.numSet, [folded.base, offset, litStr(codecOf(slotType)), value])
   }
-  return sc(rtKeys.memCopy, [base, offset, value, litInt(sizeOf(slotType))])
+  return sc(rtKeys.memCopy, [folded.base, offset, value, litInt(sizeOf(slotType))])
 }
