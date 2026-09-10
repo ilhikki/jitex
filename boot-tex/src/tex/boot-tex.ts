@@ -62,22 +62,16 @@ function readBytesFromState(
 // suite
 // ------------------------------------------------------------
 
-/** boot-tex 流水线选项 */
-export interface BootTexOptions {
-  /** syscall 内联开关（透传给 transform 的 inlineSyscalls） */
-  inlineSyscalls?: boolean | string[]
-}
-
 /**
  * 构建 boot tex 流水线。
  *
  * 作为黑盒入口：调用方只需提供「是否内联」开关，其余阶段由本 suite 内部编排，
  * 各阶段耗时由 runner 记录在 RunReport.stages[].duration 中。
  */
-export function createBootTexSuite(options: BootTexOptions = { inlineSyscalls: true }): Suite {
+export function createBootTexSuite(): Suite {
   return suite('boot tex', () => {
     // ---- 阶段 A：构建 TeX（trip 版本）----
-    const inline = true;
+    const inline = true
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
       const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
