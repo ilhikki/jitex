@@ -74,22 +74,22 @@ export interface BootTexOptions {
  * 作为黑盒入口：调用方只需提供「是否内联」开关，其余阶段由本 suite 内部编排，
  * 各阶段耗时由 runner 记录在 RunReport.stages[].duration 中。
  */
-export function createBootTexSuite(options: BootTexOptions = {}): Suite {
+export function createBootTexSuite(options: BootTexOptions = { inlineSyscalls: true }): Suite {
   return suite('boot tex', () => {
     // ---- 阶段 A：构建 TeX（trip 版本）----
-
+    const inline = true;
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
       const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
       const tangleV1 = runTanglePascal({
         tangleContent: tanglePas,
         webContent: tangleWeb,
-      }, options.inlineSyscalls)
+      }, inline)
       const tangleV2 = runTanglePascal({
         tangleContent: tangleV1.pasFile,
         webContent: tangleWeb,
-      }, options.inlineSyscalls)
-      const tangleJs = transformTangle(tangleV2.pasFile, options.inlineSyscalls)
+      }, inline)
+      const tangleJs = transformTangle(tangleV2.pasFile, inline)
       attachText('tangle.js', tangleJs)
       return { tangleJs }
     }))
@@ -104,7 +104,7 @@ export function createBootTexSuite(options: BootTexOptions = {}): Suite {
     }))
 
     const tripTexJsStage = cache(stage('compile tex.trip.pas => tex.trip.js', [tripPasStage], ([{ pasFile }]) => {
-      const texTripJs = transformTex(pasFile, options.inlineSyscalls)
+      const texTripJs = transformTex(pasFile, inline)
       attachText('tex.trip.js', texTripJs)
       return { texTripJs }
     }))
