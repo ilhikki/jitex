@@ -166,15 +166,32 @@ export async function writeCache(
 ): Promise<string> {
   const dir = stageDir(cacheDir, suiteName, stageName)
   await Deno.mkdir(dir, { recursive: true })
-  const checksum = await computeChecksum(results, artifacts)
+
+  // 归一化 attachments：按落盘文件名（sanitize 后）去重，后者覆盖前者。
+  // 恢复端只能看到磁盘上的文件列表，checksum 必须能由该列表完全重现；
+  // 否则「同名 artifact 被多次 attach」（如 boot-tex 的 tangle.js）会导致校验失败。
+  const normalized: Artifact[] = []
+  const byName = new Map<string, number>()
+  for (const a of artifacts) {
+    const name = sanitize(a.name)
+    const idx = byName.get(name)
+    if (idx === undefined) {
+      byName.set(name, normalized.length)
+      normalized.push({ name, bytes: a.bytes })
+    } else {
+      normalized[idx] = { name, bytes: a.bytes }
+    }
+  }
+
+  const checksum = await computeChecksum(results, normalized)
 
   await Deno.writeFile(`${dir}/results.json`, enc().encode(JSON.stringify(serializeResults(results), null, 2)))
   await Deno.writeFile(`${dir}/assertions.json`, enc().encode(JSON.stringify(assertions, null, 2)))
   await Deno.writeFile(`${dir}/logs.txt`, enc().encode(logs.join('\n')))
   const attachDir = `${dir}/attachments`
   await Deno.mkdir(attachDir, { recursive: true })
-  for (const a of artifacts) {
-    await Deno.writeFile(`${attachDir}/${sanitize(a.name)}`, a.bytes)
+  for (const a of normalized) {
+    await Deno.writeFile(`${attachDir}/${a.name}`, a.bytes)
   }
   const meta: MetaJson = {
     stageName,
