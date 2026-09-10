@@ -66,7 +66,6 @@ export function convertSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.bytesToBool]: (_ctx, [b]) => ((b as Uint8Array)[0] ? 1 : 0),
 
     // ---------- 字符单位 → 值 ----------
-    [rtKeys.charToI32]: (_ctx, [c]) =>
-      typeof c === 'string' ? (c.length > 0 ? c.charCodeAt(0) : 0) : (c as number),
+    [rtKeys.charToI32]: (_ctx, [c]) => typeof c === 'string' ? (c.length > 0 ? c.charCodeAt(0) : 0) : (c as number),
   }
 }

@@ -149,9 +149,7 @@ function bindByName(
   if (fileName === undefined || fileName === null) {
     return true
   }
-  const name = typeof fileName === 'string'
-    ? fileName.trim()
-    : bytesToString(fileName as Uint8Array).trim()
+  const name = typeof fileName === 'string' ? fileName.trim() : bytesToString(fileName as Uint8Array).trim()
   ctx.debugLog.push(`${tag} ${name}`)
   let store = ctx.files.get(name)
   if (store === undefined) {

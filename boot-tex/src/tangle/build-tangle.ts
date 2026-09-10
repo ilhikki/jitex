@@ -26,9 +26,6 @@ const tangleExtraCallables: Record<string, ExtraCallable> = {
 
 const tangleExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.break': extraSyscalls['extra.break'],
-  'file.reset': extraSyscalls['file.reset'],
-  'file.rewrite': extraSyscalls['file.rewrite'],
-  'factory.createHandler': extraSyscalls['factory.createHandler'],
 }
 
 export type TangleInput = {

@@ -28,8 +28,7 @@ const texExtraCallables: Record<string, ExtraCallable> = {
  */
 const eolnSyscall: SyscallHandler = (ctx, [file]) => {
   const f = file as PascalFile | null | undefined
-  const store = (f === null || f === undefined ? ctx.files.get('INPUT') : f.value) as
-    | (TextFile | undefined)
+  const store = (f === null || f === undefined ? ctx.files.get('INPUT') : f.value) as (TextFile | undefined)
   if (!store || !store.hasMore()) {
     return 1
   }
@@ -46,16 +45,6 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.breakIn': extraSyscalls['extra.breakIn'],
   'extra.erStat': extraSyscalls['extra.erStat'],
   'extra.break': extraSyscalls['extra.break'],
-  'file.reset': extraSyscalls['file.reset'],
-  'file.rewrite': extraSyscalls['file.rewrite'],
-  'file.peek': extraSyscalls['file.peek'],
-  'file.rec.rewrite': extraSyscalls['file.rec.rewrite'],
-  'file.rec.reset': extraSyscalls['file.rec.reset'],
-  'factory.createHandler': extraSyscalls['factory.createHandler'],
-  'factory.createRecHandler': extraSyscalls['factory.createRecHandler'],
-  'io.write.i32.file': extraSyscalls['io.write.i32.file'],
-  'file.eoln': eolnSyscall,
-  // 新链路（runtime.* 前缀）下的同语义覆盖
   'runtime.file.eoln': eolnSyscall,
 }
 

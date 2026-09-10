@@ -139,7 +139,8 @@ describe('ISO 7185 file of record (6.4.3.5 / 6.6.5.2)', () => {
     },
     {
       name: 'file of record: 反面 - reset 后 put 应报错',
-      code: `program test(f); type rec = record x: integer; end; var f: file of rec; begin rewrite(f); reset(f); put(f); end.`,
+      code:
+        `program test(f); type rec = record x: integer; end; var f: file of rec; begin rewrite(f); reset(f); put(f); end.`,
       purpose: 'ISO 6.6.5.2: rewrite 之前（读状态）调用 put 违反前置条件',
       recordFiles: new Map([['f', new MemoryRecordFile()]]),
       expectedError: 'pre-assertion',

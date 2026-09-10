@@ -10,7 +10,17 @@
 
 import type * as JsonCode from '@/middle/ir/json-code.ts'
 import type { TypeDescriptor } from '@/middle/lowering/type.ts'
-import { arrayCount, arraySlot, codecOf, fieldSlot, isByteScalar, isScalar, objectArrayElem, setSize, sizeOf } from './type-layout.ts'
+import {
+  arrayCount,
+  arraySlot,
+  codecOf,
+  fieldSlot,
+  isByteScalar,
+  isScalar,
+  objectArrayElem,
+  setSize,
+  sizeOf,
+} from './type-layout.ts'
 import { rtKeys } from './runtime-keys.ts'
 import type { SyscallRewriteTable } from './rewrite.ts'
 

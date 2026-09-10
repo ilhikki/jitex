@@ -121,8 +121,7 @@ function loweringAssignTarget(
   ws: WithBinding[],
 ): JsonCode.Statement[] {
   const lvalueType = a.typeOf(target)
-  const isComposite =
-    lvalueType.tag === 'array' || lvalueType.tag === 'rec' || lvalueType.tag === 'set'
+  const isComposite = lvalueType.tag === 'array' || lvalueType.tag === 'rec' || lvalueType.tag === 'set'
 
   // 简单变量
   if (target.kind === 'Identifier') {
@@ -148,19 +147,16 @@ function loweringAssignTarget(
     if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
       const ti = sym.typeInfo
       // subrange 运行时边界检查
-      const rangeCheck =
-        ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
-          ? evalStmt(
-              syscall(syscallKeys.rangeCheck, [ref(sym.varId), litInt(ti.low), litInt(ti.high)]),
-            )
-          : undefined
+      const rangeCheck = ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
+        ? evalStmt(
+          syscall(syscallKeys.rangeCheck, [ref(sym.varId), litInt(ti.low), litInt(ti.high)]),
+        )
+        : undefined
 
       const stmts: JsonCode.Statement[] = []
       if (isComposite) {
         // 复合类型整体赋值 = 字节拷贝（本模型中唯一的显式拷贝点）
-        const target = sym.isVarParam
-          ? syscall(syscallKeys.cellGet, [ref(sym.varId)])
-          : ref(sym.varId)
+        const target = sym.isVarParam ? syscall(syscallKeys.cellGet, [ref(sym.varId)]) : ref(sym.varId)
         stmts.push(
           evalStmt(syscall(syscallKeys.memCopy, [target, litInt(0), value, typeDescLiteral(ti)])),
         )

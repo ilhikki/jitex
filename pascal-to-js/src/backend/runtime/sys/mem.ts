@@ -125,8 +125,7 @@ export function memSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- 标量读写（codec 即类型）----------
-    [rtKeys.numGet]: (_ctx, [view, offset, codec]) =>
-      getNum(view as Uint8Array, offset as number, codec as Codec),
+    [rtKeys.numGet]: (_ctx, [view, offset, codec]) => getNum(view as Uint8Array, offset as number, codec as Codec),
     [rtKeys.numSet]: (_ctx, [view, offset, codec, v]) => {
       setNum(view as Uint8Array, offset as number, codec as Codec, v as number)
       return undefined
@@ -174,14 +173,10 @@ export function setSyscalls(): Record<string, SyscallHandler> {
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & y),
     [rtKeys.setDiff]: (_ctx, [a, b, size]) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & ~y),
-    [rtKeys.setEq]: (_ctx, [a, b, size]) =>
-      bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setNe]: (_ctx, [a, b, size]) =>
-      bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
-    [rtKeys.setLe]: (_ctx, [a, b, size]) =>
-      subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setGe]: (_ctx, [a, b, size]) =>
-      subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setEq]: (_ctx, [a, b, size]) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setNe]: (_ctx, [a, b, size]) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
+    [rtKeys.setLe]: (_ctx, [a, b, size]) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setGe]: (_ctx, [a, b, size]) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
     [rtKeys.setIn]: (_ctx, [bit, s, size]) => {
       const bmp = s as Uint8Array
       const i = bit as number

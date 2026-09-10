@@ -25,8 +25,8 @@ import {
   evalConstChar,
   evalConstInt,
   TypeInfo,
-  VarSymbol,
   VariantPartInfo,
+  VarSymbol,
 } from '../analysis-type.ts'
 import { AnalysisContext, DeclarationResult, GotoRecord, ScopeSnapshot, StatementResult } from '../stage-types.ts'
 
