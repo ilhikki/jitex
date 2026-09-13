@@ -20,15 +20,15 @@ export interface Stage<R> {
   readonly deps: readonly Stage<unknown>[]
   readonly fn: (results: unknown[]) => R | Promise<R>
   cacheable: boolean
-  ownerSuite: Suite | null
+  ownerSuite: Suite | undefined
 }
 
 export interface Suite {
   readonly __brand: 'Suite'
   readonly name: string
   readonly stages: Stage<unknown>[]
-  beforeFn: (() => void | Promise<void>) | null
-  afterFn: (() => void | Promise<void>) | null
+  beforeFn: (() => void | Promise<void>) | undefined
+  afterFn: (() => void | Promise<void>) | undefined
 }
 
 export type CacheableValue = string | Uint8Array | number
@@ -43,11 +43,11 @@ export type UnwrapAll<T extends readonly Stage<unknown>[]> = {
 // 声明期全局状态（suite 注册用）
 // ------------------------------------------------------------
 
-let currentDeclSuite: Suite | null = null
+let currentDeclSuite: Suite | undefined = undefined
 let nextStageId = 1
 
 export function _resetDeclState(): void {
-  currentDeclSuite = null
+  currentDeclSuite = undefined
   nextStageId = 1
 }
 
@@ -63,15 +63,15 @@ export function suite(name: string, fn: () => void): Suite {
     __brand: 'Suite',
     name,
     stages: [],
-    beforeFn: null,
-    afterFn: null,
+    beforeFn: undefined,
+    afterFn: undefined,
   }
   currentDeclSuite = s
   nextStageId = 1
   try {
     fn()
   } finally {
-    currentDeclSuite = null
+    currentDeclSuite = undefined
   }
   return s
 }
@@ -176,7 +176,7 @@ export function attachText(name: string, text: string): void {
 }
 
 export function attachJson(name: string, obj: unknown): void {
-  attachText(name, JSON.stringify(obj, null, 2))
+  attachText(name, JSON.stringify(obj, undefined, 2))
 }
 
 // ------------------------------------------------------------

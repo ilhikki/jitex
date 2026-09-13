@@ -128,7 +128,7 @@ function defaultStore(ctx: RuntimeContext, isOutput: boolean): TextFile {
 }
 
 function pick(ctx: RuntimeContext, f: unknown, isOutput: boolean): TextFile {
-  return f === null || f === undefined ? defaultStore(ctx, isOutput) : textStore(f as PascalFile)
+  return f === undefined ? defaultStore(ctx, isOutput) : textStore(f as PascalFile)
 }
 
 /**
@@ -146,7 +146,7 @@ function bindByName(
   tag: string,
   create: boolean,
 ): boolean {
-  if (fileName === undefined || fileName === null) {
+  if (fileName === undefined) {
     return true
   }
   const name = typeof fileName === 'string' ? fileName.trim() : bytesToString(fileName as Uint8Array).trim()
@@ -352,7 +352,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
 
     // ---------- 读取（语义级：读 + 推进）----------
     [rtKeys.fileReadChar]: (ctx, f) => {
-      if (f === null || f === undefined) {
+      if (f === undefined) {
         return readCharUnit(defaultStore(ctx, false))
       }
       const p = f as PascalFile
@@ -372,7 +372,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return readCharUnit(store)
     },
     [rtKeys.fileReadToken]: (ctx, f) => {
-      if (f === null || f === undefined) {
+      if (f === undefined) {
         return readTokenUnit(defaultStore(ctx, false))
       }
       const p = f as PascalFile
@@ -381,7 +381,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
 
     // ---------- 写（语义级：写 + 推进）----------
     [rtKeys.fileWrite]: (ctx, f, unit) => {
-      if (f === null || f === undefined) {
+      if (f === undefined) {
         writeText(defaultStore(ctx, true), unit)
         return undefined
       }
@@ -421,7 +421,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
 
     // ---------- 状态查询 ----------
     [rtKeys.fileEof]: (ctx, f) => {
-      if (f === null || f === undefined) {
+      if (f === undefined) {
         return defaultStore(ctx, false).hasMore() ? 0 : 1
       }
       const p = f as PascalFile

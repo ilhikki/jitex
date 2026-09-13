@@ -90,8 +90,8 @@ function findLabel(
   funcId: number,
   labelVal: number,
 ): { labelId: number; funcId: number } | undefined {
-  let fid: number | null = funcId
-  while (fid !== null) {
+  let fid: number | undefined = funcId
+  while (fid !== undefined) {
     const funcLabels = decl.labels.get(fid)
     if (funcLabels) {
       const info = funcLabels.get(labelVal)
@@ -100,7 +100,7 @@ function findLabel(
       }
     }
     const functionInfo = decl.funcInfos.get(fid)
-    fid = functionInfo ? functionInfo.parentFuncId : null
+    fid = functionInfo ? functionInfo.parentFuncId : undefined
   }
   return undefined
 }

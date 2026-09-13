@@ -18,7 +18,7 @@ function dataView(b: Uint8Array): DataView {
 
 /** 按宽度右对齐（width 为 undefined 时原样返回） */
 function pad(s: string, w: unknown): string {
-  return w === undefined || w === null ? s : formatField(s, w as number)
+  return w === undefined ? s : formatField(s, w as number)
 }
 
 export function convertSyscalls(): Record<string, SyscallHandler> {
@@ -27,7 +27,7 @@ export function convertSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.i32ToStr]: (_ctx, n, w) => pad(String(n), w),
     [rtKeys.f64ToStr]: (_ctx, n, w, p) => {
       const x = n as number
-      const text = p === undefined || p === null ? formatReal(x) : x.toFixed(p as number)
+      const text = p === undefined ? formatReal(x) : x.toFixed(p as number)
       return pad(text, w)
     },
     [rtKeys.boolToStr]: (_ctx, b, w) => pad(b ? 'TRUE' : 'FALSE', w),

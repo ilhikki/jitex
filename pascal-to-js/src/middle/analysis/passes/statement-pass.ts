@@ -106,7 +106,7 @@ class StatementPass {
 
   private lookup(name: string): AnalysisSymbol | undefined {
     const key = name.toLowerCase()
-    let s: ScopeSnapshot | null = this.scopeStack[this.scopeStack.length - 1] ?? null
+    let s: ScopeSnapshot | undefined = this.scopeStack[this.scopeStack.length - 1] ?? undefined
     while (s) {
       const v = s.bindings.get(key)
       if (v) {
@@ -589,8 +589,8 @@ class StatementPass {
     funcId: number,
     labelVal: number,
   ): { labelId: number; funcId: number } | undefined {
-    let fid: number | null = funcId
-    while (fid !== null) {
+    let fid: number | undefined = funcId
+    while (fid !== undefined) {
       const funcLabels = this.decl.labels.get(fid)
       if (funcLabels) {
         const info = funcLabels.get(labelVal)
@@ -598,8 +598,8 @@ class StatementPass {
           return info
         }
       }
-      const finfo = this.decl.funcInfos.get(fid)
-      fid = finfo ? finfo.parentFuncId : null
+      const functionInfo = this.decl.funcInfos.get(fid)
+      fid = functionInfo ? functionInfo.parentFuncId : undefined
     }
     return undefined
   }

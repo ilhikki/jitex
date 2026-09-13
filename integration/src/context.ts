@@ -95,17 +95,17 @@ export class RunContext {
 }
 
 // 全局运行时上下文（同一时间只允许一个 run 并发）
-let globalCtx: RunContext | null = null
+let globalCtx: RunContext | undefined = undefined
 
-export function setGlobalRunContext(ctx: RunContext | null): void {
+export function setGlobalRunContext(ctx: RunContext | undefined): void {
   globalCtx = ctx
 }
 
 // 日志 sink：log / addLog 的每条消息实时转发到这里（默认控制台）。
 // runner 通过 setLogSink 注入，run 结束后清空。
-let activeSink: ((msg: string) => void) | null = null
+let activeSink: ((msg: string) => void) | undefined = undefined
 
-export function setLogSink(sink: ((msg: string) => void) | null): void {
+export function setLogSink(sink: ((msg: string) => void) | undefined): void {
   activeSink = sink
 }
 

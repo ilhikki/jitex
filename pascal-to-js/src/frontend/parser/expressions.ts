@@ -263,7 +263,7 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
   const startToken = peek(input)
   // Skip [
   let pos = startPos + 1
-  const elements: [ExpressionNode, ExpressionNode | null][] = []
+  const elements: [ExpressionNode, ExpressionNode | undefined][] = []
 
   if (peek({ tokens: input.tokens, position: pos }).type !== 'RBRACKET') {
     while (true) {
@@ -273,7 +273,7 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
       }
       pos = exprResult.newPosition
 
-      let element: [ExpressionNode, ExpressionNode | null] = [exprResult.astNode, null]
+      let element: [ExpressionNode, ExpressionNode | undefined] = [exprResult.astNode, undefined]
       if (peek({ tokens: input.tokens, position: pos }).type === 'DOTDOT') {
         pos++
         const endResult = parseExpression({ tokens: input.tokens, position: pos })
@@ -450,7 +450,7 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
-    let operator: string | null = null
+    let operator: string | undefined = undefined
 
     switch (token.type) {
       case 'STAR':
@@ -532,7 +532,7 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
-    let operator: string | null = null
+    let operator: string | undefined = undefined
 
     switch (token.type) {
       case 'PLUS':
@@ -586,7 +586,7 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
-    let operator: string | null = null
+    let operator: string | undefined = undefined
 
     switch (token.type) {
       case 'EQUAL':

@@ -154,13 +154,13 @@ export function createBootTexSuite(): Suite {
           if (state.error instanceof Error) {
             log(`error: ${state.error.message}\n${state.error.stack}`)
           } else {
-            log(`error ${JSON.stringify(state.error, null, 2)}`)
+            log(`error ${JSON.stringify(state.error, undefined, 2)}`)
           }
         }
 
         const tripFmt = state.files.get('trip.fmt') as MemoryRecordFile | undefined
         if (tripFmt !== undefined) {
-          attachText('trip.fmt.json', JSON.stringify(tripFmt.getRecords(), null, 2))
+          attachText('trip.fmt.json', JSON.stringify(tripFmt.getRecords(), undefined, 2))
         }
 
         const tripLog = readTextFromState(state, 'trip.log')
@@ -225,7 +225,7 @@ export function createBootTexSuite(): Suite {
         if (state.error instanceof Error) {
           log(`error: ${state.error.message}\n${state.error.stack}`)
         } else {
-          log(`error ${JSON.stringify(state.error, null, 2)}`)
+          log(`error ${JSON.stringify(state.error, undefined, 2)}`)
         }
       }
 

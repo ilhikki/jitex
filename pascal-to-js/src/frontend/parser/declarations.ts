@@ -304,7 +304,7 @@ export function parseProcedureDeclaration(
           kind: 'ProcedureDeclaration',
           name: nameResult.astNode,
           parameters: paramsResult.astNode,
-          block: null,
+          block: undefined,
           isForward: true,
         } as ProcedureDeclarationNode,
         startToken.start,
@@ -394,7 +394,7 @@ export function parseFunctionDeclaration(
           name: nameResult.astNode,
           parameters: paramsResult.astNode,
           returnType: returnTypeResult.astNode,
-          block: null,
+          block: undefined,
           isForward: true,
         } as FunctionDeclarationNode,
         startToken.start,
@@ -440,7 +440,7 @@ export function parseBlock(input: ParserInput, outerLabels?: Set<number>): Parse
   let pos = input.position
 
   // Label section
-  let labelDeclarations: LabelDeclarationNode | null = null
+  let labelDeclarations: LabelDeclarationNode | undefined = undefined
   if (peek({ tokens: input.tokens, position: pos }).type === 'LABEL') {
     const r = parseLabelDeclaration({ tokens: input.tokens, position: pos })
     if (!r.success) {

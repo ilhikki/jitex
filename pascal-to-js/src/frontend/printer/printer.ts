@@ -309,9 +309,9 @@ function printCompound(node: CompoundStatementNode, ctx: PrintContext): string {
   const stmts = node.statements
     .map((s) => {
       const code = printStatement(s, innerCtx)
-      return code === '' ? null : indentStr(innerCtx) + code
+      return code === '' ? undefined : indentStr(innerCtx) + code
     })
-    .filter((x) => x !== null)
+    .filter((x) => x !== undefined)
   return `begin\n${stmts.join(';\n')}\n${indentStr(ctx)}end`
 }
 

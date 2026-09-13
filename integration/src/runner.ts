@@ -410,8 +410,8 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
       }
     }
   } finally {
-    setGlobalRunContext(null)
-    setLogSink(null)
+    setGlobalRunContext(undefined)
+    setLogSink(undefined)
   }
 
   // --- 构建报告 ---

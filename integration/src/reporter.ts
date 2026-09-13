@@ -56,7 +56,7 @@ export async function writeReport(
   await Deno.mkdir(runDir, { recursive: true })
 
   // overview.json
-  await Deno.writeFile(`${runDir}/overview.json`, enc.encode(JSON.stringify(report, null, 2)))
+  await Deno.writeFile(`${runDir}/overview.json`, enc.encode(JSON.stringify(report, undefined, 2)))
 
   // 三份聚合日志：logs / consoleLogs / debugLogs
   // DSL 统一用 log(msg)，默认 LogSink 写三份一样的；保留三份文件以对齐样例。

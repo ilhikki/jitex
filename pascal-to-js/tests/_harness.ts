@@ -104,7 +104,7 @@ export function assert(condition: unknown, message?: string): asserts condition 
  *   assertEquals(result.astNode.value, 42)  // 类型安全，无需 any
  */
 export function assertKind<T extends { kind: string }, K extends T['kind']>(
-  node: T | undefined | null,
+  node: T | undefined,
   expectedKind: K,
   message?: string,
 ): asserts node is Extract<T, { kind: K }> {

@@ -98,7 +98,7 @@ export function executeCompiled(
 export interface RunOptions extends TransformOptions, RuntimeOptions {}
 
 function reportErrorAsState(e: unknown, ctx: RuntimeContext) {
-  const err = e as { message?: string; stack?: string } | null | undefined
+  const err = e as { message?: string; stack?: string } | undefined
   // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
   const stackLines: string[] = err?.stack ? String(err.stack).split('\n').slice(0, 40) : []
   // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看

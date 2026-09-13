@@ -178,7 +178,7 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return JSON.stringify(literal.arg)
       case 'null':
         // ISO 7185 6.4.4: nil-value → JS null
-        return 'null'
+        return 'undefined'
       case 'field':
         return JSON.stringify(literal.arg)
       case 'type':

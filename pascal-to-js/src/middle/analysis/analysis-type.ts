@@ -108,7 +108,7 @@ export type FuncKind = 'function' | 'procedure' | 'program'
 
 export interface FuncInfo {
   funcId: number
-  parentFuncId: number | null
+  parentFuncId: number | undefined
   params: VarSymbol[]
   locals: VarSymbol[]
   retval?: VarSymbol

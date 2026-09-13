@@ -94,13 +94,13 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     // ---------- ptr ----------
     // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
     [rtKeys.ptrDeref]: (_ctx, p) => {
-      if (p === null) {
+      if (p === undefined) {
         throw new Error('dereference of nil pointer (ISO 7185 6.4.4)')
       }
       return (p as PascalCell).value
     },
     [rtKeys.ptrAssign]: (_ctx, p, v) => {
-      if (p === null) {
+      if (p === undefined) {
         throw new Error('dereference of nil pointer (ISO 7185 6.4.4)')
       }
       ;(p as PascalCell).value = v
@@ -108,7 +108,7 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     },
     // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
     [rtKeys.ptrDisposeCheck]: (_ctx, p) => {
-      if (p === null) {
+      if (p === undefined) {
         throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)')
       }
       return undefined

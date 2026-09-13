@@ -37,12 +37,12 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
 export function toRunState(
   ctx: RuntimeContext,
   status: 'running' | 'terminated' | 'error' = 'terminated',
-  error?: RunError | null,
+  error?: RunError | undefined,
 ): RunState {
   return {
     status,
     steps: ctx.steps,
-    error: error ?? null,
+    error: error ?? undefined,
     jsCode: ctx.jsCode,
     files: ctx.files,
     debugLog: ctx.debugLog,

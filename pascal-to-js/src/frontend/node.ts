@@ -56,7 +56,7 @@ export interface ProgramNode extends AstNode {
 
 export interface BlockNode extends AstNode {
   kind: 'Block'
-  labelDeclarations: LabelDeclarationNode | null
+  labelDeclarations: LabelDeclarationNode | undefined
   constDeclarations: ConstDeclarationNode[]
   typeDeclarations: TypeDeclarationNode[]
   variableDeclarations: VariableDeclarationNode[]
@@ -94,7 +94,7 @@ export interface ProcedureDeclarationNode extends AstNode {
   kind: 'ProcedureDeclaration'
   name: IdentifierNode
   parameters: ParameterDeclarationNode[]
-  block: BlockNode | null // null when FORWARD
+  block: BlockNode | undefined
   isForward: boolean
 }
 
@@ -103,7 +103,7 @@ export interface FunctionDeclarationNode extends AstNode {
   name: IdentifierNode
   parameters: ParameterDeclarationNode[]
   returnType: TypeNode
-  block: BlockNode | null // null when FORWARD
+  block: BlockNode | undefined
   isForward: boolean
 }
 
@@ -166,7 +166,7 @@ export interface RecordVariantNode extends AstNode {
 
 export interface FileTypeNode extends AstNode {
   kind: 'FileType'
-  elementType: TypeNode | null // null for "FILE" without OF
+  elementType: TypeNode | undefined // undefined for "FILE" without OF
   isPacked: boolean
 }
 
@@ -222,7 +222,7 @@ export interface IfStatementNode extends AstNode {
   kind: 'IfStatement'
   condition: ExpressionNode
   thenBranch: StatementNode
-  elseBranch: StatementNode | null
+  elseBranch: StatementNode | undefined
 }
 
 export interface WhileStatementNode extends AstNode {
@@ -250,7 +250,7 @@ export interface CaseStatementNode extends AstNode {
   kind: 'CaseStatement'
   expression: ExpressionNode
   branches: CaseBranchNode[]
-  otherwise: StatementNode | null
+  otherwise: StatementNode | undefined
 }
 
 export interface CaseBranchNode extends AstNode {
@@ -338,7 +338,7 @@ export interface ParenthesizedExpressionNode extends AstNode {
 
 export interface SetConstructorNode extends AstNode {
   kind: 'SetConstructor'
-  elements: [ExpressionNode, ExpressionNode | null][] // [start, end|null] pairs
+  elements: [ExpressionNode, ExpressionNode | undefined][] // [start, end|undefined] pairs
 }
 
 export interface InExpressionNode extends AstNode {

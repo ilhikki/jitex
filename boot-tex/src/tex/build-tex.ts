@@ -27,8 +27,8 @@ const texExtraCallables: Record<string, ExtraCallable> = {
  * 这里用 advance() 消费并回显。
  */
 const eolnSyscall: SyscallHandler = (ctx, file) => {
-  const f = file as PascalFile | null | undefined
-  const store = (f === null || f === undefined ? ctx.files.get('INPUT') : f.value) as (TextFile | undefined)
+  const f = file as PascalFile | undefined
+  const store = (f === undefined ? ctx.files.get('INPUT') : f.value) as (TextFile | undefined)
   if (!store || !store.hasMore()) {
     return 1
   }

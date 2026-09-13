@@ -83,8 +83,8 @@ function findLabel(
   funcId: number,
   labelVal: number,
 ): { labelId: number; funcId: number } | undefined {
-  let fid: number | null = funcId
-  while (fid !== null) {
+  let fid: number | undefined = funcId
+  while (fid !== undefined) {
     const funcLabels = decl.labels.get(fid)
     if (funcLabels) {
       const info = funcLabels.get(labelVal)
@@ -92,8 +92,8 @@ function findLabel(
         return info
       }
     }
-    const finfo = decl.funcInfos.get(fid)
-    fid = finfo ? finfo.parentFuncId : null
+    const functionInfo = decl.funcInfos.get(fid)
+    fid = functionInfo ? functionInfo.parentFuncId : undefined
   }
   return undefined
 }
@@ -104,13 +104,13 @@ function isAncestorFunc(
   ancestorFuncId: number,
   descFuncId: number,
 ): boolean {
-  let fid: number | null = descFuncId
-  while (fid !== null) {
+  let fid: number | undefined = descFuncId
+  while (fid !== undefined) {
     if (fid === ancestorFuncId) {
       return true
     }
-    const finfo = decl.funcInfos.get(fid)
-    fid = finfo ? finfo.parentFuncId : null
+    const functionInfo = decl.funcInfos.get(fid)
+    fid = functionInfo ? functionInfo.parentFuncId : undefined
   }
   return false
 }

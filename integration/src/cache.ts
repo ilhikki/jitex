@@ -54,7 +54,7 @@ function serializeResults(r: CacheableRecord): unknown {
 }
 
 function deserializeResults(obj: unknown): CacheableRecord {
-  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+  if (typeof obj !== 'object' || obj === undefined || Array.isArray(obj)) {
     throw new Error('cached results.json must be an object')
   }
   const rec = obj as Record<string, unknown>
@@ -66,7 +66,7 @@ function deserializeResults(obj: unknown): CacheableRecord {
       out[k] = v
     } else if (
       typeof v === 'object' &&
-      v !== null &&
+      v !== undefined &&
       typeof (v as { __bytes?: unknown }).__bytes === 'string'
     ) {
       out[k] = decodeB64((v as { __bytes: string }).__bytes)
@@ -137,20 +137,20 @@ export async function computeChecksum(
   return await sha256Hex(chunks)
 }
 
-// 读取 meta.json；不存在返回 null。
-export async function readMeta(dir: string): Promise<MetaJson | null> {
+// 读取 meta.json；不存在返回 undefined。
+export async function readMeta(dir: string): Promise<MetaJson | undefined> {
   const p = `${dir}/meta.json`
   try {
     const bytes = await Deno.readFile(p)
     return JSON.parse(dec().decode(bytes)) as MetaJson
   } catch {
-    return null
+    return undefined
   }
 }
 
 export async function writeMeta(dir: string, meta: MetaJson): Promise<void> {
   await Deno.mkdir(dir, { recursive: true })
-  await Deno.writeFile(`${dir}/meta.json`, enc().encode(JSON.stringify(meta, null, 2)))
+  await Deno.writeFile(`${dir}/meta.json`, enc().encode(JSON.stringify(meta, undefined, 2)))
 }
 
 // 写缓存条目（成功后调用）。
@@ -185,8 +185,8 @@ export async function writeCache(
 
   const checksum = await computeChecksum(results, normalized)
 
-  await Deno.writeFile(`${dir}/results.json`, enc().encode(JSON.stringify(serializeResults(results), null, 2)))
-  await Deno.writeFile(`${dir}/assertions.json`, enc().encode(JSON.stringify(assertions, null, 2)))
+  await Deno.writeFile(`${dir}/results.json`, enc().encode(JSON.stringify(serializeResults(results), undefined, 2)))
+  await Deno.writeFile(`${dir}/assertions.json`, enc().encode(JSON.stringify(assertions, undefined, 2)))
   await Deno.writeFile(`${dir}/logs.txt`, enc().encode(logs.join('\n')))
   const attachDir = `${dir}/attachments`
   await Deno.mkdir(attachDir, { recursive: true })
@@ -203,7 +203,7 @@ export async function writeCache(
   return checksum
 }
 
-// 尝试从缓存恢复；不满足条件返回 null。
+// 尝试从缓存恢复；不满足条件返回 undefined。
 // 若 requireCacheStrict=true（CLI --with-cache 场景）：
 //   - 该 stage 被标记 cacheable 但缓存条目不存在 → 抛错
 //   - 依赖被标记 cacheable 但依赖缓存不存在/不匹配 → 抛错
@@ -213,14 +213,14 @@ export async function tryRecoverCache(
   stage: Stage<unknown>,
   depChecksums: Map<string, string>, // stageName -> 当前依赖的实际 checksum
   requireCacheStrict: boolean,
-): Promise<RecoveredData | null> {
+): Promise<RecoveredData | undefined> {
   if (!stage.cacheable) {
     if (requireCacheStrict) {
       throw new Error(
         `--with-cache: stage '${stage.name}' is not marked cache() but cache mode is enabled`,
       )
     }
-    return null
+    return undefined
   }
 
   const dir = stageDir(cacheDir, suiteName, stage.name)
@@ -231,7 +231,7 @@ export async function tryRecoverCache(
         `--with-cache: no cache entry found for stage '${stage.name}' (expected at ${dir})`,
       )
     }
-    return null
+    return undefined
   }
 
   // 依赖校验：所有直接 deps 都必须 cacheable + 在 depChecksums 里 + 和 meta.deps 里的 checksum 匹配
@@ -245,7 +245,7 @@ export async function tryRecoverCache(
       if (requireCacheStrict) {
         throw new Error('unreachable')
       }
-      return null
+      return undefined
     }
     const recorded = meta.deps.find((d) => d.stageName === dep.name)
     if (!recorded) {
@@ -254,7 +254,7 @@ export async function tryRecoverCache(
           `--with-cache: cache of '${stage.name}' missing recorded checksum for dep '${dep.name}'`,
         )
       }
-      return null
+      return undefined
     }
     const actual = depChecksums.get(dep.name)
     if (!actual) {
@@ -263,7 +263,7 @@ export async function tryRecoverCache(
           `--with-cache: dep '${dep.name}' of '${stage.name}' has no computed checksum`,
         )
       }
-      return null
+      return undefined
     }
     if (recorded.checksum !== actual) {
       if (requireCacheStrict) {
@@ -271,7 +271,7 @@ export async function tryRecoverCache(
           `--with-cache: dep '${dep.name}' of '${stage.name}' checksum mismatch (cache has a stale version). purge cache and rerun.`,
         )
       }
-      return null
+      return undefined
     }
   }
 
@@ -309,7 +309,7 @@ export async function tryRecoverCache(
     if (requireCacheStrict) {
       throw new Error(`--with-cache: failed to read cache for '${stage.name}': ${(err as Error).message}`)
     }
-    return null
+    return undefined
   }
 
   // 自身 checksum 校验
@@ -320,7 +320,7 @@ export async function tryRecoverCache(
         `--with-cache: cache of '${stage.name}' corrupted (checksum mismatch). purge and retry.`,
       )
     }
-    return null
+    return undefined
   }
 
   return { results, artifacts, assertions, logs, checksum: actualChecksum }

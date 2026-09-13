@@ -182,7 +182,7 @@ async function main(argv: string[]): Promise<number> {
       : '[SKIP]  '
     console.log(`  ${mark} #${s.id} ${s.title} (${s.duration}ms)`)
     for (const a of s.artifacts) {
-      console.log(`           artifact: ${a.name} (${a.size} bytes${a.lines != null ? `, ${a.lines} lines` : ''})`)
+      console.log(`           artifact: ${a.name} (${a.size} bytes${a.lines != undefined ? `, ${a.lines} lines` : ''})`)
     }
     if (s.status === 'failed') {
       for (const line of s.stackTrace) {

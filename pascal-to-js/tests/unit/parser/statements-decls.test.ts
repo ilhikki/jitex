@@ -25,7 +25,7 @@ describe('Parser: CASE statement', () => {
     assertEquals(s.kind, 'CaseStatement', 'kind=CaseStatement')
     assertEquals(s.branches.length, 1, '1 branch')
     assertEquals(s.branches[0].labels.length, 1, '1 label')
-    assert(s.otherwise === null, 'otherwise null')
+    assert(s.otherwise === undefined, 'otherwise undefined')
   })
 
   test('parse CASE with multiple labels per branch', () => {
@@ -42,25 +42,25 @@ describe('Parser: CASE statement', () => {
   test('parse CASE with OTHERWISE', () => {
     const s = stmtOf('case x of 1: y := 2; otherwise y := 0 end') as CaseStatementNode
     assertEquals(s.branches.length, 1, '1 branch')
-    assert(s.otherwise !== null, 'otherwise present')
+    assert(s.otherwise !== undefined, 'otherwise present')
   })
 
   test('parse CASE with only OTHERWISE', () => {
     const s = stmtOf('case x of otherwise y := 0 end') as CaseStatementNode
     assertEquals(s.branches.length, 0, '0 branches')
-    assert(s.otherwise !== null, 'otherwise present')
+    assert(s.otherwise !== undefined, 'otherwise present')
   })
 
   test('parse CASE with OTHERWISE followed by semicolon before END', () => {
     const s = stmtOf('case x of 1: y := 2; otherwise y := 0; end') as CaseStatementNode
     assertEquals(s.branches.length, 1, '1 branch')
-    assert(s.otherwise !== null, 'otherwise present')
+    assert(s.otherwise !== undefined, 'otherwise present')
   })
 
   test('parse CASE with OTHERWISE followed by multiple semicolons before END', () => {
     const s = stmtOf('case x of otherwise y := 0;; end') as CaseStatementNode
     assertEquals(s.branches.length, 0, '0 branches')
-    assert(s.otherwise !== null, 'otherwise present')
+    assert(s.otherwise !== undefined, 'otherwise present')
   })
 })
 
@@ -113,7 +113,7 @@ end;`
       return
     }
     assertEquals(r.astNode.parameters.length, 1, '1 param')
-    assert(r.astNode.block!.labelDeclarations !== null, 'labels present')
+    assert(r.astNode.block!.labelDeclarations !== undefined, 'labels present')
     assertEquals(r.astNode.block!.variableDeclarations.length, 1, '1 var')
   })
 })
@@ -170,7 +170,7 @@ end.`
       return
     }
     const prog = r.astNode as ProgramNode
-    assert(prog.block.labelDeclarations !== null, 'labels present')
+    assert(prog.block.labelDeclarations !== undefined, 'labels present')
     assertEquals(prog.block.constDeclarations.length, 1, '1 const')
     assertEquals(prog.block.typeDeclarations.length, 1, '1 type')
     assertEquals(prog.block.variableDeclarations.length, 1, '1 var')

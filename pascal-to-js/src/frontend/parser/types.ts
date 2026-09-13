@@ -423,7 +423,7 @@ function parseFileType(
   const start = startPos ?? peek(input).start
   let pos = input.position + 1 // skip FILE
 
-  let elementType: TypeNode | null = null
+  let elementType: TypeNode | undefined = undefined
 
   if (peek({ tokens: input.tokens, position: pos }).type === 'OF') {
     pos++

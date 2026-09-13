@@ -279,14 +279,14 @@ describe('Production: statement', () => {
     const result = parseStatement(makeInput('IF X > 0 THEN Y := 1'))
     assert(result.success, 'parse success')
     assertKind(result.astNode, 'IfStatement')
-    assert(result.astNode.elseBranch === null, 'elseBranch expected null')
+    assert(result.astNode.elseBranch === undefined, 'elseBranch expected undefined')
   })
 
   test('should parse if-else statement', () => {
     const result = parseStatement(makeInput('IF X > 0 THEN Y := 1 ELSE Y := 2'))
     assert(result.success, 'parse success')
     assertKind(result.astNode, 'IfStatement')
-    assert(result.astNode.elseBranch !== null, 'elseBranch expected not null')
+    assert(result.astNode.elseBranch !== undefined, 'elseBranch expected not undefined')
   })
 
   test('should parse while statement', () => {
@@ -497,7 +497,7 @@ describe('Production: procedure_declaration', () => {
     const result = parseProcedureDeclaration(makeInput('PROCEDURE DEBUGHELP; FORWARD;'))
     assert(result.success, 'parse success')
     assertEquals(result.astNode.isForward, true, 'isForward mismatch')
-    assert(result.astNode.block === null, 'block expected null (forward)')
+    assert(result.astNode.block === undefined, 'block expected undefined (forward)')
   })
 })
 
@@ -535,7 +535,7 @@ describe('Production: block', () => {
     const source = 'LABEL 9999; CONST MAX = 100; VAR X: INTEGER; BEGIN 9999: X := 1 END'
     const result = parseBlock(makeInput(source))
     assert(result.success, 'parse success')
-    assert(result.astNode.labelDeclarations !== null, 'labelDeclarations expected not null')
+    assert(result.astNode.labelDeclarations !== undefined, 'labelDeclarations expected not undefined')
     assertEquals(result.astNode.constDeclarations.length, 1, 'length mismatch, expected 1')
     assertEquals(result.astNode.variableDeclarations.length, 1, 'length mismatch, expected 1')
   })
@@ -570,7 +570,7 @@ describe('Production: program', () => {
       makeInput('PROGRAM TEST; LABEL 9999; CONST MAX = 100; BEGIN 9999: GOTO 9999 END.'),
     )
     assert(result.success, 'parse success')
-    assert(result.astNode.block.labelDeclarations !== null, 'block.labelDeclarations expected not null')
+    assert(result.astNode.block.labelDeclarations !== undefined, 'block.labelDeclarations expected not undefined')
     assertEquals(result.astNode.block.constDeclarations.length, 1, 'block.constDeclarations length expected 1')
   })
 

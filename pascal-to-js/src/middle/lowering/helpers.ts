@@ -68,8 +68,8 @@ export function litBool(v: boolean): JsonCode.Literal {
 }
 
 export function litNull(): JsonCode.Literal {
-  // ISO 7185 6.4.4: nil-value，JS 中用 null 表示
-  return { kind: 'literal', key: 'null', arg: 'null' }
+  // ISO 7185 6.4.4: nil-value，JS 中用 undefined 表示
+  return { kind: 'literal', key: 'null', arg: 'undefined' }
 }
 
 export function syscall(key: SyscallKey, args: JsonCode.Expr[]): JsonCode.Syscall {

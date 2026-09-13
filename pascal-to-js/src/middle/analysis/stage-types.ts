@@ -52,7 +52,7 @@ export class AnalysisContext {
 export interface ScopeSnapshot {
   bindings: Map<string, AnalysisSymbol>
   funcId: number
-  outer: ScopeSnapshot | null
+  outer: ScopeSnapshot | undefined
 }
 
 // ============================================================

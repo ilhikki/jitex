@@ -367,7 +367,7 @@ function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
   }
   pos = thenStmtResult.newPosition
 
-  let elseBranch: StatementNode | null = null
+  let elseBranch: StatementNode | undefined = undefined
   if (peek({ tokens: input.tokens, position: pos }).type === 'ELSE') {
     pos++
     const elseResult = parseStatement({ tokens: input.tokens, position: pos })
@@ -573,7 +573,7 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   pos = ofResult.newPosition
 
   const branches: CaseBranchNode[] = []
-  let otherwise: StatementNode | null = null
+  let otherwise: StatementNode | undefined = undefined
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'END') {
     // Check for OTHERWISE / OTHERS (UCSD Pascal 别名)

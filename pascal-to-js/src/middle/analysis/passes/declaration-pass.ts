@@ -81,7 +81,7 @@ class DeclarationPass {
   }
 
   run(program: ProgramNode): void {
-    const topFuncId = this.allocFunc(program.block, null, 'program', null)
+    const topFuncId = this.allocFunc(program.block, undefined, 'program', undefined)
     this.pushScope(topFuncId, program.block)
     this.analyzeBlock(program.block, topFuncId)
     this.globalBindings = this.currentScope().bindings
@@ -127,7 +127,7 @@ class DeclarationPass {
     const scope: MutableScope = {
       bindings: new Map(),
       funcId,
-      outer: this.scopeStack.length > 0 ? this.scopeStack[this.scopeStack.length - 1] : null,
+      outer: this.scopeStack.length > 0 ? this.scopeStack[this.scopeStack.length - 1] : undefined,
     }
     this.scopeStack.push(scope)
     if (block) {
@@ -153,7 +153,7 @@ class DeclarationPass {
 
   private lookup(name: string): AnalysisSymbol | undefined {
     const key = name.toLowerCase()
-    let s: ScopeSnapshot | null = this.scopeStack[this.scopeStack.length - 1] ?? null
+    let s: ScopeSnapshot | undefined = this.scopeStack[this.scopeStack.length - 1] ?? undefined
     while (s) {
       const v = s.bindings.get(key)
       if (v) {
@@ -169,10 +169,10 @@ class DeclarationPass {
   // --------------------------------------------------------
 
   private allocFunc(
-    block: BlockNode | null,
-    decl: ProcedureDeclarationNode | FunctionDeclarationNode | null,
+    block: BlockNode | undefined,
+    decl: ProcedureDeclarationNode | FunctionDeclarationNode | undefined,
     kind: FuncKind,
-    parentFuncId: number | null,
+    parentFuncId: number | undefined,
   ): number {
     const funcId = this.allocId()
     if (decl) {
@@ -186,11 +186,11 @@ class DeclarationPass {
       params: [],
       locals: [],
       children: [],
-      hasBody: block !== null,
+      hasBody: block !== undefined,
       kind,
     }
     this.funcInfos.set(funcId, info)
-    if (parentFuncId !== null) {
+    if (parentFuncId !== undefined) {
       const parent = this.funcInfos.get(parentFuncId)
       if (parent) {
         parent.children.push(funcId)
