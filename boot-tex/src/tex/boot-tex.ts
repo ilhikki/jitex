@@ -71,19 +71,18 @@ function readBytesFromState(
 export function createBootTexSuite(): Suite {
   return suite('boot tex', () => {
     // ---- 阶段 A：构建 TeX（trip 版本）----
-    const inline = true
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
       const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
       const tangleV1 = runTanglePascal({
         tangleContent: tanglePas,
         webContent: tangleWeb,
-      }, inline)
+      })
       const tangleV2 = runTanglePascal({
         tangleContent: tangleV1.pasFile,
         webContent: tangleWeb,
-      }, inline)
-      const tangleJs = transformTangle(tangleV2.pasFile, inline)
+      })
+      const tangleJs = transformTangle(tangleV2.pasFile)
       attachText('tangle.js', tangleJs)
       return { tangleJs }
     }))
@@ -98,7 +97,7 @@ export function createBootTexSuite(): Suite {
     }))
 
     const tripTexJsStage = cache(stage('compile tex.trip.pas => tex.trip.js', [tripPasStage], ([{ pasFile }]) => {
-      const texTripJs = transformTex(pasFile, inline)
+      const texTripJs = transformTex(pasFile)
       attachText('tex.trip.js', texTripJs)
       return { texTripJs }
     }))

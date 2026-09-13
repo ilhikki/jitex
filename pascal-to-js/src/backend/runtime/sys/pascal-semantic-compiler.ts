@@ -64,16 +64,6 @@ export function basicSyscall(): Record<string, SyscallHandler> {
   }
 }
 
-export interface PascalSemanticCompilerOptions {
-  /**
-   * syscall 内联开关（对应 TransformOptions.inlineSyscalls）：
-   *   - false / undefined：不内联（默认）
-   *   - true：内联所有已实现内联规则的 key
-   *   - string[]：只内联列出的 key
-   */
-  inlineSyscalls?: boolean | string[]
-}
-
 /**
  * syscall 内联表：key → 「已编译的实参表达式 → 内联 JS 表达式」。
  *
@@ -99,6 +89,8 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.i32Neg]: (a) => `(-(${a[0]}) | 0)`,
   [rtKeys.i32And]: (a) => `((${a[0]} & ${a[1]}) | 0)`,
   [rtKeys.i32Or]: (a) => `((${a[0]} | ${a[1]}) | 0)`,
+  [rtKeys.boolAnd]: (a) => `(${a[0]} && ${a[1]})`,
+  [rtKeys.boolOr]: (a) => `(${a[0]}|| ${a[1]})`,
   [rtKeys.i32Not]: (a) => `(~(${a[0]}) | 0)`,
   [rtKeys.i32Abs]: (a) => `(Math.abs(${a[0]}) | 0)`,
   [rtKeys.i32Odd]: (a) => `(((${a[0]}) % 2) !== 0 ? 1 : 0)`,
@@ -160,18 +152,8 @@ const inlineSyscalls: Record<string, InlineGen> = {
 }
 
 export class PascalSemanticCompiler implements SemanticCompiler {
-  private readonly inlineMode: true | Set<string>
-
-  constructor(options: PascalSemanticCompilerOptions = {}) {
-    const inline = options.inlineSyscalls
-    this.inlineMode = inline === true ? true : new Set(Array.isArray(inline) ? inline : [])
-  }
-
   /** 命中内联规则时返回生成函数，否则 undefined */
   private inlineFor(key: string): InlineGen | undefined {
-    if (this.inlineMode !== true && !this.inlineMode.has(key)) {
-      return undefined
-    }
     return inlineSyscalls[key]
   }
 
@@ -212,16 +194,6 @@ export class PascalSemanticCompiler implements SemanticCompiler {
   syscallToJs(syscall: JsonCode.Syscall, compiler: JsCompiler): string | undefined {
     const key = syscall.key
     const args = syscall.args.map((a) => compiler.compileExpr(a))
-
-    // 短路语义：bool.and / bool.or 必须 inline 为 JS 的 && / ||。
-    // 若走 dispatcher，实参会在调用前全部求值，破坏 Pascal 的短路行为
-    // （见 Phase 1 的 logical short circuit 测试）。这是语义必需，非优化。
-    if (key === rtKeys.boolAnd) {
-      return `(${args[0]} && ${args[1]})`
-    }
-    if (key === rtKeys.boolOr) {
-      return `(${args[0]} || ${args[1]})`
-    }
 
     // 内联开关命中 → 展开为内联 JS 表达式（消除 dispatcher 的数组分配 + 两层调用）
     const inline = this.inlineFor(key)
