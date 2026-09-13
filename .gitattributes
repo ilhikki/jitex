@@ -1,0 +1,11 @@
+gitattributes
+
+* -text
+*.ts text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+resources -text
+reports -text

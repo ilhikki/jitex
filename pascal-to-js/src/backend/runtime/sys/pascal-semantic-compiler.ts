@@ -1,11 +1,7 @@
 import type { JsCompiler, SemanticCompiler } from '@/backend/codegen/json-code-compiler.ts'
 import * as JsonCode from '@/middle/ir/json-code.ts'
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import type {
-  PascalSet,
-  SyscallHandler,
-} from '../runtime-type.ts'
-
+import type { PascalSet, SyscallHandler } from '../runtime-type.ts'
 
 function newPascalSet(set: Set<number>): PascalSet {
   return {

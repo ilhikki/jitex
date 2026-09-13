@@ -1,23 +1,6 @@
 // ============================================================
 // 辅助函数：real 格式化
 
-import {
-  ArrayHandler,
-  ArrayValue,
-  DefaultRecordValue,
-  DimsLink,
-  PascalArray,
-  PascalRecord,
-  RecordHandler,
-  RecordValue,
-  RuntimeContext,
-  TypeDescriptor,
-  TypeHandler,
-  VariantBranchDescriptor,
-  VariantPartDescriptor,
-  VariantState,
-} from '@/backend/runtime/runtime-type.ts'
-
 // ============================================================
 export function formatReal(n: number): string {
   if (Number.isInteger(n)) {

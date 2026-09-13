@@ -511,7 +511,7 @@ class StatementPass {
    * 记录一次 unknown 类型推断，打印出触发它的 AST 节点（printer 还原为源码）。
    * 仅用于定位类型链断点，返回 `{tag:'unknown'}` 本身。
    */
-  private unknown(node: ExpressionNode, _why: string): TypeInfo {
+  private unknown(_node: ExpressionNode, _why: string): TypeInfo {
     return { tag: 'unknown' }
   }
 

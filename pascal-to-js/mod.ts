@@ -70,9 +70,7 @@ export type {
   TypeHandler,
   VariantPartDescriptor,
 } from '@/backend/runtime/runtime-type.ts'
-export {
-  encodeUtf8,
-} from '@/backend/runtime/runtime-util.ts'
+export { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
 export { MemoryTextFile } from '@/backend/runtime/sys/memory-text-file.ts'
 export { parse } from '@/run.ts'
 

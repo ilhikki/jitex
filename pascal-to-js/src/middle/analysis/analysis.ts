@@ -99,8 +99,8 @@ function findLabel(
         return info
       }
     }
-    const finfo = decl.funcInfos.get(fid)
-    fid = finfo ? finfo.parentFuncId : null
+    const functionInfo = decl.funcInfos.get(fid)
+    fid = functionInfo ? functionInfo.parentFuncId : null
   }
   return undefined
 }
