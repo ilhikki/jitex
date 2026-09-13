@@ -15,7 +15,7 @@
  */
 
 import type { RunError, RunState } from './run-state.ts'
-import type { RuntimeContext, RuntimeOptions, SyscallHandler } from './runtime-type.ts'
+import { RuntimeContext, RuntimeOptions, Syscall, SyscallHandler } from './runtime-type.ts'
 import { arithSyscalls } from './sys/arith.ts'
 import { basicSyscall } from './sys/pascal-semantic-compiler.ts'
 import { convertSyscalls } from './sys/convert.ts'
@@ -65,19 +65,15 @@ function getDefaultSyscalls(): Record<string, SyscallHandler> {
 }
 
 export function createDispatcher(
+  ctx: RuntimeContext,
   extraSyscalls: Record<string, SyscallHandler>,
-): (ctx: RuntimeContext, key: string, args: unknown[]) => unknown {
-  const syscalls = { ...getDefaultSyscalls() }
-  for (const [key, fn] of Object.entries(extraSyscalls)) {
+): Record<string, Syscall> {
+  const boundSyscalls: Record<string, Syscall> = {}
+  const allSyscalls = { ...getDefaultSyscalls(), ...extraSyscalls }
+  for (const [key, fn] of Object.entries(allSyscalls)) {
     if (fn) {
-      syscalls[key] = fn
+      boundSyscalls[key] = fn.bind(undefined, ctx)
     }
   }
-  return (ctx, key, args) => {
-    const fn = syscalls[key]
-    if (fn) {
-      return fn(ctx, args)
-    }
-    throw new Error(`Unknown syscall: ${key}`)
-  }
+  return boundSyscalls
 }

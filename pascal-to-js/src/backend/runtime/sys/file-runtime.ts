@@ -225,7 +225,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
   return {
     // ---------- reset / rewrite ----------
     // 第二参数（非 ISO 的 `reset(f, name)` 形式）用于按名字绑定/新建文件存储
-    [rtKeys.fileReset]: (ctx, [f, fileName]) => {
+    [rtKeys.fileReset]: (ctx, f, fileName) => {
       const p = f as PascalFile
       if (!bindByName(ctx, p, fileName, 'file.reset', false)) {
         // 具名输入文件不存在：打开失败，句柄保持未初始化
@@ -242,7 +242,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       }
       return undefined
     },
-    [rtKeys.fileRewrite]: (ctx, [f, fileName]) => {
+    [rtKeys.fileRewrite]: (ctx, f, fileName) => {
       const p = f as PascalFile
       bindByName(ctx, p, fileName, 'file.rewrite', true)
       const store = p.value
@@ -259,7 +259,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- 推进 / 查看当前元素 ----------
-    [rtKeys.fileGet]: (_ctx, [f]) => {
+    [rtKeys.fileGet]: (_ctx, f) => {
       const p = f as PascalFile
       if (isRec(p)) {
         const rs = recStore(p)
@@ -282,7 +282,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       readCharUnit(store)
       return undefined
     },
-    [rtKeys.filePeek]: (_ctx, [f, size]) => {
+    [rtKeys.filePeek]: (_ctx, f, size) => {
       const p = f as PascalFile
       if (isRec(p)) {
         const rs = recStore(p)
@@ -316,7 +316,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
 
     // ---------- 写一个元素 ----------
     // unit 存在 → `f^ := x`（设缓冲区）；unit 缺失 → `put(f)`（把缓冲区写入文件）
-    [rtKeys.filePut]: (_ctx, [f, unit]) => {
+    [rtKeys.filePut]: (_ctx, f, unit) => {
       const p = f as PascalFile
       if (isRec(p)) {
         const rs = recStore(p)
@@ -351,7 +351,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- 读取（语义级：读 + 推进）----------
-    [rtKeys.fileReadChar]: (ctx, [f]) => {
+    [rtKeys.fileReadChar]: (ctx, f) => {
       if (f === null || f === undefined) {
         return readCharUnit(defaultStore(ctx, false))
       }
@@ -371,7 +371,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       }
       return readCharUnit(store)
     },
-    [rtKeys.fileReadToken]: (ctx, [f]) => {
+    [rtKeys.fileReadToken]: (ctx, f) => {
       if (f === null || f === undefined) {
         return readTokenUnit(defaultStore(ctx, false))
       }
@@ -380,7 +380,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- 写（语义级：写 + 推进）----------
-    [rtKeys.fileWrite]: (ctx, [f, unit]) => {
+    [rtKeys.fileWrite]: (ctx, f, unit) => {
       if (f === null || f === undefined) {
         writeText(defaultStore(ctx, true), unit)
         return undefined
@@ -403,24 +403,24 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- 行 / 页 ----------
-    [rtKeys.fileWriteln]: (ctx, [f]) => {
+    [rtKeys.fileWriteln]: (ctx, f) => {
       const store = pick(ctx, f, true)
       store.writeByte(10)
       return undefined
     },
-    [rtKeys.fileReadln]: (ctx, [f]) => {
+    [rtKeys.fileReadln]: (ctx, f) => {
       const store = pick(ctx, f, false)
       skipLine(store)
       return undefined
     },
-    [rtKeys.filePage]: (ctx, [f]) => {
+    [rtKeys.filePage]: (ctx, f) => {
       const store = pick(ctx, f, true)
       store.writeByte(12)
       return undefined
     },
 
     // ---------- 状态查询 ----------
-    [rtKeys.fileEof]: (ctx, [f]) => {
+    [rtKeys.fileEof]: (ctx, f) => {
       if (f === null || f === undefined) {
         return defaultStore(ctx, false).hasMore() ? 0 : 1
       }
@@ -430,7 +430,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       }
       return textStore(p).hasMore() ? 0 : 1
     },
-    [rtKeys.fileEoln]: (ctx, [f]) => {
+    [rtKeys.fileEoln]: (ctx, f) => {
       const store = pick(ctx, f, false)
       if (!store.hasMore()) {
         return 1
@@ -440,8 +440,8 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
 
     // ---------- 构造 / 绑定 ----------
-    [rtKeys.fileCreate]: (_ctx, [type]) => ({ kind: 'file', value: undefined, type } as PascalFile),
-    [rtKeys.programFileUrl]: (ctx, [f, name]) => {
+    [rtKeys.fileCreate]: (_ctx, type) => ({ kind: 'file', value: undefined, type } as PascalFile),
+    [rtKeys.programFileUrl]: (ctx, f, name) => {
       const p = f as PascalFile
       const key = name as string
       const url = ctx.programFileUrls[key] ?? key

@@ -26,7 +26,7 @@ const texExtraCallables: Record<string, ExtraCallable> = {
  * input_ln 读到行结束符就停下、不消费它；真实终端会把那个换行回显出来，
  * 这里用 advance() 消费并回显。
  */
-const eolnSyscall: SyscallHandler = (ctx, [file]) => {
+const eolnSyscall: SyscallHandler = (ctx, file) => {
   const f = file as PascalFile | null | undefined
   const store = (f === null || f === undefined ? ctx.files.get('INPUT') : f.value) as (TextFile | undefined)
   if (!store || !store.hasMore()) {

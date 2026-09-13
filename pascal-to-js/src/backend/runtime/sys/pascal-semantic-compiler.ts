@@ -17,7 +17,7 @@ function unboxPascalSet(set: unknown): Set<number> {
 export function basicSyscall(): Record<string, SyscallHandler> {
   // subrange 运行时边界检查。'range.check'（lowering 直接产）与
   // 'runtime.range.check'（rewrite 产，如 pred/succ 展开）共用同一实现。
-  const rangeCheck: SyscallHandler = (_ctx, [index, min, max]) => {
+  const rangeCheck: SyscallHandler = (_ctx, index, min, max) => {
     if ((index as number) < (min as number) || (index as number) > (max as number)) {
       throw new Error(`subrange value ${index} out of range ${min}..${max}`)
     }
@@ -34,26 +34,26 @@ export function basicSyscall(): Record<string, SyscallHandler> {
 
   return {
     // ---------- set（运算类：阶段1 起由 rewrite 产 runtime.set.*）----------
-    [rtKeys.setUnion]: (_ctx, [v1, v2]): PascalSet => {
+    [rtKeys.setUnion]: (_ctx, v1, v2): PascalSet => {
       return newPascalSet(new Set<number>([...unboxPascalSet(v1), ...unboxPascalSet(v2)]))
     },
-    [rtKeys.setIntersect]: (_ctx, [set, other]) => {
+    [rtKeys.setIntersect]: (_ctx, set, other) => {
       const jsSet = unboxPascalSet(set)
       return newPascalSet(new Set([...jsSet].filter((x) => unboxPascalSet(other).has(x))))
     },
-    [rtKeys.setDiff]: (_ctx, [set, other]) =>
+    [rtKeys.setDiff]: (_ctx, set, other) =>
       newPascalSet(new Set([...(unboxPascalSet(set))].filter((x) => !(unboxPascalSet(other)).has(x)))),
-    [rtKeys.setEq]: (_ctx, [left, right]) =>
+    [rtKeys.setEq]: (_ctx, left, right) =>
       (unboxPascalSet(left)).size === (unboxPascalSet(right)).size &&
       [...unboxPascalSet(left)].every((x: number) => (unboxPascalSet(right)).has(x)),
-    [rtKeys.setNe]: (_ctx, [left, right]) =>
+    [rtKeys.setNe]: (_ctx, left, right) =>
       !((unboxPascalSet(left)).size === (unboxPascalSet(right)).size &&
         [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x))),
-    [rtKeys.setLe]: (_ctx, [left, right]) =>
+    [rtKeys.setLe]: (_ctx, left, right) =>
       [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x)),
-    [rtKeys.setGe]: (_ctx, [left, right]) =>
+    [rtKeys.setGe]: (_ctx, left, right) =>
       [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x)),
-    [rtKeys.setIn]: (_ctx, [value, set]) => (unboxPascalSet(set)).has(value as number),
+    [rtKeys.setIn]: (_ctx, value, set) => (unboxPascalSet(set)).has(value as number),
 
     'runtime.steps.check': stepsCheck,
     // ---------- hook（调试钩子，no-op）----------
@@ -236,6 +236,6 @@ export class PascalSemanticCompiler implements SemanticCompiler {
     // 具体 handler 见 sys/arith.ts（算术/逻辑/比较/转换/指针）、
     // sys/pascal-semantic-compiler.ts（cell/array/rec/mem/set）、sys/file.ts（IO/文件）。
     // 重新 inline 属于后续优化阶段。
-    return `__sys(${JSON.stringify(key)}, [${args.join(', ')}])`
+    return `__sys[${JSON.stringify(key)}](${args.join(', ')})`
   }
 }

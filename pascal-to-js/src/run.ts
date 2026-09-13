@@ -5,16 +5,17 @@ import { parseProgram } from '@/frontend/parser/declarations.ts'
 
 import { analyzeProgram } from '@/middle/analysis/analysis.ts'
 import { loweringProgram } from '@/middle/lowering/lowering.ts'
-import { composeMapping, mergeRewriteTables, rewrite } from '@/middle/rewrite/rewrite.ts'
 import type { SyscallRewriter, SyscallRewriteTable } from '@/middle/rewrite/rewrite.ts'
+import { composeMapping, mergeRewriteTables, rewrite } from '@/middle/rewrite/rewrite.ts'
 import { buildPascalRewriteTable } from '@/middle/rewrite/pascal-rewriters.ts'
 import { toJs } from '@/backend/codegen/json-code-compiler.ts'
 import type { RunError, RunState } from '@/backend/runtime/run-state.ts'
 
-import type { RuntimeContext, RuntimeOptions } from '@/backend/runtime/runtime-type.ts'
+import { RuntimeContext, RuntimeOptions, Syscall } from '@/backend/runtime/runtime-type.ts'
 import { PascalSemanticCompiler } from '@/backend/runtime/sys/pascal-semantic-compiler.ts'
 import { createDispatcher, createRuntimeContext, toRunState } from '@/backend/runtime/runtime.ts'
 import { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
+
 /**
  * 将 Pascal 源码解析为 AST。
  *
@@ -85,7 +86,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
 
 export function executeCompiled(
   code: string,
-  __sys: (key: string, args: unknown[]) => unknown,
+  syscalls: Record<string, Syscall>,
 ): void {
   // 提取导出的函数名
   const exportMatch = code.match(/export\s+default\s+(\w+);/)
@@ -98,7 +99,7 @@ export function executeCompiled(
   const execCode = code.replace(/export.*$/, `return ${mainName};`)
   const factory = new Function(execCode)
   const mainFn = factory()
-  mainFn(__sys)
+  mainFn(syscalls)
 }
 
 export interface RunOptions extends TransformOptions, RuntimeOptions {}
@@ -134,13 +135,10 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
   try {
     ctx.jsCode = source
     // __sys dispatcher
-    const dispatcher = createDispatcher(options.extraSyscalls ?? {})
-    const __sys = (key: string, args: unknown[]): unknown => {
-      return dispatcher(ctx, key, args)
-    }
+    const dispatcher = createDispatcher(ctx, options.extraSyscalls ?? {})
 
     // 执行（ES module 代码）
-    executeCompiled(source, __sys)
+    executeCompiled(source, dispatcher)
 
     return toRunState(ctx, 'terminated')
   } catch (e: unknown) {

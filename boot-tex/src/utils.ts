@@ -34,7 +34,7 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
   'extra.breakIn': (ctx) => {
     ctx.debugLog.push('extra.breakIn')
   },
-  'extra.erStat': (_ctx, [file]) => {
+  'extra.erStat': (_ctx, file) => {
     const pascalFile = file as PascalFile
     return pascalFile.value !== undefined ? 0 : 1
   },

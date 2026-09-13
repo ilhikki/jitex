@@ -110,7 +110,8 @@ export interface RuntimeOptions {
 }
 
 /** 单个 syscall 处理器：接收 ctx 与参数列表，返回结果 */
-export type SyscallHandler = (ctx: RuntimeContext, args: unknown[]) => unknown
+export type SyscallHandler = (ctx: RuntimeContext, ...args: unknown[]) => unknown
+export type Syscall = (...args: unknown[]) => unknown
 
 export type PascalFile = {
   kind: 'file'

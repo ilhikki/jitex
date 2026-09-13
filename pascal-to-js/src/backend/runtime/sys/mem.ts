@@ -126,37 +126,37 @@ function withBit(bits: number[], size: number): Uint8Array {
 export function memSyscalls(): Record<string, SyscallHandler> {
   return {
     // ---------- 分配 / 拷贝 / 视图 ----------
-    [rtKeys.memNew]: (_ctx, [size]) => new Uint8Array(size as number),
-    [rtKeys.memClone]: (_ctx, [src, size]) => (src as Uint8Array).slice(0, size as number),
-    [rtKeys.memCopy]: (_ctx, [dst, dstOff, src, size]) => {
+    [rtKeys.memNew]: (_ctx, size) => new Uint8Array(size as number),
+    [rtKeys.memClone]: (_ctx, src, size) => (src as Uint8Array).slice(0, size as number),
+    [rtKeys.memCopy]: (_ctx, dst, dstOff, src, size) => {
       const d = dst as Uint8Array
       const s = src as Uint8Array
       d.set(s.subarray(0, size as number), dstOff as number)
       return undefined
     },
-    [rtKeys.viewSub]: (_ctx, [view, offset, size]) => {
+    [rtKeys.viewSub]: (_ctx, view, offset, size) => {
       const v = view as Uint8Array
       const off = offset as number
       return v.subarray(off, off + (size as number))
     },
 
     // ---------- 标量读写（codec 即类型）----------
-    [rtKeys.numGet]: (_ctx, [view, offset, codec]) => getNum(view as Uint8Array, offset as number, codec as Codec),
-    [rtKeys.numSet]: (_ctx, [view, offset, codec, v]) => {
+    [rtKeys.numGet]: (_ctx, view, offset, codec) => getNum(view as Uint8Array, offset as number, codec as Codec),
+    [rtKeys.numSet]: (_ctx, view, offset, codec, v) => {
       setNum(view as Uint8Array, offset as number, codec as Codec, v as number)
       return undefined
     },
 
     // ---------- cell（var 参数传递）----------
-    [rtKeys.cellNew]: (_ctx, [v]): PascalCell => ({ kind: 'cell', value: v }),
-    [rtKeys.cellGet]: (_ctx, [c]) => (c as PascalCell).value,
-    [rtKeys.cellSet]: (_ctx, [c, v]) => {
+    [rtKeys.cellNew]: (_ctx, v): PascalCell => ({ kind: 'cell', value: v }),
+    [rtKeys.cellGet]: (_ctx, c) => (c as PascalCell).value,
+    [rtKeys.cellSet]: (_ctx, c, v) => {
       ;(c as PascalCell).value = v
       return undefined
     },
 
     // ---------- object 数组（元素是 object，如 file；用 JS Array 承载）----------
-    [rtKeys.arrNew]: (_ctx, [count, elemType]): unknown[] => {
+    [rtKeys.arrNew]: (_ctx, count, elemType): unknown[] => {
       const n = count as number
       const out = new Array<unknown>(n)
       for (let i = 0; i < n; i++) {
@@ -164,8 +164,8 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       }
       return out
     },
-    [rtKeys.arrGet]: (_ctx, [arr, idx]) => (arr as unknown[])[idx as number],
-    [rtKeys.arrSet]: (_ctx, [arr, idx, v]) => {
+    [rtKeys.arrGet]: (_ctx, arr, idx) => (arr as unknown[])[idx as number],
+    [rtKeys.arrSet]: (_ctx, arr, idx, v) => {
       ;(arr as unknown[])[idx as number] = v
       return undefined
     },
@@ -183,17 +183,17 @@ export function memSyscalls(): Record<string, SyscallHandler> {
  */
 export function setSyscalls(): Record<string, SyscallHandler> {
   return {
-    [rtKeys.setUnion]: (_ctx, [a, b, size]) =>
+    [rtKeys.setUnion]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x | y),
-    [rtKeys.setIntersect]: (_ctx, [a, b, size]) =>
+    [rtKeys.setIntersect]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & y),
-    [rtKeys.setDiff]: (_ctx, [a, b, size]) =>
+    [rtKeys.setDiff]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & ~y),
-    [rtKeys.setEq]: (_ctx, [a, b, size]) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setNe]: (_ctx, [a, b, size]) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
-    [rtKeys.setLe]: (_ctx, [a, b, size]) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setGe]: (_ctx, [a, b, size]) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setIn]: (_ctx, [bit, s, size]) => {
+    [rtKeys.setEq]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setNe]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
+    [rtKeys.setLe]: (_ctx, a, b, size) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setGe]: (_ctx, a, b, size) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setIn]: (_ctx, bit, s, size) => {
       const bmp = s as Uint8Array
       const i = bit as number
       if (i < 0 || i >= (size as number) * 8) {
@@ -201,8 +201,8 @@ export function setSyscalls(): Record<string, SyscallHandler> {
       }
       return ((bmp[i >> 3] ?? 0) >> (i & 7)) & 1
     },
-    [rtKeys.setElem]: (_ctx, [bit, size]) => withBit([bit as number], size as number),
-    [rtKeys.setRange]: (_ctx, [lo, hi, size]) => {
+    [rtKeys.setElem]: (_ctx, bit, size) => withBit([bit as number], size as number),
+    [rtKeys.setRange]: (_ctx, lo, hi, size) => {
       const bits: number[] = []
       for (let i = lo as number; i <= (hi as number); i++) {
         bits.push(i)
