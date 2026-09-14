@@ -592,7 +592,11 @@ class DeclarationPass {
           const sym: VarSymbol = {
             kind: 'param',
             varId,
-            typeInfo: { tag: 'unknown' },
+            // ISO 7185 6.6.3.4/6.6.3.5：函数形参在表达式中即调用，类型为返回类型；
+            // 过程形参不能出现在表达式中，用内部标记，analyzeExpr 遇到时报错。
+            typeInfo: callable.kind === 'function' && callable.retTypeInfo
+              ? callable.retTypeInfo
+              : { tag: 'procedure' },
             isVarParam: false,
             callable,
           }
@@ -622,8 +626,13 @@ class DeclarationPass {
   private resolveCallableParamInfo(spec: CallableParameterSpec): CallableParamInfo {
     const params: CallableParamSig[] = spec.parameters.map((inner) => {
       if (inner.callable) {
-        // 嵌套的可调用形参：本轮不深入判定其内部形状
-        return { isVar: false, typeInfo: { tag: 'unknown' } as TypeInfo }
+        // 嵌套的可调用形参：过程形参用内部标记，函数形参用其返回类型
+        return {
+          isVar: false,
+          typeInfo: inner.callable.kind === 'function' && inner.callable.returnType
+            ? this.resolveTypeInfo(inner.callable.returnType)
+            : { tag: 'procedure' },
+        }
       }
       return { isVar: inner.isVar, typeInfo: this.resolveTypeInfo(inner.type!) }
     })

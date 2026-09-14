@@ -30,6 +30,9 @@ export type TypeTag =
   | 'subrange'
   | 'pointer'
   | 'unknown'
+  // 内部标记（非 ISO 类型）：过程形参。过程标识符不能出现在表达式中（ISO 6.6.3.4），
+  // 此 tag 仅用于分析阶段明确该符号的语义，rewrite 阶段不会见到它。
+  | 'procedure'
 
 export interface TypeInfo {
   tag: TypeTag

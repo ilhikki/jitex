@@ -397,11 +397,13 @@ class StatementPass {
         if (!sym && !BUILTIN_IDENTIFIERS.has(node.name.toLowerCase())) {
           this.recordUndefinedRef('identifier', node.name)
         }
-        if (sym?.kind === 'param' && sym.callable) {
-          // ISO 7185 6.6.3.5：形参在其块内标识实参函数；无形参表形式作 factor 即为调用
-          info = sym.callable.retTypeInfo ??
-            this.unknown(node, `functional parameter '${node.name}' 无结果类型`)
-        } else if (sym?.kind === 'var' || sym?.kind === 'param') {
+        if (sym?.kind === 'var' || sym?.kind === 'param') {
+          if (sym.typeInfo.tag === 'procedure') {
+            // ISO 7185 6.6.3.4：过程形参不能出现在表达式中，只能作为过程语句
+            throw new Error(
+              `procedure formal parameter '${node.name}' cannot be used as an expression (ISO 7185 6.6.3.4)`,
+            )
+          }
           info = sym.typeInfo
         } else if (sym?.kind === 'const') {
           info = sym.typeInfo
@@ -472,7 +474,7 @@ class StatementPass {
           this.analyzeExpr(a)
         }
         if (sym?.kind === 'param' && sym.callable) {
-          // ISO 7185 6.6.3.5：形参在其块内标识实参函数，可作 factor 调用
+          // ISO 7185 6.6.3.5：调用可调用形参。过程形参不能作函数调用。
           if (sym.callable.kind !== 'function') {
             throw new Error(
               `'${node.name.name}' is a procedure formal parameter and is not a function (ISO 7185 6.6.3.4)`,
@@ -483,8 +485,7 @@ class StatementPass {
               `function '${node.name.name}' expects ${sym.callable.params.length} actual-parameter(s) but ${node.arguments.length} given (ISO 7185 6.7.3)`,
             )
           }
-          info = sym.callable.retTypeInfo ??
-            this.unknown(node, `call '${node.name.name}' 无返回类型`)
+          info = sym.typeInfo
         } else if (sym?.kind === 'func') {
           const funcInfo = this.decl.funcInfos.get(sym.funcId)
           if (funcInfo && funcInfo.params.length !== node.arguments.length) {
