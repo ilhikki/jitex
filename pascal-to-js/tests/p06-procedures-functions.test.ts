@@ -448,10 +448,155 @@ const tests: PascalTest[] = [
     purpose: 'ISO 6.6.3.4/6.6.3.6：两个 formal-parameter-list 须 congruous，或都不出现',
     expectedError: '',
   },
-
-  // ==========================================================================
-  // 6.6.5.2 File handling procedures
-  // ==========================================================================
+  {
+    name: '6.6 过程形参可在块内多次调用',
+    code: `program test(output);
+        var k: integer;
+        procedure twice(procedure p);
+        begin p; p; end;
+        procedure bump;
+        begin k := k + 1; end;
+        begin k := 0; twice(bump); writeln(k); end.`,
+    purpose: 'ISO 6.6.3.4：形参在块的整个激活期标识实参过程，可被多次调用',
+    expectedOutput: '2\n',
+  },
+  {
+    name: '6.6 无形参表的函数形参',
+    code: `program test(output);
+        function apply(function f: integer): integer;
+        begin apply := f + f; end;
+        function seven: integer;
+        begin seven := 7; end;
+        begin writeln(apply(seven)); end.`,
+    purpose: 'ISO 6.6.3.5：functional-parameter-section 可无形参表，结果类型须表示同一类型',
+    expectedOutput: '14\n',
+  },
+  {
+    name: '6.6 过程形参可转发给下一层形参',
+    code: `program test(output);
+        procedure outer(procedure p);
+          procedure inner(procedure q);
+          begin q; end;
+        begin inner(p); end;
+        procedure hello;
+        begin writeln('HI'); end;
+        begin outer(hello); end.`,
+    purpose: 'ISO 6.6.3.4：形参本身亦可作另一过程形参的实参（链式传递）',
+    expectedOutput: 'HI\n',
+  },
+  {
+    name: '6.6 实参过程访问其外层过程的变量',
+    code: `program test(output);
+        procedure home;
+          var k: integer;
+          procedure bump;
+          begin k := k + 1; end;
+          procedure call(procedure p);
+          begin k := 7; p; writeln(k); end;
+        begin call(bump); end;
+        begin home; end.`,
+    purpose: 'ISO 6.6.3.4 / 6.2.2.5：形参标识实参过程，而实参过程访问其自身外层过程的变量',
+    expectedOutput: '8\n',
+  },
+  {
+    name: '6.6 过程形参带变量参数段',
+    code: `program test(output);
+        procedure apply(procedure p(var x: integer); var y: integer);
+        begin p(y); end;
+        procedure bump(var v: integer);
+        begin v := v + 1; end;
+        var a: integer;
+        begin a := 3; apply(bump, a); writeln(a); end.`,
+    purpose: 'ISO 6.6.3.4 / 6.6.3.6 b：变量参数段须与实参过程的形参表 congruous',
+    expectedOutput: '4\n',
+  },
+  {
+    name: '6.6 过程形参带值参数段',
+    code: `program test(output);
+        procedure apply(procedure p(x: integer); n: integer);
+        begin p(n); end;
+        procedure show(x: integer);
+        begin writeln(x); end;
+        begin apply(show, 9); end.`,
+    purpose: 'ISO 6.6.3.4 / 6.6.3.6 a：值参数段须与实参过程的形参表 congruous',
+    expectedOutput: '9\n',
+  },
+  {
+    name: '6.6 多个形参的过程各对应一个实参',
+    code: `program test(output);
+        procedure two(procedure p; procedure q);
+        begin p; q; end;
+        procedure a;
+        begin writeln('A'); end;
+        procedure b;
+        begin writeln('B'); end;
+        begin two(a, b); end.`,
+    purpose: 'ISO 6.7.3：多个形参与多个实参一一对应',
+    expectedOutput: 'A\nB\n',
+  },
+  {
+    name: '6.6 过程形参的实参须为过程标识符',
+    code: `program test(output);
+        var v: integer;
+        procedure apply(procedure p);
+        begin p; end;
+        begin v := 1; apply(v); end.`,
+    purpose: 'ISO 6.6.3.4：实参须是有定义点的 procedure-identifier，变量不满足',
+    expectedError: '',
+  },
+  {
+    name: '6.6 内置过程不可作过程形参的实参',
+    code: `program test(output);
+        procedure apply(procedure p);
+        begin p; end;
+        begin apply(write); end.`,
+    purpose: 'ISO 6.6.3.4：实参须有被 program-block 包含的定义点，内置过程没有定义点',
+    expectedError: '',
+  },
+  {
+    name: '6.6 函数形参的 result-type 须与实参函数相同',
+    code: `program test(output);
+        function apply(function f: real): real;
+        begin apply := f; end;
+        function n: integer;
+        begin n := 1; end;
+        begin writeln(apply(n)); end.`,
+    purpose: 'ISO 6.6.3.5：形参段的结果类型须与实参函数的结果类型表示同一类型',
+    expectedError: '',
+  },
+  {
+    name: '6.6 函数标识符不可作过程形参的实参',
+    code: `program test(output);
+        procedure apply(procedure p);
+        begin p; end;
+        function f: integer;
+        begin f := 1; end;
+        begin apply(f); end.`,
+    purpose: 'ISO 6.6.3.4：实参须为 procedure-identifier，函数标识符不满足',
+    expectedError: '',
+  },
+  {
+    name: '6.6 形参表对应位置类型不同应报错',
+    code: `program test(output);
+        procedure apply(procedure p(x: integer));
+        begin end;
+        procedure q(x: real);
+        begin end;
+        begin apply(q); end.`,
+    purpose: 'ISO 6.6.3.6 a：对应位置的值参数段的类型标识符须 denote 同一类型',
+    expectedError: '',
+  },
+  {
+    name: '6.6 值参数段与变量参数段不匹配应报错',
+    code: `program test(output);
+        procedure apply(procedure p(x: integer));
+        begin end;
+        procedure q(var x: integer);
+        begin end;
+        begin apply(q); end.`,
+    purpose: 'ISO 6.6.3.6 a/b：对应位置须同为值参数段或同为变量参数段',
+    expectedError: '',
+  },
   {
     name: '6.6 rewrite(f) 后 f.M 为 Generation，可顺序写入',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'HELLO');END.`,
