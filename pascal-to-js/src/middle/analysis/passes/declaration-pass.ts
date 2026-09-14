@@ -11,6 +11,7 @@
 import {
   BlockNode,
   ConstDeclarationNode,
+  ExpressionNode,
   FunctionDeclarationNode,
   ParameterDeclarationNode,
   ProcedureDeclarationNode,
@@ -290,13 +291,38 @@ class DeclarationPass {
   }
 
   private analyzeConst(decl: ConstDeclarationNode): void {
-    const lit = evalLiteral(decl.value)
+    const lit = this.evalConstValue(decl.value)
     if (lit) {
       const ti = typeInfoOfLiteralKey(lit.key)
       this.bind(decl.name.name, { kind: 'const', literal: lit, typeInfo: ti })
     } else {
       this.bind(decl.name.name, { kind: 'type', typeInfo: { tag: 'unknown' } })
     }
+  }
+
+  /**
+   * ISO 6.3：constant = [ sign ] ( unsigned-number | constant-identifier ) | character-string
+   * 除字面量外，还须支持带符号常量（-5）与对已定义常量的引用（B = A）。
+   */
+  private evalConstValue(node: ExpressionNode): { key: string; arg: string } | undefined {
+    const lit = evalLiteral(node)
+    if (lit) {
+      return lit
+    }
+    if (node.kind === 'UnaryExpression' && (node.operator === '-' || node.operator === '+')) {
+      const inner = this.evalConstValue(node.operand)
+      if (inner && (inner.key === 'i32' || inner.key === 'f64')) {
+        return node.operator === '-' ? { key: inner.key, arg: `-${inner.arg}` } : inner
+      }
+      return undefined
+    }
+    if (node.kind === 'Identifier') {
+      const sym = this.lookup(node.name)
+      if (sym?.kind === 'const') {
+        return sym.literal
+      }
+    }
+    return undefined
   }
 
   // --------------------------------------------------------

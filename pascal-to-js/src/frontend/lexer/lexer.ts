@@ -127,19 +127,26 @@ export function tokenize(input: LexerInput): Token[] {
         }
         continue
       }
-      // Regular comment
-      while (pos < src.length && src[pos] !== '}') {
+      // Regular comment. ISO 6.1.8: the construct
+      // (`{' | `(*') commentary (`*)' | `}') shall be a comment, so either closing
+      // delimiter terminates the comment regardless of which opening delimiter was used.
+      while (pos < src.length && src[pos] !== '}' && !(src[pos] === '*' && src[pos + 1] === ')')) {
         pos++
       }
       if (pos < src.length) {
-        pos++
+        pos += src[pos] === '}' ? 1 : 2
       }
       continue
     }
 
     if (src[pos] === '(' && pos + 1 < src.length && src[pos + 1] === '*') {
       pos += 2
+      // ISO 6.1.8: `}` also terminates a comment opened with `(*`
       while (pos < src.length) {
+        if (src[pos] === '}') {
+          pos++
+          break
+        }
         if (src[pos] === '*' && pos + 1 < src.length && src[pos + 1] === ')') {
           pos += 2
           break
@@ -176,36 +183,35 @@ export function tokenize(input: LexerInput): Token[] {
       while (pos < src.length && isDigit(src[pos])) {
         pos++
       }
-      // Check for real number
+      let isReal = false
+      // ISO 6.1.5: unsigned-real = digit-sequence '.' [ fractional-part ] [ scale-factor ]
+      //                       | digit-sequence scale-factor
+      // so the fractional part is optional and a scale-factor may follow the
+      // integer part directly (e.g. 5e3).
       if (pos < src.length && src[pos] === '.' && pos + 1 < src.length && src[pos + 1] !== '.') {
+        isReal = true
         pos++
         while (pos < src.length && isDigit(src[pos])) {
           pos++
         }
-        // Optional exponent
-        if (pos < src.length && (src[pos] === 'e' || src[pos] === 'E')) {
-          pos++
-          if (pos < src.length && (src[pos] === '+' || src[pos] === '-')) {
-            pos++
-          }
+      }
+      // Optional scale-factor: ( 'e' | 'E' ) [ sign ] digit-sequence
+      if (pos < src.length && (src[pos] === 'e' || src[pos] === 'E')) {
+        const afterSign = src[pos + 1] === '+' || src[pos + 1] === '-' ? pos + 2 : pos + 1
+        if (afterSign < src.length && isDigit(src[afterSign])) {
+          isReal = true
+          pos = afterSign
           while (pos < src.length && isDigit(src[pos])) {
             pos++
           }
         }
-        tokens.push({
-          type: 'REAL',
-          content: src.substring(start, pos),
-          start: offsetToPos(start),
-          end: offsetToPos(pos),
-        })
-      } else {
-        tokens.push({
-          type: 'INTEGER',
-          content: src.substring(start, pos),
-          start: offsetToPos(start),
-          end: offsetToPos(pos),
-        })
       }
+      tokens.push({
+        type: isReal ? 'REAL' : 'INTEGER',
+        content: src.substring(start, pos),
+        start: offsetToPos(start),
+        end: offsetToPos(pos),
+      })
       continue
     }
 
