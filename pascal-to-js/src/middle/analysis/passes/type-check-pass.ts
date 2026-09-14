@@ -111,7 +111,7 @@ class TypeCheckPass {
    */
   private checkDeclaredNames(block: BlockNode, formalParamNames: string[] = []): void {
     const kinds = new Map<string, string>()
-    const declare = (name: string, kind: string) => {
+    const declareKind = (name: string, kind: string) => {
       const key = name.toLowerCase()
       const prev = kinds.get(key)
       if (prev !== undefined) {
@@ -124,17 +124,17 @@ class TypeCheckPass {
 
     // ISO 6.2.2.7：形参与块内局部声明同属一个 region
     for (const name of formalParamNames) {
-      declare(name, 'a formal parameter')
+      declareKind(name, 'a formal parameter')
     }
     for (const c of block.constDeclarations) {
-      declare(c.name.name, 'a constant')
+      declareKind(c.name.name, 'a constant')
     }
     for (const t of block.typeDeclarations) {
-      declare(t.name.name, 'a type')
+      declareKind(t.name.name, 'a type')
     }
     for (const v of block.variableDeclarations) {
       for (const n of v.names) {
-        declare(n.name, 'a variable')
+        declareKind(n.name, 'a variable')
       }
     }
 
@@ -153,7 +153,7 @@ class TypeCheckPass {
           )
         }
         routines.set(key, 'forward')
-        declare(d.name.name, 'a procedure')
+        declareKind(d.name.name, 'a procedure')
         continue
       }
       if (prev === 'defined') {
@@ -162,7 +162,7 @@ class TypeCheckPass {
         )
       }
       if (prev === undefined) {
-        declare(d.name.name, 'a procedure')
+        declareKind(d.name.name, 'a procedure')
       }
       routines.set(key, 'defined')
     }
