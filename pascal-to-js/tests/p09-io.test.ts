@@ -24,405 +24,118 @@
 //     6.9.3.6 String-types
 //   6.9.4 The procedure writeln
 //   6.9.5 The procedure page
-//
-// 状态：骨架文件，用例待从 tests/integration/ 迁移（迁移时仅改 name，内容不动）。
 
-import { describe, type PascalTest, runPascalTests } from './harness.ts'
-import { MemoryRecordFile } from '@jitex/pascal-to-js'
+import { type PascalTest, runPascalTests } from './harness.ts'
 
 function text(s: string): Uint8Array {
   return new TextEncoder().encode(s)
 }
 
-describe('ISO 7185 6.9 - Input and output', () => {
-  const tests: PascalTest[] = [
-    {
-      name: '6.9 writeln with no arguments',
-      code: `program test;
+const tests: PascalTest[] = [
+  // ---------- write / writeln 基本形式（6.9.3 / 6.9.4） ----------
+  {
+    name: '6.9 writeln 无参数写出行结束符',
+    code: `program test(output);
 begin
   writeln;
 end.`,
-      purpose: 'writeln without arguments outputs a newline',
-      expectedOutput: '\n',
-    },
-    {
-      name: '6.9 writeln with integer',
-      code: `program test;
-begin
-  writeln(42);
-end.`,
-      purpose: 'writeln outputs integer value',
-      expectedContains: '42',
-    },
-    {
-      name: '6.9 writeln with string literal',
-      code: `program test;
-begin
-  writeln('hello world');
-end.`,
-      purpose: 'writeln outputs string literal value',
-      expectedContains: 'hello world',
-    },
-    {
-      name: '6.9 writeln with multiple arguments',
-      code: `program test;
-begin
-  writeln(1, 2, 3);
-end.`,
-      purpose: 'writeln outputs multiple arguments consecutively (no separator, per Pascal82)',
-      expectedContains: '123',
-    },
-    {
-      name: '6.9 write with no newline',
-      code: `program test;
+    purpose: 'ISO 6.9.4：Writeln(f) 终止（可能存在的）部分行，post-assertion 要求 f.L 追加 end-of-line',
+    expectedOutput: '\n',
+  },
+  {
+    name: '6.9 write 连续写出不换行',
+    code: `program test(output);
 begin
   write('hello');
   write('world');
 end.`,
-      purpose: 'write outputs without trailing newline',
-      expectedOutput: 'helloworld',
-    },
-    {
-      name: '6.9 write with integer',
-      code: `program test;
-begin
-  write(123);
-end.`,
-      purpose: 'write outputs integer value without newline',
-      expectedOutput: '123',
-    },
-    {
-      name: '6.9 write with string literal',
-      code: `program test;
-begin
-  write('test');
-end.`,
-      purpose: 'write outputs string literal without newline',
-      expectedOutput: 'test',
-    },
-    {
-      name: '6.9 write with multiple arguments',
-      code: `program test;
-begin
-  write('a', 'b', 'c');
-end.`,
-      purpose: 'write outputs multiple arguments without newline',
-      expectedOutput: 'abc',
-    },
-    {
-      name: '6.9 readln reads integer',
-      code: `program test;
-var n: integer;
-begin
-  readln(n);
-  writeln(n + 1);
-end.`,
-      purpose: 'readln with empty input defaults to 0 (n+1=1)',
-      expectedContains: '1',
-    },
-    {
-      name: '6.9 readln reads multiple values',
-      code: `program test;
-var a, b: integer;
-begin
-  readln(a, b);
-  writeln(a + b);
-end.`,
-      purpose: 'readln with empty input defaults to 0 (a+b=0)',
-      expectedContains: '0',
-    },
-    {
-      name: '6.9 read reads single value',
-      code: `program test;
-var n: integer;
-begin
-  read(n);
-  writeln(n);
-end.`,
-      purpose: 'read with empty input defaults to 0',
-      expectedContains: '0',
-    },
-    {
-      name: '6.9 rewrite creates file',
-      code: `program test(f);
-var f: text;
-begin
-  rewrite(f);
-  writeln(f, 'hello file');
-end.`,
-      purpose: 'rewrite creates a new text file',
-    },
-    {
-      name: '6.9 writeln to file',
-      code: `program test(f);
-var f: text;
-begin
-  rewrite(f);
-  writeln(f, 'line1');
-  writeln(f, 'line2');
-end.`,
-      purpose: 'writeln writes to text file',
-    },
-    {
-      name: '6.9 ord function',
-      code: `program test;
-begin
-  writeln(ord('A'));
-end.`,
-      purpose: 'ord returns ASCII code of character',
-      expectedContains: '65',
-    },
-    {
-      name: '6.9 chr function',
-      code: `program test;
-begin
-  writeln(chr(65));
-end.`,
-      purpose: 'chr returns character from ASCII code',
-      expectedContains: 'A',
-    },
-    {
-      name: '6.9 pred function',
-      code: `program test;
-begin
-  writeln(pred(5));
-end.`,
-      purpose: 'pred returns predecessor of integer',
-      expectedContains: '4',
-    },
-    {
-      name: '6.9 succ function',
-      code: `program test;
-begin
-  writeln(succ(5));
-end.`,
-      purpose: 'succ returns successor of integer',
-      expectedContains: '6',
-    },
-    {
-      name: '6.9 abs function',
-      code: `program test;
-begin
-  writeln(abs(-10));
-end.`,
-      purpose: 'abs returns absolute value',
-      expectedContains: '10',
-    },
-    {
-      name: '6.9 sqr function',
-      code: `program test;
-begin
-  writeln(sqr(5));
-end.`,
-      purpose: 'sqr returns square of integer',
-      expectedContains: '25',
-    },
-    {
-      name: '6.9 standard write writeln procedures',
-      code: `program test;
-begin
-  write('a');
-  writeln('b');
-  writeln('c');
-end.`,
-      purpose: 'write and writeln are standard procedures',
-      expectedContains: 'ab',
-    },
-    {
-      name: '6.9 new dispose procedures (ISO 7185 6.6.5.3 pointer support)',
-      code: `program test;
-type P = ^integer;
-var p: P;
-begin
-  new(p);
-  p^ := 10;
-  writeln(p^);
-  dispose(p);
-end.`,
-      purpose: 'ISO 7185 6.6.5.3 new/dispose + 6.4.4 pointer-types + 6.5.4 identified-variable',
-      expectedContains: '10',
-    },
-    {
-      name: '6.9 file does not exist (mock IO does not simulate file errors)',
-      code: `program test(f);
-var f: text;
-begin
-  reset(f);
-end.`,
-      purpose: 'reset on file with no external association; mock IO does not simulate file-not-found errors',
-    },
-    {
-      name: '6.9 file write error (mock IO does simulate file errors)',
-      code: `program test(f);
-var f: text;
-begin
-  writeln(f, 'test');
-end.`,
-      purpose: 'writing to unopened file; mock IO does  simulate file-state errors',
-      expectedError: 'mode',
-    },
-    {
-      name: '6.9 large output',
-      code: `program test;
-var i: integer;
-begin
-  for i := 1 to 10 do
-    writeln(i);
-end.`,
-      purpose: 'large output is handled correctly',
-      expectedContains: '5',
-    },
-    {
-      name: '6.9 writeln with negative integer',
-      code: `program test;
-begin
-  writeln(-42);
-end.`,
-      purpose: 'writeln outputs negative integer',
-      expectedContains: '-42',
-    },
-    {
-      name: '6.9 writeln with real number',
-      code: `program test;
-begin
-  writeln(3.14);
-end.`,
-      purpose: 'writeln outputs real number',
-      expectedContains: '3.14',
-    },
-    {
-      name: '6.9 writeln with boolean',
-      code: `program test;
-begin
-  writeln(true);
-end.`,
-      purpose: 'writeln outputs boolean value (case is implementation-defined per Pascal82)',
-      expectedContains: 'TRUE',
-    },
-    {
-      name: '6.9 eoln function',
-      code: `program test;
-var n: integer;
-begin
-  readln(n);
-  writeln(eoln);
-end.`,
-      purpose: 'eoln detects end of line (case is implementation-defined per Pascal82)',
-      expectedContains: 'TRUE',
-    },
-    {
-      name: '6.9 ord without parentheses should fail',
-      code: `program test;
-begin
-  writeln(ord);
-end.`,
-      purpose: '有参内置函数省略括号应报错（风险覆盖：不是所有内置函数都能无参调用）',
-      expectedError: '',
-    },
-    {
-      name: '6.9 chr with boundary value',
-      code: `program test;
-begin
-  writeln(chr(32));
-end.`,
-      purpose: 'chr handles boundary ASCII values',
-      expectedContains: ' ',
-    },
-    {
-      name: '6.9 abs with zero',
-      code: `program test;
-begin
-  writeln(abs(0));
-end.`,
-      purpose: 'abs returns zero for zero input',
-      expectedContains: '0',
-    },
-    {
-      name: '6.9 sqr with negative',
-      code: `program test;
-begin
-  writeln(sqr(-5));
-end.`,
-      purpose: 'sqr returns positive for negative input',
-      expectedContains: '25',
-    },
-    {
-      name: '6.9 pred with zero',
-      code: `program test;
-begin
-  writeln(pred(0));
-end.`,
-      purpose: 'pred returns -1 for zero',
-      expectedContains: '-1',
-    },
-    {
-      name: '6.9 succ with max smallint',
-      code: `program test;
-begin
-  writeln(succ(32767));
-end.`,
-      purpose: 'succ returns next integer',
-      expectedContains: '32768',
-    },
-    {
-      name: '6.9 ord with space',
-      code: `program test;
-begin
-  writeln(ord(' '));
-end.`,
-      purpose: 'ord returns ASCII code for space',
-      expectedContains: '32',
-    },
-    {
-      name: '6.9 write writeln combination',
-      code: `program test;
+    purpose: 'ISO 6.9.3：write 只写字符序列，不写 end-of-line；字符写出默认宽度为分量数（6.9.3.6）',
+    expectedOutput: 'helloworld',
+  },
+  {
+    name: '6.9 write 后接 writeln 终止部分行',
+    code: `program test(output);
 begin
   write('Hello');
   writeln(' World');
   write('Good');
   writeln('bye');
 end.`,
-      purpose: 'write and writeln work together',
-      expectedContains: 'Hello World',
-    },
-    {
-      name: '6.9 file eof detection',
-      code: `program test(f);
-var f: text;
+    purpose: 'ISO 6.9.3/6.9.4：write 累积到部分行，writeln 写出参数后再写 end-of-line',
+    expectedOutput: 'Hello World\nGoodbye\n',
+  },
+  {
+    name: '6.9 writeln 多参数按顺序写出',
+    code: `program test(output);
 begin
-  reset(f);
-  writeln(eof(f));
+  writeln(1, 2, 3);
 end.`,
-      purpose: 'eof works with files (case is implementation-defined per Pascal82)',
-      expectedContains: 'TRUE',
-    },
-    {
-      name: '6.9 real-format-width-precision',
-      code: `program test;
-var r: real;
+    purpose:
+      'ISO 6.9.3：write(f,p1,...,pn) 等价于依次 write(f,p1); write(f,p2,...)；integer 默认宽度为实现相关（E.10）',
+    expectedOutput: '123\n',
+  },
+  {
+    name: '6.9 write 写出 integer',
+    code: `program test(output);
 begin
-  r := 3.14159;
-  writeln(r:20);
-  writeln(r:10);
-  writeln(r);
+  write(123);
 end.`,
-      purpose: 'real 格式化：不同宽度',
-      expectedContains: '3.14159',
-    },
-    {
-      name: '6.9 real-format-integer-value',
-      code: `program test;
-var r: real;
+    purpose: 'ISO 6.9.3.3：写出 e 的十进制表示，不追加 end-of-line',
+    expectedOutput: '123',
+  },
+  {
+    name: '6.9 writeln 写出字符字符串',
+    code: `program test(output);
 begin
-  r := 5.0;
-  writeln(r);
+  writeln('hello world');
 end.`,
-      purpose: '整数值的real格式化（科学计数法）',
-      expectedContains: 'E+000',
-    },
-    {
-      name: '6.9 integer-format-width',
-      code: `program test;
+    purpose: 'ISO 6.9.3.6：string-type 默认 TotalWidth = 分量数 n，写出全部 n 个字符',
+    expectedOutput: 'hello world\n',
+  },
+
+  // ---------- 6.9.3.1 write-parameter 的三种形式 ----------
+  {
+    name: '6.9.3.1 write 的 e:TotalWidth 与 e:TotalWidth:FracDigits 形式',
+    code: `program test(output);
+begin
+  write(42:4);
+  writeln;
+  writeln(3.5:6:1);
+end.`,
+    purpose: 'ISO 6.9.3.1/6.9.3.3/6.9.3.4.2：42:4 因 4 ≥ IntDigits+1 写出 1 空格+符号空格+42；3.5:6:1 定点写出',
+    expectedOutput: '  42\n   3.5\n',
+  },
+
+  // ---------- 6.9.3.2 char-type ----------
+  {
+    name: '6.9.3.2 char 字段宽度补前导空格',
+    code: `program test(output);
+var c: char;
+begin
+  c := 'A';
+  write(c:5);
+  writeln;
+end.`,
+    purpose: 'ISO 6.9.3.2：char 的表示为 (TotalWidth-1) 个空格后接该字符，故 c:5 写出 4 空格 + A',
+    expectedOutput: '    A\n',
+  },
+  {
+    name: '6.9.3.2 char 默认宽度为 1',
+    code: `program test(output);
+var c: char;
+begin
+  c := 'A';
+  writeln(c);
+  writeln(c:1);
+end.`,
+    purpose: 'ISO 6.9.3.2：char 的默认 TotalWidth 为 1，故 c 与 c:1 均只写 1 个字符、无前导空格',
+    expectedOutput: 'A\nA\n',
+  },
+
+  // ---------- 6.9.3.3 integer-type ----------
+  {
+    name: '6.9.3.3 integer 宽度足够补空格、宽度不足写全部字符',
+    code: `program test(output);
 var i: integer;
 begin
   i := 42;
@@ -431,118 +144,309 @@ begin
   write(i:1);
   writeln;
 end.`,
-      purpose: 'integer 格式化宽度',
-      expectedContains: '    42 4242',
-    },
-    {
-      name: '6.9 boolean-format',
-      code: `program test;
-var b: boolean;
+    purpose:
+      'ISO 6.9.3.3：42:6 → (6-2-1) 空格+符号空格+"42"；42:3 → 恰好容纳故无前导空格；42:1 → 宽度不足时只写符号与数字',
+    expectedOutput: '    42 4242\n',
+  },
+  {
+    name: '6.9.3.3 integer 负数的符号与字段宽度',
+    code: `program test(output);
 begin
-  b := true;
-  writeln(b);
-  b := false;
-  writeln(b);
+  writeln(-42:6);
+  writeln(-42:3);
+  writeln(-42:1);
 end.`,
-      purpose: 'boolean 输出 TRUE/FALSE',
-      expectedContains: 'TRUE\nFALSE',
-    },
-    {
-      name: '6.9 char-format-width',
-      code: `program test;
-var c: char;
+    purpose: 'ISO 6.9.3.3：负数在宽度足够时写 (TotalWidth-IntDigits-1) 空格 + "-"；宽度不足时只写 "-" 与数字',
+    expectedOutput: '   -42\n-42\n-42\n',
+  },
+
+  // ---------- 6.9.3.4 real-type ----------
+  {
+    name: '6.9.3.4.2 real 定点表示 :TotalWidth:FracDigits',
+    code: `program test(output);
+var r: real;
 begin
-  c := 'A';
-  write(c:5);
-  writeln;
+  r := 3.14159;
+  writeln(r:8:2);
 end.`,
-      purpose: 'char 格式化宽度',
-      expectedContains: '    A',
-    },
-    {
-      name: '6.9 readln-mixed-types',
-      code: `program test;
+    purpose: 'ISO 6.9.3.4.2：3.14159 舍入到 2 位小数为 3.14，MinNumChars=4，TotalWidth 8 故补 4 个前导空格',
+    expectedOutput: '    3.14\n',
+  },
+  {
+    name: '6.9.3.4.2 real 定点表示宽度小于 MinNumChars 时不补前导空格',
+    code: `program test(output);
+var r: real;
+begin
+  r := 12.75;
+  writeln(r:2:2);
+end.`,
+    purpose: 'ISO 6.9.3.4.2 NOTE：至少写出 MinNumChars 个字符；TotalWidth 小于该值时不写前导空格，故写出 12.75',
+    expectedOutput: '12.75\n',
+  },
+  {
+    name: '6.9.3.4.2 real 定点表示负数',
+    code: `program test(output);
+var r: real;
+begin
+  r := -3.5;
+  writeln(r:7:1);
+end.`,
+    purpose: 'ISO 6.9.3.4.2：负数且舍入后非零时 MinNumChars 额外 +1 容纳 "-"，故 TotalWidth 7 时补 3 个前导空格',
+    expectedOutput: '   -3.5\n',
+  },
+  {
+    name: '6.9.3.4.2 real 定点表示按 FracDigits 舍入',
+    code: `program test(output);
+var r: real;
+begin
+  r := 2.56;
+  writeln(r:6:1);
+end.`,
+    purpose: 'ISO 6.9.3.4.2：2.56 + 0.5*10^-1 = 2.61 后截断到 1 位小数得 2.6，MinNumChars=3，TotalWidth 6 补 3 个空格',
+    expectedOutput: '   2.6\n',
+  },
+  {
+    name: '6.9.3.4.1 real 单参写出浮点表示',
+    code: `program test(output);
+var r: real;
+begin
+  r := 12.5;
+  writeln(r:20);
+end.`,
+    purpose:
+      'ISO 6.9.3.4.1：Write(f,e:TotalWidth) 写浮点表示，尾数为 1.25…；ExpDigits（E.13）、指数字符 e/E（E.14）均为实现相关，故只断言 ISO 确定的尾数前缀 ".25"',
+    expectedContains: '.25',
+  },
+
+  // ---------- 6.9.3.5 Boolean-type ----------
+  {
+    name: '6.9.3.5 boolean 写出 true 的词形',
+    code: `program test(output);
+begin
+  writeln(true);
+end.`,
+    purpose:
+      'ISO 6.9.3.5：Boolean 写出 true 对应的字符串；每个字母的大小写为实现相关（Annex E.15），故仅断言与大小写无关的 "RUE" 与换行',
+    expectedContains: 'RUE\n',
+  },
+  {
+    name: '6.9.3.5 boolean 写出 false 的词形',
+    code: `program test(output);
+begin
+  writeln(false);
+end.`,
+    purpose:
+      'ISO 6.9.3.5：Boolean 写出 false 对应的字符串；字母大小写实现相关（Annex E.15），故仅断言与大小写无关的 "ALSE" 与换行',
+    expectedContains: 'ALSE\n',
+  },
+  {
+    name: '6.9 read 整数后 eoln 为真并写出',
+    code: `program test(input, output);
+var n: integer;
+begin
+  read(n);
+  writeln(eoln);
+end.`,
+    purpose:
+      'ISO 6.9.1c：read(f,v) 读出整数后 f.R 停在行结束符之前，故 eoln 为真；其布尔值按 6.9.3.5 写出（大小写实现相关）',
+    input: '7\n',
+    expectedContains: 'RUE\n',
+  },
+
+  // ---------- 6.9.3.6 string-types ----------
+  {
+    name: '6.9.3.6 string 默认宽度等于分量数',
+    code: `program test(output);
+var s: packed array [1..5] of char;
+begin
+  s := 'abcde';
+  writeln(s);
+  writeln('test');
+end.`,
+    purpose:
+      'ISO 6.9.3.6：string-type 默认 TotalWidth = 分量数 n，写出全部 n 个字符；packed array[1..5] of char 属 string-type（6.4.3.2）',
+    expectedOutput: 'abcde\ntest\n',
+  },
+  {
+    name: '6.9.3.6 string 字段宽度：超出时左补空格、不足时截断',
+    code: `program test(output);
+begin
+  writeln('hello':8);
+  writeln('hello':3);
+end.`,
+    purpose:
+      'ISO 6.9.3.6：TotalWidth > n 时写 (TotalWidth-n) 个空格加全部字符；1 ≤ TotalWidth ≤ n 时只写前 TotalWidth 个字符',
+    expectedOutput: '   hello\nhel\n',
+  },
+
+  // ---------- 6.9.1 read ----------
+  {
+    name: '6.9.1 read char 不跳过前导空格',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITELN(C);END.`,
+    purpose: 'ISO 6.9.1b：read(f,v) 对 char 等价于 v := f↑; get(f)，不跳过空格，故文件首字符为空格时读出空格',
+    textFiles: new Map<string, Uint8Array>([['F', text(' A')]]),
+    expectedOutput: ' \n',
+  },
+  {
+    name: '6.9.1 read char 逐字符读取（含中间空格）',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;A,B,C:CHAR;BEGIN RESET(F);READ(F,A,B,C);WRITELN(A,B,C);END.`,
+    purpose: 'ISO 6.9.1b：read(f,v1,...,vn) 等价于依次 read(f,vi)，char 不跳过任何字符，故逐字读出 "A B"',
+    textFiles: new Map<string, Uint8Array>([['F', text('A B')]]),
+    expectedOutput: 'A B\n',
+  },
+  {
+    name: '6.9.1 read char 读出文件首字符',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITELN(C);END.`,
+    purpose: 'ISO 6.9.1b：read(f,c) 取缓冲区变量当前字符并 get 推进，故读出首字符 A',
+    textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
+    expectedOutput: 'A\n',
+  },
+  {
+    name: '6.9.1 read 整数跳过空格与行结束符',
+    code: `program test(input, output);
+var a, b: integer;
+begin
+  read(a);
+  read(b);
+  writeln(a:1, ' ', b:1);
+end.`,
+    purpose: 'ISO 6.9.1c NOTE 3：r 表示被跳过的空格与 end-of-line；读取整数可跨行，故 "10\\n20" 读出 10 与 20',
+    input: '10\n20',
+    expectedOutput: '10 20\n',
+  },
+  {
+    name: '6.9.1 read 整数从文本文件读出',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;N:INTEGER;BEGIN RESET(F);READ(F,N);WRITELN('N=',N);END.`,
+    purpose: 'ISO 6.9.1c：read(f,v) 跳过前导空格/行结束符后读 signed-integer 并赋予 v',
+    textFiles: new Map<string, Uint8Array>([['F', text('42')]]),
+    expectedOutput: 'N=42\n',
+  },
+  {
+    name: '6.9.1 read 连续读出多个整数',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;A,B:INTEGER;BEGIN RESET(F);READ(F,A,B);WRITELN('A=',A,' B=',B);END.`,
+    purpose: 'ISO 6.9.1a/c：read(f,A,B) 等价于 read(f,A); read(f,B)，空格作为 r 被跳过',
+    textFiles: new Map<string, Uint8Array>([['F', text('10 20')]]),
+    expectedOutput: 'A=10 B=20\n',
+  },
+  {
+    name: '6.9.1 read real 从文本读出',
+    code: `program test(input, output);
+var r: real;
+begin
+  read(r);
+  writeln(r:8:2);
+end.`,
+    purpose: 'ISO 6.9.1d：read(f,v) 对 real 读 signed-number 并赋予 v；用 6.9.3.4.2 定点形式断言读得的值',
+    input: '3.25',
+    expectedOutput: '    3.25\n',
+  },
+  {
+    name: '6.9.1 read 整数遇到空字段为错误',
+    code: `program test(input, output);
 var i: integer;
-    r: real;
-    c: char;
 begin
-  readln(i, r);
+  read(i);
   writeln(i);
-  writeln(r:0:2);
 end.`,
-      purpose: 'readln 读取 integer 和 real 混合',
-      input: '10\n3.14',
-      expectedContains: '10\n3.14',
-    },
-    {
-      name: '6.9 readln-empty-input',
-      code: `program test;
+    purpose: 'ISO 6.9.1c「It shall be an error if s is empty」及 Annex D.54：整数字段为空（输入耗尽）时必须报错',
+    input: '',
+    expectedError: '',
+  },
+  {
+    name: '6.9.1 read 整数遇到非整数字符为错误',
+    code: `program test(input, output);
 var i: integer;
 begin
-  readln(i);
+  read(i);
   writeln(i);
 end.`,
-      purpose: 'readln 空行输入（默认值）',
-      input: '',
-      expectedContains: '0',
-    },
-    {
-      name: '6.9 readln-multiple-lines',
-      code: `program test;
-var a, b, c: integer;
+    purpose: 'ISO 6.9.1c 及 Annex D.54：跳过空格/行结束符后的序列不能构成 signed-integer 时必须报错',
+    input: 'abc',
+    expectedError: '',
+  },
+
+  // ---------- 6.9.2 readln ----------
+  {
+    name: '6.9.2 readln 逐行读取整数',
+    code: `program test(input, output);
+var a, b: integer;
 begin
   readln(a);
   readln(b);
-  readln(c);
-  writeln(a + b + c);
+  writeln(a:1, ' ', b:1);
 end.`,
-      purpose: 'readln 多行输入',
-      input: '10\n20\n30',
-      expectedContains: '60',
-    },
-    {
-      name: '6.9 eof-input-end',
-      code: `program test;
+    purpose: 'ISO 6.9.2：readln(f,v) 等价于 read(f,v); readln(f)，每次读完一行并定位到下一行行首',
+    input: '10\n20',
+    expectedOutput: '10 20\n',
+  },
+  {
+    name: '6.9.2 readln 多值等价 read 后接 readln（跨行 real）',
+    code: `program test(input, output);
 var i: integer;
+    r: real;
 begin
-  while not eof do
-    begin
-      readln(i);
-      writeln(i);
-    end;
-  writeln('EOF reached');
+  readln(i, r);
+  writeln(i:1);
+  writeln(r:8:2);
 end.`,
-      purpose: 'eof 在输入结束时为 true',
-      input: '1\n2\n3',
-      expectedContains: '1\n2\n3\nEOF reached',
-    },
-    {
-      name: '6.9 eoln-before-read',
-      code: `program test(f);
-var f: text;
-    c: char;
+    purpose:
+      'ISO 6.9.2/6.9.1d：readln(f,i,r) 等价于 read(f,i); read(f,r); readln(f)，integer 后的行结束符被 real 读取跳过',
+    input: '10\n3.14',
+    expectedOutput: '10\n    3.14\n',
+  },
+  {
+    name: '6.9.2 readln 无参数跳过当前行',
+    code: `program test(input, output);
+var c: char;
 begin
-  rewrite(f);
-  writeln(f, 'ab');
-  writeln(f, 'cd');
-  reset(f);
-  while not eof(f) do
-    begin
-      while not eoln(f) do
-        begin
-          read(f, c);
-          write(c);
-        end;
-      readln(f);
-      writeln;
-    end;
+  readln;
+  read(c);
+  writeln(c);
 end.`,
-      purpose: '文件 eoln 行末检测',
-      expectedContains: 'ab\ncd',
-    },
-    {
-      name: '6.9 file-write-and-reset(f)',
-      code: `program test(f);
+    purpose: 'ISO 6.9.2：readln(f) 等价于「while not eoln(^) do get(^); get(^)」，把位置放到当前行末之后',
+    input: 'abc\nX',
+    expectedOutput: 'X\n',
+  },
+  {
+    name: '6.9.2 readln(f) 定位到下一行行首',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);READLN(F);CH:=F^;WRITE(CH);WRITELN;END.`,
+    purpose: 'ISO 6.9.2 NOTE 1：readln 把当前文件位置放到当前行末之后，故缓冲区变量为下一行首字符 L',
+    textFiles: new Map<string, Uint8Array>([['F', text('LINE1\nLINE2\n')]]),
+    expectedOutput: 'L\n',
+  },
+
+  // ---------- 6.9.4 writeln / 6.9.3 write 应用于文件 ----------
+  {
+    name: '6.9.4 writeln(f) 写出参数并追加行结束符',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'HELLO');END.`,
+    purpose: 'ISO 6.9.4：writeln(f,p) 等价于 write(f,p); writeln(f)，故文件内容为 HELLO 加 end-of-line',
+    textFiles: new Map<string, Uint8Array>([['F', text('')]]),
+    expectedFileContains: [{ url: 'F', contains: 'HELLO\n' }],
+  },
+  {
+    name: '6.9.3 write(f) 写多个参数',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITE(F,'N=',42);WRITELN(F);END.`,
+    purpose: 'ISO 6.9.3：write(f,p1,p2) 等价于 write(f,p1); write(f,p2)，分别写字符字符串与 integer',
+    textFiles: new Map<string, Uint8Array>([['F', text('')]]),
+    expectedFileContains: [{ url: 'F', contains: 'N=42\n' }],
+  },
+  {
+    name: '6.9.3.3 write 带字段宽度写入文件',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'l.',5:1,')');END.`,
+    purpose: 'ISO 6.9.3.1/6.9.3.3：5:1 因 1 < IntDigits+1 只写数字 5，故文件内容为 "l.5)" 加 end-of-line',
+    textFiles: new Map<string, Uint8Array>([['F', text('')]]),
+    expectedFileContains: [{ url: 'F', contains: 'l.5)\n' }],
+  },
+  {
+    name: '6.9.3 write 应用于 Inspection 模式文本文件为错误',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WRITELN(F,'X');END.`,
+    purpose: 'ISO 6.9.3：write 应用于文本文件时，若 f 未定义或 f.M = Inspection 则为错误；reset 后文件处于 Inspection',
+    textFiles: new Map<string, Uint8Array>([['F', text('')]]),
+    expectedError: 'generation',
+  },
+  {
+    name: '6.9 逐行字符读写往返（read/write 与 eoln/eof 交互）',
+    code: `program test(f);
 var f: text;
     s: char;
 begin
@@ -561,278 +465,42 @@ begin
       writeln;
     end;
 end.`,
-      purpose: '写入文件后 reset 再读取',
-      expectedContains: 'Hello\nWorld',
-    },
-    {
-      name: '6.9 file-write-integer-and-read',
-      code: `program test(f);
-var f: text;
-    i, j: integer;
-    s: char;
-begin
-  rewrite(f);
-  writeln(f, '42 99');
-  reset(f);
-  while not eof(f) do
-    begin
-      while not eoln(f) do
-        begin
-          read(f, s);
-          write(s);
-        end;
-      readln(f);
-      writeln;
-    end;
-end.`,
-      purpose: '写入整数到文件再逐字符读取',
-      expectedContains: '42 99',
-    },
-    {
-      name: '6.9 REWRITE + WRITELN 写入单行',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'HELLO');END.`,
-      purpose: 'REWRITE + WRITELN 写入到内存文件，无 ASSIGN/CLOSE',
-      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
-      expectedFileContains: [{ url: 'F', contains: 'HELLO' }],
-    },
-    {
-      name: '6.9 REWRITE + WRITE 多个参数',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITE(F,'N=',42);WRITELN(F);END.`,
-      purpose: 'WRITE 多参数写入文件，最后 WRITELN 换行',
-      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
-      expectedFileContains: [{ url: 'F', contains: 'N=42' }],
-    },
-    {
-      name: '6.9 WRITELN with width 写入文件',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'l.',5:1,')');END.`,
-      purpose: 'TANGLE 风格：WRITELN(F, "l.", LINE:1, ")")',
-      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
-      expectedFileContains: [{ url: 'F', contains: 'l.5)' }],
-    },
-    {
-      name: '6.9 RESET 空文件 EOF 立即为真',
-      code:
-        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('NOT EMPTY');END.`,
-      purpose: '空文件 RESET 后 EOF 为真',
-      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
-      expectedContains: 'EMPTY',
-    },
-    {
-      name: '6.9 RESET 非空文件 EOF 为假',
-      code:
-        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITELN('EMPTY')ELSE WRITELN('HAS DATA');END.`,
-      purpose: '非空文件 RESET 后 EOF 为假',
-      textFiles: new Map<string, Uint8Array>([['F', text('hello')]]),
-      expectedContains: 'HAS DATA',
-    },
-    {
-      name: '6.9 F^ 读首字符 + GET 推进',
-      code:
-        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);CH:=F^;WRITE(CH);GET(F);CH:=F^;WRITE(CH);WRITELN;END.`,
-      purpose: 'F^ 读缓冲区字符，GET 推进 offset（tangle INPUTLN 风格）',
-      textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
-      expectedContains: 'AB',
-    },
-    {
-      name: '6.9 INPUTLN 风格逐字符循环',
-      code:
-        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);WHILE NOT EOLN(F)DO BEGIN CH:=F^;WRITE(CH);GET(F);END;WRITELN;END.`,
-      purpose: 'WHILE NOT EOLN(F) DO BEGIN CH:=F^;WRITE(CH);GET(F) END',
-      textFiles: new Map<string, Uint8Array>([['F', text('HELLO\n')]]),
-      expectedContains: 'HELLO',
-    },
-    {
-      name: '6.9 EOLN 在行尾返回真',
-      code:
-        `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITELN('AT EOLN');END.`,
-      purpose: 'GET 推进到行尾时 EOLN 返回真',
-      textFiles: new Map<string, Uint8Array>([['F', text('AB\n')]]),
-      expectedContains: 'AT EOLN',
-    },
-    {
-      name: '6.9 READLN 跳过当前行',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);READLN(F);CH:=F^;WRITE(CH);WRITELN;END.`,
-      purpose: 'READLN(F) 跳过当前行，下一行首字符可读',
-      textFiles: new Map<string, Uint8Array>([['F', text('LINE1\nLINE2\n')]]),
-      expectedContains: 'L',
-    },
-    {
-      name: '6.9 READ 从文件读整数',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;N:INTEGER;BEGIN RESET(F);READ(F,N);WRITELN('N=',N);END.`,
-      purpose: 'READ(F, N) 从文本文件读整数',
-      textFiles: new Map<string, Uint8Array>([['F', text('42')]]),
-      expectedContains: 'N=42',
-    },
-    {
-      name: '6.9 READ 多个整数',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;A,B:INTEGER;BEGIN RESET(F);READ(F,A,B);WRITELN('A=',A,' B=',B);END.`,
-      purpose: 'READ(F, A, B) 连续读多个整数',
-      textFiles: new Map<string, Uint8Array>([['F', text('10 20')]]),
-      expectedContains: 'A=10 B=20',
-    },
-    {
-      name: '6.9 文件复制：INFILE → OUTFILE',
-      code:
-        `PROGRAM COPYFILE(OUTPUT,INFILE,OUTFILE);VAR INFILE,OUTFILE:TEXT;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN WHILE NOT EOLN(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;WRITELN(OUTFILE);READLN(INFILE);END;END.`,
-      purpose: '通过 PROGRAM 头声明文件参数，逐字符复制',
-      textFiles: new Map<string, Uint8Array>([
-        ['INFILE', text('LINE1\nLINE2\n')],
-        ['OUTFILE', new Uint8Array(0)],
-      ]),
-      programFileUrls: { INFILE: 'INFILE', OUTFILE: 'OUTFILE' },
-      expectedFileContains: [{ url: 'OUTFILE', contains: 'LINE1' }],
-    },
-    {
-      name: '6.9 文件复制：无 programFileUrls，默认恒等映射（key === value）',
-      code:
-        `PROGRAM COPYFILE(OUTPUT,INFILE,OUTFILE);VAR INFILE,OUTFILE:TEXT;CH:CHAR;BEGIN RESET(INFILE);REWRITE(OUTFILE);WHILE NOT EOF(INFILE)DO BEGIN CH:=INFILE^;WRITE(OUTFILE,CH);GET(INFILE);END;END.`,
-      purpose: '缺省 programFileUrls 时，程序文件参数名即 files 键名',
-      textFiles: new Map<string, Uint8Array>([
-        ['INFILE', text('LINE1\nLINE2\n')],
-        ['OUTFILE', new Uint8Array(0)],
-      ]),
-      expectedFileContains: [{ url: 'OUTFILE', contains: 'LINE1' }],
-    },
-    {
-      name: '6.9 程序参数绑定 + RESET + READ',
-      code: `PROGRAM TEST(OUTPUT,DATA);VAR DATA:TEXT;N:INTEGER;BEGIN RESET(DATA);READ(DATA,N);WRITELN(N*2);END.`,
-      purpose: '通过程序参数绑定文件名，不再使用 ASSIGN',
-      textFiles: new Map<string, Uint8Array>([['DATA', text('21')]]),
-      expectedContains: '42',
-    },
-    {
-      name: '6.9 PUT 调用不报错（文本文件）',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);PUT(F);WRITELN(F,'AFTER PUT');END.`,
-      purpose: 'PUT 在简化实现中是 no‑op，但要能正确执行',
-      textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
-      expectedFileContains: [{ url: 'F', contains: 'AFTER PUT' }],
-    },
-    {
-      name: '6.9 ISSUE-034: READ char 读取首个字符（非空白）',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITELN(C);END.`,
-      purpose: 'READ(F, C) 读 char：文件首字符为 A，应读到 A',
-      textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
-      expectedContains: 'A',
-    },
-    {
-      name: '6.9 ISSUE-034: READ char 不跳过空格（标准行为）',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITELN(ORD(C));END.`,
-      purpose: 'READ(F, C) 读 char：文件首字符为空格(ASCII 32)，标准要求读到空格',
-      textFiles: new Map<string, Uint8Array>([['F', text(' A')]]),
-      expectedContains: '32',
-    },
-    {
-      name: '6.9 ISSUE-034: 连续 READ char 逐字读取',
-      code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;A,B,C:CHAR;BEGIN RESET(F);READ(F,A,B,C);WRITELN(A,B,C);END.`,
-      purpose: 'READ(F, A, B, C) 读三个 char：应逐字读取 "A B"（含中间空格）',
-      textFiles: new Map<string, Uint8Array>([['F', text('A B')]]),
-      expectedContains: 'A B',
-    },
-    {
-      name: '6.9 file of record: 正向 - 写入并读取简单记录',
-      code:
-        `program test(f); type rec = record x: integer; y: integer; end; var f: file of rec; r: rec; begin rewrite(f); r.x := 10; r.y := 20; f^ := r; put(f); reset(f); r := f^; write(r.x, ',', r.y); end.`,
-      purpose: 'ISO 6.4.3.5/6.6.5.2 file of record: 写入记录后重置读取，验证记录字段',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '10,20',
-    },
-    {
-      name: '6.9 file of record: 正向 - 多条记录顺序读取',
-      code:
-        `program test(f); type rec = record x: integer; end; var f: file of rec; r1, r2: rec; begin rewrite(f); r1.x := 1; f^ := r1; put(f); r2.x := 2; f^ := r2; put(f); reset(f); r1 := f^; get(f); r2 := f^; write(r1.x + r2.x); end.`,
-      purpose: 'ISO 6.6.5.2 file of record: 写入两条记录，顺序读取并求和',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '3',
-    },
-    {
-      name: '6.9 file of record: 正向 - 变体 record 字段访问 (int 视图)',
-      code:
-        `program test(f); type mw = record case integer of 1: (int: integer); 2: (b0, b1, b2, b3: 0..255); end; var f: file of mw; w: mw; begin rewrite(f); w.int := 42; f^ := w; put(f); reset(f); w := f^; write(w.int); end.`,
-      purpose: 'ISO 6.4.2.3 变体 record: 通过 int 字段访问，模拟 TeX memory_word',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '42',
-    },
-    {
-      name: '6.9 file of record: 正向 - 变体 record 字段访问 (字节视图)',
-      code:
-        `program test(f); type mw = record case integer of 1: (int: integer); 2: (b0, b1, b2, b3: 0..255); end; var f: file of mw; w: mw; begin rewrite(f); w.b0 := 1; w.b1 := 2; w.b2 := 3; w.b3 := 4; f^ := w; put(f); reset(f); w := f^; write(w.b0, w.b1, w.b2, w.b3); end.`,
-      purpose: 'ISO 6.4.2.3 变体 record: 通过字节字段访问，模拟 TeX four_quarters',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '1234',
-    },
-    {
-      name: '6.9 file of record: 正向 - 字段级赋值 f^.field := x (TeX dump 模式)',
-      code:
-        `program test(f); type rec = record x: integer; y: integer; end; var f: file of rec; begin rewrite(f); f^.x := 10; f^.y := 20; put(f); reset(f); write(f^.x, ',', f^.y); end.`,
-      purpose: 'ISO 6.6.5.2: f^.field := x 修改缓冲区字段，put 写入。TeX dump_int/dump_hh 即此模式',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '10,20',
-    },
-    {
-      name: '6.9 file of record: 正向 - 多条字段级赋值顺序写入',
-      code:
-        `program test(f); type rec = record x: integer; end; var f: file of rec; begin rewrite(f); f^.x := 1; put(f); f^.x := 2; put(f); f^.x := 3; put(f); reset(f); write(f^.x); get(f); write(f^.x); get(f); write(f^.x); end.`,
-      purpose: 'ISO 6.6.5.2: 多次 f^.field := x; put(f) 顺序写入，get 顺序读取',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '123',
-    },
-    {
-      name: '6.9 file of record: 正向 - 变体 record 字段级赋值 (int 视图，TeX dump_int)',
-      code:
-        `program test(f); type mw = record case integer of 1: (int: integer); 2: (b0, b1, b2, b3: 0..255); end; var f: file of mw; begin rewrite(f); f^.int := 42; put(f); reset(f); write(f^.int); end.`,
-      purpose: 'ISO 6.4.2.3/6.6.5.2: f^.int := x (TeX dump_int 宏模式)',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '42',
-    },
-    {
-      name: '6.9 file of record: 正向 - 变体 record 字段级赋值 (字节视图，TeX dump_qqqq)',
-      code:
-        `program test(f); type mw = record case integer of 1: (int: integer); 2: (b0, b1, b2, b3: 0..255); end; var f: file of mw; begin rewrite(f); f^.b0 := 1; f^.b1 := 2; f^.b2 := 3; f^.b3 := 4; put(f); reset(f); write(f^.b0, f^.b1, f^.b2, f^.b3); end.`,
-      purpose: 'ISO 6.4.2.3/6.6.5.2: f^.b0 := x 等 (TeX dump_qqqq 宏模式)',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '1234',
-    },
-    {
-      name: '6.9 file of record: 正向 - f^ := r 后再改 r，缓冲区不受影响',
-      code:
-        `program test(f); type rec = record x: integer; end; var f: file of rec; a, b: rec; begin rewrite(f); a.x := 1; f^ := a; a.x := 2; b := f^; write(b.x); end.`,
-      purpose: 'ISO 6.6.3.3: f^ := a 是赋值（值语义），之后改 a 不得改变缓冲区 → 期望读到 1',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '1',
-    },
-    {
-      name: '6.9 file of record: 正向 - f^ := mem[k] 后再改 mem[k]，缓冲区不受影响',
-      code:
-        `program test(f); type rec = record x: integer; end; var f: file of rec; mem: array[1..3] of rec; b: rec; begin rewrite(f); mem[2].x := 1; f^ := mem[2]; mem[2].x := 2; b := f^; write(b.x); end.`,
-      purpose: 'ISO 6.6.3.3: TeX dump_wd(mem[k]) 模式，数组元素是共享视图，赋值后改元素不得改变缓冲区 → 期望 1',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '1',
-    },
-    {
-      name: '6.9 file of record: 正向 - 写入后改写源，已写入的记录不受影响',
-      code:
-        `program test(f); type rec = record x: integer; end; var f: file of rec; mem: array[1..3] of rec; b: rec; begin rewrite(f); mem[1].x := 1; f^ := mem[1]; put(f); mem[1].x := 9; mem[2].x := 2; f^ := mem[2]; put(f); reset(f); b := f^; write(b.x); get(f); b := f^; write(b.x); end.`,
-      purpose: 'ISO 6.6.3.3: put 之后改写源内存，已落盘的记录必须保持原值 → 期望 12（TeX 格式转储的核心不变量）',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedContains: '12',
-    },
-    {
-      name: '6.9 file of record: 反面 - reset 后写缓冲区应报错',
-      code:
-        `program test(f); type rec = record x: integer; end; var f: file of rec; r: rec; begin rewrite(f); reset(f); f^ := r; end.`,
-      purpose: 'ISO 6.6.5.2: rewrite 之前（读状态）写缓冲区违反前置条件',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedError: 'pre-assertion',
-    },
-    {
-      name: '6.9 file of record: 反面 - reset 后 put 应报错',
-      code:
-        `program test(f); type rec = record x: integer; end; var f: file of rec; begin rewrite(f); reset(f); put(f); end.`,
-      purpose: 'ISO 6.6.5.2: rewrite 之前（读状态）调用 put 违反前置条件',
-      recordFiles: new Map([['f', new MemoryRecordFile()]]),
-      expectedError: 'pre-assertion',
-    },
-  ]
+    purpose:
+      'ISO 6.9.1b/6.9.2/6.9.4：逐字符 read(f,s)+write(s) 复制，eoln 控制行内循环、eof 控制行循环，readln 换行后 writeln 输出 end-of-line',
+    expectedOutput: 'Hello\nWorld\n',
+  },
 
-  runPascalTests(tests)
-})
+  // ---------- 6.9.5 page ----------
+  {
+    name: '6.9.5 page 在行末未写 end-of-line 时隐式 writeln',
+    code: `program test(output);
+begin
+  write('abc');
+  page;
+  writeln('X');
+end.`,
+    purpose:
+      'ISO 6.9.5：若 f.L 非空且 f.L.last 不是 end-of-line，page(f) 须隐式执行 writeln(f)，故其后应出现 abc 与行结束符',
+    expectedContains: 'abc\n',
+  },
+  {
+    name: '6.9.5 page 应用于生成模式文本文件',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'first');PAGE(F);WRITELN(F,'second');END.`,
+    purpose: 'ISO 6.9.5：page(f) 的换页效果实现相关（E.16），但不得破坏已写内容与后续写出，故两行文本均应保留',
+    textFiles: new Map<string, Uint8Array>([['F', text('')]]),
+    expectedFileContains: [{ url: 'F', contains: 'first' }, { url: 'F', contains: 'second' }],
+  },
+
+  // ---------- 6.9.3.1 字段宽度参数的下界 ----------
+  {
+    name: '6.9.3.1 TotalWidth 小于 1 为错误',
+    code: `program test(output);
+begin
+  writeln(42:0);
+end.`,
+    purpose: 'ISO 6.9.3.1 及 Annex D.58：TotalWidth 与 FracDigits 均须 ≥1，任一小于 1 即为错误',
+    expectedError: '',
+  },
+]
+
+runPascalTests('ISO 7185 6.9 - Input and output', tests)
