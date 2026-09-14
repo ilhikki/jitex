@@ -24,11 +24,13 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.i32Mod]: (_ctx, a, b) => {
       const m = b as number
-      if (m === 0) {
-        throw new Error('JS VM: division by zero')
+      // ISO 7185 6.7.2.2: i mod j 在 j 为 0 或负数时为 error
+      if (m <= 0) {
+        throw new Error(`JS VM: i mod j requires j > 0 (ISO 7185 6.7.2.2), got ${m}`)
       }
       const l = a as number
-      return (l - Math.trunc(l / m) * m) | 0
+      // ISO 7185 6.7.2.2: i mod j = i - k*j，其中 k 使 0 <= i mod j < j（floor 语义）
+      return (l - Math.floor(l / m) * m) | 0
     },
     [rtKeys.i32Neg]: (_ctx, a) => -(a as number) | 0,
     [rtKeys.i32And]: (_ctx, a, b) => ((a as number) & (b as number)) | 0,
