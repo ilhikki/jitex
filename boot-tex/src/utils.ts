@@ -114,6 +114,16 @@ export class ConsoleFile implements TextFile {
     const items = bytesToString(data)
     this.output.push(items)
   }
+
+  /** 当前行是否已有内容且以非 end-of-line 字符结尾（ISO 6.9.5 page 的隐式 writeln 判定） */
+  currentLineHasContent(): boolean {
+    const last = this.output[this.output.length - 1]
+    if (last === undefined || last.length === 0) {
+      return false
+    }
+    const ch = last[last.length - 1]
+    return ch !== '\n' && ch !== '\r'
+  }
 }
 
 export function getTripChFile() {
