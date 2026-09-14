@@ -10,7 +10,7 @@
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
 import type { SyscallHandler } from '../runtime-type.ts'
-import { formatField, formatReal } from '../runtime-util.ts'
+import { bytesToString, formatField, formatReal } from '../runtime-util.ts'
 
 function dataView(b: Uint8Array): DataView {
   return new DataView(b.buffer, b.byteOffset, b.byteLength)
@@ -32,6 +32,23 @@ export function convertSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.boolToStr]: (_ctx, b, w) => pad(b ? 'TRUE' : 'FALSE', w),
     [rtKeys.i32ToChar]: (_ctx, n, w) => pad(String.fromCharCode(n as number), w),
+    /**
+     * ISO 6.9.3.6：string-type 值的字段宽度。
+     * TotalWidth > n 时先写 (TotalWidth - n) 个空格再写全部字符；
+     * 1 <= TotalWidth <= n 时只写前 TotalWidth 个字符；
+     * TotalWidth < 1 为 error（ISO 6.9.3.1 / D.58）。
+     */
+    [rtKeys.bytesToStrField]: (_ctx, bytes, w) => {
+      const text = bytesToString(bytes as Uint8Array)
+      const width = w as number
+      if (width < 1) {
+        throw new Error(`write field width shall be >= 1 (ISO 7185 6.9.3.1), got ${width}`)
+      }
+      if (width > text.length) {
+        return ' '.repeat(width - text.length) + text
+      }
+      return text.slice(0, width)
+    },
 
     // ---------- 值 → 字节 ----------
     [rtKeys.i32ToBytes]: (_ctx, n) => {

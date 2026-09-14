@@ -381,8 +381,16 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const tt = parseType(targetType)
       // 字符串（char 数组）零转换，直接写字节；
       // 字节文件（file of byte）的值本身就是字节，同样零转换
-      if (isCharArray(vt) || isByteFile(tt)) {
+      if (isByteFile(tt)) {
         return sc(rtKeys.fileWrite, [target, value])
+      }
+      if (isCharArray(vt)) {
+        // ISO 6.9.3.6：string 值带字段宽度时须左补空格或截断（与 integer 等类型不同，
+        // 后者的字段宽度只保证最小宽度、不截断）
+        if (isNullLit(width)) {
+          return sc(rtKeys.fileWrite, [target, value])
+        }
+        return sc(rtKeys.fileWrite, [target, sc(rtKeys.bytesToStrField, [value, width])])
       }
       const binary = isBinaryFile(tt)
       const key = toConvertKey(vt, binary)

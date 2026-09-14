@@ -99,6 +99,7 @@ export const rtKeys = {
   i32ToStr: 'runtime.convert.i32.To.str',
   i32ToBytes: 'runtime.convert.i32.To.bytes',
   i32ToChar: 'runtime.convert.i32.To.char',
+  bytesToStrField: 'runtime.convert.bytes.To.str.field',
   f64ToStr: 'runtime.convert.f64.To.str',
   f64ToBytes: 'runtime.convert.f64.To.bytes',
   boolToStr: 'runtime.convert.bool.To.str',
