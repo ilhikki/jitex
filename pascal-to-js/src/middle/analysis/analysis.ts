@@ -17,6 +17,7 @@ import { AnalysisContext, DeclarationResult, StatementResult } from './stage-typ
 import { runDeclarationPass } from './passes/declaration-pass.ts'
 import { runStatementPass } from './passes/statement-pass.ts'
 import { runCheckPass } from './passes/check-pass.ts'
+import { runTypeCheckPass } from './passes/type-check-pass.ts'
 
 export function analyzeProgram(
   program: ProgramNode,
@@ -28,6 +29,7 @@ export function analyzeProgram(
   const declResult = runDeclarationPass(program, ctx)
   const stmtResult = runStatementPass(program, ctx, declResult)
   runCheckPass(declResult, stmtResult)
+  runTypeCheckPass(program, declResult)
   return buildAnalysis(declResult, stmtResult, ctx)
 }
 
