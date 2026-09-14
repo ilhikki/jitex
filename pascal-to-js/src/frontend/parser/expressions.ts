@@ -17,9 +17,7 @@ import {
   UnaryExpressionNode,
 } from '@/frontend/node.ts'
 
-// ============================================================================
 // Expression Parsers
-// ============================================================================
 
 // parseIdentifier: IDENTIFIER
 export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode> {

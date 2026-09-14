@@ -56,9 +56,7 @@ import type {
   WithStatementNode,
 } from '../node.ts'
 
-// ============================================================================
 // 公开 API
-// ============================================================================
 
 /** AST 节点转 Pascal 源代码（幂等） */
 export function nodeToCode(node: AstNode): string {
@@ -66,9 +64,7 @@ export function nodeToCode(node: AstNode): string {
   return printNode(node, ctx)
 }
 
-// ============================================================================
 // 内部实现
-// ============================================================================
 
 interface PrintContext {
   indent: number
@@ -179,9 +175,7 @@ function printNode(node: AstNode, ctx: PrintContext): string {
   }
 }
 
-// ============================================================================
 // 表达式
-// ============================================================================
 
 /** 字符串字面量加引号，内部单引号转义为双单引号 */
 function quoteString(raw: string): string {
@@ -255,9 +249,7 @@ function printIn(node: InExpressionNode, ctx: PrintContext): string {
   return `${left} IN ${right}`
 }
 
-// ============================================================================
 // 语句
-// ============================================================================
 
 function printProgram(node: ProgramNode, ctx: PrintContext): string {
   const params = node.parameters.length > 0 ? `(${node.parameters.map((p) => p.name).join(', ')})` : ''
@@ -417,9 +409,7 @@ function printProcedureCall(node: ProcedureCallNode): string {
   return `${node.name.name}${args}`
 }
 
-// ============================================================================
 // 声明
-// ============================================================================
 
 function printLabelDecl(node: { labels: IntegerLiteralNode[] }): string {
   return node.labels.map((l) => l.raw).join(', ')
@@ -484,9 +474,7 @@ function printParamDecl(node: ParameterDeclarationNode, ctx: PrintContext): stri
   return node.isVar ? `var ${names}: ${type}` : `${names}: ${type}`
 }
 
-// ============================================================================
 // 类型
-// ============================================================================
 
 function printType(type: TypeNode, ctx: PrintContext): string {
   return printNode(type, ctx)

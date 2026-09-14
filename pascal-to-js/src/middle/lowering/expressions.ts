@@ -35,9 +35,7 @@ import {
 } from './helpers.ts'
 import { typeDescLiteral } from './type.ts'
 
-// ============================================================
 // loweringExpr → Expr
-// ============================================================
 
 export function loweringExpr(node: ExpressionNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
   switch (node.kind) {
@@ -411,9 +409,7 @@ function loweringInExpression(
   ])
 }
 
-// ============================================================
 // 符号解析（含 with 重写）
-// ============================================================
 
 export function resolveSymbol(node: IdentifierNode, a: Analysis, _ws: WithBinding[]): AnalysisSymbol | undefined {
   return a.symbolOf(node)

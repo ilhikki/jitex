@@ -16,7 +16,6 @@ import {
   FieldAccessNode,
   ForStatementNode,
   GotoStatementNode,
-  IdentifierNode,
   IfStatementNode,
   LabeledStatementNode,
   ProcedureCallNode,
@@ -45,9 +44,7 @@ import { defaultExpr, typeDescLiteral } from './type.ts'
 import { loweringCallableArgument, loweringExpr, resolveSymbol } from './expressions.ts'
 import { loweringReadln, loweringWriteln } from './io.ts'
 
-// ============================================================
 // loweringStmt → Statement[]
-// ============================================================
 
 export function loweringStmt(
   node: StatementNode,
@@ -465,9 +462,7 @@ function loweringWith(
   return out
 }
 
-// ============================================================
 // ProcedureCall 编译
-// ============================================================
 
 function loweringProcedureCall(
   node: ProcedureCallNode,

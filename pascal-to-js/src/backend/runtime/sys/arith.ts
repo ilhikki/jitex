@@ -11,7 +11,6 @@ import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 export function arithSyscalls(): Record<string, SyscallHandler> {
   return {
-    // ---------- i32 ----------
     [rtKeys.i32Add]: (_ctx, a, b) => ((a as number) + (b as number)) | 0,
     [rtKeys.i32Sub]: (_ctx, a, b) => ((a as number) - (b as number)) | 0,
     [rtKeys.i32Mul]: (_ctx, a, b) => ((a as number) * (b as number)) | 0,
@@ -39,7 +38,6 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.i32Abs]: (_ctx, a) => Math.abs(a as number) | 0,
     [rtKeys.i32Odd]: (_ctx, a) => (((a as number) % 2) !== 0 ? 1 : 0),
 
-    // ---------- f32 ----------
     [rtKeys.f32Add]: (_ctx, a, b) => Math.fround((a as number) + (b as number)),
     [rtKeys.f32Sub]: (_ctx, a, b) => Math.fround((a as number) - (b as number)),
     [rtKeys.f32Mul]: (_ctx, a, b) => Math.fround((a as number) * (b as number)),
@@ -67,13 +65,11 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.f32Arctan]: (_ctx, a) => Math.atan(a as number),
 
-    // ---------- bool（统一 0/1 语义）----------
     // and / or 用 && / ||：对 0/1 输入结果仍是 0/1，且保短路
     [rtKeys.boolAnd]: (_ctx, a, b) => (a as number) && (b as number),
     [rtKeys.boolOr]: (_ctx, a, b) => (a as number) || (b as number),
     [rtKeys.boolNot]: (_ctx, a) => ((a as number) ? 0 : 1),
 
-    // ---------- cmp（统一 0/1）----------
     [rtKeys.cmpEq]: (_ctx, a, b) => (a === b ? 1 : 0),
     [rtKeys.cmpNe]: (_ctx, a, b) => (a !== b ? 1 : 0),
     [rtKeys.cmpLt]: (_ctx, a, b) => ((a as number) < (b as number) ? 1 : 0),
@@ -81,7 +77,6 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.cmpGt]: (_ctx, a, b) => ((a as number) > (b as number) ? 1 : 0),
     [rtKeys.cmpGe]: (_ctx, a, b) => ((a as number) >= (b as number) ? 1 : 0),
 
-    // ---------- cast ----------
     [rtKeys.castF32ToI32]: (_ctx, a) => Math.trunc(a as number),
     // ISO 7185 6.6.6.3: round(x) = trunc(x+0.5) if x>=0, trunc(x-0.5) if x<0
     // （JS Math.round 对 -3.5 返回 -3，不符合 ISO 的 -4）
@@ -93,7 +88,6 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.castBoolToI32]: (_ctx, a) => (a ? 1 : 0),
     [rtKeys.castI32ToChar]: (_ctx, a) => String.fromCharCode(a as number),
 
-    // ---------- ptr ----------
     // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
     [rtKeys.ptrDeref]: (_ctx, p) => {
       if (p === undefined) {

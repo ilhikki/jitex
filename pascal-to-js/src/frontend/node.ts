@@ -9,8 +9,6 @@ export interface AstNode {
   loc: SourceLocation
 }
 
-// --- Literals ---
-
 export interface IdentifierNode extends AstNode {
   kind: 'Identifier'
   name: string
@@ -45,8 +43,6 @@ export interface BooleanLiteralNode extends AstNode {
   value: boolean
 }
 
-// --- Program & Block ---
-
 export interface ProgramNode extends AstNode {
   kind: 'Program'
   name: IdentifierNode
@@ -64,8 +60,6 @@ export interface BlockNode extends AstNode {
   functionDeclarations: FunctionDeclarationNode[]
   compound: CompoundStatementNode
 }
-
-// --- Declarations ---
 
 export interface LabelDeclarationNode extends AstNode {
   kind: 'LabelDeclaration'
@@ -128,8 +122,6 @@ export interface CallableParameterSpec {
   /** 仅 function：结果类型 */
   returnType?: TypeNode
 }
-
-// --- Types ---
 
 export type TypeNode =
   | SimpleTypeNode
@@ -201,8 +193,6 @@ export interface PointerTypeNode extends AstNode {
   kind: 'PointerType'
   domainType: TypeNode
 }
-
-// --- Statements ---
 
 export type StatementNode =
   | CompoundStatementNode
@@ -296,8 +286,6 @@ export interface ProcedureCallNode extends AstNode {
   name: IdentifierNode
   arguments: ExpressionNode[]
 }
-
-// --- Expressions ---
 
 export type ExpressionNode =
   | IdentifierNode

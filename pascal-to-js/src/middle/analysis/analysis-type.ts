@@ -13,9 +13,7 @@ import {
   WithStatementNode,
 } from '@/frontend/node.ts'
 
-// ============================================================
 // 类型系统
-// ============================================================
 
 export type TypeTag =
   | 'i32'
@@ -72,9 +70,7 @@ export interface VariantBranchInfo {
   nested?: VariantPartInfo
 }
 
-// ============================================================
 // 符号
-// ============================================================
 
 export interface VarSymbol {
   kind: 'var' | 'param'
@@ -122,9 +118,7 @@ export interface TypeSymbol {
 
 export type AnalysisSymbol = VarSymbol | FuncSymbol | ConstSymbol | TypeSymbol
 
-// ============================================================
 // 函数信息
-// ============================================================
 
 /** 函数/过程/程序的分类，用于决定编译期与运行期的初始化策略 */
 export type FuncKind = 'function' | 'procedure' | 'program'
@@ -140,9 +134,7 @@ export interface FuncInfo {
   kind: FuncKind
 }
 
-// ============================================================
 // 额外 callable 注入
-// ============================================================
 
 /**
  * 额外 callable 注入项（编译期声明，AGENTS.md 原则 A.7：注入优先）。
@@ -157,9 +149,7 @@ export interface ExtraCallable {
   allowOverrideNative?: boolean | undefined
 }
 
-// ============================================================
 // 内置过程/函数名
-// ============================================================
 
 /** 内置过程名（ISO 7185 6.6.5 标准过程 + runtime 扩展） */
 export const BUILTIN_PROCEDURES = new Set([
@@ -202,9 +192,7 @@ export const BUILTIN_FUNCTIONS = new Set([
 /** 内置无参标识符（parser 将无参调用解析为 Identifier） */
 export const BUILTIN_IDENTIFIERS = new Set(['maxint', 'nil', 'eof', 'eoln'])
 
-// ============================================================
 // 简单类型表
-// ============================================================
 
 export const SIMPLE_TYPES: Record<string, TypeInfo> = {
   integer: { tag: 'i32' },
@@ -225,9 +213,7 @@ export const SIMPLE_TYPES: Record<string, TypeInfo> = {
   text: { tag: 'file', elem: { tag: 'char' } },
 }
 
-// ============================================================
 // 公共工具函数
-// ============================================================
 
 /**
  * 编译期常量整数求值（用于 subrange 边界、数组索引、case 标签）。
@@ -338,9 +324,7 @@ export function typeInfoOfLiteralKey(key: string): TypeInfo {
   }
 }
 
-// ============================================================
 // Analysis — 编译阶段可见的只读接口
-// ============================================================
 
 export interface Analysis {
   nextId(): number

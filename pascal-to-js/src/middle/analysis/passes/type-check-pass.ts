@@ -32,9 +32,7 @@ import { isOrdinalType } from '../type-compat.ts'
 /** 内置类型名（ISO 6.4.2.2 的 required simple-types + 实现提供的 text/string 等） */
 const BUILTIN_TYPE_NAMES = new Set(Object.keys(SIMPLE_TYPES))
 
-// ============================================================
 // Pass 4 入口
-// ============================================================
 
 export function runTypeCheckPass(program: ProgramNode, declResult: DeclarationResult): void {
   const pass = new TypeCheckPass(declResult)
@@ -54,9 +52,7 @@ class TypeCheckPass {
     this.checkBlock(program.block, new Set(BUILTIN_TYPE_NAMES))
   }
 
-  // --------------------------------------------------------
   // ISO 6.10：program-parameter-list 的标识符须互不相同
-  // --------------------------------------------------------
 
   private checkProgramParameters(program: ProgramNode): void {
     const seen = new Set<string>()
@@ -71,9 +67,7 @@ class TypeCheckPass {
     }
   }
 
-  // --------------------------------------------------------
   // ISO 6.6.1：forward 声明的标识符须有对应的 procedure-identification
-  // --------------------------------------------------------
 
   private checkForwardResidue(): void {
     const names = [...this.decl.forwardFuncs.keys()].sort()
@@ -84,9 +78,7 @@ class TypeCheckPass {
     }
   }
 
-  // --------------------------------------------------------
   // 逐 block 检查
-  // --------------------------------------------------------
 
   private checkBlock(
     block: BlockNode,
@@ -110,9 +102,7 @@ class TypeCheckPass {
     }
   }
 
-  // --------------------------------------------------------
   // ISO 6.2.2.7：同一 region 内不得出现同拼写的定义
-  // --------------------------------------------------------
 
   /**
    * ISO 6.2.2.7：同一 region 内不得有两个同拼写的定义点（不区分声明种类）。
@@ -178,9 +168,7 @@ class TypeCheckPass {
     }
   }
 
-  // --------------------------------------------------------
   // ISO 6.2.2.9 定义点先于应用 + 6.4.3.4 set-type 的 base-type
-  // --------------------------------------------------------
 
   /** 返回本 block 结束后（含外层）可见的类型名集合 */
   private checkTypeDefinitions(block: BlockNode, outerTypes: Set<string>): Set<string> {
@@ -267,9 +255,7 @@ class TypeCheckPass {
     }
   }
 
-  // --------------------------------------------------------
   // ISO 6.6.2：function-block 须含对函数标识符的赋值语句
-  // --------------------------------------------------------
 
   private checkFunctionAssignment(decl: FunctionDeclarationNode): void {
     const block = decl.block

@@ -1,6 +1,4 @@
-// ============================================================
 // RuntimeContext
-// ============================================================
 
 /** 类型描述符（compiler.ts serializeTypeInfo 生成的序列化 TypeInfo，runtime 消费） */
 export interface TypeDescriptor {
@@ -33,9 +31,7 @@ export interface VariantBranchDescriptor {
   nested?: VariantPartDescriptor
 }
 
-// ============================================================
 // Handler 接口（预编译的类型行为，与值分离）
-// ============================================================
 
 /**
  * Record 行为 handler。
@@ -75,9 +71,7 @@ export interface TypeHandler {
   copy?(value: unknown): unknown
 }
 
-// ============================================================
 // 读取状态（维护当前行 tokens）
-// ============================================================
 
 export interface ReadState {
   tokens: string[]

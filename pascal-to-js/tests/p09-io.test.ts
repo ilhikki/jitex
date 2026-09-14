@@ -32,7 +32,6 @@ function text(s: string): Uint8Array {
 }
 
 const tests: PascalTest[] = [
-  // ---------- write / writeln 基本形式（6.9.3 / 6.9.4） ----------
   {
     name: '6.9 writeln 无参数写出行结束符',
     code: `program test(output);
@@ -93,7 +92,6 @@ end.`,
     expectedOutput: 'hello world\n',
   },
 
-  // ---------- 6.9.3.1 write-parameter 的三种形式 ----------
   {
     name: '6.9.3.1 write 的 e:TotalWidth 与 e:TotalWidth:FracDigits 形式',
     code: `program test(output);
@@ -106,7 +104,6 @@ end.`,
     expectedOutput: '  42\n   3.5\n',
   },
 
-  // ---------- 6.9.3.2 char-type ----------
   {
     name: '6.9.3.2 char 字段宽度补前导空格',
     code: `program test(output);
@@ -132,7 +129,6 @@ end.`,
     expectedOutput: 'A\nA\n',
   },
 
-  // ---------- 6.9.3.3 integer-type ----------
   {
     name: '6.9.3.3 integer 宽度足够补空格、宽度不足写全部字符',
     code: `program test(output);
@@ -160,7 +156,6 @@ end.`,
     expectedOutput: '   -42\n-42\n-42\n',
   },
 
-  // ---------- 6.9.3.4 real-type ----------
   {
     name: '6.9.3.4.2 real 定点表示 :TotalWidth:FracDigits',
     code: `program test(output);
@@ -218,7 +213,6 @@ end.`,
     expectedContains: '.25',
   },
 
-  // ---------- 6.9.3.5 Boolean-type ----------
   {
     name: '6.9.3.5 boolean 写出 true 的词形',
     code: `program test(output);
@@ -253,7 +247,6 @@ end.`,
     expectedContains: 'RUE\n',
   },
 
-  // ---------- 6.9.3.6 string-types ----------
   {
     name: '6.9.3.6 string 默认宽度等于分量数',
     code: `program test(output);
@@ -279,7 +272,6 @@ end.`,
     expectedOutput: '   hello\nhel\n',
   },
 
-  // ---------- 6.9.1 read ----------
   {
     name: '6.9.1 read char 不跳过前导空格',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITELN(C);END.`,
@@ -367,7 +359,6 @@ end.`,
     expectedError: '',
   },
 
-  // ---------- 6.9.2 readln ----------
   {
     name: '6.9.2 readln 逐行读取整数',
     code: `program test(input, output);
@@ -417,7 +408,6 @@ end.`,
     expectedOutput: 'L\n',
   },
 
-  // ---------- 6.9.4 writeln / 6.9.3 write 应用于文件 ----------
   {
     name: '6.9.4 writeln(f) 写出参数并追加行结束符',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'HELLO');END.`,
@@ -472,7 +462,6 @@ end.`,
     expectedOutput: 'Hello\nWorld\n',
   },
 
-  // ---------- 6.9.5 page ----------
   {
     name: '6.9.5 page 在行末未写 end-of-line 时隐式 writeln',
     code: `program test(output);
@@ -493,7 +482,6 @@ end.`,
     expectedFileContains: [{ url: 'F', contains: 'first' }, { url: 'F', contains: 'second' }],
   },
 
-  // ---------- 6.9.3.1 字段宽度参数的下界 ----------
   {
     name: '6.9.3.1 TotalWidth 小于 1 为错误',
     code: `program test(output);

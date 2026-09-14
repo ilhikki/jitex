@@ -25,9 +25,7 @@ import {
 import { rtKeys } from './runtime-keys.ts'
 import type { SyscallRewriteTable } from './rewrite.ts'
 
-// ============================================================
 // 工具
-// ============================================================
 
 function sc(key: string, args: JsonCode.Expr[]): JsonCode.Syscall {
   return { kind: 'syscall', key, args }
@@ -85,9 +83,7 @@ function isByteFile(fileType: TypeDescriptor | undefined): boolean {
   return fileType?.tag === 'file' && isByteScalar(fileType.elem)
 }
 
-// ============================================================
 // 阶段1：算术 / 逻辑 / 比较 / 转换
-// ============================================================
 
 function binary(i32Key: string, f32Key: string, setKey?: string) {
   return (sys: JsonCode.Syscall): JsonCode.Expr => {
@@ -173,9 +169,7 @@ function ordRewrite(sys: JsonCode.Syscall): JsonCode.Expr {
   return sys.args[0]
 }
 
-// ============================================================
 // 阶段2/3：内存 / 文件 / IO
-// ============================================================
 
 /** 数组元素的字节偏移表达式：Σ (idx_i - low_i) × stride_i */
 function offsetExpr(indices: JsonCode.Expr[], lows: number[], strides: number[]): JsonCode.Expr {
@@ -267,13 +261,10 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
   }
 }
 
-// ============================================================
 // 表
-// ============================================================
 
 export function buildPascalRewriteTable(): SyscallRewriteTable {
   return {
-    // ---------- 阶段1：二元算术 / 集合 ----------
     'lowering.add': binary(rtKeys.i32Add, rtKeys.f32Add, rtKeys.setUnion),
     'lowering.sub': binary(rtKeys.i32Sub, rtKeys.f32Sub, rtKeys.setDiff),
     'lowering.mul': binary(rtKeys.i32Mul, rtKeys.f32Mul, rtKeys.setIntersect),
@@ -281,16 +272,13 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.intDiv': binaryFixed(rtKeys.i32Div),
     'lowering.mod': binaryFixed(rtKeys.i32Mod),
 
-    // ---------- 阶段1：逻辑 / 位运算 ----------
     'lowering.and': logical(rtKeys.i32And, rtKeys.boolAnd),
     'lowering.or': logical(rtKeys.i32Or, rtKeys.boolOr),
 
-    // ---------- 阶段1：一元 ----------
     'lowering.neg': unaryFloatOrI32(rtKeys.f32Neg, rtKeys.i32Neg),
     'lowering.not': unaryI32OrOther(rtKeys.i32Not, rtKeys.boolNot),
     'lowering.abs': unaryFloatOrI32(rtKeys.f32Abs, rtKeys.i32Abs),
 
-    // ---------- 阶段1：数学函数 ----------
     'lowering.sqr': (sys) => {
       const t = parseType(sys.args[1])
       const x = sys.args[0]
@@ -304,7 +292,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.arctan': unary(rtKeys.f32Arctan),
     'lowering.odd': unary(rtKeys.i32Odd),
 
-    // ---------- 阶段1：转换 ----------
     'lowering.trunc': unary(rtKeys.castF32ToI32),
     'lowering.round': unary(rtKeys.castF32ToI32Round),
     'lowering.ord': ordRewrite,
@@ -312,7 +299,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.pred': predSucc(false),
     'lowering.succ': predSucc(true),
 
-    // ---------- 阶段1：比较 ----------
     'lowering.eq': compare(rtKeys.setEq, rtKeys.cmpEq),
     'lowering.ne': compare(rtKeys.setNe, rtKeys.cmpNe),
     'lowering.lt': compare(undefined, rtKeys.cmpLt),
@@ -320,7 +306,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.gt': compare(undefined, rtKeys.cmpGt),
     'lowering.ge': compare(rtKeys.setGe, rtKeys.cmpGe),
 
-    // ---------- 阶段1：in / 指针 ----------
     'lowering.in': (sys) => {
       const st = parseType(sys.args[3])
       return sc(rtKeys.setIn, [sys.args[0], sys.args[2], litInt(setSize(st!))])
@@ -329,7 +314,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.ptr.assign': (sys) => sc(rtKeys.ptrAssign, sys.args),
     'lowering.ptr.dispose.check': (sys) => sc(rtKeys.ptrDisposeCheck, sys.args),
 
-    // ---------- 阶段2/3：内存 ----------
     'lowering.mem.default': (sys) => {
       const td = parseType(sys.args[0])
       if (!td) {
@@ -349,7 +333,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       return sc(rtKeys.memCopy, [sys.args[0], sys.args[1], sys.args[2], litInt(sizeOf(td!))])
     },
 
-    // ---------- 阶段2/3：set ----------
     'lowering.set.empty': (sys) => {
       const td = parseType(sys.args[0])
       return sc(rtKeys.memNew, [litInt(setSize(td!))])
@@ -372,7 +355,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       return elems.reduce((a, b) => sc(rtKeys.setUnion, [a, b, size]))
     },
 
-    // ---------- 阶段2/3：文件 ----------
     'lowering.file.create': (sys) => sc(rtKeys.fileCreate, [sys.args[0]]),
     'lowering.file.reset': (sys) => sc(rtKeys.fileReset, [sys.args[0], ...sys.args.slice(2)]),
     'lowering.file.rewrite': (sys) => sc(rtKeys.fileRewrite, [sys.args[0], ...sys.args.slice(2)]),
@@ -390,7 +372,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.file.eoln': (sys) => sc(rtKeys.fileEoln, [sys.args[0]]),
     'lowering.program.fileUrl': (sys) => sc(rtKeys.programFileUrl, [sys.args[0], sys.args[1]]),
 
-    // ---------- 阶段2/3：IO ----------
     'lowering.io.write': (sys) => {
       const [target, targetType, value, valueType, width, prec] = sys.args
       const vt = parseType(valueType)
@@ -441,7 +422,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.io.eof': () => sc(rtKeys.fileEof, [litNullLiteral()]),
     'lowering.io.eoln': () => sc(rtKeys.fileEoln, [litNullLiteral()]),
 
-    // ---------- 阶段2/3：数组 / 记录 ----------
     // ISO 6.6.5.4：pack(a, i, z) / unpack(z, a, i) 按元素字节连续搬移
     'lowering.pack': (sys) => {
       const [src, start, dst, srcType, dstType] = sys.args
@@ -499,7 +479,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       return sc(rtKeys.memClone, [sys.args[0], litInt(sizeOf(td!))])
     },
 
-    // ---------- 阶段2/3：cell / 检查 ----------
     'lowering.cell.create': (sys) => sc(rtKeys.cellNew, [sys.args[0]]),
     'lowering.cell.get': (sys) => sc(rtKeys.cellGet, [sys.args[0]]),
     'lowering.cell.set': (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),

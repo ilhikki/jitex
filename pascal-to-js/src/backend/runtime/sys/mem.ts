@@ -143,7 +143,6 @@ function withBit(bits: number[], size: number): Uint8Array {
 
 export function memSyscalls(): Record<string, SyscallHandler> {
   return {
-    // ---------- 分配 / 拷贝 / 视图 ----------
     [rtKeys.memNew]: (_ctx, size) => new Uint8Array(size as number),
     [rtKeys.memClone]: (_ctx, src, size) => (src as Uint8Array).slice(0, size as number),
     [rtKeys.memCopy]: (_ctx, dst, dstOff, src, size) => {
@@ -158,14 +157,12 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return v.subarray(off, off + (size as number))
     },
 
-    // ---------- 标量读写（codec 即类型）----------
     [rtKeys.numGet]: (_ctx, view, offset, codec) => getNum(view as Uint8Array, offset as number, codec as Codec),
     [rtKeys.numSet]: (_ctx, view, offset, codec, v) => {
       setNum(view as Uint8Array, offset as number, codec as Codec, v as number)
       return undefined
     },
 
-    // ---------- cell（var 参数传递）----------
     [rtKeys.cellNew]: (_ctx, v): PascalCell => ({ kind: 'cell', value: v }),
     [rtKeys.cellGet]: (_ctx, c) => (c as PascalCell).value,
     [rtKeys.cellSet]: (_ctx, c, v) => {
@@ -173,7 +170,6 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- object 数组（元素是 object，如 file；统一用视图 {base, offset} 承载）----------
     // 所有 object 数组，无论是否部分下标，都表示为视图；arrGet/arrSet/arrSublist 无需分支
     [rtKeys.arrNew]: (_ctx, count, elemType): ObjArrView => {
       const n = count as number
@@ -198,7 +194,6 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return { base: v.base, offset: v.offset + (offset as number) }
     },
 
-    // ---------- pack / unpack（ISO 6.6.5.4）：按元素字节连续搬移 ----------
     [rtKeys.packArray]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
       const s = src as Uint8Array
       const d = dst as Uint8Array
@@ -216,7 +211,6 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- 对象表示的值（含 file / pointer 字段，见 isObjectRepr）----------
     [rtKeys.objNew]: (_ctx, td) => defaultValueOf(td as TypeDescriptor),
     [rtKeys.recGetField]: (_ctx, obj, name) => (obj as Record<string, unknown>)[name as string],
     [rtKeys.recSetField]: (_ctx, obj, name, v) => {

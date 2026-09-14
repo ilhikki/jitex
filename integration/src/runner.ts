@@ -49,9 +49,7 @@ export interface RunReport {
   runLogs: string[]
 }
 
-// ------------------------------------------------------------
 // runId 生成
-// ------------------------------------------------------------
 
 function defaultRunId(): string {
   const now = new Date()
@@ -73,7 +71,6 @@ function artifactRecord(a: { name: string; bytes: Uint8Array }) {
   return { name: a.name, size: a.bytes.length, lines }
 }
 
-// ------------------------------------------------------------
 // 拓扑排序（Kahn）
 //
 // universe = 全 suite 的 stages（用于 dep 归属校验）
@@ -81,7 +78,6 @@ function artifactRecord(a: { name: string; bytes: Uint8Array }) {
 //
 // 如果 active 中某 stage 的 dep 不在 active 但在 universe 中 → 允许（该 dep 将通过"预恢复"从缓存拿结果）
 // 如果 active 中某 stage 的 dep 也不在 universe → 抛错（不属于这个 suite，非法）
-// ------------------------------------------------------------
 
 function topoSort(
   active: Stage<unknown>[],
@@ -202,9 +198,7 @@ async function preRecoverFilteredDeps(
   }
 }
 
-// ------------------------------------------------------------
 // run 主流程
-// ------------------------------------------------------------
 
 export async function run(suite: Suite, options: RunOptions = {}): Promise<RunReport> {
   const startedAt = Date.now()

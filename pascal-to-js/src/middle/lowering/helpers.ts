@@ -11,9 +11,7 @@
 import * as JsonCode from '@/middle/ir/json-code.ts'
 import { TypeInfo } from '@/middle/analysis/analysis-type.ts'
 
-// ============================================================
 // With 绑定上下文
-// ============================================================
 
 export interface WithBinding {
   tempVarId: number
@@ -22,9 +20,7 @@ export interface WithBinding {
   fields: Map<string, TypeInfo>
 }
 
-// ============================================================
 // 辅助构造函数
-// ============================================================
 
 export function ref(varId: number): JsonCode.Ref {
   return { kind: 'ref', varId }
@@ -104,27 +100,21 @@ export function returnStmt(value?: JsonCode.Expr): JsonCode.Return {
   return { kind: 'return', value }
 }
 
-// ============================================================
 // syscall key 常量表
-// ============================================================
 
 export const syscallKeys = {
-  // ---------- 调试 / 检查 ----------
   hookFunctionEnter: 'lowering.hook.function.enter', // [id, name]
   stepsCheck: 'lowering.steps.check', // []
   rangeCheck: 'lowering.range.check', // [v, lo, hi]
 
-  // ---------- 内存 ----------
   memDefault: 'lowering.mem.default', // [typeDesc]
   memCopy: 'lowering.mem.copy', // [dst, dstOffset, src, typeDesc]
 
-  // ---------- set ----------
   setEmpty: 'lowering.set.empty', // [typeDesc]
   setRange: 'lowering.set.range', // [lo, hi, typeDesc]
   setElem: 'lowering.set.elem', // [v, typeDesc]
   setLiteral: 'lowering.set.literal', // [...elems, typeDesc]
 
-  // ---------- 文件 ----------
   fileCreate: 'lowering.file.create', // [typeDesc]
   fileReset: 'lowering.file.reset', // [f, typeDesc, ...src]
   fileRewrite: 'lowering.file.rewrite', // [f, typeDesc, ...src]
@@ -135,7 +125,6 @@ export const syscallKeys = {
   fileEoln: 'lowering.file.eoln', // [f]
   programFileUrl: 'lowering.program.fileUrl', // [f, name, typeDesc]
 
-  // ---------- io ----------
   ioWrite: 'lowering.io.write', // [target, targetType, value, valueType, width, prec]
   ioWriteln: 'lowering.io.writeln', // [target, targetType]
   ioRead: 'lowering.io.read', // [target, targetType, valueType]
@@ -144,7 +133,6 @@ export const syscallKeys = {
   ioEof: 'lowering.io.eof', // []
   ioEoln: 'lowering.io.eoln', // []
 
-  // ---------- 记录 / 数组 / cell ----------
   recAccess: 'lowering.rec.access', // [rec, name, typeDesc]
   recAssign: 'lowering.rec.assign', // [rec, name, value, typeDesc]
   recCopy: 'lowering.rec.copy', // [rec, typeDesc]
@@ -154,9 +142,7 @@ export const syscallKeys = {
   cellGet: 'lowering.cell.get', // [cell]
   cellSet: 'lowering.cell.set', // [cell, value]
 
-  // ============================================================
   // 阶段1：算术 / 逻辑 / 比较 / 转换（泛型，rewrite 消费 type 分发）
-  // ============================================================
 
   // 二元运算，args = [left, leftType, right, rightType]
   add: 'lowering.add',

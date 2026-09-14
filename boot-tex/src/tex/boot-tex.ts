@@ -4,9 +4,7 @@ import { runTangleJs, runTanglePascal, transformTangle, validRunTangleResult } f
 import { bytesToString, ConsoleFile, getTripChFile, readFile, readTextFile } from '../utils.ts'
 import { texExtraSyscalls, transformTex } from './build-tex.ts'
 
-// ------------------------------------------------------------
 // 辅助函数：运行 trip tex（pass1 / pass2 共享）
-// ------------------------------------------------------------
 
 interface RunTripTexArgs {
   tripJs: string
@@ -58,9 +56,7 @@ function readBytesFromState(
   return (value as MemoryTextFile).getData()
 }
 
-// ------------------------------------------------------------
 // suite
-// ------------------------------------------------------------
 
 /**
  * 构建 boot tex 流水线。
@@ -70,7 +66,6 @@ function readBytesFromState(
  */
 export function createBootTexSuite(): Suite {
   return suite('boot tex', () => {
-    // ---- 阶段 A：构建 TeX（trip 版本）----
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
       const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
@@ -102,8 +97,6 @@ export function createBootTexSuite(): Suite {
       return { texTripJs }
     }))
 
-    // ---- 阶段 B：准备测试资源 ----
-
     const tripSourcesStage = cache(stage('load trip sources', [], async () => {
       const tripTex = await readFile('./resources/kunth/tex/trip.tex')
       const tripTfm = await readFile('./resources/kunth/tex/trip.tfm')
@@ -117,8 +110,6 @@ export function createBootTexSuite(): Suite {
       attachText('tripin.log', tripinLog)
       return { tripTex, tripTfm, tripinLog, tripLog, tripDvi, triposTex, tripFot }
     }))
-
-    // ---- 阶段 C：pass 1 — INITEX dump ----
 
     const pass1RunStage = stage(
       'trip pass 1: run initex',
@@ -181,8 +172,6 @@ export function createBootTexSuite(): Suite {
       )
       assertEquals(tripLog, tripinLog, 'output should equal tripin.log')
     })
-
-    // ---- 阶段 D：pass 2 — load fmt + run ----
 
     const pass2RunStage = stage('trip pass 2: run with fmt', [
       tripTexJsStage,

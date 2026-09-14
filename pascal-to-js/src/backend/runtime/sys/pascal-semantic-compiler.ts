@@ -33,7 +33,6 @@ export function basicSyscall(): Record<string, SyscallHandler> {
   }
 
   return {
-    // ---------- set（运算类：阶段1 起由 rewrite 产 runtime.set.*）----------
     [rtKeys.setUnion]: (_ctx, v1, v2): PascalSet => {
       return newPascalSet(new Set<number>([...unboxPascalSet(v1), ...unboxPascalSet(v2)]))
     },
@@ -56,9 +55,7 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     [rtKeys.setIn]: (_ctx, value, set) => (unboxPascalSet(set)).has(value as number),
 
     'runtime.steps.check': stepsCheck,
-    // ---------- hook（调试钩子，no-op）----------
     'runtime.hook.function.enter': () => undefined,
-    // ---------- range.check（subrange 运行时边界检查）----------
     'range.check': rangeCheck,
     [rtKeys.rangeCheck]: rangeCheck,
   }
@@ -82,7 +79,6 @@ type InlineGen = (args: string[]) => string | undefined
 const SIMPLE_EXPR_RE = /^(?:[A-Za-z_$][\w$]*|-?\d+|"[^"]*")$/
 
 const inlineSyscalls: Record<string, InlineGen> = {
-  // ---------- i32 算术 / 位运算 ----------
   [rtKeys.i32Add]: (a) => `((${a[0]} + ${a[1]}) | 0)`,
   [rtKeys.i32Sub]: (a) => `((${a[0]} - ${a[1]}) | 0)`,
   [rtKeys.i32Mul]: (a) => `((${a[0]} * ${a[1]}) | 0)`,
@@ -95,7 +91,6 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.i32Abs]: (a) => `(Math.abs(${a[0]}) | 0)`,
   [rtKeys.i32Odd]: (a) => `(((${a[0]}) % 2) !== 0 ? 1 : 0)`,
 
-  // ---------- f32 ----------
   [rtKeys.f32Add]: (a) => `(Math.fround(${a[0]} + ${a[1]}))`,
   [rtKeys.f32Sub]: (a) => `(Math.fround(${a[0]} - ${a[1]}))`,
   [rtKeys.f32Mul]: (a) => `(Math.fround(${a[0]} * ${a[1]}))`,
@@ -107,10 +102,8 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.f32Exp]: (a) => `(Math.exp(${a[0]}))`,
   [rtKeys.f32Arctan]: (a) => `(Math.atan(${a[0]}))`,
 
-  // ---------- bool ----------
   [rtKeys.boolNot]: (a) => `((${a[0]}) ? 0 : 1)`,
 
-  // ---------- cmp（统一 0/1）----------
   [rtKeys.cmpEq]: (a) => `((${a[0]} === ${a[1]}) ? 1 : 0)`,
   [rtKeys.cmpNe]: (a) => `((${a[0]} !== ${a[1]}) ? 1 : 0)`,
   [rtKeys.cmpLt]: (a) => `(((${a[0]}) < (${a[1]})) ? 1 : 0)`,
@@ -118,14 +111,12 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.cmpGt]: (a) => `(((${a[0]}) > (${a[1]})) ? 1 : 0)`,
   [rtKeys.cmpGe]: (a) => `(((${a[0]}) >= (${a[1]})) ? 1 : 0)`,
 
-  // ---------- cast ----------
   // 注：cast.f32.to.i32.round / cast.char.to.i32 的参数在 handler 里被多次使用，
   // 内联会造成实参重复求值（与 dispatcher 语义不一致），暂不内联。
   [rtKeys.castF32ToI32]: (a) => `(Math.trunc(${a[0]}))`,
   [rtKeys.castBoolToI32]: (a) => `((${a[0]}) ? 1 : 0)`,
   [rtKeys.castI32ToChar]: (a) => `(String.fromCharCode(${a[0]}))`,
 
-  // ---------- 内存原语 ----------
   // mem.new / mem.clone / mem.copy：每个实参只出现一次
   [rtKeys.memNew]: (a) => `(new Uint8Array(${a[0]}))`,
   [rtKeys.memClone]: (a) => `(${a[0]}.slice(0, ${a[1]}))`,
@@ -140,21 +131,17 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // 注：num.get / num.set 刻意不内联——mem.ts 的 handler 已按 ArrayBuffer 缓存
   // DataView，内联版每次读写都要 new DataView，反而更慢。
 
-  // ---------- cell ----------
   [rtKeys.cellNew]: (a) => `({ kind: 'cell', value: ${a[0]} })`,
   [rtKeys.cellGet]: (a) => `(${a[0]}.value)`,
   // cell.set 的 handler 返回 undefined，用 void 保持返回值语义
   [rtKeys.cellSet]: (a) => `(void (${a[0]}.value = ${a[1]}))`,
 
-  // ---------- object 数组（统一视图表示 {base, offset}）----------
   // arrGet / arrSet / arrSublist 都是类型无知的原子操作：统一走 base[offset+idx]，
   // 无需在运行时区分「完整数组」与「子数组视图」。
   [rtKeys.arrGet]: (a) => `(${a[0]}.base[${a[0]}.offset + ${a[1]}])`,
   [rtKeys.arrSet]: (a) => `(void (${a[0]}.base[${a[0]}.offset + ${a[1]}] = ${a[2]}))`,
-  [rtKeys.arrSublist]: (a) =>
-    `({base: ${a[0]}.base, offset: (${a[0]}.offset + ${a[1]}) | 0})`,
+  [rtKeys.arrSublist]: (a) => `({base: ${a[0]}.base, offset: (${a[0]}.offset + ${a[1]}) | 0})`,
 
-  // ---------- 可调用形参：间接调用（ISO 6.6.3.4/6.6.3.5）----------
   // callee 是函数值；每个实参只出现一次，语义与 dispatcher 一致
   [rtKeys.callIndirect]: (a) => `(${a[0]})(${a.slice(1).join(', ')})`,
 }

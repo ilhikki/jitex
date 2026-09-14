@@ -12,9 +12,8 @@
 import { type PascalTest, runPascalTests } from './harness.ts'
 
 const tests: PascalTest[] = [
-  // ==========================================================================
   // 解析边界测试
-  // ==========================================================================
+
   {
     name: '空 begin end 程序',
     code: `program test;
@@ -78,9 +77,7 @@ end.`,
     expectedOutput: '-123\n',
   },
 
-  // ------------------------------
   // 运算符优先级测试
-  // ------------------------------
   {
     name: '乘法优先级高于加法',
     code: 'program test(output);\nvar\n  a, b, c: integer;\nbegin\n  a := 2 + 3 * 4;\n  writeln(a);\nend.',
@@ -109,9 +106,7 @@ end.`,
     expectedOutput: 'T\n',
   },
 
-  // ------------------------------
   // 作用域测试
-  // ------------------------------
   {
     name: '全局变量在主程序体可见',
     code: 'program test(output);\nvar\n  x, y: integer;\nbegin\n  x := 1;\n  y := x + 2;\n  writeln(y);\nend.',
@@ -153,9 +148,7 @@ end.`,
     expectedOutput: '1\n',
   },
 
-  // ------------------------------
   // 过程和函数测试
-  // ------------------------------
   {
     name: '无参过程声明与调用',
     code: "program test(output);\nprocedure Hello;\nbegin\n  writeln('hello');\nend;\nbegin\n  Hello;\nend.",
@@ -212,9 +205,7 @@ end.`,
     expectedOutput: '42\n',
   },
 
-  // ------------------------------
   // 递归测试
-  // ------------------------------
   {
     name: '简单递归过程',
     code:
@@ -237,9 +228,7 @@ end.`,
     expectedOutput: 'A\n',
   },
 
-  // ------------------------------
   // 类型测试
-  // ------------------------------
   {
     name: '枚举类型',
     code:
@@ -269,9 +258,7 @@ end.`,
     expectedOutput: '50\n',
   },
 
-  // ------------------------------
   // 控制流测试
-  // ------------------------------
   {
     name: 'CASE 仅有 OTHERWISE 分支',
     code:
@@ -294,15 +281,11 @@ end.`,
     expectedOutput: '1\n',
   },
 
-  // ==========================================================================
   // Knuth TeX/TANGLE Pascal 风格特性
   // 这些代码风格模仿 tangle-official.pas（紧凑、大写关键字、OTHERS: 等）；
   // 其中 FILE OF CHAR 上的文本过程、OTHERS: 分支、PAGE 效果等为本实现扩展/实现相关行为。
-  // ==========================================================================
 
-  // ------------------------------
   // FILE OF CHAR 类型（Knuth 用 TEXTFILE = PACKED FILE OF CHAR）
-  // ------------------------------
   {
     name: 'FILE OF CHAR 变量可执行文本写操作',
     code: `PROGRAM TANGLE(F);
@@ -355,9 +338,8 @@ END.`,
     ],
   },
 
-  // ==========================================================================
   // OTHERS: case 分支（UCSD Pascal 风格，UCSD/Turbo 扩展，Knuth 在 TANGLE 中使用）
-  // ==========================================================================
+
   {
     name: 'OTHERS: 作为 case 默认分支',
     code: `PROGRAM TANGLE(output);
@@ -420,9 +402,8 @@ END.`,
     expectedOutput: 'other\nafter case\n',
   },
 
-  // ==========================================================================
   // PAGE 系统过程（ISO 7185 6.9.5 定义其为 implementation-defined 效果）
-  // ==========================================================================
+
   {
     name: 'PAGE 输出换页符',
     code: `PROGRAM TANGLE(output);
@@ -449,9 +430,8 @@ END.`,
     expectedFileContains: [{ url: 'F', contains: 'before\n\fafter\n' }],
   },
 
-  // ==========================================================================
   // 综合测试：模仿 TANGLE 中的代码片段
-  // ==========================================================================
+
   {
     name: 'TANGLE 风格字符转义 case',
     code: `PROGRAM TANGLE(output);

@@ -34,9 +34,7 @@ import {
 import { AnalysisContext, DeclarationResult, GotoRecord, ScopeSnapshot, StatementResult } from '../stage-types.ts'
 import { isAssignCompatible, isSameType } from '../type-compat.ts'
 
-// ============================================================
 // Pass 2 入口
-// ============================================================
 
 export function runStatementPass(
   program: ProgramNode,
@@ -48,9 +46,7 @@ export function runStatementPass(
   return pass.result()
 }
 
-// ============================================================
 // StatementPass
-// ============================================================
 
 class StatementPass {
   private ctx: AnalysisContext
@@ -119,9 +115,7 @@ class StatementPass {
     }
   }
 
-  // --------------------------------------------------------
   // 作用域重建（只读 lookup，不 bind）
-  // --------------------------------------------------------
 
   private pushScope(block: BlockNode): void {
     const scope = this.decl.blockScopes.get(block)
@@ -156,9 +150,7 @@ class StatementPass {
     return s.funcId
   }
 
-  // --------------------------------------------------------
   // Block 语句遍历（递归进入子函数）
-  // --------------------------------------------------------
 
   private analyzeBlockStatements(block: BlockNode): void {
     this.pushScope(block)
@@ -176,9 +168,7 @@ class StatementPass {
     this.popScope()
   }
 
-  // --------------------------------------------------------
   // 语句分析
-  // --------------------------------------------------------
 
   private analyzeStatement(node: StatementNode): void {
     switch (node.kind) {
@@ -366,9 +356,7 @@ class StatementPass {
     }
   }
 
-  // --------------------------------------------------------
   // 表达式分析
-  // --------------------------------------------------------
 
   private analyzeExpr(node: ExpressionNode): TypeInfo {
     const cached = this.exprType.get(node)
@@ -693,10 +681,8 @@ class StatementPass {
     return { tag: 'unknown' }
   }
 
-  // --------------------------------------------------------
   // ISO 7185 检查：6.4.6 赋值兼容、6.8.3.4 条件类型、6.8.3.5 case 常量互异、
   // 6.6.3.3 变量参数、6.7.3 实参个数
-  // --------------------------------------------------------
 
   /** ISO 6.8.2.2 + 6.4.6：值须与变量类型赋值兼容 */
   private checkAssignmentCompatibility(
@@ -810,9 +796,7 @@ class StatementPass {
     return typeNode?.kind === 'ArrayType' && typeNode.isPacked
   }
 
-  // --------------------------------------------------------
   // 辅助
-  // --------------------------------------------------------
 
   /**
    * ISO 7185 6.6.3.4/6.6.3.5：校验可调用形参对应的实参——

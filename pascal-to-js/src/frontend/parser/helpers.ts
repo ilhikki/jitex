@@ -39,8 +39,6 @@ export function loc<T extends AstNode>(
   return { ...node, loc: { start: startPos, end: endPos } }
 }
 
-// --- Success / Failure constructors ---
-
 export function ok<T>(newPosition: number, astNode: T): ParseResult<T> {
   return { success: true, newPosition, astNode }
 }
@@ -48,8 +46,6 @@ export function ok<T>(newPosition: number, astNode: T): ParseResult<T> {
 export function fail<T>(error: string, position: number): ParseResult<T> {
   return { success: false, error, position }
 }
-
-// --- Token consumers ---
 
 export function expectType(input: ParserInput, type: string): ParseResult<Token> {
   const token = peek(input)
@@ -72,8 +68,6 @@ export function expectKeyword(input: ParserInput, kw: string): ParseResult<Token
   }
   return ok(input.position + 1, token)
 }
-
-// --- List parsers ---
 
 export function parseList<T>(
   input: ParserInput,

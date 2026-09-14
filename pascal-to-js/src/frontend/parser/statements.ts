@@ -23,9 +23,7 @@ import {
 } from '@/frontend/node.ts'
 import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
-// ============================================================================
 // Statement Parsers
-// ============================================================================
 
 // parseStatement — dispatches based on lookahead
 export function parseStatement(input: ParserInput): ParseResult<StatementNode> {

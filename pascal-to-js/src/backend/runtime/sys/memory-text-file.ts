@@ -46,7 +46,6 @@ export class MemoryTextFile implements TextFile {
     this.buffer = newBuffer
   }
 
-  // ---- 位置 ----
   seek(pos: number): void {
     if (pos < 0) {
       throw new Error('seek position must be >= 0')
@@ -54,7 +53,6 @@ export class MemoryTextFile implements TextFile {
     this.pos = pos
   }
 
-  // ---- 读取 ----
   peekByte(): number | undefined {
     if (this.pos >= this.length) {
       return undefined
@@ -69,7 +67,6 @@ export class MemoryTextFile implements TextFile {
     this.pos++
   }
 
-  // ---- 写入 ----
   writeByte(byte: number): void {
     if (this.mode !== 'generation') {
       throw new Error('writeByte requires generation mode')
@@ -95,14 +92,12 @@ export class MemoryTextFile implements TextFile {
     this.pos += data.length
   }
 
-  // ---- 内容 ----
   clear(): void {
     this.buffer = new Uint8Array(0)
     this.length = 0
     this.pos = 0
   }
 
-  // ---- 模式 ----
   setMode(mode: 'inspection' | 'generation'): void {
     this.mode = mode
   }
@@ -111,7 +106,6 @@ export class MemoryTextFile implements TextFile {
     return this.mode
   }
 
-  // ---- 查询 ----
   hasMore(): boolean {
     return this.pos < this.length
   }

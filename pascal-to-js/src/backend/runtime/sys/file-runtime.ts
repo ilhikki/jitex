@@ -93,9 +93,7 @@ export class ByteRecordFile implements RecStore {
   }
 }
 
-// ============================================================
 // 辅助
-// ============================================================
 
 function isRec(f: PascalFile): boolean {
   return f.type?.elem?.tag === 'rec'
@@ -253,11 +251,8 @@ function skipLine(store: TextFile): void {
   }
 }
 
-// ============================================================
-
 export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
   return {
-    // ---------- reset / rewrite ----------
     // 第二参数（非 ISO 的 `reset(f, name)` 形式）用于按名字绑定/新建文件存储
     [rtKeys.fileReset]: (ctx, f, fileName) => {
       const p = f as PascalFile
@@ -286,7 +281,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- 推进 / 查看当前元素 ----------
     [rtKeys.fileGet]: (_ctx, f) => {
       const p = f as PascalFile
       if (isRec(p)) {
@@ -342,7 +336,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return b
     },
 
-    // ---------- 写一个元素 ----------
     // unit 存在 → `f^ := x`（设缓冲区）；unit 缺失 → `put(f)`（把缓冲区写入文件）
     [rtKeys.filePut]: (_ctx, f, unit) => {
       const p = f as PascalFile
@@ -378,7 +371,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- 读取（语义级：读 + 推进）----------
     [rtKeys.fileReadChar]: (ctx, f) => {
       if (f === undefined) {
         return readCharUnit(defaultStore(ctx, false))
@@ -407,7 +399,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return readTokenUnit(textStore(p))
     },
 
-    // ---------- 写（语义级：写 + 推进）----------
     [rtKeys.fileWrite]: (ctx, f, unit) => {
       if (f === undefined) {
         writeText(defaultStore(ctx, true), unit)
@@ -430,7 +421,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- 行 / 页 ----------
     [rtKeys.fileWriteln]: (ctx, f) => {
       const store = pick(ctx, f, true)
       store.writeByte(10)
@@ -451,7 +441,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- 状态查询 ----------
     [rtKeys.fileEof]: (ctx, f) => {
       if (f === undefined) {
         return defaultStore(ctx, false).hasMore() ? 0 : 1
@@ -471,7 +460,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return b === 10 || b === 13 ? 1 : 0
     },
 
-    // ---------- 构造 / 绑定 ----------
     [rtKeys.fileCreate]: (_ctx, type) => ({ kind: 'file', value: undefined, type } as PascalFile),
     [rtKeys.programFileUrl]: (ctx, f, name) => {
       const p = f as PascalFile
@@ -488,8 +476,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
   }
 }
-
-// ============================================================
 
 /** 文本写入：string → UTF-8 字节；Uint8Array → 原样 */
 function writeText(store: TextFile, unit: unknown): void {

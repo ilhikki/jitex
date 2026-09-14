@@ -15,17 +15,13 @@ import { assignStmt, evalStmt, litField, ref, returnStmt, syscall, syscallKeys }
 import { defaultExpr, typeDescLiteral } from './type.ts'
 import { loweringStmt } from './statements.ts'
 
-// ============================================================
 // 入口：loweringProgram
-// ============================================================
 
 export function loweringProgram(program: ProgramNode, a: Analysis): JsonCode.Function {
   return loweringBlock(program.block, a, program.parameters)
 }
 
-// ============================================================
 // loweringBlock → JsonCode.Function
-// ============================================================
 
 function loweringBlock(
   block: BlockNode,

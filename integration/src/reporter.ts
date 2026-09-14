@@ -38,9 +38,7 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-// ------------------------------------------------------------
 // run 目录写盘
-// ------------------------------------------------------------
 
 export interface WriteReportResult {
   runDir: string
@@ -110,9 +108,7 @@ function sanitizeFilename(name: string): string {
   return base
 }
 
-// ------------------------------------------------------------
 // HTML：run 详情页（对齐样例结构：h1 / env / files / stages）
-// ------------------------------------------------------------
 
 async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
   const status = r.success ? 'SUCCESS' : 'FAIL'
@@ -183,9 +179,7 @@ async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
   await Deno.writeFile(`${runDir}/index.html`, enc.encode(html))
 }
 
-// ------------------------------------------------------------
 // HTML：顶层 run 列表（扫描 reportDir 下所有 runId）
-// ------------------------------------------------------------
 
 async function writeTopLevelIndex(reportDir: string): Promise<void> {
   // 读取所有 runId（子目录，忽略 .cache）

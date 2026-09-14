@@ -18,9 +18,7 @@ import {
   VariableDeclarationNode,
 } from '@jitex/pascal-to-js'
 
-// ============================================================================
 // Declaration Parsers
-// ============================================================================
 
 // LABEL label {, label} ;
 export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDeclarationNode> {
@@ -551,9 +549,7 @@ export function parseFunctionDeclaration(
   )
 }
 
-// ============================================================================
 // Block & Program Parsers
-// ============================================================================
 
 export function parseBlock(input: ParserInput, outerLabels?: Set<number>): ParseResult<BlockNode> {
   const startToken = peek(input)

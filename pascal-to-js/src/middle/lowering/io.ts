@@ -15,9 +15,7 @@ import { assignStmt, evalStmt, litNull, ref, syscall, syscallKeys, WithBinding }
 import { typeDescLiteral } from './type.ts'
 import { loweringExpr, resolveSymbol } from './expressions.ts'
 
-// ============================================================
 // 写目标的解析：首参数为文件时作为 target，否则默认 input/output
-// ============================================================
 
 function resolveTarget(
   args: ExpressionNode[],
@@ -54,9 +52,7 @@ function splitWriteArg(arg: ExpressionNode): {
   return { valueNode: arg }
 }
 
-// ============================================================
 // writeln / write
-// ============================================================
 
 export function loweringWriteln(
   args: ExpressionNode[],
@@ -90,9 +86,7 @@ export function loweringWriteln(
   return out
 }
 
-// ============================================================
 // readln / read
-// ============================================================
 
 export function loweringReadln(
   args: ExpressionNode[],

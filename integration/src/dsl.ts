@@ -9,9 +9,7 @@
 import { requireRunContext, requireStageContext } from './context.ts'
 import type { Artifact, AssertionRecord } from './context.ts'
 
-// ------------------------------------------------------------
 // 类型定义
-// ------------------------------------------------------------
 
 export interface Stage<R> {
   readonly __brand: 'Stage'
@@ -39,9 +37,7 @@ export type UnwrapAll<T extends readonly Stage<unknown>[]> = {
   [K in keyof T]: Unwrap<T[K]>
 }
 
-// ------------------------------------------------------------
 // 声明期全局状态（suite 注册用）
-// ------------------------------------------------------------
 
 let currentDeclSuite: Suite | undefined = undefined
 let nextStageId = 1
@@ -51,9 +47,7 @@ export function _resetDeclState(): void {
   nextStageId = 1
 }
 
-// ------------------------------------------------------------
 // suite
-// ------------------------------------------------------------
 
 export function suite(name: string, fn: () => void): Suite {
   if (currentDeclSuite) {
@@ -76,9 +70,7 @@ export function suite(name: string, fn: () => void): Suite {
   return s
 }
 
-// ------------------------------------------------------------
 // stage
-// ------------------------------------------------------------
 
 export function stage<const T extends readonly Stage<unknown>[], R>(
   name: string,
@@ -102,9 +94,7 @@ export function stage<const T extends readonly Stage<unknown>[], R>(
   return stageObj
 }
 
-// ------------------------------------------------------------
 // cache（显式标记）
-// ------------------------------------------------------------
 
 export function cache<R extends CacheableRecord>(stage: Stage<R>): Stage<R> {
   if (!currentDeclSuite) {
@@ -114,9 +104,7 @@ export function cache<R extends CacheableRecord>(stage: Stage<R>): Stage<R> {
   return stage
 }
 
-// ------------------------------------------------------------
 // before / after
-// ------------------------------------------------------------
 
 export function before(fn: () => void | Promise<void>): void {
   if (!currentDeclSuite) {
@@ -132,9 +120,7 @@ export function after(fn: () => void | Promise<void>): void {
   currentDeclSuite.afterFn = fn
 }
 
-// ------------------------------------------------------------
 // assert 系列
-// ------------------------------------------------------------
 
 export class AssertionError extends Error {
   override name = 'AssertionError'
@@ -160,9 +146,7 @@ export function assertEquals<T>(actual: T, expected: T, message?: string): void 
   }
 }
 
-// ------------------------------------------------------------
 // attach 系列
-// ------------------------------------------------------------
 
 export function attach(name: string, bytes: Uint8Array): void {
   const ctx = requireStageContext()
@@ -179,18 +163,14 @@ export function attachJson(name: string, obj: unknown): void {
   attachText(name, JSON.stringify(obj, undefined, 2))
 }
 
-// ------------------------------------------------------------
 // log
-// ------------------------------------------------------------
 
 export function log(message: string): void {
   const ctx = requireStageContext()
   ctx.addLog(message)
 }
 
-// ------------------------------------------------------------
 // 供 runner 用：确认在 run 内但不在 stage 内（hook 期安全检查）
-// ------------------------------------------------------------
 
 export function _ensureNoActiveStage(): void {
   const run = requireRunContext()

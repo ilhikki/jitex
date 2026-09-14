@@ -10,9 +10,7 @@
 
 import { DeclarationResult, StatementResult } from '../stage-types.ts'
 
-// ============================================================
 // Pass 3 入口
-// ============================================================
 
 export function runCheckPass(
   declResult: DeclarationResult,
@@ -22,9 +20,7 @@ export function runCheckPass(
   checkUndefinedRefs(stmtResult)
 }
 
-// ============================================================
 // goto 规则检查（ISO 7185 6.8.1, 6.8.2.4）
-// ============================================================
 
 function checkGotos(
   decl: DeclarationResult,
@@ -53,9 +49,7 @@ function checkGotos(
   }
 }
 
-// ============================================================
 // 无定义引用检查（ISO 7185: 标识符须先声明后使用）
-// ============================================================
 
 function checkUndefinedRefs(stmt: StatementResult): void {
   if (stmt.undefinedRefs.length === 0) {
@@ -74,9 +68,7 @@ function checkUndefinedRefs(stmt: StatementResult): void {
   throw new Error(`Undefined reference(s):\n${lines.join('\n')}`)
 }
 
-// ============================================================
 // 辅助：沿 parentFuncId 链查找 label
-// ============================================================
 
 function findLabel(
   decl: DeclarationResult,

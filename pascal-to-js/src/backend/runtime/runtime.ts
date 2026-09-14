@@ -49,9 +49,7 @@ export function toRunState(
   }
 }
 
-// ============================================================
 // dispatch — 所有走 dispatcher 的 syscall
-// ============================================================
 
 function getDefaultSyscalls(): Record<string, SyscallHandler> {
   return {

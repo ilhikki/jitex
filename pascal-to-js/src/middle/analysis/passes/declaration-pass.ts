@@ -38,15 +38,11 @@ import {
 } from '../analysis-type.ts'
 import { AnalysisContext, DeclarationResult, ScopeSnapshot } from '../stage-types.ts'
 
-// ============================================================
 // 内部作用域栈
-// ============================================================
 
 interface MutableScope extends ScopeSnapshot {}
 
-// ============================================================
 // Pass 1 入口
-// ============================================================
 
 export function runDeclarationPass(
   program: ProgramNode,
@@ -57,9 +53,7 @@ export function runDeclarationPass(
   return pass.result()
 }
 
-// ============================================================
 // DeclarationPass
-// ============================================================
 
 class DeclarationPass {
   private ctx: AnalysisContext
@@ -108,9 +102,7 @@ class DeclarationPass {
     }
   }
 
-  // --------------------------------------------------------
   // ID 分配
-  // --------------------------------------------------------
 
   private allocId(): number {
     return this.nextId_++
@@ -123,9 +115,7 @@ class DeclarationPass {
     }
   }
 
-  // --------------------------------------------------------
   // 作用域
-  // --------------------------------------------------------
 
   private pushScope(funcId: number, block?: BlockNode): void {
     const scope: MutableScope = {
@@ -168,9 +158,7 @@ class DeclarationPass {
     return undefined
   }
 
-  // --------------------------------------------------------
   // 函数分配
-  // --------------------------------------------------------
 
   private allocFunc(
     block: BlockNode | undefined,
@@ -209,9 +197,7 @@ class DeclarationPass {
     return funcId
   }
 
-  // --------------------------------------------------------
   // Block 分析（声明部分）
-  // --------------------------------------------------------
 
   private analyzeBlock(block: BlockNode, funcId: number): void {
     // LABEL — per-function 作用域：每个函数有自己的 label 表。
@@ -328,9 +314,7 @@ class DeclarationPass {
     return undefined
   }
 
-  // --------------------------------------------------------
   // 类型解析
-  // --------------------------------------------------------
 
   private resolveTypeInfo(node: TypeNode): TypeInfo {
     const cached = this.typeNodeInfo.get(node)
@@ -488,9 +472,7 @@ class DeclarationPass {
     return { tagName, branches }
   }
 
-  // --------------------------------------------------------
   // 函数声明
-  // --------------------------------------------------------
 
   private declareProcName(decl: ProcedureDeclarationNode): void {
     const parentFuncId = this.currentScope().funcId

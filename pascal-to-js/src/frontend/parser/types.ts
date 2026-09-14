@@ -18,9 +18,7 @@ import {
 import { Position } from '@/frontend/token.ts'
 import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
-// ============================================================================
 // Type Parsers
-// ============================================================================
 
 // parseType — dispatches to the correct type parser based on lookahead
 export function parseType(input: ParserInput): ParseResult<TypeNode> {
@@ -510,9 +508,7 @@ function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNo
   )
 }
 
-// ============================================================================
 // Declaration Parsers
-// ============================================================================
 
 // identifier_list : type
 export function parseVariableDeclaration(input: ParserInput): ParseResult<VariableDeclarationNode> {

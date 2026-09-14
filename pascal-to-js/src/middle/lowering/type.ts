@@ -14,9 +14,7 @@ import * as JsonCode from '@/middle/ir/json-code.ts'
 import { TypeInfo, VariantPartInfo } from '@/middle/analysis/analysis-type.ts'
 import { litBool, litChar, litInt, litNull, litReal, syscall, syscallKeys } from './helpers.ts'
 
-// ============================================================
 // 变量默认值
-// ============================================================
 
 export function defaultExpr(ti: TypeInfo): JsonCode.Expr {
   switch (ti.tag) {
@@ -47,9 +45,7 @@ export function defaultExpr(ti: TypeInfo): JsonCode.Expr {
   }
 }
 
-// ============================================================
 // 类型描述符序列化（嵌入 JsonCode literal，由 rewrite 消费）
-// ============================================================
 
 export function typeDescLiteral(ti: TypeInfo): JsonCode.Literal {
   return { kind: 'literal', key: 'type', arg: JSON.stringify(serializeTypeInfo(ti)) }
