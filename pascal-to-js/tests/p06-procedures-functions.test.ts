@@ -598,6 +598,64 @@ const tests: PascalTest[] = [
     expectedError: '',
   },
   {
+    name: '6.6 实参可为 forward 声明的过程',
+    code: `program test(output);
+        procedure apply(procedure p);
+        begin p; end;
+        procedure hello; forward;
+        procedure hello;
+        begin writeln('F'); end;
+        begin apply(hello); end.`,
+    purpose: 'ISO 6.6.3.4 / 6.6.1：forward 与其后续定义构成同一定义点，可作实参',
+    expectedOutput: 'F\n',
+  },
+  {
+    name: '6.6 形参过程可在循环内被反复调用',
+    code: `program test(output);
+        var k: integer;
+        procedure apply(procedure p; n: integer);
+        var j: integer;
+        begin for j := 1 to n do p; end;
+        procedure bump;
+        begin k := k + 1; end;
+        begin k := 0; apply(bump, 3); writeln(k); end.`,
+    purpose: 'ISO 6.6.3.4：形参在块的整个激活期内均可调用',
+    expectedOutput: '3\n',
+  },
+  {
+    name: '6.6 函数形参可在表达式内多次使用',
+    code: `program test(output);
+        function apply(function f: integer): integer;
+        begin apply := f * f; end;
+        function three: integer;
+        begin three := 3; end;
+        begin writeln(apply(three) + apply(three)); end.`,
+    purpose: 'ISO 6.6.3.5：形参函数可作 factor 出现在表达式中',
+    expectedOutput: '18\n',
+  },
+  {
+    name: '6.6 形参标识符遮蔽同名的外层过程',
+    code: `program test(output);
+        procedure p;
+        begin writeln('GLOBAL'); end;
+        procedure apply(procedure p);
+        begin p; end;
+        begin apply(p); end.`,
+    purpose: 'ISO 6.6.3.4 / 6.2.2.5：形参在其块内标识实参过程，实参可为同名外层过程',
+    expectedOutput: 'GLOBAL\n',
+  },
+  {
+    name: '6.6 形参标识符与同 region 的过程名重复应报错',
+    code: `program test(output);
+        procedure apply(procedure p);
+          procedure p;
+          begin end;
+        begin end;
+        begin end.`,
+    purpose: 'ISO 6.2.2.7：形参标识符与同一 region 内的过程标识符不得各有定义点',
+    expectedError: '',
+  },
+  {
     name: '6.6 rewrite(f) 后 f.M 为 Generation，可顺序写入',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'HELLO');END.`,
     purpose: 'ISO 6.6.5.2：rewrite(f) 的后置断言为 f.L=f.R=S()、f.M=Generation、f^ 完全未定义',
