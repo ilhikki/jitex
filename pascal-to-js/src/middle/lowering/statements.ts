@@ -559,6 +559,36 @@ function loweringProcedureCall(
         ),
       ]
     }
+    case 'pack': {
+      // ISO 7185 6.6.5.4: pack(a, i, z) 等价于 z[j] := a[k]（k 自 i 起随 j 递增）
+      const [aArg, iArg, zArg] = node.arguments
+      return [
+        evalStmt(
+          syscall(syscallKeys.pack, [
+            loweringExpr(aArg, a, ws),
+            loweringExpr(iArg, a, ws),
+            loweringExpr(zArg, a, ws),
+            typeDescLiteral(a.typeOf(aArg)),
+            typeDescLiteral(a.typeOf(zArg)),
+          ]),
+        ),
+      ]
+    }
+    case 'unpack': {
+      // ISO 7185 6.6.5.4: unpack(z, a, i) 等价于 a[k] := z[j]（k 自 i 起随 j 递增）
+      const [zArg, aArg, iArg] = node.arguments
+      return [
+        evalStmt(
+          syscall(syscallKeys.unpack, [
+            loweringExpr(zArg, a, ws),
+            loweringExpr(aArg, a, ws),
+            loweringExpr(iArg, a, ws),
+            typeDescLiteral(a.typeOf(zArg)),
+            typeDescLiteral(a.typeOf(aArg)),
+          ]),
+        ),
+      ]
+    }
     case 'new': {
       // ISO 7185 6.6.5.3: new(p) 创建新变量，p 指向它
       const argNode = node.arguments[0]

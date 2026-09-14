@@ -151,6 +151,8 @@ export const BUILTIN_PROCEDURES = new Set([
   'page',
   'new',
   'dispose',
+  'pack',
+  'unpack',
 ])
 
 /** 内置函数名（ISO 7185 6.6.6 标准函数 + runtime 扩展） */

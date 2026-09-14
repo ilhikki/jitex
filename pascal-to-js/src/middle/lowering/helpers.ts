@@ -200,5 +200,8 @@ export const syscallKeys = {
   ptrDeref: 'lowering.ptr.deref',
   ptrAssign: 'lowering.ptr.assign',
   ptrDisposeCheck: 'lowering.ptr.dispose.check',
+  // 数组整体搬移（ISO 6.6.5.4）
+  pack: 'lowering.pack',
+  unpack: 'lowering.unpack',
 } as const
 export type SyscallKey = (typeof syscallKeys)[keyof typeof syscallKeys]

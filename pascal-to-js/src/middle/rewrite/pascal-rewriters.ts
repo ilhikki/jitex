@@ -426,6 +426,31 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.io.eoln': () => sc(rtKeys.fileEoln, [litNullLiteral()]),
 
     // ---------- 阶段2/3：数组 / 记录 ----------
+    // ISO 6.6.5.4：pack(a, i, z) / unpack(z, a, i) 按元素字节连续搬移
+    'lowering.pack': (sys) => {
+      const [src, start, dst, srcType, dstType] = sys.args
+      const srcArr = arraySlot(parseType(srcType)!)
+      return sc(rtKeys.packArray, [
+        src,
+        litInt(srcArr.lows[0] ?? 0),
+        litInt(srcArr.elemSize),
+        start,
+        dst,
+        litInt(arrayCount(parseType(dstType)!)),
+      ])
+    },
+    'lowering.unpack': (sys) => {
+      const [src, dst, start, srcType, dstType] = sys.args
+      const dstArr = arraySlot(parseType(dstType)!)
+      return sc(rtKeys.unpackArray, [
+        src,
+        dst,
+        litInt(dstArr.lows[0] ?? 0),
+        litInt(dstArr.elemSize),
+        start,
+        litInt(arrayCount(parseType(srcType)!)),
+      ])
+    },
     'lowering.array.access': (sys) => {
       const td = parseType(sys.args[sys.args.length - 1])
       const indices = sys.args.slice(0, -1)

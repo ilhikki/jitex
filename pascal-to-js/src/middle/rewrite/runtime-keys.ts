@@ -115,6 +115,8 @@ export const rtKeys = {
   // ---------- 内存（类型在 get/set 时传入）----------
   memNew: 'runtime.mem.new',
   memCopy: 'runtime.mem.copy',
+  packArray: 'runtime.array.pack',
+  unpackArray: 'runtime.array.unpack',
   memClone: 'runtime.mem.clone',
   numGet: 'runtime.num.get',
   numSet: 'runtime.num.set',

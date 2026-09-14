@@ -174,6 +174,24 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       ;(arr as unknown[])[idx as number] = v
       return undefined
     },
+
+    // ---------- pack / unpack（ISO 6.6.5.4）：按元素字节连续搬移 ----------
+    [rtKeys.packArray]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
+      const s = src as Uint8Array
+      const d = dst as Uint8Array
+      const size = elemSize as number
+      const from = ((start as number) - (srcLow as number)) * size
+      d.set(s.subarray(from, from + (count as number) * size), 0)
+      return undefined
+    },
+    [rtKeys.unpackArray]: (_ctx, src, dst, dstLow, elemSize, start, count) => {
+      const s = src as Uint8Array
+      const d = dst as Uint8Array
+      const size = elemSize as number
+      const to = ((start as number) - (dstLow as number)) * size
+      d.set(s.subarray(0, (count as number) * size), to)
+      return undefined
+    },
   }
 }
 
