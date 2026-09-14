@@ -311,8 +311,6 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const st = parseType(sys.args[3])
       return sc(rtKeys.setIn, [sys.args[0], sys.args[2], litInt(setSize(st!))])
     },
-    'lowering.ptr.new': (sys) => sc(rtKeys.ptrNew, sys.args),
-    'lowering.ptr.free': (sys) => sc(rtKeys.ptrFree, sys.args),
     'lowering.ptr.deref': (sys) => sc(rtKeys.ptrDeref, sys.args),
     'lowering.ptr.assign': (sys) => sc(rtKeys.ptrAssign, sys.args),
     'lowering.ptr.dispose.check': (sys) => sc(rtKeys.ptrDisposeCheck, sys.args),

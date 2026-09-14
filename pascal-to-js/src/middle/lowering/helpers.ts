@@ -197,8 +197,6 @@ export const syscallKeys = {
   ge: 'lowering.ge',
   in: 'lowering.in', // [value, valueType, set, setType]
   // 指针
-  ptrNew: 'lowering.ptr.new',
-  ptrFree: 'lowering.ptr.free',
   ptrDeref: 'lowering.ptr.deref',
   ptrAssign: 'lowering.ptr.assign',
   ptrDisposeCheck: 'lowering.ptr.dispose.check',

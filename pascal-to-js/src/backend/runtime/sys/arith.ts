@@ -7,7 +7,7 @@
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import type { SyscallHandler } from '../runtime-type.ts'
+import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 export function arithSyscalls(): Record<string, SyscallHandler> {
   return {
@@ -94,40 +94,23 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.castI32ToChar]: (_ctx, a) => String.fromCharCode(a as number),
 
     // ---------- ptr ----------
-    // ISO 7185 6.4.4 / 6.5.4：指针值以整数句柄表示（0 = nil-value），句柄表在 RuntimeContext。
-    [rtKeys.ptrNew]: (ctx, value) => {
-      const id = ++ctx.nextPtrId
-      ctx.ptrTable.set(id, { kind: 'cell', value })
-      return id
-    },
-    [rtKeys.ptrDeref]: (ctx, id) => {
-      if (id === 0) {
+    // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
+    [rtKeys.ptrDeref]: (_ctx, p) => {
+      if (p === undefined) {
         throw new Error('dereference of nil pointer (ISO 7185 6.4.4)')
       }
-      const cell = ctx.ptrTable.get(id as number)
-      if (cell === undefined) {
-        throw new Error(`dereference of an invalid pointer handle: ${id}`)
-      }
-      return cell.value
+      return (p as PascalCell).value
     },
-    [rtKeys.ptrAssign]: (ctx, id, v) => {
-      if (id === 0) {
+    [rtKeys.ptrAssign]: (_ctx, p, v) => {
+      if (p === undefined) {
         throw new Error('dereference of nil pointer (ISO 7185 6.4.4)')
       }
-      const cell = ctx.ptrTable.get(id as number)
-      if (cell === undefined) {
-        throw new Error(`dereference of an invalid pointer handle: ${id}`)
-      }
-      cell.value = v
-      return undefined
-    },
-    [rtKeys.ptrFree]: (ctx, id) => {
-      ctx.ptrTable.delete(id as number)
+      ;(p as PascalCell).value = v
       return undefined
     },
     // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
-    [rtKeys.ptrDisposeCheck]: (_ctx, id) => {
-      if (id === 0) {
+    [rtKeys.ptrDisposeCheck]: (_ctx, p) => {
+      if (p === undefined) {
         throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)')
       }
       return undefined

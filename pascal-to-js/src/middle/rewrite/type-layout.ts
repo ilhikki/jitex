@@ -67,8 +67,6 @@ export function isScalar(td: TypeDescriptor): boolean {
     case 'f64':
     case 'bool':
     case 'char':
-    // 指针以整数句柄存放（0 = nil），故按标量处理，可直接落入 record 的字节布局
-    case 'pointer':
       return true
     default:
       return false
@@ -132,9 +130,6 @@ export function codecOf(td: TypeDescriptor): Codec {
     case 'bool':
     case 'char':
       return 'u8'
-    case 'pointer':
-      // 指针值 = 整数句柄
-      return 'i32'
     default:
       throw new Error(`codecOf: not a scalar type: ${td.tag}`)
   }

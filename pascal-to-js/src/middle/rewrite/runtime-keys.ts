@@ -67,8 +67,6 @@ export const rtKeys = {
   castF32ToI32Round: 'runtime.cast.f32.to.i32.round',
 
   // ---------- ptr ----------
-  ptrNew: 'runtime.ptr.new',
-  ptrFree: 'runtime.ptr.free',
   ptrDeref: 'runtime.ptr.deref',
   ptrAssign: 'runtime.ptr.assign',
   ptrDisposeCheck: 'runtime.ptr.dispose.check',

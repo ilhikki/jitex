@@ -12,7 +12,7 @@
 
 import * as JsonCode from '@/middle/ir/json-code.ts'
 import { TypeInfo, VariantPartInfo } from '@/middle/analysis/analysis-type.ts'
-import { litBool, litChar, litInt, litReal, syscall, syscallKeys } from './helpers.ts'
+import { litBool, litChar, litInt, litNull, litReal, syscall, syscallKeys } from './helpers.ts'
 
 // ============================================================
 // 变量默认值
@@ -40,8 +40,8 @@ export function defaultExpr(ti: TypeInfo): JsonCode.Expr {
     case 'file':
       return syscall(syscallKeys.fileCreate, [typeDescLiteral(ti)])
     case 'pointer':
-      // ISO 7185 6.4.4: 指针变量默认为 nil-value（句柄 0）
-      return litInt(0)
+      // ISO 7185 6.4.4: 指针变量默认为 nil-value
+      return litNull()
     default:
       return litInt(0)
   }
