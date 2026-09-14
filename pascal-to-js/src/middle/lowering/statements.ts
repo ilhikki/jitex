@@ -604,11 +604,12 @@ function loweringProcedureCall(
         throw new Error('new: argument must be a pointer-type variable')
       }
       const defaultVal = defaultExpr(ptrType.domainType)
-      const cell = syscall(syscallKeys.cellCreate, [defaultVal])
+      // 指针值 = 整数句柄（0 表示 nil），故 new 即分配一个句柄并赋给指针变量
+      const handle = syscall(syscallKeys.ptrNew, [defaultVal])
       if (sym.isVarParam) {
-        return [evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), cell]))]
+        return [evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), handle]))]
       }
-      return [assignStmt(ref(sym.varId), cell)]
+      return [assignStmt(ref(sym.varId), handle)]
     }
     case 'dispose': {
       // ISO 7185 6.6.5.3: dispose(p) 释放标识值，p 置 nil
@@ -620,13 +621,18 @@ function loweringProcedureCall(
       if (!sym || (sym.kind !== 'var' && sym.kind !== 'param')) {
         throw new Error('dispose: argument is not a variable')
       }
-      // 先检查 p 不是 nil（解引用前检查），然后置 nil
+      // 先检查 p 不是 nil，再释放句柄并置 nil（句柄 0）
       const ptrExpr = loweringExpr(argNode, a, ws)
       const checkStmt = evalStmt(syscall(syscallKeys.ptrDisposeCheck, [ptrExpr]))
+      const freeStmt = evalStmt(syscall(syscallKeys.ptrFree, [ptrExpr]))
       if (sym.isVarParam) {
-        return [checkStmt, evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), litNull()]))]
+        return [
+          checkStmt,
+          freeStmt,
+          evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), litInt(0)])),
+        ]
       }
-      return [checkStmt, assignStmt(ref(sym.varId), litNull())]
+      return [checkStmt, freeStmt, assignStmt(ref(sym.varId), litInt(0))]
     }
     default: {
       throw new Error(`loweringProcedureCall: unknown procedure ${name}`)

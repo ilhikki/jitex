@@ -31,6 +31,8 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     extensions: new Set(options.extensions ?? []),
     debugLog: [],
     jsCode: undefined,
+    ptrTable: new Map(),
+    nextPtrId: 0,
   }
 }
 

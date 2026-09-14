@@ -25,7 +25,6 @@ import {
   litChar,
   litField,
   litInt,
-  litNull,
   litReal,
   ref,
   syscall,
@@ -138,7 +137,8 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
     return litInt(2147483647)
   }
   if (name === 'nil') {
-    return litNull()
+    // ISO 7185 6.4.4: nil-value 用句柄 0 表示
+    return litInt(0)
   }
   // 内置无参函数（parser 将无括号调用解析为 Identifier）
   if (name === 'eof') {

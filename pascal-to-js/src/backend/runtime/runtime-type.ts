@@ -97,6 +97,12 @@ export interface RuntimeContext {
    * file.ts 不再使用；transform.ts 在编译/运行出错时追加诊断信息。 */
   debugLog: string[]
   jsCode: string | undefined
+  /**
+   * 指针句柄表：identifying-value 用整数句柄表示（0 表示 nil-value）。
+   * 指针因此可以存进 record 的字节布局（4 字节），与 ISO 6.4.4 的指针值语义一致。
+   */
+  ptrTable: Map<number, PascalCell>
+  nextPtrId: number
 }
 
 export interface RuntimeOptions {
