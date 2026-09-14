@@ -88,18 +88,24 @@ class TypeCheckPass {
   // 逐 block 检查
   // --------------------------------------------------------
 
-  private checkBlock(block: BlockNode, outerTypes: Set<string>): void {
-    this.checkDeclaredNames(block)
+  private checkBlock(
+    block: BlockNode,
+    outerTypes: Set<string>,
+    formalParamNames: string[] = [],
+  ): void {
+    this.checkDeclaredNames(block, formalParamNames)
     const availableTypes = this.checkTypeDefinitions(block, outerTypes)
     for (const p of block.procedureDeclarations) {
       if (p.block) {
-        this.checkBlock(p.block, availableTypes)
+        const params = p.parameters?.flatMap((pd) => pd.names.map((n) => n.name)) ?? []
+        this.checkBlock(p.block, availableTypes, params)
       }
     }
     for (const f of block.functionDeclarations) {
       if (f.block) {
         this.checkFunctionAssignment(f)
-        this.checkBlock(f.block, availableTypes)
+        const params = f.parameters?.flatMap((pd) => pd.names.map((n) => n.name)) ?? []
+        this.checkBlock(f.block, availableTypes, params)
       }
     }
   }
@@ -113,7 +119,7 @@ class TypeCheckPass {
    * 另外按 6.6.1，一个 procedure-identifier 至多关联一个 procedure-block；
    * forward 声明与其后的 procedure-identification 合起来只算一个定义点。
    */
-  private checkDeclaredNames(block: BlockNode): void {
+  private checkDeclaredNames(block: BlockNode, formalParamNames: string[] = []): void {
     const kinds = new Map<string, string>()
     const declare = (name: string, kind: string) => {
       const key = name.toLowerCase()
@@ -126,6 +132,10 @@ class TypeCheckPass {
       kinds.set(key, kind)
     }
 
+    // ISO 6.2.2.7：形参与块内局部声明同属一个 region
+    for (const name of formalParamNames) {
+      declare(name, 'a formal parameter')
+    }
     for (const c of block.constDeclarations) {
       declare(c.name.name, 'a constant')
     }

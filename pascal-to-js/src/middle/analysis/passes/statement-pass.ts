@@ -326,11 +326,32 @@ class StatementPass {
         ) {
           this.recordUndefinedRef('procedure', node.name.name)
         }
-        const params = sym?.kind === 'func' ? this.decl.funcInfos.get(sym.funcId)?.params : undefined
+        // 用户定义过程 或 可调用形参（过程/函数形参）的形参表
+        let params: VarSymbol[] | undefined
+        if (sym?.kind === 'func') {
+          params = this.decl.funcInfos.get(sym.funcId)?.params
+        } else if (sym?.kind === 'param' && sym.callable) {
+          // 可调用形参的自带形参表签名（analysis-type CallableParamInfo.params → VarSymbol[]）
+          params = sym.callable.params.map((s, i) => ({
+            kind: 'param',
+            varId: -1 - i,
+            name: '',
+            typeInfo: s.typeInfo,
+            isVarParam: s.isVar,
+          } as VarSymbol))
+        }
         for (let i = 0; i < node.arguments.length; i++) {
           const arg = node.arguments[i]
-          const argType = this.analyzeExpr(arg)
           const formal = params?.[i]
+          if (formal?.callable) {
+            // 可调用形参的实参是过程/函数标识符，不作表达式求值，
+            // 但仍需缓存符号供 lowering 查找函数引用。
+            if (arg.kind === 'Identifier') {
+              this.symbolCache.set(arg, this.lookup(arg.name))
+            }
+            continue
+          }
+          const argType = this.analyzeExpr(arg)
           if (formal?.isVarParam) {
             this.checkVariableParameter(node.name.name, formal, arg, argType)
           }
@@ -470,8 +491,32 @@ class StatementPass {
         ) {
           this.recordUndefinedRef('function', node.name.name)
         }
-        for (const a of node.arguments) {
+        // 取被调用者的形参表（用户函数 或 可调用形参）
+        let callParams: VarSymbol[] | undefined
+        if (sym?.kind === 'func') {
+          callParams = this.decl.funcInfos.get(sym.funcId)?.params
+        } else if (sym?.kind === 'param' && sym.callable) {
+          callParams = sym.callable.params.map((s, i) => ({
+            kind: 'param',
+            varId: -1 - i,
+            name: '',
+            typeInfo: s.typeInfo,
+            isVarParam: s.isVar,
+          } as VarSymbol))
+        }
+        for (let i = 0; i < node.arguments.length; i++) {
+          const a = node.arguments[i]
+          if (callParams?.[i]?.callable) {
+            // 可调用形参的实参是过程/函数标识符，不作表达式求值，但缓存符号
+            if (a.kind === 'Identifier') {
+              this.symbolCache.set(a, this.lookup(a.name))
+            }
+            continue
+          }
           this.analyzeExpr(a)
+        }
+        if (callParams) {
+          this.checkCallableActuals(node.name.name, callParams, node.arguments)
         }
         if (sym?.kind === 'param' && sym.callable) {
           // ISO 7185 6.6.3.5：调用可调用形参。过程形参不能作函数调用。
@@ -492,9 +537,6 @@ class StatementPass {
             throw new Error(
               `function '${node.name.name}' expects ${funcInfo.params.length} actual-parameter(s) but ${node.arguments.length} given (ISO 7185 6.7.3)`,
             )
-          }
-          if (funcInfo) {
-            this.checkCallableActuals(node.name.name, funcInfo.params, node.arguments)
           }
           info = sym.retTypeInfo ?? this.unknown(node, `call '${node.name.name}' 无返回类型`)
         } else {
@@ -804,39 +846,84 @@ class StatementPass {
       )
     }
     const sym = this.lookup(arg.name)
-    if (sym?.kind !== 'func') {
-      throw new Error(
-        `The actual-parameter of '${calleeName}' shall be a ${noun} with a defining-point contained by the program-block (ISO 7185 ${section})`,
-      )
-    }
-    const actualInfo = this.decl.funcInfos.get(sym.funcId)
-    if (!actualInfo) {
-      throw new Error(
-        `The actual-parameter of '${calleeName}' shall be a ${noun} with a defining-point (ISO 7185 ${section})`,
-      )
-    }
-    if (isFunc) {
-      if (actualInfo.kind !== 'function') {
+
+    // 实参是用户定义的过程/函数
+    if (sym?.kind === 'func') {
+      const actualInfo = this.decl.funcInfos.get(sym.funcId)
+      if (!actualInfo) {
         throw new Error(
-          `The actual-parameter of '${calleeName}' shall be a function-identifier (ISO 7185 6.6.3.5)`,
+          `The actual-parameter of '${calleeName}' shall be a ${noun} with a defining-point (ISO 7185 ${section})`,
         )
       }
-      if (
-        !isSameType(
-          spec.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
-          sym.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
-        )
-      ) {
+      if (isFunc) {
+        if (actualInfo.kind !== 'function') {
+          throw new Error(
+            `The actual-parameter of '${calleeName}' shall be a function-identifier (ISO 7185 6.6.3.5)`,
+          )
+        }
+        if (
+          !isSameType(
+            spec.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
+            sym.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
+          )
+        ) {
+          throw new Error(
+            `The result-type of the actual function '${arg.name}' and that of the formal parameter of '${calleeName}' shall denote the same type (ISO 7185 6.6.3.5)`,
+          )
+        }
+      } else if (actualInfo.kind !== 'procedure') {
         throw new Error(
-          `The result-type of the actual function '${arg.name}' and that of the formal parameter of '${calleeName}' shall denote the same type (ISO 7185 6.6.3.5)`,
+          `The actual-parameter of '${calleeName}' shall be a procedure-identifier (ISO 7185 6.6.3.4)`,
         )
       }
-    } else if (actualInfo.kind !== 'procedure') {
-      throw new Error(
-        `The actual-parameter of '${calleeName}' shall be a procedure-identifier (ISO 7185 6.6.3.4)`,
-      )
+      this.checkCallableCongruity(calleeName, spec.params, actualInfo, arg.name)
+      return
     }
-    this.checkCallableCongruity(calleeName, spec.params, actualInfo, arg.name)
+
+    // 实参是可调用形参（链式传递：形参本身作另一形参的实参，ISO 6.6.3.4/3.5）
+    if (sym?.kind === 'param' && sym.callable) {
+      if (sym.callable.kind !== spec.kind) {
+        throw new Error(
+          `The actual-parameter of '${calleeName}' shall be a ${noun} (ISO 7185 ${section})`,
+        )
+      }
+      if (isFunc) {
+        if (
+          !isSameType(
+            spec.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
+            sym.callable.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
+          )
+        ) {
+          throw new Error(
+            `The result-type of the actual function '${arg.name}' and that of the formal parameter of '${calleeName}' shall denote the same type (ISO 7185 6.6.3.5)`,
+          )
+        }
+      }
+      // 形参签名 congruity：逐位比较 isVar 与类型同一
+      const actualSigs = sym.callable.params
+      if (spec.params.length !== actualSigs.length) {
+        throw new Error(
+          `The formal-parameter-lists of '${arg.name}' and the formal parameter of '${calleeName}' shall be congruous (ISO 7185 6.6.3.6)`,
+        )
+      }
+      for (let i = 0; i < spec.params.length; i++) {
+        if (spec.params[i].isVar !== actualSigs[i].isVar) {
+          throw new Error(
+            `Corresponding formal-parameter-sections of '${arg.name}' and '${calleeName}' shall match (both value or both variable) (ISO 7185 6.6.3.6)`,
+          )
+        }
+        if (!isSameType(spec.params[i].typeInfo, actualSigs[i].typeInfo)) {
+          throw new Error(
+            `The type-identifiers in corresponding positions of '${arg.name}' and '${calleeName}' shall denote the same type (ISO 7185 6.6.3.6)`,
+          )
+        }
+      }
+      return
+    }
+
+    throw new Error(
+      `The actual-parameter of '${calleeName}' shall be a ${noun} with a defining-point contained by the program-block (ISO 7185 ${section})`,
+    )
   }
 
   /** ISO 7185 6.6.3.6：形参段自带的形参表与实参函数的形参表须 congruous，或两者都不出现 */

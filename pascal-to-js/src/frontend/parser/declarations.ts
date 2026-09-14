@@ -198,12 +198,49 @@ export function parseVariableDeclarations(
   return ok(pos, decls)
 }
 
-// ============================================================================
 // Procedure / Function Declarations
-// ============================================================================
-
 // ISO 7185 6.6.3.1/6.6.3.5: functional-parameter-specification = function-heading
 //   function-heading = 'function' identifier [ formal-parameter-list ] ':' result-type
+/**
+ * ISO 7185 6.6.3.1：procedural-parameter-specification = procedure-heading
+ * procedure-heading = 'procedure' identifier [ formal-parameter-list ]
+ */
+function parseProceduralParameterSection(
+  input: ParserInput,
+): ParseResult<ParameterDeclarationNode> {
+  const startToken = peek(input)
+  let pos = input.position + 1 // skip PROCEDURE
+
+  const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
+  if (!nameResult.success) {
+    return fail(nameResult.error, nameResult.position)
+  }
+  pos = nameResult.newPosition
+
+  const paramsResult = parseParameterList({ tokens: input.tokens, position: pos })
+  if (!paramsResult.success) {
+    return fail(paramsResult.error, paramsResult.position)
+  }
+  pos = paramsResult.newPosition
+
+  return ok(
+    pos,
+    withLoc(
+      {
+        kind: 'ParameterDeclaration',
+        names: [nameResult.astNode],
+        isVar: false,
+        callable: {
+          kind: 'procedure',
+          parameters: paramsResult.astNode,
+        },
+      } as ParameterDeclarationNode,
+      startToken.start,
+      input.tokens[pos - 1].end,
+    ),
+  )
+}
+
 function parseFunctionalParameterSection(
   input: ParserInput,
 ): ParseResult<ParameterDeclarationNode> {
@@ -262,6 +299,22 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
   const params: ParameterDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'RPAREN') {
+    // ISO 7185 6.6.3.1/6.6.3.4：procedural-parameter-specification = procedure-heading
+    if (peek({ tokens: input.tokens, position: pos }).type === 'PROCEDURE') {
+      const callableResult = parseProceduralParameterSection({ tokens: input.tokens, position: pos })
+      if (!callableResult.success) {
+        return fail(callableResult.error, callableResult.position)
+      }
+      params.push(callableResult.astNode)
+      pos = callableResult.newPosition
+
+      if (peek({ tokens: input.tokens, position: pos }).type !== 'SEMICOLON') {
+        break
+      }
+      pos++
+      continue
+    }
+
     // ISO 7185 6.6.3.1/6.6.3.5：functional-parameter-specification = function-heading
     if (peek({ tokens: input.tokens, position: pos }).type === 'FUNCTION') {
       const callableResult = parseFunctionalParameterSection({ tokens: input.tokens, position: pos })

@@ -501,11 +501,11 @@ const tests: PascalTest[] = [
   {
     name: '6.6 过程形参带变量参数段',
     code: `program test(output);
+        var a: integer;
         procedure apply(procedure p(var x: integer); var y: integer);
         begin p(y); end;
         procedure bump(var v: integer);
         begin v := v + 1; end;
-        var a: integer;
         begin a := 3; apply(bump, a); writeln(a); end.`,
     purpose: 'ISO 6.6.3.4 / 6.6.3.6 b：变量参数段须与实参过程的形参表 congruous',
     expectedOutput: '4\n',

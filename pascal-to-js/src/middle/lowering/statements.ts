@@ -478,6 +478,47 @@ function loweringProcedureCall(
   const name = node.name.name.toLowerCase()
   const sym = resolveSymbol(node.name, a, ws)
 
+  // ISO 7185 6.6.3.4：过程形参在其块内标识实参过程 → 间接调用
+  if (sym?.kind === 'param' && sym.callable) {
+    const out: JsonCode.Statement[] = []
+    const argExprs: JsonCode.Expr[] = []
+    const cellVars: { cellVar: number; target: ExpressionNode }[] = []
+    const sig = sym.callable.params
+    for (let i = 0; i < node.arguments.length; i++) {
+      const arg = node.arguments[i]
+      const isVar = sig[i]?.isVar
+      if (isVar) {
+        const cellVar = a.allocTempLocal(funcId, { tag: 'unknown' })
+        out.push(
+          assignStmt(ref(cellVar), syscall(syscallKeys.cellCreate, [loweringExpr(arg, a, ws)])),
+        )
+        argExprs.push(ref(cellVar))
+        cellVars.push({ cellVar, target: arg })
+      } else {
+        argExprs.push(loweringExpr(arg, a, ws))
+      }
+    }
+    out.push(evalStmt(syscall(syscallKeys.callIndirect, [ref(sym.varId), ...argExprs])))
+    // 写回 var 参数
+    for (const cv of cellVars) {
+      const valExpr = syscall(syscallKeys.cellGet, [ref(cv.cellVar)])
+      const tgt = cv.target
+      if (tgt.kind === 'Identifier') {
+        const s = resolveSymbol(tgt, a, ws)
+        if (s && (s.kind === 'var' || s.kind === 'param')) {
+          if (s.isVarParam) {
+            out.push(evalStmt(syscall(syscallKeys.cellSet, [ref(s.varId), valExpr])))
+          } else {
+            out.push(assignStmt(ref(s.varId), valExpr))
+          }
+          continue
+        }
+      }
+      out.push(...loweringAssignTarget(tgt, valExpr, a, funcId, ws))
+    }
+    return out
+  }
+
   // 用户定义过程
   if (sym?.kind === 'func') {
     return loweringUserCallStmt(sym.funcId, node.arguments, a, funcId, ws)
