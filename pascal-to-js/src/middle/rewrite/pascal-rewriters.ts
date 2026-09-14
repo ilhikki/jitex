@@ -16,8 +16,8 @@ import {
   codecOf,
   fieldSlot,
   isByteScalar,
+  isObjectRepr,
   isScalar,
-  objectArrayElem,
   remainingArrayType,
   setSize,
   sizeOf,
@@ -318,15 +318,17 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     // ---------- 阶段2/3：内存 ----------
     'lowering.mem.default': (sys) => {
       const td = parseType(sys.args[0])
-      if (td?.tag === 'set') {
+      if (!td) {
+        throw new Error('rewrite: mem.default expects a type descriptor')
+      }
+      // 含 file / pointer 的类型无法字节化 → 用 JS 对象 / object[] 承载（见 isObjectRepr）
+      if (isObjectRepr(td)) {
+        return sc(rtKeys.recNew, [litType(td)])
+      }
+      if (td.tag === 'set') {
         return sc(rtKeys.memNew, [litInt(setSize(td))])
       }
-      // file 数组：元素是 object，用 JS Array 承载
-      const oe = td && objectArrayElem(td)
-      if (oe) {
-        return sc(rtKeys.arrNew, [litInt(arrayCount(td!)), litType(oe)])
-      }
-      return sc(rtKeys.memNew, [litInt(sizeOf(td!))])
+      return sc(rtKeys.memNew, [litInt(sizeOf(td))])
     },
     'lowering.mem.copy': (sys) => {
       const td = parseType(sys.args[3])
@@ -476,6 +478,10 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     },
     'lowering.rec.copy': (sys) => {
       const td = parseType(sys.args[1])
+      if (td && isObjectRepr(td)) {
+        // 对象表示的 record / 数组：按值语义深拷贝（pointer / file 拷引用）
+        return sc(rtKeys.recClone, [sys.args[0]])
+      }
       return sc(rtKeys.memClone, [sys.args[0], litInt(sizeOf(td!))])
     },
 
@@ -526,7 +532,7 @@ function accessAt(
   indices: JsonCode.Expr[],
   fieldName?: string,
 ): JsonCode.Expr {
-  if (fieldName === undefined && objectArrayElem(td)) {
+  if (fieldName === undefined && isObjectRepr(td)) {
     return sc(rtKeys.arrGet, [base, elemIndexExpr(td, indices)])
   }
 
@@ -535,6 +541,10 @@ function accessAt(
   let slotType: TypeDescriptor
 
   if (fieldName !== undefined) {
+    if (isObjectRepr(td)) {
+      // 对象表示的 record（含 file / pointer 字段）：字段按名字读取
+      return sc(rtKeys.recGetField, [base, litStr(fieldName)])
+    }
     const slot = fieldSlot(td, fieldName)
     if (!slot) {
       const fixed = (td.fields ?? []).map((f) => f.name).join(',')
@@ -569,7 +579,7 @@ function assignAt(
   value: JsonCode.Expr,
   fieldName?: string,
 ): JsonCode.Expr {
-  if (fieldName === undefined && objectArrayElem(td)) {
+  if (fieldName === undefined && isObjectRepr(td)) {
     return sc(rtKeys.arrSet, [base, elemIndexExpr(td, indices), value])
   }
 
@@ -578,6 +588,10 @@ function assignAt(
   let slotType: TypeDescriptor
 
   if (fieldName !== undefined) {
+    if (isObjectRepr(td)) {
+      // 对象表示的 record（含 file / pointer 字段）：字段按名字写入
+      return sc(rtKeys.recSetField, [base, litStr(fieldName), value])
+    }
     const slot = fieldSlot(td, fieldName)
     if (!slot) {
       const fixed = (td.fields ?? []).map((f) => f.name).join(',')

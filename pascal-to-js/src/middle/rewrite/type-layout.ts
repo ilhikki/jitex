@@ -59,6 +59,46 @@ function rangeCodec(low: number, high: number): Codec {
   return 'i32'
 }
 
+/**
+ * 该类型的值是否需要以「JS 对象」承载（而非字节序列）。
+ *
+ * file 与 pointer 的值本身就是对象（句柄 / identifying-value），放不进 Uint8Array；
+ * 含这类字段的 record（用普通 JS 对象）与含这类元素的 array（用 object[]）逐层如此。
+ * rewrite 与 runtime 共用本判据决定表示。
+ */
+export function isObjectRepr(td: TypeDescriptor): boolean {
+  switch (td.tag) {
+    case 'file':
+    case 'pointer':
+      return true
+    case 'array':
+      return td.elem !== undefined && isObjectRepr(td.elem)
+    case 'rec':
+      for (const f of td.fields ?? []) {
+        if (isObjectRepr(f.type)) {
+          return true
+        }
+      }
+      return variantHasObject(td.variant)
+    default:
+      return false
+  }
+}
+
+function variantHasObject(vp: VariantPartDescriptor | undefined): boolean {
+  for (const b of vp?.branches ?? []) {
+    for (const f of b.fields) {
+      if (isObjectRepr(f.type)) {
+        return true
+      }
+    }
+    if (variantHasObject(b.nested)) {
+      return true
+    }
+  }
+  return false
+}
+
 /** 是否为标量类型 */
 export function isScalar(td: TypeDescriptor): boolean {
   switch (td.tag) {
@@ -71,23 +111,6 @@ export function isScalar(td: TypeDescriptor): boolean {
     default:
       return false
   }
-}
-
-/**
- * 数组的「object 元素」类型。
- *
- * file 是 `object`，不能装进 `Uint8Array` 字节视图；这类数组用 JS Array 表示。
- * 返回摊平后的最内层元素类型（当它是 file 时），否则 undefined。
- */
-export function objectArrayElem(td: TypeDescriptor): TypeDescriptor | undefined {
-  if (td.tag !== 'array') {
-    return undefined
-  }
-  let cur = td
-  while (cur.tag === 'array' && cur.elem) {
-    cur = cur.elem
-  }
-  return cur.tag === 'file' ? cur : undefined
 }
 
 /** 数组元素个数（各维长度之积）；非数组返回 1 */

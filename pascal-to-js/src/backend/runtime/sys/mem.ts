@@ -8,7 +8,9 @@
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
+import { arrayCount, isObjectRepr, setSize, sizeOf } from '@/middle/rewrite/type-layout.ts'
 import type { Codec } from '@/middle/rewrite/type-layout.ts'
+import type { TypeDescriptor } from '@/middle/lowering/type.ts'
 import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 /**
@@ -192,7 +194,87 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       d.set(s.subarray(0, (count as number) * size), to)
       return undefined
     },
+
+    // ---------- 对象表示的 record（含 file / pointer 字段，见 isObjectRepr）----------
+    [rtKeys.recNew]: (_ctx, td) => newRecordValue(td as TypeDescriptor),
+    [rtKeys.recGetField]: (_ctx, obj, name) => (obj as Record<string, unknown>)[name as string],
+    [rtKeys.recSetField]: (_ctx, obj, name, v) => {
+      ;(obj as Record<string, unknown>)[name as string] = v
+      return undefined
+    },
+    [rtKeys.recClone]: (_ctx, v) => cloneValue(v),
   }
+}
+
+/** 类型的默认值：能字节化的用 Uint8Array，含 file / pointer 的用 JS 对象 / object[] */
+function defaultValueOf(td: TypeDescriptor): unknown {
+  switch (td.tag) {
+    case 'i32':
+      // 子界型取上界…取下界（ISO 7185 6.4.2.4 的变量初始值约定）
+      return td.low ?? 0
+    case 'enum':
+    case 'bool':
+      return 0
+    case 'f64':
+      return 0
+    case 'char':
+      return '\x00'
+    case 'set':
+      return new Uint8Array(setSize(td))
+    case 'pointer':
+      // ISO 7185 6.4.4: 未初始化的指针为 nil-value
+      return undefined
+    case 'file':
+      return { kind: 'file', value: undefined, type: td }
+    case 'array':
+      return isObjectRepr(td)
+        ? Array.from({ length: arrayCount(td) }, () => defaultValueOf(td.elem!))
+        : new Uint8Array(sizeOf(td))
+    case 'rec':
+      return isObjectRepr(td) ? newRecordValue(td) : new Uint8Array(sizeOf(td))
+    default:
+      return 0
+  }
+}
+
+function newRecordValue(td: TypeDescriptor): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const f of td.fields ?? []) {
+    out[f.name] = defaultValueOf(f.type)
+  }
+  // variant 各分支的字段一并预置（union 语义由赋值方负责）
+  for (const b of td.variant?.branches ?? []) {
+    for (const f of b.fields) {
+      out[f.name] = defaultValueOf(f.type)
+    }
+  }
+  return out
+}
+
+/**
+ * 值语义拷贝：字节视图拷字节；对象表示的 record / 数组递归拷贝；
+ * pointer 的 identifying-value 与 file 句柄拷引用（ISO 7185 的值语义要求如此）。
+ */
+function cloneValue(v: unknown): unknown {
+  if (v instanceof Uint8Array) {
+    return v.slice()
+  }
+  if (Array.isArray(v)) {
+    return v.map(cloneValue)
+  }
+  if (v !== null && typeof v === 'object') {
+    const kind = (v as { kind?: string }).kind
+    if (kind === 'file' || kind === 'cell') {
+      return v
+    }
+    const src = v as Record<string, unknown>
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(src)) {
+      out[k] = cloneValue(src[k])
+    }
+    return out
+  }
+  return v
 }
 
 /**

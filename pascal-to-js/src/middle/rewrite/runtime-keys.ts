@@ -117,6 +117,11 @@ export const rtKeys = {
   memCopy: 'runtime.mem.copy',
   packArray: 'runtime.array.pack',
   unpackArray: 'runtime.array.unpack',
+  // 对象表示的 record（含 file / pointer 字段）：字段访问与深拷贝
+  recNew: 'runtime.rec.new',
+  recGetField: 'runtime.rec.get.field',
+  recSetField: 'runtime.rec.set.field',
+  recClone: 'runtime.rec.clone',
   memClone: 'runtime.mem.clone',
   numGet: 'runtime.num.get',
   numSet: 'runtime.num.set',
