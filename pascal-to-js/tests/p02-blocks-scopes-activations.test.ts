@@ -1,11 +1,32 @@
-import { describe } from './harness.ts'
-import { type PascalTest, runPascalTests } from './harness.ts'
+// ISO/IEC 7185:1990 - 6.2 Blocks, scopes, and activations
+//
+// 章节概括：
+//   定义 block 的语法与语义：block 由 label-declaration-part、constant-definition-part、
+//   type-definition-part、variable-declaration-part、procedure-and-function-declaration-part
+//   与 statement-part 组成，并规定标签声明与其语句的一一对应关系、标签的定义点。
+//   规定每个标识符或标签定义点具有 region 与 scope：scope 一般为该 region 及其包围的所有区域，
+//   但被内层同名定义点排除；field-designator 的 field-specifier 区域被排除在包围作用域之外。
+//   同一区域内不得有同名定义点，所有应用出现须能唯一定位，且定义点须先于其在程序块内的所有应用出现
+//   （唯一例外是 new-pointer-type 域类型中的类型标识符）。required identifiers 视为其定义点区域包围整个程序。
+//   activations 部分规定块的一次激活所包含的实体（statement-part 的算法、各标签对应的程序点、
+//   各变量、局部过程/函数、函数结果）、激活的嵌套关系，并定义 activation-point：激活开始时
+//   变量（除程序参数外）与结果处于 totally-undefined，直到激活终止才消失。
+//
+// 子章节：
+//   6.2.1 Blocks
+//   6.2.2 Scopes
+//   6.2.3 Activations
+//
+// 状态：骨架文件，用例待从 tests/integration/ 迁移（迁移时仅改 name，内容不动）。
 
-describe('Phase 4: Scope', () => {
-  // Original m36 tests
-  const m36Tests: PascalTest[] = [
+import { assert, describe, test } from './harness.ts'
+import { type PascalTest, runPascalTests } from './harness.ts'
+import { run } from '@jitex/pascal-to-js'
+
+describe('ISO 7185 6.2 - Blocks, scopes, and activations', () => {
+  const tests: PascalTest[] = [
     {
-      name: 'global var used in main',
+      name: '6.2 global var used in main',
       code: `program test;
 var x: integer;
 begin
@@ -16,7 +37,7 @@ end.`,
       expectedContains: '42',
     },
     {
-      name: 'global var used in procedure',
+      name: '6.2 global var used in procedure',
       code: `program test;
 var x: integer;
 procedure show;
@@ -31,7 +52,7 @@ end.`,
       expectedContains: '100',
     },
     {
-      name: 'global var used in nested procedure',
+      name: '6.2 global var used in nested procedure',
       code: `program test;
 var x: integer;
 procedure outer;
@@ -50,7 +71,7 @@ end.`,
       expectedContains: '200',
     },
     {
-      name: 'global var used in function',
+      name: '6.2 global var used in function',
       code: `program test;
 var x: integer;
 function getx: integer;
@@ -65,7 +86,7 @@ end.`,
       expectedContains: '50',
     },
     {
-      name: 'multiple global variables',
+      name: '6.2 multiple global variables',
       code: `program test;
 var a, b, c: integer;
 procedure calc;
@@ -82,7 +103,7 @@ end.`,
       expectedContains: '6',
     },
     {
-      name: 'local var in procedure',
+      name: '6.2 local var in procedure',
       code: `program test;
 procedure proc;
 var x: integer;
@@ -97,7 +118,7 @@ end.`,
       expectedContains: '10',
     },
     {
-      name: 'local var in function',
+      name: '6.2 local var in function',
       code: `program test;
 function func: integer;
 var x: integer;
@@ -112,7 +133,7 @@ end.`,
       expectedContains: '20',
     },
     {
-      name: 'local var shadows global',
+      name: '6.2 local var shadows global',
       code: `program test;
 var x: integer;
 procedure proc;
@@ -130,7 +151,7 @@ end.`,
       expectedContains: '99',
     },
     {
-      name: 'inner nested var shadows outer',
+      name: '6.2 inner nested var shadows outer',
       code: `program test;
 procedure outer;
 var x: integer;
@@ -152,7 +173,7 @@ end.`,
       expectedContains: '3',
     },
     {
-      name: 'sibling procedures independent',
+      name: '6.2 sibling procedures independent',
       code: `program test;
 procedure proc1;
 var x: integer;
@@ -174,7 +195,7 @@ end.`,
       expectedContains: '10',
     },
     {
-      name: 'local var not accessible outside scope',
+      name: '6.2 local var not accessible outside scope',
       code: `program test;
 procedure proc;
 var x: integer;
@@ -188,7 +209,7 @@ end.`,
       expectedError: '',
     },
     {
-      name: 'value parameter passing',
+      name: '6.2 value parameter passing',
       code: `program test;
 var a: integer;
 procedure setx(n: integer);
@@ -205,7 +226,7 @@ end.`,
       expectedContains: '11',
     },
     {
-      name: 'var parameter passing',
+      name: '6.2 var parameter passing',
       code: `program test;
 var a: integer;
 procedure setx(var n: integer);
@@ -221,7 +242,7 @@ end.`,
       expectedContains: '11',
     },
     {
-      name: 'parameter shadows global',
+      name: '6.2 parameter shadows global',
       code: `program test;
 var x: integer;
 procedure proc(x: integer);
@@ -236,7 +257,7 @@ end.`,
       expectedContains: '5',
     },
     {
-      name: 'parameter shadows local',
+      name: '6.2 parameter shadows local',
       code: `program test;
 procedure outer;
 var x: integer;
@@ -255,7 +276,7 @@ end.`,
       expectedContains: '20',
     },
     {
-      name: 'parameter in nested procedure',
+      name: '6.2 parameter in nested procedure',
       code: `program test;
 procedure outer(a: integer);
 procedure inner;
@@ -272,7 +293,7 @@ end.`,
       expectedContains: '42',
     },
     {
-      name: 'multiple parameters',
+      name: '6.2 multiple parameters',
       code: `program test;
 procedure calc(a, b, c: integer);
 begin
@@ -285,7 +306,7 @@ end.`,
       expectedContains: '6',
     },
     {
-      name: 'function name as return variable',
+      name: '6.2 function name as return variable',
       code: `program test;
 function double(n: integer): integer;
 begin
@@ -298,7 +319,7 @@ end.`,
       expectedContains: '10',
     },
     {
-      name: 'function return in expression',
+      name: '6.2 function return in expression',
       code: `program test;
 function add(a, b: integer): integer;
 begin
@@ -311,7 +332,7 @@ end.`,
       expectedContains: '14',
     },
     {
-      name: 'nested function return',
+      name: '6.2 nested function return',
       code: `program test;
 procedure outer;
 function inner(n: integer): integer;
@@ -328,7 +349,7 @@ end.`,
       expectedContains: '15',
     },
     {
-      name: 'recursive function return',
+      name: '6.2 recursive function return',
       code: `program test;
 function fact(n: integer): integer;
 begin
@@ -344,7 +365,7 @@ end.`,
       expectedContains: '120',
     },
     {
-      name: 'goto in procedure',
+      name: '6.2 goto in procedure',
       code: `program test;
 procedure proc;
 label 10;
@@ -361,7 +382,7 @@ end.`,
       expectedContains: 'ok',
     },
     {
-      name: 'goto in main program',
+      name: '6.2 goto in main program',
       code: `program test;
 label 20;
 begin
@@ -374,7 +395,7 @@ end.`,
       expectedContains: 'done',
     },
     {
-      name: 'goto from procedure to outer block label',
+      name: '6.2 goto from procedure to outer block label',
       code: `program test;
 label 10;
 procedure proc;
@@ -391,7 +412,7 @@ end.`,
       expectedContains: 'start\nend',
     },
     {
-      name: 'label in nested procedure',
+      name: '6.2 label in nested procedure',
       code: `program test;
 procedure outer;
 procedure inner;
@@ -412,7 +433,7 @@ end.`,
       expectedContains: 'yes',
     },
     {
-      name: 'labels in different scopes',
+      name: '6.2 labels in different scopes',
       code: `program test;
 procedure proc1;
 label 10;
@@ -436,7 +457,7 @@ end.`,
       expectedContains: 'p1',
     },
     {
-      name: 'global constant in procedure',
+      name: '6.2 global constant in procedure',
       code: `program test;
 const PI = 3.14;
 procedure show;
@@ -450,7 +471,7 @@ end.`,
       expectedContains: '3.14',
     },
     {
-      name: 'local constant shadows global',
+      name: '6.2 local constant shadows global',
       code: `program test;
 const x = 10;
 procedure proc;
@@ -465,7 +486,7 @@ end.`,
       expectedContains: '20',
     },
     {
-      name: 'constant in procedure',
+      name: '6.2 constant in procedure',
       code: `program test;
 procedure proc;
 const LIMIT = 100;
@@ -479,7 +500,7 @@ end.`,
       expectedContains: '100',
     },
     {
-      name: 'constant visible in nested procedure',
+      name: '6.2 constant visible in nested procedure',
       code: `program test;
 procedure outer;
 const C = 50;
@@ -497,7 +518,7 @@ end.`,
       expectedContains: '50',
     },
     {
-      name: 'global type in procedure',
+      name: '6.2 global type in procedure',
       code: `program test;
 type T = integer;
 var x: T;
@@ -514,7 +535,7 @@ end.`,
       expectedContains: '10',
     },
     {
-      name: 'local type in procedure',
+      name: '6.2 local type in procedure',
       code: `program test;
 procedure proc;
 type T = integer;
@@ -530,7 +551,7 @@ end.`,
       expectedContains: '20',
     },
     {
-      name: 'record type field access',
+      name: '6.2 record type field access',
       code: `program test;
 type
   Person = record
@@ -549,7 +570,7 @@ end.`,
       expectedContains: '30',
     },
     {
-      name: 'array type usage',
+      name: '6.2 array type usage',
       code: `program test;
 type
   Arr = array[1..5] of integer;
@@ -568,7 +589,7 @@ end.`,
       expectedContains: '3',
     },
     {
-      name: 'enum type usage',
+      name: '6.2 enum type usage',
       code: `program test;
 type
   Color = (red, green, blue);
@@ -585,7 +606,7 @@ end.`,
       expectedContains: 'ok',
     },
     {
-      name: 'local var modifies global indirectly',
+      name: '6.2 local var modifies global indirectly',
       code: `program test;
 var x: integer;
 procedure proc;
@@ -603,7 +624,7 @@ end.`,
       expectedContains: '6',
     },
     {
-      name: 'nested function access outer param',
+      name: '6.2 nested function access outer param',
       code: `program test;
 procedure outer(n: integer);
 function inner: integer;
@@ -620,7 +641,7 @@ end.`,
       expectedContains: '20',
     },
     {
-      name: 'function param shadows outer local',
+      name: '6.2 function param shadows outer local',
       code: `program test;
 procedure outer;
 var x: integer;
@@ -638,9 +659,74 @@ end.`,
       purpose: 'function parameter shadows outer procedure local variable',
       expectedContains: '6',
     },
+    {
+      name: '6.2 正向：内置过程 writeln 可正常调用',
+      code: `PROGRAM P;BEGIN WRITELN('ok');END.`,
+      purpose: '内置过程不依赖用户声明，不应被误判为无定义',
+      expectedOutput: 'ok\n',
+    },
+    {
+      name: '6.2 正向：内置函数 abs 可正常调用',
+      code: `PROGRAM P;VAR X:INTEGER;BEGIN X:=ABS(-5);WRITELN(X);END.`,
+      purpose: '内置函数不依赖用户声明，不应被误判为无定义',
+      expectedOutput: '5\n',
+    },
+    {
+      name: '6.2 正向：maxint 无参标识符',
+      code: `PROGRAM P;VAR X:INTEGER;BEGIN X:=MAXINT;WRITELN(X);END.`,
+      purpose: 'maxint 是预定义标识符（ISO 7185 6.1.5），不应被误判为无定义',
+      expectedOutput: '2147483647\n',
+    },
+    {
+      name: '6.2 正向：nil 无参标识符',
+      code: `PROGRAM P;TYPE IP=^INTEGER;VAR P1:IP;BEGIN P1:=NIL;IF P1=NIL THEN WRITELN('nil');END.`,
+      purpose: 'nil 是预定义标识符（ISO 7185 6.4.4），不应被误判为无定义',
+      expectedOutput: 'nil\n',
+    },
+    {
+      name: '6.2 正向：eof 无参标识符',
+      code: `PROGRAM P;BEGIN IF EOF THEN WRITELN('eof');END.`,
+      purpose: 'eof 无参形式（标准输入）不应被误判为无定义',
+      expectedOutput: 'eof\n',
+    },
+    {
+      name: '6.2 反向：引用未声明变量应报错',
+      code: `PROGRAM P;VAR X:INTEGER;BEGIN Y:=1;END.`,
+      purpose: 'ISO 7185 6.2.1: 变量使用前必须先声明，Y 未声明',
+      expectedError: 'undefined identifier',
+    },
+    {
+      name: '6.2 反向：调用未声明函数应报错',
+      code: `PROGRAM P;VAR X:INTEGER;BEGIN X:=FOO(1);END.`,
+      purpose: 'ISO 7185 6.2.1: FOO 未声明，函数调用无定义',
+      expectedError: 'unknown function',
+    },
+    {
+      name: '6.2 反向：调用未声明过程应报错',
+      code: `PROGRAM P;BEGIN BAR;END.`,
+      purpose: 'ISO 7185 6.2.1: BAR 未声明，过程调用无定义',
+      expectedError: 'unknown procedure',
+    },
+    {
+      name: '6.2 反向：嵌套过程中引用未声明变量应报错',
+      code: `PROGRAM P;PROCEDURE Q;BEGIN LOCAL:=1;END;BEGIN Q;END.`,
+      purpose: '局部作用域内未声明的变量引用同样应报错',
+      expectedError: 'undefined identifier',
+    },
   ]
 
-  const tests: PascalTest[] = [...m36Tests]
-
   runPascalTests(tests)
+
+  test('6.2 反向：多个无定义引用一次性全部捕获', () => {
+    const state = run(
+      `PROGRAM P;VAR X:INTEGER;BEGIN Y:=1;Z:=FOO(2);BAR;END.`,
+      { maxSteps: 1e5 },
+    )
+    assert(state.status === 'error', `expected error, got status=${state.status}`)
+    const msg = state.error?.message ?? ''
+    assert(msg.includes('undefined identifier Y'), `missing Y in: ${msg}`)
+    assert(msg.includes('undefined identifier Z'), `missing Z in: ${msg}`)
+    assert(msg.includes('unknown function FOO'), `missing FOO in: ${msg}`)
+    assert(msg.includes('unknown procedure BAR'), `missing BAR in: ${msg}`)
+  })
 })
