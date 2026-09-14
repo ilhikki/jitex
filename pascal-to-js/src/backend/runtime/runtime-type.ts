@@ -143,6 +143,9 @@ export interface TextFile {
 
   // 查询
   hasMore(): boolean
+
+  /** 当前行是否已有内容且以非 end-of-line 字符结尾（ISO 6.9.5 page 的隐式 writeln 判定） */
+  currentLineHasContent(): boolean
 }
 
 export interface RecordFile {

@@ -415,6 +415,10 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.filePage]: (ctx, f) => {
       const store = pick(ctx, f, true)
+      // ISO 7185 6.9.5: 若 f.L 非空且 f.L.last 不是 end-of-line，page(f) 先隐式 writeln(f)
+      if (store.currentLineHasContent()) {
+        store.writeByte(10)
+      }
       store.writeByte(12)
       return undefined
     },

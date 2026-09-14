@@ -116,6 +116,15 @@ export class MemoryTextFile implements TextFile {
     return this.pos < this.length
   }
 
+  /** 当前行是否已有内容且以非 end-of-line 字符结尾（ISO 6.9.5 page 的隐式 writeln 判定） */
+  currentLineHasContent(): boolean {
+    if (this.pos === 0) {
+      return false
+    }
+    const last = this.buffer[this.pos - 1]
+    return last !== 10 && last !== 13
+  }
+
   /** 获取全部内容（方便调试） */
   getData(): Uint8Array {
     return this.buffer.slice(0, this.length)
