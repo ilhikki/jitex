@@ -489,6 +489,8 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.cell.create': (sys) => sc(rtKeys.cellNew, [sys.args[0]]),
     'lowering.cell.get': (sys) => sc(rtKeys.cellGet, [sys.args[0]]),
     'lowering.cell.set': (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),
+    // 可调用形参的间接调用：callee 为函数值，是个原子操作，无需类型分派
+    'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
     'lowering.range.check': (sys) => sc(rtKeys.rangeCheck, sys.args),
     'lowering.steps.check': () => sc('runtime.steps.check', []),
     'lowering.hook.function.enter': () => sc('runtime.hook.function.enter', []),

@@ -78,6 +78,26 @@ export interface VarSymbol {
   varId: number
   typeInfo: TypeInfo
   isVarParam: boolean
+  /**
+   * ISO 7185 6.6.3.4/6.6.3.5：本形参为可调用形参（过程/函数作形式参数）。
+   * 有值时该形参在其块内标识实参过程/函数，可作语句或 factor 调用。
+   */
+  callable?: CallableParamInfo
+}
+
+/** 可调用形参的签名信息（供调用解析与实参 congruity 校验） */
+export interface CallableParamInfo {
+  kind: 'procedure' | 'function'
+  /** 形参自带的 formal-parameter-list 的签名（可为空） */
+  params: CallableParamSig[]
+  /** 仅 function：结果类型 */
+  retTypeInfo?: TypeInfo
+}
+
+/** 形参自带形参表中单个形参段的签名（congruity 判定用，见 ISO 7185 6.6.3.6） */
+export interface CallableParamSig {
+  isVar: boolean
+  typeInfo: TypeInfo
 }
 
 export interface FuncSymbol {

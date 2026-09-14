@@ -200,6 +200,8 @@ export const syscallKeys = {
   ptrDeref: 'lowering.ptr.deref',
   ptrAssign: 'lowering.ptr.assign',
   ptrDisposeCheck: 'lowering.ptr.dispose.check',
+  // 可调用形参（ISO 6.6.3.5）：间接调用，args = [callee, ...actualArgs]
+  callIndirect: 'lowering.call.indirect',
   // 数组整体搬移（ISO 6.6.5.4）
   pack: 'lowering.pack',
   unpack: 'lowering.unpack',

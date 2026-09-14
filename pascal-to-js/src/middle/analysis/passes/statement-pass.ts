@@ -23,8 +23,10 @@ import {
   BUILTIN_FUNCTIONS,
   BUILTIN_IDENTIFIERS,
   BUILTIN_PROCEDURES,
+  CallableParamSig,
   evalConstChar,
   evalConstInt,
+  FuncInfo,
   TypeInfo,
   VariantPartInfo,
   VarSymbol,
@@ -333,6 +335,9 @@ class StatementPass {
             this.checkVariableParameter(node.name.name, formal, arg, argType)
           }
         }
+        if (params) {
+          this.checkCallableActuals(node.name.name, params, node.arguments)
+        }
         return
       }
       case 'EmptyStatement':
@@ -392,7 +397,11 @@ class StatementPass {
         if (!sym && !BUILTIN_IDENTIFIERS.has(node.name.toLowerCase())) {
           this.recordUndefinedRef('identifier', node.name)
         }
-        if (sym?.kind === 'var' || sym?.kind === 'param') {
+        if (sym?.kind === 'param' && sym.callable) {
+          // ISO 7185 6.6.3.5：形参在其块内标识实参函数；无形参表形式作 factor 即为调用
+          info = sym.callable.retTypeInfo ??
+            this.unknown(node, `functional parameter '${node.name}' 无结果类型`)
+        } else if (sym?.kind === 'var' || sym?.kind === 'param') {
           info = sym.typeInfo
         } else if (sym?.kind === 'const') {
           info = sym.typeInfo
@@ -462,12 +471,29 @@ class StatementPass {
         for (const a of node.arguments) {
           this.analyzeExpr(a)
         }
-        if (sym?.kind === 'func') {
+        if (sym?.kind === 'param' && sym.callable) {
+          // ISO 7185 6.6.3.5：形参在其块内标识实参函数，可作 factor 调用
+          if (sym.callable.kind !== 'function') {
+            throw new Error(
+              `'${node.name.name}' is a procedure formal parameter and is not a function (ISO 7185 6.6.3.4)`,
+            )
+          }
+          if (sym.callable.params.length !== node.arguments.length) {
+            throw new Error(
+              `function '${node.name.name}' expects ${sym.callable.params.length} actual-parameter(s) but ${node.arguments.length} given (ISO 7185 6.7.3)`,
+            )
+          }
+          info = sym.callable.retTypeInfo ??
+            this.unknown(node, `call '${node.name.name}' 无返回类型`)
+        } else if (sym?.kind === 'func') {
           const funcInfo = this.decl.funcInfos.get(sym.funcId)
           if (funcInfo && funcInfo.params.length !== node.arguments.length) {
             throw new Error(
               `function '${node.name.name}' expects ${funcInfo.params.length} actual-parameter(s) but ${node.arguments.length} given (ISO 7185 6.7.3)`,
             )
+          }
+          if (funcInfo) {
+            this.checkCallableActuals(node.name.name, funcInfo.params, node.arguments)
           }
           info = sym.retTypeInfo ?? this.unknown(node, `call '${node.name.name}' 无返回类型`)
         } else {
@@ -744,6 +770,105 @@ class StatementPass {
   // --------------------------------------------------------
   // 辅助
   // --------------------------------------------------------
+
+  /**
+   * ISO 7185 6.6.3.4/6.6.3.5：校验可调用形参对应的实参——
+   * 实参须是有定义点、且该定义点被 program-block 包含的过程/函数标识符。
+   */
+  private checkCallableActuals(
+    calleeName: string,
+    formals: VarSymbol[],
+    args: ExpressionNode[],
+  ): void {
+    for (let i = 0; i < formals.length && i < args.length; i++) {
+      const formal = formals[i]
+      if (formal.callable) {
+        this.checkCallableActual(calleeName, formal, args[i])
+      }
+    }
+  }
+
+  private checkCallableActual(
+    calleeName: string,
+    formal: VarSymbol,
+    arg: ExpressionNode,
+  ): void {
+    const spec = formal.callable!
+    const isFunc = spec.kind === 'function'
+    const noun = isFunc ? 'function-identifier' : 'procedure-identifier'
+    const section = isFunc ? '6.6.3.5' : '6.6.3.4'
+    if (arg.kind !== 'Identifier') {
+      throw new Error(
+        `The actual-parameter of '${calleeName}' for a ${spec.kind} formal parameter shall be a ${noun} (ISO 7185 ${section})`,
+      )
+    }
+    const sym = this.lookup(arg.name)
+    if (sym?.kind !== 'func') {
+      throw new Error(
+        `The actual-parameter of '${calleeName}' shall be a ${noun} with a defining-point contained by the program-block (ISO 7185 ${section})`,
+      )
+    }
+    const actualInfo = this.decl.funcInfos.get(sym.funcId)
+    if (!actualInfo) {
+      throw new Error(
+        `The actual-parameter of '${calleeName}' shall be a ${noun} with a defining-point (ISO 7185 ${section})`,
+      )
+    }
+    if (isFunc) {
+      if (actualInfo.kind !== 'function') {
+        throw new Error(
+          `The actual-parameter of '${calleeName}' shall be a function-identifier (ISO 7185 6.6.3.5)`,
+        )
+      }
+      if (
+        !isSameType(
+          spec.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
+          sym.retTypeInfo ?? { tag: 'unknown' } as TypeInfo,
+        )
+      ) {
+        throw new Error(
+          `The result-type of the actual function '${arg.name}' and that of the formal parameter of '${calleeName}' shall denote the same type (ISO 7185 6.6.3.5)`,
+        )
+      }
+    } else if (actualInfo.kind !== 'procedure') {
+      throw new Error(
+        `The actual-parameter of '${calleeName}' shall be a procedure-identifier (ISO 7185 6.6.3.4)`,
+      )
+    }
+    this.checkCallableCongruity(calleeName, spec.params, actualInfo, arg.name)
+  }
+
+  /** ISO 7185 6.6.3.6：形参段自带的形参表与实参函数的形参表须 congruous，或两者都不出现 */
+  private checkCallableCongruity(
+    calleeName: string,
+    formalSigs: CallableParamSig[],
+    actualInfo: FuncInfo,
+    actualName: string,
+  ): void {
+    const actuals = actualInfo.params
+    if (formalSigs.length !== actuals.length) {
+      throw new Error(
+        `The formal-parameter-lists of '${actualName}' and of the corresponding formal parameter of '${calleeName}' shall be congruous, or both shall be absent (ISO 7185 6.6.3.6)`,
+      )
+    }
+    for (let i = 0; i < formalSigs.length; i++) {
+      const f = formalSigs[i]
+      const act = actuals[i]
+      if (f.isVar !== act.isVarParam) {
+        throw new Error(
+          `Corresponding formal-parameter-sections of '${actualName}' and '${calleeName}' shall both be value or both be variable parameters (ISO 7185 6.6.3.6)`,
+        )
+      }
+      if (
+        f.typeInfo.tag !== 'unknown' && act.typeInfo.tag !== 'unknown' &&
+        !isSameType(f.typeInfo, act.typeInfo)
+      ) {
+        throw new Error(
+          `Corresponding formal-parameter-sections of '${actualName}' and '${calleeName}' shall have the same type (ISO 7185 6.6.3.6)`,
+        )
+      }
+    }
+  }
 
   private findLabel(
     funcId: number,

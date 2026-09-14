@@ -10,6 +10,7 @@
 
 import {
   BlockNode,
+  CallableParameterSpec,
   ConstDeclarationNode,
   ExpressionNode,
   FunctionDeclarationNode,
@@ -21,6 +22,8 @@ import {
 } from '@/frontend/node.ts'
 import {
   AnalysisSymbol,
+  CallableParamInfo,
+  CallableParamSig,
   evalConstInt,
   evalLiteral,
   FuncInfo,
@@ -580,7 +583,26 @@ class DeclarationPass {
   ): void {
     const info = this.funcInfos.get(funcId)!
     for (const p of params) {
-      const ti = this.resolveTypeInfo(p.type)
+      // ISO 7185 6.6.3.4/6.6.3.5：可调用形参（过程/函数作形式参数）
+      if (p.callable) {
+        const callable = this.resolveCallableParamInfo(p.callable)
+        for (const name of p.names) {
+          const varId = this.allocId()
+          this.recordName(varId, name.name)
+          const sym: VarSymbol = {
+            kind: 'param',
+            varId,
+            typeInfo: { tag: 'unknown' },
+            isVarParam: false,
+            callable,
+          }
+          info.params.push(sym)
+          this.bind(name.name, sym)
+        }
+        continue
+      }
+
+      const ti = this.resolveTypeInfo(p.type!)
       for (const name of p.names) {
         const varId = this.allocId()
         this.recordName(varId, name.name)
@@ -594,5 +616,18 @@ class DeclarationPass {
         this.bind(name.name, sym)
       }
     }
+  }
+
+  /** 可调用形参的 heading → 签名信息（含自带的 formal-parameter-list 与结果类型） */
+  private resolveCallableParamInfo(spec: CallableParameterSpec): CallableParamInfo {
+    const params: CallableParamSig[] = spec.parameters.map((inner) => {
+      if (inner.callable) {
+        // 嵌套的可调用形参：本轮不深入判定其内部形状
+        return { isVar: false, typeInfo: { tag: 'unknown' } as TypeInfo }
+      }
+      return { isVar: inner.isVar, typeInfo: this.resolveTypeInfo(inner.type!) }
+    })
+    const retTypeInfo = spec.returnType ? this.resolveTypeInfo(spec.returnType) : undefined
+    return { kind: spec.kind, params, retTypeInfo }
   }
 }

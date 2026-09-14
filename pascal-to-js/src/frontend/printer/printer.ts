@@ -472,7 +472,15 @@ function printFunctionDecl(node: FunctionDeclarationNode, ctx: PrintContext): st
 
 function printParamDecl(node: ParameterDeclarationNode, ctx: PrintContext): string {
   const names = node.names.map((n) => n.name).join(', ')
-  const type = printType(node.type, ctx)
+  // ISO 7185 6.6.3.4/6.6.3.5：可调用形参段（过程/函数作形式参数）
+  if (node.callable) {
+    const params = node.callable.parameters.length > 0
+      ? `(${node.callable.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
+      : ''
+    const result = node.callable.returnType ? `: ${printType(node.callable.returnType, ctx)}` : ''
+    return `${node.callable.kind} ${names}${params}${result}`
+  }
+  const type = node.type ? printType(node.type, ctx) : ''
   return node.isVar ? `var ${names}: ${type}` : `${names}: ${type}`
 }
 

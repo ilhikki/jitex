@@ -137,6 +137,10 @@ export const rtKeys = {
   cellGet: 'runtime.cell.get',
   cellSet: 'runtime.cell.set',
 
+  // ---------- 可调用形参（ISO 6.6.3.4/6.6.3.5）----------
+  // 间接调用：args = [callee, ...actualArgs]，callee 为函数值
+  callIndirect: 'runtime.call.indirect',
+
   // ---------- set（构造类；运算类见上）----------
   setRange: 'runtime.set.range',
   setElem: 'runtime.set.elem',

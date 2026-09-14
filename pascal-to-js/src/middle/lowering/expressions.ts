@@ -102,6 +102,12 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
 
   const sym = resolveSymbol(node, a, ws)
 
+  // ISO 7185 6.6.3.5：可调用形参在其块内标识实参函数。
+  // 无形参表形式出现在 factor 位置即为一次无实参的调用 → 间接调用。
+  if (sym?.kind === 'param' && sym.callable) {
+    return syscall(syscallKeys.callIndirect, [ref(sym.varId)])
+  }
+
   if (sym?.kind === 'var' || sym?.kind === 'param') {
     if (sym.isVarParam) {
       return syscall(syscallKeys.cellGet, [ref(sym.varId)])
@@ -230,9 +236,18 @@ function loweringFunctionCall(
 ): JsonCode.Expr {
   const sym = resolveSymbol(node.name, a, ws)
 
+  // ISO 7185 6.6.3.5：调用可调用形参（形参标识实参函数）→ 间接调用
+  if (sym?.kind === 'param' && sym.callable) {
+    const args = node.arguments.map((x) => loweringExpr(x, a, ws))
+    return syscall(syscallKeys.callIndirect, [ref(sym.varId), ...args])
+  }
+
   // 用户定义函数
   if (sym?.kind === 'func') {
-    const args = node.arguments.map((x) => loweringExpr(x, a, ws))
+    const info = a.funcInfo(sym.funcId)
+    const args = node.arguments.map((x, i) =>
+      info.params[i]?.callable ? loweringCallableArgument(x, a, ws) : loweringExpr(x, a, ws)
+    )
     return callExpr(sym.funcId, args)
   }
 
@@ -402,4 +417,29 @@ function loweringInExpression(
 
 export function resolveSymbol(node: IdentifierNode, a: Analysis, _ws: WithBinding[]): AnalysisSymbol | undefined {
   return a.symbolOf(node)
+}
+
+/**
+ * 求可调用形参实参所标识的函数值（ISO 7185 6.6.3.4/6.6.3.5）。
+ *
+ * 编译产物中的函数是普通 JS 函数声明，其名字即函数值；实参函数对其外层
+ * 过程变量的访问由 JS 闭包保持，故直接传函数引用（而非另造转发闭包）即可。
+ */
+export function loweringCallableArgument(
+  arg: ExpressionNode,
+  a: Analysis,
+  ws: WithBinding[],
+): JsonCode.Expr {
+  if (arg.kind !== 'Identifier') {
+    throw new Error('loweringCallableArgument: actual callable parameter must be an identifier')
+  }
+  const sym = resolveSymbol(arg, a, ws)
+  if (sym?.kind === 'func') {
+    return ref(sym.funcId)
+  }
+  // 形参本身作另一形参的实参（链式传递）：直接传槽位中已有的函数值
+  if (sym?.kind === 'param' && sym.callable) {
+    return ref(sym.varId)
+  }
+  throw new Error(`loweringCallableArgument: '${arg.name}' is not a procedure/function identifier`)
 }

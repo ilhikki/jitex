@@ -149,6 +149,10 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // ---------- object 数组 ----------
   [rtKeys.arrGet]: (a) => `(${a[0]}[${a[1]}])`,
   [rtKeys.arrSet]: (a) => `(void (${a[0]}[${a[1]}] = ${a[2]}))`,
+
+  // ---------- 可调用形参：间接调用（ISO 6.6.3.4/6.6.3.5）----------
+  // callee 是函数值；每个实参只出现一次，语义与 dispatcher 一致
+  [rtKeys.callIndirect]: (a) => `(${a[0]})(${a.slice(1).join(', ')})`,
 }
 
 export class PascalSemanticCompiler implements SemanticCompiler {

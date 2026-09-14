@@ -42,7 +42,7 @@ import {
   WithBinding,
 } from './helpers.ts'
 import { defaultExpr, typeDescLiteral } from './type.ts'
-import { loweringExpr, resolveSymbol } from './expressions.ts'
+import { loweringCallableArgument, loweringExpr, resolveSymbol } from './expressions.ts'
 import { loweringReadln, loweringWriteln } from './io.ts'
 
 // ============================================================
@@ -650,6 +650,11 @@ function loweringUserCallStmt(
     const param = info.params[i]
     if (!param) {
       argExprs.push(loweringExpr(args[i], a, ws))
+      continue
+    }
+    if (param.callable) {
+      // ISO 7185 6.6.3.4/6.6.3.5：可调用形参的实参是过程/函数标识符 → 传其函数值
+      argExprs.push(loweringCallableArgument(args[i], a, ws))
       continue
     }
     if (param.isVarParam) {

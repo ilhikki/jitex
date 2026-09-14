@@ -110,8 +110,23 @@ export interface FunctionDeclarationNode extends AstNode {
 export interface ParameterDeclarationNode extends AstNode {
   kind: 'ParameterDeclaration'
   names: IdentifierNode[]
-  type: TypeNode
+  /** 值/变量参数的类型；可调用形参（functional/procedural parameter）无此项 */
+  type?: TypeNode
   isVar: boolean
+  /**
+   * ISO 7185 6.6.3.1：procedural-parameter-specification / functional-parameter-specification
+   * 都是 heading 形式。有值时本形参段为可调用形参（过程/函数作形式参数）。
+   */
+  callable?: CallableParameterSpec
+}
+
+/** 可调用形参（过程 / 函数作形式参数）的 heading 信息 */
+export interface CallableParameterSpec {
+  kind: 'procedure' | 'function'
+  /** 形参自带的 formal-parameter-list（可为空：无形参表形式） */
+  parameters: ParameterDeclarationNode[]
+  /** 仅 function：结果类型 */
+  returnType?: TypeNode
 }
 
 // --- Types ---
