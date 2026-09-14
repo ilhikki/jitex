@@ -164,6 +164,22 @@ function bindByName(
   return true
 }
 
+/**
+ * 无 file-name 的 reset / rewrite：按元素类型建立初始存储。
+ *
+ * ISO 7185 6.6.5.2 把「文件未定义时使用」定为 error，而 reset / rewrite 的作用正是让
+ * 文件进入定义状态；未初始化的文件变量在此建立存储（record → 字节记录，
+ * 其余 → 文本式单位读写，见 isByteFile 的说明）。
+ */
+function ensureStore(p: PascalFile): PascalFileStore {
+  let store = p.value
+  if (store === undefined) {
+    store = (isRec(p) ? new ByteRecordFile() : new MemoryTextFile()) as unknown as PascalFileStore
+    p.value = store
+  }
+  return store
+}
+
 /** 读一个字符单位；行结束符消耗后返回空格（char 用 ord 值表示） */
 function readCharUnit(store: TextFile): number {
   if (!store.hasMore()) {
@@ -231,10 +247,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         // 具名输入文件不存在：打开失败，句柄保持未初始化
         return undefined
       }
-      const store = p.value
-      if (store === undefined) {
-        throw new Error('file is not init')
-      }
+      const store = ensureStore(p)
       store.seek(0)
       store.setMode('inspection')
       if (isRec(p)) {
@@ -245,10 +258,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.fileRewrite]: (ctx, f, fileName) => {
       const p = f as PascalFile
       bindByName(ctx, p, fileName, 'file.rewrite', true)
-      const store = p.value
-      if (store === undefined) {
-        throw new Error('file is not init')
-      }
+      const store = ensureStore(p)
       store.clear()
       store.seek(0)
       store.setMode('generation')
