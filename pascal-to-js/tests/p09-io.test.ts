@@ -555,6 +555,74 @@ begin
 end.`,
     purpose: 'ISO 6.6.3.3 / 6.6.5.2：file 类型的变量参数在过程内可 rewrite/write/reset',
   },
+  {
+    name: '6.6 file 作二维数组元素（缩写与全形式）',
+    code: `program test(output);
+var a: array[1..2, 1..2] of file of char;
+begin
+  rewrite(a[1, 1]);
+  write(a[1, 1], 'X');
+  reset(a[1, 1]);
+  rewrite(a[2][2]);
+  write(a[2][2], 'Y');
+  reset(a[2][2]);
+end.`,
+    purpose: 'ISO 6.4.3.2 / 6.6.5.2：多维数组的 file 元素（缩写与全形式等价）可作 rewrite/write/reset 的实参',
+  },
+  {
+    name: '6.6 file 作嵌套 record 的字段',
+    code: `program test(output);
+type inner = record f: file of char; n: integer end;
+     outer = record i: inner; k: char end;
+var x: outer;
+begin
+  x.i.n := 1;
+  rewrite(x.i.f);
+  write(x.i.f, 'A');
+  reset(x.i.f);
+  write(x.i.n);
+end.`,
+    purpose: 'ISO 6.4.3.3 / 6.6.5.2：嵌套 record 里的 file 字段是 variable-access',
+    expectedOutput: '1',
+  },
+  {
+    name: '6.6 file 作 record 数组的字段',
+    code: `program test(output);
+type r = record f: file of char end;
+var a: array[1..2] of r;
+begin
+  rewrite(a[2].f);
+  write(a[2].f, 'B');
+  reset(a[2].f);
+end.`,
+    purpose: 'ISO 6.4.3.2 / 6.4.3.3：数组元素的 record 字段（含 file）可作 rewrite/write/reset 的实参',
+  },
+  {
+    name: '6.6 pointer 作 record 数组的字段',
+    code: `program test(output);
+type node = record v: integer; next: ^node end;
+var a: array[1..2] of node;
+begin
+  new(a[1].next);
+  a[1].next^.v := 7;
+  write(a[1].next^.v);
+  dispose(a[1].next);
+end.`,
+    purpose: 'ISO 6.4.3.2 / 6.4.4 / 6.6.5.3：数组元素的 record 中的 pointer 字段可 new/解引用/dispose',
+    expectedOutput: '7',
+  },
+  {
+    name: '6.6 函数的结果类型不得为 file 类型',
+    code: `program test(output);
+function f: file of char;
+begin
+end;
+begin
+  f;
+end.`,
+    purpose: 'ISO 6.6.2：function 的 result-type 必须是 simple-type 或 pointer-type；file 作结果类型应报错',
+    expectedError: 'function',
+  },
 ]
 
 runPascalTests('ISO 7185 6.9 - Input and output', tests)
