@@ -43,7 +43,7 @@ const tests: PascalTest[] = [
   },
   {
     name: '6.4.1 type-denoter 可以是已定义的类型标识符',
-    code: 'program test(output); type A = 1..5; B = A; var b: B; begin b := 3; writeln(b); end.',
+    code: 'program test(output); type A = 1..5; B = A; var v: B; begin v := 3; writeln(v); end.',
     purpose: '6.4.1：type-denoter = type-identifier，B 与 A 表示同一个类型',
     expectedOutput: '3\n',
   },
@@ -73,11 +73,11 @@ type
   P = ^Node;
   Node = record value: integer; next: P end;
 var
-  p: P;
+  q: P;
 begin
-  new(p);
-  p^.value := 7;
-  writeln(p^.value);
+  new(q);
+  q^.value := 7;
+  writeln(q^.value);
 end.`,
     purpose: '6.4.1/6.2.2.9：pointer-type 的 domain-type 允许引用尚未定义的类型，从而表达递归类型',
     expectedOutput: '7\n',
@@ -98,16 +98,16 @@ end.`,
 type
   I = integer; R = real; Bt = Boolean; C = char;
 var
-  i: I; r: R; b: Bt; c: C;
+  iv: I; rv: R; bv: Bt; cv: C;
 begin
-  i := 3;
-  r := i;
-  b := true;
-  c := 'x';
-  writeln(i);
-  writeln(trunc(r));
-  if b then writeln('b-ok');
-  writeln(c);
+  iv := 3;
+  rv := iv;
+  bv := true;
+  cv := 'x';
+  writeln(iv);
+  writeln(trunc(rv));
+  if bv then writeln('b-ok');
+  writeln(cv);
 end.`,
     purpose: '6.4.2.2：integer/real/Boolean/char 均存在且可作类型标识符使用',
     expectedOutput: '3\n3\nb-ok\nx\n',
@@ -197,6 +197,30 @@ begin
 end.`,
     purpose: '6.4.2.3：枚举常量可赋给同类型变量，同类型值可比较',
     expectedOutput: 'different\nred\n',
+  },
+  {
+    name: '6.4.2.3 整数字面量不可赋给枚举类型变量',
+    code: `program test;
+type Color = (red, green, blue);
+var c: Color;
+begin
+  c := 5;
+end.`,
+    purpose: '6.4.2.3 + 6.4.6：枚举类型只能取该枚举类型的值，integer 与其不满足赋值兼容',
+    expectedError: '',
+  },
+  {
+    name: '6.4.2.3 不同枚举类型之间不可赋值',
+    code: `program test;
+type Color = (red, green, blue);
+     Light = (on, off);
+var c: Color;
+    l: Light;
+begin
+  c := l;
+end.`,
+    purpose: '6.4.1 + 6.4.6：两个枚举类型互不相同，彼此不赋值兼容',
+    expectedError: '',
   },
 
   // ==========================================================================
@@ -550,20 +574,20 @@ end.`,
   // ==========================================================================
   {
     name: '6.4.4 nil 值的赋值与比较',
-    code: "program test(output); type P = ^integer; var p: P; begin p := nil; if p = nil then writeln('nil'); end.",
+    code: "program test(output); type TP = ^integer; var p: TP; begin p := nil; if p = nil then writeln('nil'); end.",
     purpose: '6.4.4：pointer-type 的值集含唯一的 nil-value，token nil 表示它',
     expectedOutput: 'nil\n',
   },
   {
     name: '6.4.4 new 创建变量并解引用',
-    code: 'program test(output); type P = ^integer; var p: P; begin new(p); p^ := 7; writeln(p^); end.',
+    code: 'program test(output); type TP = ^integer; var p: TP; begin new(p); p^ := 7; writeln(p^); end.',
     purpose: '6.4.4：identifying-value 与所标识变量仅由 new 创建，可通过 p^ 访问',
     expectedOutput: '7\n',
   },
   {
     name: '6.4.4 同一 pointer-type 的变量间赋值',
-    code: 'program test(output); type P = ^integer; var p, q: P; begin new(p); p^ := 3; q := p; writeln(q^); end.',
-    purpose: '6.4.6 a+6.4.4：p、q 同属 pointer-type P，赋值后二者标识同一变量',
+    code: 'program test(output); type TP = ^integer; var p, q: TP; begin new(p); p^ := 3; q := p; writeln(q^); end.',
+    purpose: '6.4.6 a+6.4.4：p、q 同属 pointer-type TP，赋值后二者标识同一变量',
     expectedOutput: '3\n',
   },
   {

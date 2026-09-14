@@ -394,18 +394,18 @@ const tests: PascalTest[] = [
     code: `program test(f);
         type r = record x: integer end;
         var f: file of r;
-            r: r;
+            rec: r;
         procedure setit(var v: r);
         begin v.x := 42; end;
         begin
           rewrite(f);
-          r.x := 0;
-          f^ := r;
+          rec.x := 0;
+          f^ := rec;
           setit(f^);
           put(f);
           reset(f);
-          r := f^;
-          writeln(r.x);
+          rec := f^;
+          writeln(rec.x);
         end.`,
     purpose: 'ISO 6.5.1/6.6.3.3：buffer-variable 是 variable-access，可作变量参数',
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),

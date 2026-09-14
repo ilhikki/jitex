@@ -577,6 +577,19 @@ end.`,
     purpose: 'ISO 6.7.3：实参个数须与形参个数相等，多传实参应报错',
     expectedError: '',
   },
+  {
+    name: '6.7.3 function-designator：实参个数不足须报错',
+    code: `program test(output);
+function add(a, b: integer): integer;
+begin
+  add := a + b;
+end;
+begin
+  writeln(add(1));
+end.`,
+    purpose: 'ISO 6.7.3：实参个数须与形参个数相等，少传实参同样应报错',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.7 - Expressions', tests)

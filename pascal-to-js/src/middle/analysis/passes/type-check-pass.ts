@@ -6,6 +6,7 @@
  *   6.10    program-parameter-list 的标识符须互不相同
  *   6.6.1   forward 声明的标识符须有对应的 procedure-identification；
  *           一个 identifier 至多关联一个 procedure-block
+ *   6.2.2.7 同一 region 内不得出现两个同拼写的定义点（不区分声明种类）
  *   6.2.2.9 定义点须先于应用出现（new-pointer-type 的 domain-type 为例外）
  *   6.4.3.4 set-type 的 base-type 须为 ordinal-type
  *   6.6.2   function-block 须至少含一条对该函数标识符赋值的语句
@@ -88,7 +89,7 @@ class TypeCheckPass {
   // --------------------------------------------------------
 
   private checkBlock(block: BlockNode, outerTypes: Set<string>): void {
-    this.checkRoutineDeclarations(block)
+    this.checkDeclaredNames(block)
     const availableTypes = this.checkTypeDefinitions(block, outerTypes)
     for (const p of block.procedureDeclarations) {
       if (p.block) {
@@ -107,12 +108,36 @@ class TypeCheckPass {
   // ISO 6.2.2.7：同一 region 内不得出现同拼写的定义
   // --------------------------------------------------------
 
-  private checkRoutineDeclarations(block: BlockNode): void {
-    // 过程/函数：forward 声明与其后的 procedure-identification 合起来只算一个定义点，
-    // 但一个 identifier 至多关联一个 procedure-block（ISO 6.6.1）。
-    //
-    // NOTE: 6.2.2.7 的更广要求（同一 region 内不同声明种类也不得同拼写，例如
-    // `type P = ^integer; var p: P;`）未在此处实现，需另行裁决后单独处理。
+  /**
+   * ISO 6.2.2.7：同一 region 内不得有两个同拼写的定义点（不区分声明种类）。
+   * 另外按 6.6.1，一个 procedure-identifier 至多关联一个 procedure-block；
+   * forward 声明与其后的 procedure-identification 合起来只算一个定义点。
+   */
+  private checkDeclaredNames(block: BlockNode): void {
+    const kinds = new Map<string, string>()
+    const declare = (name: string, kind: string) => {
+      const key = name.toLowerCase()
+      const prev = kinds.get(key)
+      if (prev !== undefined) {
+        throw new Error(
+          `'${name}' is declared twice in the same scope as ${prev} and ${kind} (ISO 7185 6.2.2.7)`,
+        )
+      }
+      kinds.set(key, kind)
+    }
+
+    for (const c of block.constDeclarations) {
+      declare(c.name.name, 'a constant')
+    }
+    for (const t of block.typeDeclarations) {
+      declare(t.name.name, 'a type')
+    }
+    for (const v of block.variableDeclarations) {
+      for (const n of v.names) {
+        declare(n.name, 'a variable')
+      }
+    }
+
     const routines = new Map<string, 'forward' | 'defined'>()
     const routineDecls: (ProcedureDeclarationNode | FunctionDeclarationNode)[] = [
       ...block.procedureDeclarations,
@@ -128,12 +153,16 @@ class TypeCheckPass {
           )
         }
         routines.set(key, 'forward')
+        declare(d.name.name, 'a procedure')
         continue
       }
       if (prev === 'defined') {
         throw new Error(
           `More than one procedure-block associated with '${d.name.name}' (ISO 7185 6.6.1)`,
         )
+      }
+      if (prev === undefined) {
+        declare(d.name.name, 'a procedure')
       }
       routines.set(key, 'defined')
     }

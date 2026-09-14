@@ -701,6 +701,31 @@ end.`,
     expectedError: '',
   },
   {
+    name: '6.8 while 的条件须是 Boolean 表达式',
+    code: `program test;
+var x: integer;
+begin
+  x := 0;
+  while x do
+    x := x + 1;
+end.`,
+    purpose: '6.8.3.4：while 的条件须为 Boolean 类型，integer 作条件不合法',
+    expectedError: '',
+  },
+  {
+    name: '6.8 repeat 的 until 条件须是 Boolean 表达式',
+    code: `program test;
+var x: integer;
+begin
+  x := 0;
+  repeat
+    x := x + 1;
+  until x;
+end.`,
+    purpose: '6.8.3.4：repeat 的 until 条件须为 Boolean 类型，integer 作条件不合法',
+    expectedError: '',
+  },
+  {
     name: '6.8 if 与布尔运算符组合的条件',
     code: `program test(output);
 var a, b, c: integer;
