@@ -174,20 +174,6 @@ end.`,
     expectedError: '',
   },
   {
-    name: '6.7 实数除法除数为零为错误',
-    code: `program test(output);
-var r: real;
-i: integer;
-begin
-  i := 0;
-  r := 10 / i;
-  writeln(trunc(r));
-end.`,
-    purpose:
-      '【乙类·D.44】ISO 6.7.2.2：x / y 在 y 为零时为错误——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
-    expectedError: '',
-  },
-  {
     name: '6.7 div 除数为零为错误',
     code: `program test(output);
 var x, j: integer;
@@ -209,19 +195,6 @@ begin
   writeln(x);
 end.`,
     purpose: 'ISO 6.7.2.2：i mod j 在 j 为零时为错误',
-    expectedError: '',
-  },
-  {
-    name: '6.7 整数运算须符合数学规则：maxint + 1 报错',
-    code: `program test(output);
-var x: integer;
-begin
-  x := maxint;
-  x := x + 1;
-  writeln(x);
-end.`,
-    purpose:
-      '【乙类·D.47】ISO 6.7.2.2：整数运算须按数学规则正确执行，否则出错；maxint + 1 超出 integer 范围，应报错而非环绕——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
   {

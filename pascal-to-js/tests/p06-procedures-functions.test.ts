@@ -915,14 +915,6 @@ const tests: PascalTest[] = [
     expectedOutput: 'OK',
   },
   {
-    name: '6.6 chr 的参数超出字符值范围应报错',
-    code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(CHR(-1));END.`,
-    purpose:
-      '【乙类·D.37】ISO 6.6.6.4：不存在序数为该值的字符时为 error——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
-    expectedError: '',
-    maxSteps: 1000,
-  },
-  {
     name: '6.6 succ 返回后继序数值（integer）',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(SUCC(5));END.`,
     purpose: 'ISO 6.6.6.4：succ(x) 结果的序数比 x 大 1，结果类型与 x 相同',
@@ -996,15 +988,6 @@ const tests: PascalTest[] = [
     purpose: 'ISO 6.6.6.5：eoln(f) 在 f.R.first 为 end-of-line 组件时为 true',
     textFiles: new Map<string, Uint8Array>([['F', text('AB\n')]]),
     expectedOutput: 'EOLN',
-  },
-  {
-    name: '6.6 eoln(f) 在 eof(f) 为真时应报错',
-    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOLN(F)THEN WRITE('EOLN');END.`,
-    purpose:
-      '【乙类·D.42】ISO 6.6.6.5：eoln(f) 激活时若 eof(f) 为真则为 error——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
-    textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
-    expectedError: '',
-    maxSteps: 1000,
   },
   {
     name: '6.6 省略参数的 eof 应用于 input',

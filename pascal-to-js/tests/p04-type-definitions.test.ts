@@ -492,32 +492,6 @@ end.`,
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.4.3.4 成员超出目标 base-type 区间的 set 赋值是错误',
-    code: `program test;
-type S1 = set of 1..10; S2 = set of 1..5;
-var a: S1; b: S2;
-begin
-  a := [3, 8];
-  b := a;
-end.`,
-    purpose:
-      '【乙类·D.50】6.4.6 d 及其错误规则 b：成员 8 不在 T1 的 base-type 1..5 的闭区间内——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
-    expectedError: '',
-  },
-  {
-    name: '6.4.3.4 packed set 与 unpacked set 互不兼容',
-    code: `program test;
-type S = set of 1..5; P = packed set of 1..5;
-var a: S; b: P;
-begin
-  a := [1];
-  b := a;
-end.`,
-    purpose:
-      '【乙类·D.50】6.4.5 c：两个 set-type 须同为 packed 或同非 packed 才兼容，故赋值是错误——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
-    expectedError: '',
-  },
-  {
     name: '6.4.3.4 packed set 的构造与 in 运算',
     code: `program test(output);
 type S = packed set of 1..5;

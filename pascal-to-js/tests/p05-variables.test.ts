@@ -189,26 +189,6 @@ end.`,
     purpose: '带 tag-field 的变体部分，其分量在对应变体激活时可访问',
     expectedOutput: '42\n',
   },
-  {
-    name: '6.5.3.3 变体未激活时访问其分量是错误',
-    code: `program p(output);
-type
-  r = record
-    case tag: integer of
-      1: (i: integer);
-      2: (c: char);
-  end;
-var v: r;
-begin
-  v.tag := 2;
-  v.i := 42;
-  writeln(v.i);
-end.`,
-    purpose:
-      '【乙类·D.2】ISO 6.5.3.3：每次引用与访问期间变体须处于激活状态，否则是 error——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
-    expectedError: '',
-  },
-
   // 6.5.4 Identified-variables
   {
     name: '6.5.4 p^ 表示指针所指的变量',

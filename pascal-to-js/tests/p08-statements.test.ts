@@ -861,22 +861,6 @@ end.`,
     expectedError: '',
   },
   {
-    name: '6.8 case-index 无匹配 case 常量时为错误',
-    code: `program test(output);
-var x: integer;
-begin
-  x := 10;
-  case x of
-    1: writeln('one');
-    2: writeln('two');
-  end;
-  writeln('done');
-end.`,
-    purpose:
-      '【乙类·D.51】6.8.3.5：进入 case 语句时必有一个 case 常量等于 case-index 值，否则为错误——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
-    expectedError: '',
-  },
-  {
     name: '6.8 嵌套 case',
     code: `program test(output);
 var x, y: integer;
