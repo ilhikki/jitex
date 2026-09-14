@@ -109,7 +109,8 @@ var i: integer;
 begin
   i := true;
 end.`,
-    purpose: '6.8.2.2：值须与变量类型赋值兼容，boolean 不兼容 integer，程序非法',
+    purpose:
+      '【乙类·D.49】6.8.2.2：值须与变量类型赋值兼容，boolean 不兼容 integer，程序非法——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
   {
@@ -860,7 +861,8 @@ begin
   end;
   writeln('done');
 end.`,
-    purpose: '6.8.3.5：进入 case 语句时必有一个 case 常量等于 case-index 值，否则为错误',
+    purpose:
+      '【乙类·D.51】6.8.3.5：进入 case 语句时必有一个 case 常量等于 case-index 值，否则为错误——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
   {

@@ -348,7 +348,8 @@ begin
   read(i);
   writeln(i);
 end.`,
-    purpose: 'ISO 6.9.1c「It shall be an error if s is empty」及 Annex D.54：整数字段为空（输入耗尽）时必须报错',
+    purpose:
+      '【乙类·D.54】ISO 6.9.1c「It shall be an error if s is empty」：整数字段为空（输入耗尽）时为 error——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     input: '',
     expectedError: '',
   },
@@ -360,7 +361,8 @@ begin
   read(i);
   writeln(i);
 end.`,
-    purpose: 'ISO 6.9.1c 及 Annex D.54：跳过空格/行结束符后的序列不能构成 signed-integer 时必须报错',
+    purpose:
+      '【乙类·D.54】ISO 6.9.1c 及 Annex D.54：跳过空格/行结束符后的序列不能构成 signed-integer 时为 error——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     input: 'abc',
     expectedError: '',
   },
@@ -498,7 +500,8 @@ end.`,
 begin
   writeln(42:0);
 end.`,
-    purpose: 'ISO 6.9.3.1 及 Annex D.58：TotalWidth 与 FracDigits 均须 ≥1，任一小于 1 即为错误',
+    purpose:
+      '【乙类·D.58】ISO 6.9.3.1：TotalWidth 与 FracDigits 均须 ≥1，任一小于 1 即为错误——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
 ]

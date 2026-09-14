@@ -23,6 +23,10 @@
 
 import { type PascalTest, runPascalTests } from './harness.ts'
 
+function text(s: string): Uint8Array {
+  return new TextEncoder().encode(s)
+}
+
 const tests: PascalTest[] = [
   // ---------------------------------------------------------------------------
   // 6.5.1 Variable-declarations
@@ -210,7 +214,8 @@ begin
   v.i := 42;
   writeln(v.i);
 end.`,
-    purpose: 'ISO 6.5.3.3：每次引用与访问期间变体须处于激活状态，否则是 error（5.1 f 允许处理器文档化不上报）',
+    purpose:
+      '【乙类·D.2】ISO 6.5.3.3：每次引用与访问期间变体须处于激活状态，否则是 error——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
 
@@ -260,15 +265,18 @@ end.`,
   // ---------------------------------------------------------------------------
   {
     name: '6.5.5 文本文件的缓冲区变量具有 char 类型',
-    code: `program p(input, output);
-var c: char;
+    code: `program p(input, output, f);
+var c: char; f: text;
 begin
-  write('A');
-  c := output^;
+  reset(f);
+  c := f^;
   writeln(c);
 end.`,
-    purpose: 'ISO 6.5.5：与 textfile 关联的 buffer-variable 具有 char 类型（可作为 char 变量使用）',
-    expectedOutput: 'AA\n',
+    purpose:
+      'ISO 6.5.5：与 textfile 关联的 buffer-variable 具有 char 类型；6.6.5.2 的 reset 后置断言保证此时 f^ = f.R.first（原用例在 write 之后读 output^，因 put 的后置断言 f^ totally-undefined 而属 D.43 错误，期望值不可由 ISO 推出）',
+    textFiles: new Map<string, Uint8Array>([['F', text('A')]]),
+    programFileUrls: { f: 'F' },
+    expectedOutput: 'A\n',
   },
 ]
 

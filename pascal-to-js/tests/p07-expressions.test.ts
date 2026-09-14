@@ -169,7 +169,8 @@ begin
   x := 10 mod j;
   writeln(x);
 end.`,
-    purpose: 'ISO 6.7.2.2：i mod j 在 j 为负时出错（j <= 0 即错误）',
+    purpose:
+      '【乙类·D.46】ISO 6.7.2.2：i mod j 在 j 为负时出错（j <= 0 即错误）——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
   {
@@ -182,7 +183,8 @@ begin
   r := 10 / i;
   writeln(trunc(r));
 end.`,
-    purpose: 'ISO 6.7.2.2：x / y 在 y 为零时为错误',
+    purpose:
+      '【乙类·D.44】ISO 6.7.2.2：x / y 在 y 为零时为错误——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
   {
@@ -218,7 +220,8 @@ begin
   x := x + 1;
   writeln(x);
 end.`,
-    purpose: 'ISO 6.7.2.2：整数运算须按数学规则正确执行，否则出错；maxint + 1 超出 integer 范围，应报错而非环绕',
+    purpose:
+      '【乙类·D.47】ISO 6.7.2.2：整数运算须按数学规则正确执行，否则出错；maxint + 1 超出 integer 范围，应报错而非环绕——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
   {
@@ -557,7 +560,8 @@ end;
 begin
   writeln(f(1));
 end.`,
-    purpose: 'ISO 6.7.3：函数激活结束时若结果未定义则为错误（函数体内从未给 f 赋值）',
+    purpose:
+      '【乙类·D.48】ISO 6.7.3：函数激活结束时若结果未定义则为错误（函数体内从未给 f 赋值）——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
     expectedError: '',
   },
   {
