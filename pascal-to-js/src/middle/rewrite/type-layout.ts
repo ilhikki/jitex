@@ -200,9 +200,7 @@ function variantSize(vp: VariantPartDescriptor): number {
   return max
 }
 
-// ============================================================
 // 字段槽位
-// ============================================================
 
 export interface FieldSlot {
   offset: number
@@ -257,9 +255,7 @@ function variantFieldSlot(
   return undefined
 }
 
-// ============================================================
 // 数组槽位
-// ============================================================
 
 export interface ArraySlot {
   /** 最内层元素类型 */
@@ -270,6 +266,8 @@ export interface ArraySlot {
   lows: number[]
   /** 各维步长（字节） */
   strides: number[]
+  /** 摊平后的各维范围，供部分下标切分剩余维度 */
+  dims: { low: number; high: number }[]
 }
 
 /** 把（可能嵌套的）数组类型摊平成维度 + 步长 */
@@ -287,5 +285,22 @@ export function arraySlot(td: TypeDescriptor): ArraySlot {
   for (let i = dims.length - 2; i >= 0; i--) {
     strides[i] = strides[i + 1] * (dims[i + 1].high - dims[i + 1].low + 1)
   }
-  return { elemType: cur, elemSize, lows: dims.map((d) => d.low), strides }
+  return { elemType: cur, elemSize, lows: dims.map((d) => d.low), strides, dims }
+}
+
+/**
+ * 部分下标时的槽位类型。
+ *
+ * `a[i]`（二维数组）只给一个下标时，槽位不是最内层元素，而是「剩余维度构成的数组」。
+ * ISO 6.4.3.2 / 6.5.3.2 要求缩写形式 a[i,j] 与全形式 a[i][j] 等价：全形式正是靠这一步
+ * 拿到中间层的数组视图，内层再取下标才成立。
+ */
+export function remainingArrayType(
+  arr: ArraySlot,
+  indexCount: number,
+): TypeDescriptor | undefined {
+  if (indexCount >= arr.dims.length) {
+    return undefined
+  }
+  return { tag: 'array', dims: arr.dims.slice(indexCount), elem: arr.elemType }
 }

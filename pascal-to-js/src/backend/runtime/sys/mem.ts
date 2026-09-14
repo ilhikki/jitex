@@ -29,8 +29,16 @@ function dv(buffer: ArrayBufferLike): DataView {
   return d
 }
 
+/** 视图参数校验：把「拿标量当视图用」这类建模错误暴露在出错点 */
+function assertView(view: unknown, what: string): asserts view is Uint8Array {
+  if (!(view instanceof Uint8Array)) {
+    throw new Error(`${what}: expected a byte view, got ${view === null ? 'null' : typeof view}`)
+  }
+}
+
 /** 按 codec 读标量 */
 function getNum(view: Uint8Array, offset: number, codec: Codec): number {
+  assertView(view, 'num.get')
   const d = dv(view.buffer)
   const o = view.byteOffset + offset
   switch (codec) {
@@ -51,6 +59,7 @@ function getNum(view: Uint8Array, offset: number, codec: Codec): number {
 
 /** 按 codec 写标量 */
 function setNum(view: Uint8Array, offset: number, codec: Codec, v: number): void {
+  assertView(view, 'num.set')
   const d = dv(view.buffer)
   const o = view.byteOffset + offset
   switch (codec) {
@@ -75,9 +84,7 @@ function setNum(view: Uint8Array, offset: number, codec: Codec, v: number): void
   }
 }
 
-// ============================================================
 // 位图集合运算
-// ============================================================
 
 function bitmapOp(
   a: Uint8Array,
@@ -120,8 +127,6 @@ function withBit(bits: number[], size: number): Uint8Array {
   }
   return out
 }
-
-// ============================================================
 
 export function memSyscalls(): Record<string, SyscallHandler> {
   return {

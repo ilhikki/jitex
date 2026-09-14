@@ -291,7 +291,7 @@ end.`,
   {
     name: '6.4.3.2 Boolean 作为 index-type',
     code:
-      'program test(output); var a: array[Boolean] of integer; begin a[false] := 0; a[true] := 1; writeln(a[false], a[true]); end.',
+      'program test(output); var a: array[boolean] of integer; begin a[false] := 0; a[true] := 1; writeln(a[false], a[true]); end.',
     purpose: '6.4.3.2：index-type 为 ordinal-type，Boolean 的两个值各对应一个分量',
     expectedOutput: '01\n',
   },

@@ -18,6 +18,7 @@ import {
   isByteScalar,
   isScalar,
   objectArrayElem,
+  remainingArrayType,
   setSize,
   sizeOf,
 } from './type-layout.ts'
@@ -516,7 +517,8 @@ function accessAt(
   } else {
     const arr = arraySlot(td)
     offset = offsetExpr(indices, arr.lows, arr.strides)
-    slotType = arr.elemType
+    // 部分下标（如二维数组的 a[i]）产出剩余维度的子数组视图，而非最内层元素
+    slotType = remainingArrayType(arr, indices.length) ?? arr.elemType
   }
 
   offset = addOffset(folded.delta, offset)
@@ -558,7 +560,8 @@ function assignAt(
   } else {
     const arr = arraySlot(td)
     offset = offsetExpr(indices, arr.lows, arr.strides)
-    slotType = arr.elemType
+    // 部分下标（如二维数组的 a[i]）产出剩余维度的子数组视图，而非最内层元素
+    slotType = remainingArrayType(arr, indices.length) ?? arr.elemType
   }
 
   offset = addOffset(folded.delta, offset)
