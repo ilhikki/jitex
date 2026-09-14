@@ -323,7 +323,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       }
       // 含 file / pointer 的类型无法字节化 → 用 JS 对象 / object[] 承载（见 isObjectRepr）
       if (isObjectRepr(td)) {
-        return sc(rtKeys.recNew, [litType(td)])
+        return sc(rtKeys.objNew, [litType(td)])
       }
       if (td.tag === 'set') {
         return sc(rtKeys.memNew, [litInt(setSize(td))])

@@ -195,8 +195,8 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- 对象表示的 record（含 file / pointer 字段，见 isObjectRepr）----------
-    [rtKeys.recNew]: (_ctx, td) => newRecordValue(td as TypeDescriptor),
+    // ---------- 对象表示的值（含 file / pointer 字段，见 isObjectRepr）----------
+    [rtKeys.objNew]: (_ctx, td) => defaultValueOf(td as TypeDescriptor),
     [rtKeys.recGetField]: (_ctx, obj, name) => (obj as Record<string, unknown>)[name as string],
     [rtKeys.recSetField]: (_ctx, obj, name, v) => {
       ;(obj as Record<string, unknown>)[name as string] = v

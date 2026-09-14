@@ -132,6 +132,24 @@ function pick(ctx: RuntimeContext, f: unknown, isOutput: boolean): TextFile {
 }
 
 /**
+ * file-name 归一化为字符串。
+ *
+ * 运行时的 file-name 可能是 Pascal 字符串（Uint8Array）、char 值（以序数表示）或宿主字符串。
+ */
+function fileNameToString(fileName: unknown): string {
+  if (typeof fileName === 'string') {
+    return fileName.trim()
+  }
+  if (typeof fileName === 'number') {
+    return String.fromCharCode(fileName)
+  }
+  if (fileName instanceof Uint8Array) {
+    return bytesToString(fileName).trim()
+  }
+  return ''
+}
+
+/**
  * 处理非 ISO 的 `reset(f, name)` / `rewrite(f, name)` 形式：
  * 按名字在 ctx.files 中查找并绑定到句柄。
  *
@@ -149,7 +167,7 @@ function bindByName(
   if (fileName === undefined) {
     return true
   }
-  const name = typeof fileName === 'string' ? fileName.trim() : bytesToString(fileName as Uint8Array).trim()
+  const name = fileNameToString(fileName)
   ctx.debugLog.push(`${tag} ${name}`)
   let store = ctx.files.get(name)
   if (store === undefined) {
