@@ -128,9 +128,11 @@ export const rtKeys = {
   viewSub: 'runtime.view.sub',
 
   // ---------- object 数组（元素非字节可寻址，如 file）----------
-  arrNew: 'runtime.arr.new',
   arrGet: 'runtime.arr.get',
   arrSet: 'runtime.arr.set',
+  arrNew: 'runtime.arr.new',
+  // 对象数组的部分下标视图（a[i] 对二维数组返回子数组视图，而非元素）
+  arrSublist: 'runtime.arr.sublist',
 
   // ---------- cell ----------
   cellNew: 'runtime.cell.new',

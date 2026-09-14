@@ -632,42 +632,27 @@ function loweringProcedureCall(
     }
     case 'new': {
       // ISO 7185 6.6.5.3: new(p) 创建新变量，p 指向它
+      // p 可以是指针变量、记录的 pointer 字段、数组元素的 pointer 字段等
       const argNode = node.arguments[0]
-      if (argNode.kind !== 'Identifier') {
-        throw new Error('new: argument must be a pointer variable')
-      }
-      const sym = resolveSymbol(argNode as IdentifierNode, a, ws)
-      if (!sym || (sym.kind !== 'var' && sym.kind !== 'param')) {
-        throw new Error('new: argument is not a variable')
-      }
       const ptrType = a.typeOf(argNode)
       if (ptrType.tag !== 'pointer' || !ptrType.domainType) {
         throw new Error('new: argument must be a pointer-type variable')
       }
       const defaultVal = defaultExpr(ptrType.domainType)
       const cell = syscall(syscallKeys.cellCreate, [defaultVal])
-      if (sym.isVarParam) {
-        return [evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), cell]))]
-      }
-      return [assignStmt(ref(sym.varId), cell)]
+      return loweringAssignTarget(argNode, cell, a, funcId, ws)
     }
     case 'dispose': {
       // ISO 7185 6.6.5.3: dispose(p) 释放标识值，p 置 nil
       const argNode = node.arguments[0]
-      if (argNode.kind !== 'Identifier') {
-        throw new Error('dispose: argument must be a pointer variable')
+      const ptrType = a.typeOf(argNode)
+      if (ptrType.tag !== 'pointer') {
+        throw new Error('dispose: argument must be a pointer-type variable')
       }
-      const sym = resolveSymbol(argNode as IdentifierNode, a, ws)
-      if (!sym || (sym.kind !== 'var' && sym.kind !== 'param')) {
-        throw new Error('dispose: argument is not a variable')
-      }
-      // 先检查 p 不是 nil（解引用前检查），然后置 nil
+      // 先检查 p 不是 nil，然后置 nil
       const ptrExpr = loweringExpr(argNode, a, ws)
       const checkStmt = evalStmt(syscall(syscallKeys.ptrDisposeCheck, [ptrExpr]))
-      if (sym.isVarParam) {
-        return [checkStmt, evalStmt(syscall(syscallKeys.cellSet, [ref(sym.varId), litNull()]))]
-      }
-      return [checkStmt, assignStmt(ref(sym.varId), litNull())]
+      return [checkStmt, ...loweringAssignTarget(argNode, litNull(), a, funcId, ws)]
     }
     default: {
       throw new Error(`loweringProcedureCall: unknown procedure ${name}`)

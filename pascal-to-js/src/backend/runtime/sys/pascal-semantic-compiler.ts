@@ -146,9 +146,13 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // cell.set 的 handler 返回 undefined，用 void 保持返回值语义
   [rtKeys.cellSet]: (a) => `(void (${a[0]}.value = ${a[1]}))`,
 
-  // ---------- object 数组 ----------
-  [rtKeys.arrGet]: (a) => `(${a[0]}[${a[1]}])`,
-  [rtKeys.arrSet]: (a) => `(void (${a[0]}[${a[1]}] = ${a[2]}))`,
+  // ---------- object 数组（统一视图表示 {base, offset}）----------
+  // arrGet / arrSet / arrSublist 都是类型无知的原子操作：统一走 base[offset+idx]，
+  // 无需在运行时区分「完整数组」与「子数组视图」。
+  [rtKeys.arrGet]: (a) => `(${a[0]}.base[${a[0]}.offset + ${a[1]}])`,
+  [rtKeys.arrSet]: (a) => `(void (${a[0]}.base[${a[0]}.offset + ${a[1]}] = ${a[2]}))`,
+  [rtKeys.arrSublist]: (a) =>
+    `({base: ${a[0]}.base, offset: (${a[0]}.offset + ${a[1]}) | 0})`,
 
   // ---------- 可调用形参：间接调用（ISO 6.6.3.4/6.6.3.5）----------
   // callee 是函数值；每个实参只出现一次，语义与 dispatcher 一致

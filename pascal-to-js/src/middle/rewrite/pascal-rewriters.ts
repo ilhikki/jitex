@@ -190,6 +190,12 @@ function offsetExpr(indices: JsonCode.Expr[], lows: number[], strides: number[])
 
 /** object 数组的下标表达式：同 offsetExpr，但步长以「元素」为单位（不是字节） */
 function elemIndexExpr(td: TypeDescriptor, indices: JsonCode.Expr[]): JsonCode.Expr {
+  const dims = arrayDims(td)
+  return elementOffset(indices, dims)
+}
+
+/** 摊平嵌套数组的所有维度（object 数组用，不涉及字节大小） */
+function arrayDims(td: TypeDescriptor): Array<{ low: number; high: number }> {
   const dims: Array<{ low: number; high: number }> = []
   let cur: TypeDescriptor | undefined = td
   while (cur && cur.tag === 'array') {
@@ -198,6 +204,14 @@ function elemIndexExpr(td: TypeDescriptor, indices: JsonCode.Expr[]): JsonCode.E
     }
     cur = cur.elem
   }
+  return dims
+}
+
+/** 按元素步长计算摊平偏移（用于 object 数组的部分/完全下标） */
+function elementOffset(
+  indices: JsonCode.Expr[],
+  dims: Array<{ low: number; high: number }>,
+): JsonCode.Expr {
   const strides = new Array<number>(dims.length).fill(1)
   for (let i = dims.length - 2; i >= 0; i--) {
     strides[i] = strides[i + 1] * (dims[i + 1].high - dims[i + 1].low + 1)
@@ -535,6 +549,12 @@ function accessAt(
   fieldName?: string,
 ): JsonCode.Expr {
   if (fieldName === undefined && isObjectRepr(td)) {
+    // 对象数组：下标数等于维数时取元素；少于维数时返回子数组视图（ISO 6.4.3.2）
+    const dims = arrayDims(td)
+    if (indices.length < dims.length) {
+      const flatOff = elementOffset(indices, dims)
+      return sc(rtKeys.arrSublist, [base, flatOff])
+    }
     return sc(rtKeys.arrGet, [base, elemIndexExpr(td, indices)])
   }
 
@@ -582,6 +602,7 @@ function assignAt(
   fieldName?: string,
 ): JsonCode.Expr {
   if (fieldName === undefined && isObjectRepr(td)) {
+    // 对象数组：下标数等于维数时写元素；少于维数时（子数组视图）交由 arrSet 处理
     return sc(rtKeys.arrSet, [base, elemIndexExpr(td, indices), value])
   }
 

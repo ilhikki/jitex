@@ -14,6 +14,17 @@ import type { TypeDescriptor } from '@/middle/lowering/type.ts'
 import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 /**
+ * object 数组的统一表示：所有含 object 元素（file / pointer / 含它们的 record）
+ * 的数组都用视图承载，下标 = base[offset + idx]。
+ * 部分下标（a[i] on 二维数组）只是在视图上叠加 offset，共享同一 base，
+ * 因此 arrGet / arrSet 对「完整数组」和「子数组视图」一视同仁，无需分支。
+ */
+interface ObjArrView {
+  base: unknown[]
+  offset: number
+}
+
+/**
  * DataView 缓存：按底层 ArrayBuffer 复用一个 DataView。
  *
  * DataView 的读写偏移是相对其视图窗口的；本模型里 offset 由编译期算出、
@@ -162,19 +173,29 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // ---------- object 数组（元素是 object，如 file；用 JS Array 承载）----------
-    [rtKeys.arrNew]: (_ctx, count, elemType): unknown[] => {
+    // ---------- object 数组（元素是 object，如 file；统一用视图 {base, offset} 承载）----------
+    // 所有 object 数组，无论是否部分下标，都表示为视图；arrGet/arrSet/arrSublist 无需分支
+    [rtKeys.arrNew]: (_ctx, count, elemType): ObjArrView => {
       const n = count as number
-      const out = new Array<unknown>(n)
+      const base = new Array<unknown>(n)
       for (let i = 0; i < n; i++) {
-        out[i] = { kind: 'file', value: undefined, type: elemType }
+        base[i] = { kind: 'file', value: undefined, type: elemType }
       }
-      return out
+      return { base, offset: 0 }
     },
-    [rtKeys.arrGet]: (_ctx, arr, idx) => (arr as unknown[])[idx as number],
-    [rtKeys.arrSet]: (_ctx, arr, idx, v) => {
-      ;(arr as unknown[])[idx as number] = v
+    [rtKeys.arrGet]: (_ctx, arr, idx) => {
+      const v = arr as ObjArrView
+      return v.base[v.offset + (idx as number)]
+    },
+    [rtKeys.arrSet]: (_ctx, arr, idx, val) => {
+      const v = arr as ObjArrView
+      v.base[v.offset + (idx as number)] = val
       return undefined
+    },
+    // 部分下标：在已有视图上叠加偏移，共享同一 base（同一分量）
+    [rtKeys.arrSublist]: (_ctx, arr, offset) => {
+      const v = arr as ObjArrView
+      return { base: v.base, offset: v.offset + (offset as number) }
     },
 
     // ---------- pack / unpack（ISO 6.6.5.4）：按元素字节连续搬移 ----------
@@ -227,9 +248,11 @@ function defaultValueOf(td: TypeDescriptor): unknown {
     case 'file':
       return { kind: 'file', value: undefined, type: td }
     case 'array':
-      return isObjectRepr(td)
-        ? Array.from({ length: arrayCount(td) }, () => defaultValueOf(td.elem!))
-        : new Uint8Array(sizeOf(td))
+      if (isObjectRepr(td)) {
+        const base = Array.from({ length: arrayCount(td) }, () => defaultValueOf(td.elem!))
+        return { base, offset: 0 } satisfies ObjArrView
+      }
+      return new Uint8Array(sizeOf(td))
     case 'rec':
       return isObjectRepr(td) ? newRecordValue(td) : new Uint8Array(sizeOf(td))
     default:
