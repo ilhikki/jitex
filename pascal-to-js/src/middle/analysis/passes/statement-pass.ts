@@ -10,10 +10,12 @@
 
 import {
   BlockNode,
+  CaseStatementNode,
   ExpressionNode,
   IdentifierNode,
   ProgramNode,
   StatementNode,
+  TypeNode,
   WithStatementNode,
 } from '@/frontend/node.ts'
 import {
@@ -28,6 +30,7 @@ import {
   VarSymbol,
 } from '../analysis-type.ts'
 import { AnalysisContext, DeclarationResult, GotoRecord, ScopeSnapshot, StatementResult } from '../stage-types.ts'
+import { isAssignCompatible, isSameType } from '../type-compat.ts'
 
 // ============================================================
 // Pass 2 入口
@@ -65,6 +68,8 @@ class StatementPass {
   private scopeStack: ScopeSnapshot[] = []
   private withStack: { fields: Map<string, TypeInfo> }[] = []
   private nonTransparentDepth = 0
+  /** varId → 变量声明的类型节点，供 6.6.3.3 判定 packed 分量 */
+  private varTypeNodes = new Map<number, TypeNode>()
 
   constructor(ctx: AnalysisContext, decl: DeclarationResult) {
     this.ctx = ctx
@@ -72,7 +77,31 @@ class StatementPass {
   }
 
   run(program: ProgramNode): void {
+    this.collectVarTypeNodes(program.block)
     this.analyzeBlockStatements(program.block)
+  }
+
+  /** 收集 varId → 声明类型节点（沿 block 树递归） */
+  private collectVarTypeNodes(block: BlockNode): void {
+    const scope = this.decl.blockScopes.get(block)
+    for (const v of block.variableDeclarations) {
+      for (const n of v.names) {
+        const sym = scope?.bindings.get(n.name.toLowerCase())
+        if (sym?.kind === 'var') {
+          this.varTypeNodes.set(sym.varId, v.type)
+        }
+      }
+    }
+    for (const p of block.procedureDeclarations) {
+      if (p.block) {
+        this.collectVarTypeNodes(p.block)
+      }
+    }
+    for (const f of block.functionDeclarations) {
+      if (f.block) {
+        this.collectVarTypeNodes(f.block)
+      }
+    }
   }
 
   result(): StatementResult {
@@ -158,7 +187,8 @@ class StatementPass {
         return
       case 'Assignment': {
         const lt = this.analyzeExpr(node.left)
-        this.analyzeExpr(node.right)
+        const rt = this.analyzeExpr(node.right)
+        this.checkAssignmentCompatibility(lt, rt, node.right)
         if (lt.tag === 'subrange' && lt.low !== undefined && lt.high !== undefined) {
           const constVal = evalConstInt(node.right, (n) => this.lookup(n))
           if (constVal !== undefined && (constVal < lt.low || constVal > lt.high)) {
@@ -181,7 +211,7 @@ class StatementPass {
         return
       }
       case 'IfStatement':
-        this.analyzeExpr(node.condition)
+        this.requireBoolean(this.analyzeExpr(node.condition), 'if')
         this.nonTransparentDepth++
         this.analyzeStatement(node.thenBranch)
         if (node.elseBranch) {
@@ -190,7 +220,7 @@ class StatementPass {
         this.nonTransparentDepth--
         return
       case 'WhileStatement':
-        this.analyzeExpr(node.condition)
+        this.requireBoolean(this.analyzeExpr(node.condition), 'while')
         this.nonTransparentDepth++
         this.analyzeStatement(node.body)
         this.nonTransparentDepth--
@@ -200,7 +230,7 @@ class StatementPass {
         for (const s of node.statements) {
           this.analyzeStatement(s)
         }
-        this.analyzeExpr(node.untilCondition)
+        this.requireBoolean(this.analyzeExpr(node.untilCondition), 'repeat')
         this.nonTransparentDepth--
         return
       case 'ForStatement':
@@ -213,6 +243,7 @@ class StatementPass {
         return
       case 'CaseStatement':
         this.analyzeExpr(node.expression)
+        this.checkCaseConstants(node)
         this.nonTransparentDepth++
         for (const br of node.branches) {
           for (const lbl of br.labels) {
@@ -293,8 +324,14 @@ class StatementPass {
         ) {
           this.recordUndefinedRef('procedure', node.name.name)
         }
-        for (const a of node.arguments) {
-          this.analyzeExpr(a)
+        const params = sym?.kind === 'func' ? this.decl.funcInfos.get(sym.funcId)?.params : undefined
+        for (let i = 0; i < node.arguments.length; i++) {
+          const arg = node.arguments[i]
+          const argType = this.analyzeExpr(arg)
+          const formal = params?.[i]
+          if (formal?.isVarParam) {
+            this.checkVariableParameter(node.name.name, formal, arg, argType)
+          }
         }
         return
       }
@@ -382,13 +419,13 @@ class StatementPass {
         const lt = this.analyzeExpr(node.left)
         const rt = this.analyzeExpr(node.right)
         const op = node.operator
-        if (op === 'and' || op === 'or') {
+        if (op === 'AND' || op === 'OR') {
           info = lt.tag === 'i32' ? { tag: 'i32' } : { tag: 'bool' }
         } else if (['=', '<>', '<', '<=', '>', '>='].includes(op)) {
           info = { tag: 'bool' }
         } else if (op === '/') {
           info = { tag: 'f64' }
-        } else if (op === 'div' || op === 'mod') {
+        } else if (op === 'DIV' || op === 'MOD') {
           info = { tag: 'i32' }
         } else {
           if (lt.tag === 'set' && rt.tag === 'set') {
@@ -402,7 +439,7 @@ class StatementPass {
 
       case 'UnaryExpression': {
         const ot = this.analyzeExpr(node.operand)
-        if (node.operator === 'not') {
+        if (node.operator === 'NOT') {
           info = ot.tag === 'i32' ? { tag: 'i32' } : { tag: 'bool' }
         } else if (node.operator === '-') {
           info = ot.tag === 'f64' ? { tag: 'f64' } : { tag: 'i32' }
@@ -426,6 +463,12 @@ class StatementPass {
           this.analyzeExpr(a)
         }
         if (sym?.kind === 'func') {
+          const funcInfo = this.decl.funcInfos.get(sym.funcId)
+          if (funcInfo && funcInfo.params.length !== node.arguments.length) {
+            throw new Error(
+              `function '${node.name.name}' expects ${funcInfo.params.length} actual-parameter(s) but ${node.arguments.length} given (ISO 7185 6.7.3)`,
+            )
+          }
           info = sym.retTypeInfo ?? this.unknown(node, `call '${node.name.name}' 无返回类型`)
         } else {
           info = this.builtinFuncReturnType(node.name.name, node.arguments)
@@ -579,6 +622,123 @@ class StatementPass {
       return { tag: 'bool' }
     }
     return { tag: 'unknown' }
+  }
+
+  // --------------------------------------------------------
+  // ISO 7185 检查：6.4.6 赋值兼容、6.8.3.4 条件类型、6.8.3.5 case 常量互异、
+  // 6.6.3.3 变量参数、6.7.3 实参个数
+  // --------------------------------------------------------
+
+  /** ISO 6.8.2.2 + 6.4.6：值须与变量类型赋值兼容 */
+  private checkAssignmentCompatibility(
+    target: TypeInfo,
+    value: TypeInfo,
+    valueNode: ExpressionNode,
+  ): void {
+    if (target.tag === 'unknown' || value.tag === 'unknown') {
+      return
+    }
+    // ISO 6.4.4 NOTE 2：nil 不含单一类型，可适配任意 pointer-type
+    if (
+      target.tag === 'pointer' && valueNode.kind === 'Identifier' &&
+      valueNode.name.toLowerCase() === 'nil'
+    ) {
+      return
+    }
+    // 实现把枚举值常量建模为 i32（见 Pass 1 的 EnumerationType 分支），类型层面无法区分
+    // 「枚举常量」与「整数字面量」：此处仅放行常量标识符（如 `c := red`），
+    // 整数字面量（如 `c := 5`）仍按 6.4.6 判定为不兼容。
+    if (target.tag === 'enum' && value.tag === 'i32' && valueNode.kind === 'Identifier') {
+      if (this.lookup(valueNode.name)?.kind === 'const') {
+        return
+      }
+    }
+    if (isAssignCompatible(target, value)) {
+      return
+    }
+    throw new Error(
+      `Assignment is not assignment-compatible (ISO 7185 6.4.6): variable type '${target.tag}' ← expression type '${value.tag}'`,
+    )
+  }
+
+  /** ISO 6.7.2.3 / 6.8.3.4：if/while/repeat 的条件须是 Boolean-expression */
+  private requireBoolean(t: TypeInfo, what: string): void {
+    if (t.tag === 'bool' || t.tag === 'unknown') {
+      return
+    }
+    throw new Error(
+      `The condition of the '${what}' statement shall be a Boolean-expression (ISO 7185 6.8.3.4), found '${t.tag}'`,
+    )
+  }
+
+  /** ISO 6.8.3.5：case 常量所表示的值须互异 */
+  private checkCaseConstants(node: CaseStatementNode): void {
+    const seen = new Set<number>()
+    for (const br of node.branches) {
+      for (const lbl of br.labels) {
+        const v = evalConstInt(lbl, (n) => this.lookup(n))
+        if (v === undefined) {
+          // 无法求值的 case 常量交由其它检查处理，此处不做类型推断
+          continue
+        }
+        if (seen.has(v)) {
+          throw new Error(
+            `Duplicate case-constant ${v} (ISO 7185 6.8.3.5: the values denoted by the case-constants shall be distinct)`,
+          )
+        }
+        seen.add(v)
+      }
+    }
+  }
+
+  /** ISO 6.6.3.3：变量参数实参的类型与形态限制 */
+  private checkVariableParameter(
+    procName: string,
+    param: VarSymbol,
+    arg: ExpressionNode,
+    argType: TypeInfo,
+  ): void {
+    if (arg.kind !== 'Identifier' && arg.kind !== 'ArrayAccess' && arg.kind !== 'FieldAccess') {
+      throw new Error(
+        `The actual variable-parameter of '${procName}' shall be a variable-access (ISO 7185 6.6.3.3)`,
+      )
+    }
+    if (argType.tag !== 'unknown' && !isSameType(param.typeInfo, argType)) {
+      throw new Error(
+        `The actual variable-parameter of '${procName}' shall possess the same type as the formal-parameter (ISO 7185 6.6.3.3)`,
+      )
+    }
+    if (arg.kind === 'FieldAccess') {
+      const objType = this.analyzeExpr(arg.object)
+      const tagName = objType.variant?.tagName
+      if (tagName !== undefined && tagName === arg.field.name.toLowerCase()) {
+        throw new Error(
+          `The actual variable-parameter of '${procName}' shall not denote the selector field of a variant-part (ISO 7185 6.6.3.3)`,
+        )
+      }
+    }
+    if (arg.kind === 'ArrayAccess' && this.isPackedComponent(arg)) {
+      throw new Error(
+        `The actual variable-parameter of '${procName}' shall not denote a component of a packed variable (ISO 7185 6.6.3.3)`,
+      )
+    }
+  }
+
+  /** 沿数组访问回溯到基变量，判断其声明类型是否为 packed array */
+  private isPackedComponent(arg: ExpressionNode): boolean {
+    let base: ExpressionNode = arg
+    while (base.kind === 'ArrayAccess') {
+      base = base.array
+    }
+    if (base.kind !== 'Identifier') {
+      return false
+    }
+    const sym = this.symbolCache.get(base) ?? this.lookup(base.name)
+    if (sym?.kind !== 'var' && sym?.kind !== 'param') {
+      return false
+    }
+    const typeNode = this.varTypeNodes.get(sym.varId)
+    return typeNode?.kind === 'ArrayType' && typeNode.isPacked
   }
 
   // --------------------------------------------------------

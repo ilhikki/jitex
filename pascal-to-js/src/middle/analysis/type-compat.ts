@@ -116,8 +116,12 @@ export function isCompatibleOrdinal(a: TypeInfo, b: TypeInfo): boolean {
  * packed 修饰符的差异属 designated error（D.50），不在类型层面判定。
  */
 export function isCompatibleSet(a: TypeInfo, b: TypeInfo): boolean {
-  if (a.tag !== 'set' || b.tag !== 'set' || !a.setBase || !b.setBase) {
+  if (a.tag !== 'set' || b.tag !== 'set') {
     return false
+  }
+  // 集合构造器与集合运算的结果类型不含 base-type 信息，无法进一步判定
+  if (!a.setBase || !b.setBase) {
+    return true
   }
   return isCompatibleOrdinal(a.setBase, b.setBase)
 }
