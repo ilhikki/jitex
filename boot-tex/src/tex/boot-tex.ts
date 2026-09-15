@@ -66,8 +66,9 @@ function readBytesFromState(
  */
 export function createBootTexSuite(): Suite {
   return suite('boot tex', ({ debug }) => {
-    // debug 构建开关：CLI 的 --no-debug 会把它置为 'false'；默认开启
+    // debug 构建开关：CLI 的 `-a debug=false` 会把它置为 'false'；默认开启
     const isDebug = debug !== 'false'
+    log(`debug = ${isDebug}`)
 
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')

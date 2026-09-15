@@ -3,7 +3,7 @@ import { createTangleStage, TangleInput, transformTangle } from './build-tangle.
 import { readTextFile } from '../utils.ts'
 
 const tangleBootstrapSuite = suite('TANGLE Bootstrap', ({ debug }) => {
-  // debug 构建开关：CLI 的 --no-debug 会把它置为 'false'；默认开启
+  // debug 构建开关：CLI 的 `-a debug=false` 会把它置为 'false'；默认开启
   const isDebug = debug !== 'false'
 
   const stageLoadTangleSource = cache(
