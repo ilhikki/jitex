@@ -1,5 +1,6 @@
 import {
   ByteBlockFile,
+  type ByteHost,
   MemoryTextFile,
   PascalFile,
   PascalFileStore,
@@ -175,7 +176,7 @@ export function normalizeFileOpen(source: string): string {
   return out
 }
 
-const fileNameOf = (name: unknown): string => bytesToString(name as Uint8Array).trim()
+const fileNameOf = (name: unknown): string => bytesToString((name as ByteHost).bytes).trim()
 
 /** openin / openout 的运行期实现：按名字在 ctx.files 中查找（或新建）并绑定到句柄 */
 export const runtimeFileSyscalls: Record<string, SyscallHandler> = {

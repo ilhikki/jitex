@@ -40,13 +40,6 @@ export function basicSyscall(): Record<string, SyscallHandler> {
 /** 内联表达式生成器：返回 undefined 表示放弃内联、回退 dispatcher */
 type InlineGen = (args: string[]) => string | undefined
 
-/**
- * 简单表达式：标识符 / 整数字面量 / 字符串字面量。
- * 只有简单表达式才允许在生成的内联代码里重复出现——
- * 这样与 dispatcher「实参各求值一次」的语义严格等价。
- */
-const SIMPLE_EXPR_RE = /^(?:[A-Za-z_$][\w$]*|-?\d+|"[^"]*")$/
-
 const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.int32Add]: (a) => `((${a[0]} + ${a[1]}) | 0)`,
   [rtKeys.int32Subtract]: (a) => `((${a[0]} - ${a[1]}) | 0)`,
@@ -86,19 +79,9 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.castBooleanToInt32]: (a) => `((${a[0]}) ? 1 : 0)`,
   [rtKeys.castInt32ToChar]: (a) => `((${a[0]}) & 0xff)`,
 
-  // bytes.alloc / bytes.clone / bytes.copy：每个实参只出现一次
-  [rtKeys.bytesAlloc]: (a) => `(new Uint8Array(${a[0]}))`,
-  [rtKeys.bytesClone]: (a) => `(${a[0]}.slice(0, ${a[1]}))`,
-  [rtKeys.bytesCopy]: (a) => `(${a[0]}.set(${a[2]}.subarray(0, ${a[3]}), ${a[1]}))`,
-  // view.subarray：offset 在生成代码里出现两次，仅当它是简单表达式时才展开
-  [rtKeys.viewSubarray]: (a) => {
-    if (!SIMPLE_EXPR_RE.test(a[1])) {
-      return undefined
-    }
-    return `(${a[0]}.subarray(${a[1]}, ${a[1]} + ${a[2]}))`
-  },
-  // 注：bytes.get.* / bytes.set.* 刻意不内联——mem.ts 的 handler 已按 ArrayBuffer 缓存
-  // DataView，内联版每次读写都要 new DataView，反而更慢。
+  // 注：bytes.host / alloc / clone / copy / view.subarray 以及 bytes.get.* / bytes.set.*
+  // 都不内联——宿主是 { bytes, dv } 对象，构造与标量读写统一由 mem.ts 的 handler 承担
+  // （dv 随宿主走，不再需要按 ArrayBuffer 缓存）。
 
   [rtKeys.cellNew]: (a) => `({ kind: 'cell', value: ${a[0]} })`,
   [rtKeys.cellGet]: (a) => `(${a[0]}.value)`,
@@ -130,8 +113,8 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         // 字符串 / 字符字面量的内容
         return JSON.stringify(literal.arg)
       case 'bytes':
-        // 字符串字面量（packed array of char）→ Uint8Array 字面量
-        return `new Uint8Array(${literal.arg})`
+        // 字符串字面量（packed array of char）→ 字节宿主
+        return `__sys["${rtKeys.bytesHost}"](${literal.arg})`
       case 'field':
         // 记录字段名
         return JSON.stringify(literal.arg)

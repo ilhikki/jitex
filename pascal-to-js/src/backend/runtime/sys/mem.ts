@@ -1,8 +1,8 @@
 /*
- * 内存原语：Uint8Array 视图与 JS 对象（object 表示）上的操作。
+ * 内存原语：字节宿主（ByteHost）与 JS 对象（object 表示）上的操作。
  *
  * 值的表示由 rewrite 在编译期判定（见 isObjectRepr）：
- *   - 不含 file / pointer 的 array / record / set → 裸 Uint8Array（不带类型），
+ *   - 不含 file / pointer 的 array / record / set → 字节宿主（不带类型），
  *     类型译成「偏移 + 具体 key」，运行期只剩标量常量；
  *   - 含 file / pointer 的 array / record → JS 普通对象 / {base, offset} 视图。
  *
@@ -14,7 +14,7 @@
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import type { SyscallHandler } from '../runtime-type.ts'
+import type { ByteHost, SyscallHandler } from '../runtime-type.ts'
 
 /**
  * object 数组的统一表示：所有含 object 元素（file / pointer / 含它们的 record）
@@ -26,58 +26,51 @@ interface ObjArrView {
 }
 
 /**
- * DataView 缓存：按底层 ArrayBuffer 复用一个 DataView。
+ * 由字节视图构造宿主。
  *
  * DataView 的读写偏移是相对其视图窗口的；本模型里 offset 由编译期算出、
- * 运行时叠加视图的 byteOffset 得到绝对位置，因此窗口参数不承载语义——
- * 一个覆盖整个 ArrayBuffer 的 DataView 即可，无需每次构造。
+ * 运行时叠加 bytes.byteOffset 得到绝对位置，因此窗口参数不承载语义——
+ * 一个覆盖整个 ArrayBuffer 的 DataView 即可。
  */
-const dvCache = new WeakMap<ArrayBufferLike, DataView>()
-
-function dv(buffer: ArrayBufferLike): DataView {
-  let d = dvCache.get(buffer)
-  if (d === undefined) {
-    d = new DataView(buffer)
-    dvCache.set(buffer, d)
-  }
-  return d
+export function makeByteHost(bytes: Uint8Array): ByteHost {
+  return { bytes, dv: new DataView(bytes.buffer) }
 }
 
-/** 视图参数校验：把「拿标量当视图用」这类建模错误暴露在出错点 */
-function assertView(view: unknown, what: string): asserts view is Uint8Array {
-  if (!(view instanceof Uint8Array)) {
-    throw new Error(`${what}: expected a byte view, got ${view === null ? 'null' : typeof view}`)
+/** 宿主参数校验：把「拿标量当字节宿主用」这类建模错误暴露在出错点 */
+function assertView(view: unknown, what: string): asserts view is ByteHost {
+  const h = view as ByteHost | null
+  if (h === null || typeof h !== 'object' || !(h.bytes instanceof Uint8Array) || !(h.dv instanceof DataView)) {
+    throw new Error(`${what}: expected a byte host, got ${view === null ? 'null' : typeof view}`)
   }
 }
 
 /**
- * 字节视图上的标量读写。
+ * 字节宿主上的标量读写。
  *
  * 每个 key 固定一种标量种类，handler 直接调用对应的 DataView 方法——
  * 运行期既没有类型参数，也没有分支。
  *
- * 实参的视图断言不在这里做：它由 rewrite 在 debug 构建下包一层
+ * 实参的宿主断言不在这里做：它由 rewrite 在 debug 构建下包一层
  * `runtime.debug.assert.view`（见 assertViewSyscall），非 debug 构建
  * 完全不生成，两个 handler 便都不含检查。
  *
- * 刻意不内联：内联版每次读写都要重新构造 DataView，
- * 而这里按底层 ArrayBuffer 复用（见 dv 的说明）。
+ * 暂不内联：内联需保证 view 表达式单次求值（宿主在偏移算式里出现两次）。
  */
 function bytesAccessSyscalls(): Record<string, SyscallHandler> {
   const reader = (
     read: (data: DataView, offset: number) => number,
   ): SyscallHandler =>
   (_ctx, view, offset) => {
-    const v = view as Uint8Array
-    return read(dv(v.buffer), v.byteOffset + (offset as number))
+    const h = view as ByteHost
+    return read(h.dv, h.bytes.byteOffset + (offset as number))
   }
 
   const writer = (
     write: (data: DataView, offset: number, value: number) => void,
   ): SyscallHandler =>
   (_ctx, view, offset, value) => {
-    const v = view as Uint8Array
-    write(dv(v.buffer), v.byteOffset + (offset as number), value as number)
+    const h = view as ByteHost
+    write(h.dv, h.bytes.byteOffset + (offset as number), value as number)
     return undefined
   }
 
@@ -101,45 +94,51 @@ function bytesAccessSyscalls(): Record<string, SyscallHandler> {
 // 位图集合运算
 
 function bitmapOp(
-  a: Uint8Array,
-  b: Uint8Array,
+  a: ByteHost,
+  b: ByteHost,
   size: number,
   op: (x: number, y: number) => number,
-): Uint8Array {
+): ByteHost {
+  const x = a.bytes
+  const y = b.bytes
   const out = new Uint8Array(size)
   for (let i = 0; i < size; i++) {
-    out[i] = op(a[i] ?? 0, b[i] ?? 0) & 0xff
+    out[i] = op(x[i] ?? 0, y[i] ?? 0) & 0xff
   }
-  return out
+  return makeByteHost(out)
 }
 
 /** a ⊆ b ⇔ a & ~b 全 0 */
-function subset(a: Uint8Array, b: Uint8Array, size: number): boolean {
+function subset(a: ByteHost, b: ByteHost, size: number): boolean {
+  const x = a.bytes
+  const y = b.bytes
   for (let i = 0; i < size; i++) {
-    if (((a[i] ?? 0) & ~(b[i] ?? 0)) & 0xff) {
+    if (((x[i] ?? 0) & ~(y[i] ?? 0)) & 0xff) {
       return false
     }
   }
   return true
 }
 
-function bitEquals(a: Uint8Array, b: Uint8Array, size: number): boolean {
+function bitEquals(a: ByteHost, b: ByteHost, size: number): boolean {
+  const x = a.bytes
+  const y = b.bytes
   for (let i = 0; i < size; i++) {
-    if ((a[i] ?? 0) !== (b[i] ?? 0)) {
+    if ((x[i] ?? 0) !== (y[i] ?? 0)) {
       return false
     }
   }
   return true
 }
 
-function withBit(bits: number[], size: number): Uint8Array {
+function withBit(bits: number[], size: number): ByteHost {
   const out = new Uint8Array(size)
   for (const bit of bits) {
     if (bit >= 0 && bit < size * 8) {
       out[bit >> 3] |= 1 << (bit & 7)
     }
   }
-  return out
+  return makeByteHost(out)
 }
 
 export function memSyscalls(): Record<string, SyscallHandler> {
@@ -151,27 +150,41 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return view
     },
 
-    // 视图切分。codegen 仅在 offset 为简单表达式时内联（避免重复求值），
-    // 其余情形仍走 dispatcher，故保留本 handler。
+    // 由字节数组构造宿主：bytes 字面量（字符串常量）的宿主化入口
+    [rtKeys.bytesHost]: (_ctx, data) => makeByteHost(new Uint8Array(data as number[])),
+
+    // 分配新宿主
+    [rtKeys.bytesAlloc]: (_ctx, size) => makeByteHost(new Uint8Array(size as number)),
+
+    // 按值拷贝：前 size 个字节进新宿主
+    [rtKeys.bytesClone]: (_ctx, host, size) => makeByteHost((host as ByteHost).bytes.slice(0, size as number)),
+
+    // 把 src 前 size 个字节写入 dst 的 offset 处（非标量槽位的整体赋值）
+    [rtKeys.bytesCopy]: (_ctx, dst, offset, src, size) => {
+      ;(dst as ByteHost).bytes.set((src as ByteHost).bytes.subarray(0, size as number), offset as number)
+      return undefined
+    },
+
+    // 视图切分：共享同一 dv，只换字节视图（其 byteOffset 承载新偏移）
     [rtKeys.viewSubarray]: (_ctx, view, offset, size) => {
-      const v = view as Uint8Array
+      const h = view as ByteHost
       const off = offset as number
-      return v.subarray(off, off + (size as number))
+      return { bytes: h.bytes.subarray(off, off + (size as number)), dv: h.dv }
     },
 
     ...bytesAccessSyscalls(),
 
     [rtKeys.bytesPack]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
-      const s = src as Uint8Array
-      const d = dst as Uint8Array
+      const s = (src as ByteHost).bytes
+      const d = (dst as ByteHost).bytes
       const size = elemSize as number
       const from = ((start as number) - (srcLow as number)) * size
       d.set(s.subarray(from, from + (count as number) * size), 0)
       return undefined
     },
     [rtKeys.bytesUnpack]: (_ctx, src, dst, dstLow, elemSize, start, count) => {
-      const s = src as Uint8Array
-      const d = dst as Uint8Array
+      const s = (src as ByteHost).bytes
+      const d = (dst as ByteHost).bytes
       const size = elemSize as number
       const to = ((start as number) - (dstLow as number)) * size
       d.set(s.subarray(0, (count as number) * size), to)
@@ -222,12 +235,13 @@ function cloneObjectArray(view: ObjArrView): ObjArrView {
  * rewrite 其实知道静态类型，可以把 object 表示的 record 逐层展开成
  * object.new + object.clone 的构造树（与 defaultValueExpr 对称），属后续优化。
  *
- * 当前语义：Uint8Array 拷字节；JS 数组逐元素；普通对象递归；
+ * 当前语义：字节宿主拷字节（重建宿主）；JS 数组逐元素；普通对象递归；
  * file / cell 拷引用（ISO 7185 值语义要求 identifying-value 保持同一）；标量原样。
  */
 function cloneField(v: unknown): unknown {
-  if (v instanceof Uint8Array) {
-    return v.slice()
+  const h = v as ByteHost | null
+  if (h !== null && typeof h === 'object' && h.bytes instanceof Uint8Array && h.dv instanceof DataView) {
+    return makeByteHost(h.bytes.slice())
   }
   if (Array.isArray(v)) {
     return v.map(cloneField)
@@ -250,18 +264,17 @@ function cloneField(v: unknown): unknown {
  */
 export function setSyscalls(): Record<string, SyscallHandler> {
   return {
-    [rtKeys.bitmapUnion]: (_ctx, a, b, size) =>
-      bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x | y),
+    [rtKeys.bitmapUnion]: (_ctx, a, b, size) => bitmapOp(a as ByteHost, b as ByteHost, size as number, (x, y) => x | y),
     [rtKeys.bitmapIntersection]: (_ctx, a, b, size) =>
-      bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & y),
+      bitmapOp(a as ByteHost, b as ByteHost, size as number, (x, y) => x & y),
     [rtKeys.bitmapDifference]: (_ctx, a, b, size) =>
-      bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & ~y),
-    [rtKeys.bitmapEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.bitmapNotEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
-    [rtKeys.bitmapSubset]: (_ctx, a, b, size) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.bitmapSuperset]: (_ctx, a, b, size) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
+      bitmapOp(a as ByteHost, b as ByteHost, size as number, (x, y) => x & ~y),
+    [rtKeys.bitmapEqual]: (_ctx, a, b, size) => bitEquals(a as ByteHost, b as ByteHost, size as number) ? 1 : 0,
+    [rtKeys.bitmapNotEqual]: (_ctx, a, b, size) => bitEquals(a as ByteHost, b as ByteHost, size as number) ? 0 : 1,
+    [rtKeys.bitmapSubset]: (_ctx, a, b, size) => subset(a as ByteHost, b as ByteHost, size as number) ? 1 : 0,
+    [rtKeys.bitmapSuperset]: (_ctx, a, b, size) => subset(b as ByteHost, a as ByteHost, size as number) ? 1 : 0,
     [rtKeys.bitmapContains]: (_ctx, bit, s, size) => {
-      const bmp = s as Uint8Array
+      const bmp = (s as ByteHost).bytes
       const i = bit as number
       if (i < 0 || i >= (size as number) * 8) {
         return 0

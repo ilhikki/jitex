@@ -18,6 +18,7 @@
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
 import type {
   BlockStore,
+  ByteHost,
   PascalFile,
   PascalFileStore,
   RuntimeContext,
@@ -25,6 +26,7 @@ import type {
   TextFile,
 } from '../runtime-type.ts'
 import { bytesToString, encodeUtf8 } from '../runtime-util.ts'
+import { makeByteHost } from './mem.ts'
 import { MemoryTextFile } from './memory-text-file.ts'
 
 /** 定长字节块文件：每块是一段字节 */
@@ -242,20 +244,20 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         if (rs.getMode() === 'generation') {
           const buf = rs.getBuffer()
           if (buf !== undefined) {
-            return buf
+            return makeByteHost(buf)
           }
           const nb = new Uint8Array((size as number) ?? 0)
           rs.setBuffer(nb)
-          return nb
+          return makeByteHost(nb)
         }
         // 读模式：当前记录
         const rec = rs.peekBlock()
         if (rec !== undefined) {
-          return rec
+          return makeByteHost(rec)
         }
         const buf = new Uint8Array((size as number) ?? 0)
         rs.setBuffer(buf)
-        return buf
+        return makeByteHost(buf)
       }
       const store = textStore(p)
       const b = store.peekByte()
@@ -279,7 +281,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // `f^ := x`（blocks）：x 是记录字节视图
+    // `f^ := x`（blocks）：x 是记录字节宿主
     [rtKeys.filePutBufferBlock]: (_ctx, f, unit) => {
       const rs = blockStore(f as PascalFile)
       // ISO 6.6.5.2: 写缓冲区的前置条件是文件处于写状态
@@ -288,7 +290,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       }
       // `f^ := x` 是赋值（值语义），x 可能是共享视图（如 mem[k]），
       // 必须深拷贝后落缓冲：否则改 x 会连带改掉已写入的缓冲内容。
-      rs.setBuffer((unit as Uint8Array).slice())
+      rs.setBuffer((unit as ByteHost).bytes.slice())
       return undefined
     },
 
@@ -319,7 +321,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         const rs = blockStore(p)
         const rec = rs.peekBlock()
         rs.advance()
-        return rec ?? new Uint8Array(0)
+        return makeByteHost(rec ?? new Uint8Array(0))
       }
       const store = textStore(p)
       // 字节文件：原样取一个字节
@@ -348,15 +350,15 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       writeStore(ctx, f).writeByte((unit as number) & 0xff)
       return undefined
     },
-    // 写字节序列：值是 Uint8Array（char 数组 / 二进制转换结果）
+    // 写字节序列：值是字节宿主（char 数组 / 二进制转换结果）
     [rtKeys.fileWriteBytes]: (ctx, f, unit) => {
-      writeStore(ctx, f).writeBytes(unit as Uint8Array)
+      writeStore(ctx, f).writeBytes((unit as ByteHost).bytes)
       return undefined
     },
-    // 写一个定长块：值是 Uint8Array（file of record）
+    // 写一个定长块：值是字节宿主（file of record）
     [rtKeys.fileWriteBlock]: (_ctx, f, unit) => {
       const rs = blockStore(f as PascalFile)
-      rs.setBuffer(unit as Uint8Array)
+      rs.setBuffer((unit as ByteHost).bytes)
       rs.writeBlock()
       return undefined
     },

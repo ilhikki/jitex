@@ -173,7 +173,8 @@ export const rtKeys = {
   convertBytesToBoolean: 'runtime.convert.bytes.to.boolean',
   convertCharToInt32: 'runtime.convert.char.to.int32',
 
-  // 内存与视图（宿主表示：Uint8Array）
+  // 内存与视图（宿主表示：ByteHost = { bytes, dv }）
+  bytesHost: 'runtime.bytes.host',
   bytesAlloc: 'runtime.bytes.alloc',
   bytesCopy: 'runtime.bytes.copy',
   bytesClone: 'runtime.bytes.clone',

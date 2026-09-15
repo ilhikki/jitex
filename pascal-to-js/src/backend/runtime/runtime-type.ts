@@ -99,3 +99,19 @@ export type PascalCell = {
   kind: 'cell'
   value: unknown
 }
+
+/**
+ * 字节宿主：一块「既可按字节、也可按标量种类解释」的存储。
+ *
+ * 不用裸 Uint8Array 承载，是因为标量读写必须借 DataView，而 DataView 必须绑定
+ * 某个 ArrayBuffer——裸视图拿不到 DataView，只能退化成「按 buffer 全局缓存
+ * DataView」（原 dvCache）。把 DataView 与字节视图一起放进宿主，这个隐式全局
+ * 状态就没有必要了，标量访问也能内联。
+ *
+ * bytes 可能是 subarray（自带 byteOffset）；dv 覆盖 bytes.buffer，由根宿主创建、
+ * 子视图继承。标量访问的绝对偏移 = bytes.byteOffset + 编译期偏移。
+ */
+export interface ByteHost {
+  bytes: Uint8Array
+  dv: DataView
+}

@@ -58,6 +58,7 @@ export type { ParseResult, ParserInput } from '@/frontend/types.ts'
 export { parseProgram } from '@/frontend/parser/declarations.ts'
 export type {
   BlockStore,
+  ByteHost,
   PascalFile,
   PascalFileStore,
   SyscallHandler,
