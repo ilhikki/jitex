@@ -668,6 +668,40 @@ end.`,
     input: '5',
     expectedOutput: '5\n',
   },
+  {
+    name: '6.9.1 在行结束处的字符单位按空白处理',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITELN(ORD(C));END.`,
+    purpose:
+      'ISO 6.9.1b：文本文件的行结构由 end-of-line 划分，行结束处读出的字符单位表示空白；其具体字符由实现确定（Annex E）',
+    textFiles: new Map<string, Uint8Array>([['F', text('\r\nX')]]),
+    expectedOutput: '32\n',
+  },
+  {
+    name: '6.9.1 读数值时跳过行结束符序列',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;N:INTEGER;BEGIN RESET(F);READ(F,N);WRITELN(N);END.`,
+    purpose: 'ISO 6.9.1c NOTE 3：读 integer 时先跳过空格与 end-of-line，行结束符的具体字符由实现确定',
+    textFiles: new Map<string, Uint8Array>([['F', text('\r\n42')]]),
+    expectedOutput: '42\n',
+  },
+  {
+    name: '6.5.5 文件尾处缓冲区变量的取值（实现相关）',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);C:=F^;WRITELN(ORD(C));END.`,
+    purpose: 'ISO 6.5.5/6.6.5.2：f.R 为空序列时缓冲区变量的值不由 ISO 规定；本实现给出一个空白字符',
+    textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+    expectedOutput: '32\n',
+  },
+  {
+    name: '6.9.1 从文本文件读 boolean（非 ISO 扩展）',
+    code: `program test(input, output);
+var b: boolean;
+begin
+  read(b);
+  if b then writeln('T') else writeln('F');
+end.`,
+    purpose: 'ISO 6.9.1 的 read 只对 char、integer、real 类型的变量定义读入语义；读入 Boolean 是本实现的扩展',
+    input: 'true',
+    expectedOutput: 'T\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.9 - Input and output', tests)

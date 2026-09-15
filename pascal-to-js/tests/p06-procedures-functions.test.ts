@@ -1033,6 +1033,99 @@ end.`,
     expectedError: '',
   },
   {
+    name: '6.6.3.3 变量参数的实参可表示记录字段中的数组分量',
+    code: `program test(output);
+type r = record a: array[1..2] of integer end;
+var v: r;
+procedure setIt(var x: integer);
+begin
+  x := 9;
+end;
+begin
+  setIt(v.a[2]);
+  writeln(v.a[2]);
+end.`,
+    purpose: 'ISO 6.6.3.3/6.5.3：变量参数的实参须是 variable-access；分量不是 packed 变量的分量时合法',
+    expectedOutput: '9\n',
+  },
+  {
+    name: '6.6.3.4 过程形参不得作为函数形参的实参',
+    code: `program test;
+procedure outer(procedure f);
+  procedure inner(function g: integer);
+  begin end;
+begin
+  inner(f);
+end;
+begin end.`,
+    purpose: 'ISO 6.6.3.4/6.6.3.5：可调用形参作另一可调用形参的实参时，其种类须与目标形参一致',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 函数形参链式传递时结果类型须表示同一类型',
+    code: `program test;
+procedure outer(function f: real);
+  procedure inner(function g: integer);
+  begin end;
+begin
+  inner(f);
+end;
+begin end.`,
+    purpose: 'ISO 6.6.3.5：两个函数标识符的结果类型须表示同一类型',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.6 可调用形参链式传递时形参表须 congruous（个数）',
+    code: `program test;
+procedure outer(function f(a: integer): integer);
+  procedure inner(function g(a: integer; b: integer): integer);
+  begin end;
+begin
+  inner(f);
+end;
+begin end.`,
+    purpose: 'ISO 6.6.3.6：两个 formal-parameter-list congruous 要求个数相同',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.6 可调用形参链式传递时形参表须 congruous（var 属性）',
+    code: `program test;
+procedure outer(function f(a: integer): integer);
+  procedure inner(function g(var a: integer): integer);
+  begin end;
+begin
+  inner(f);
+end;
+begin end.`,
+    purpose: 'ISO 6.6.3.6：对应段须同为值参数段或同为变量参数段',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.6 可调用形参链式传递时形参表须 congruous（类型）',
+    code: `program test;
+procedure outer(function f(a: integer): integer);
+  procedure inner(function g(a: char): integer);
+  begin end;
+begin
+  inner(f);
+end;
+begin end.`,
+    purpose: 'ISO 6.6.3.6：对应位置的形式参数类型须表示同一类型',
+    expectedError: '',
+  },
+  {
+    name: '6.6.5.2 读状态下对 file of record 执行 put 违反前断言',
+    code: `program test;
+type r = record a: integer end;
+var f: file of r;
+begin
+  reset(f);
+  put(f);
+end.`,
+    purpose: 'ISO 6.6.5.2：put(f) 的前断言要求 f.M = Generation',
+    expectedError: '',
+  },
+  {
     name: '6.6.5.2 file of record 在 f.R 为空时 get 违反前断言应报错',
     code: `program test;
 type r = record a: integer end;
@@ -1093,6 +1186,112 @@ begin
 end.`,
     purpose: 'ISO 6.4.3.5/6.6.5.3：file-type 的分量类型可为枚举类型，write/read 与 f^ 赋值、get 等价',
     expectedOutput: 'green\n',
+  },
+  {
+    name: '6.6.3.4 过程形参规格缺少标识符应报错',
+    code: 'program test; procedure p(procedure ); begin end; begin end.',
+    purpose: 'ISO 6.6.3.4：procedural-parameter-specification = procedure-heading，须给出标识符',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.4 过程形参规格的形参表非法应报错',
+    code: 'program test; procedure p(procedure r(1)); begin end; begin end.',
+    purpose: 'ISO 6.6.3.4：过程形参的 heading 中的 formal-parameter-list 须合法',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 函数形参规格缺少标识符应报错',
+    code: 'program test; procedure p(function : integer); begin end; begin end.',
+    purpose: 'ISO 6.6.3.5：functional-parameter-specification = function-heading，须给出标识符',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 函数形参规格的形参表非法应报错',
+    code: 'program test; procedure p(function f(1): integer); begin end; begin end.',
+    purpose: 'ISO 6.6.3.5：函数形参的 heading 中的 formal-parameter-list 须合法',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 函数形参规格缺少结果类型应报错',
+    code: 'program test; procedure p(function f integer); begin end; begin end.',
+    purpose: 'ISO 6.6.3.5：function-heading = function identifier [ formal-parameter-list ] : result-type',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 函数形参规格的结果类型非法应报错',
+    code: 'program test; procedure p(function f: ); begin end; begin end.',
+    purpose: 'ISO 6.6.3.5：result-type 须为合法 type-denoter',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.1 形参的 type-denoter 非法应报错',
+    code: 'program test; procedure p(a: ); begin end; begin end.',
+    purpose: 'ISO 6.6.3.1：formal-parameter-section 的 type-denoter 须合法',
+    expectedError: '',
+  },
+  {
+    name: '6.6.1 过程声明中的标识符非法应报错',
+    code: 'program test; procedure 5; begin end; begin end.',
+    purpose: 'ISO 6.6.1：procedure-heading = procedure identifier ...',
+    expectedError: '',
+  },
+  {
+    name: '6.6.1 forward 指令之后须有分号',
+    code: 'program test; procedure p; forward begin end; begin end.',
+    purpose: 'ISO 6.6.1：forward-directive = forward，其后以分号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.6.1 过程声明中的块非法应报错',
+    code: `program test;
+procedure p;
+begin`,
+    purpose: 'ISO 6.6.1：procedure-declaration 须包含合法 procedure-block',
+    expectedError: '',
+  },
+  {
+    name: '6.6.2 函数声明中的标识符非法应报错',
+    code: 'program test; function 5: integer; begin end; begin end.',
+    purpose: 'ISO 6.6.2：function-heading = function identifier ...',
+    expectedError: '',
+  },
+  {
+    name: '6.6.2 函数的形参表非法应报错',
+    code: 'program test; function f(1): integer; begin end; begin end.',
+    purpose: 'ISO 6.6.2：function-heading 中的 formal-parameter-list 须合法',
+    expectedError: '',
+  },
+  {
+    name: '6.6.2 函数声明缺少结果类型应报错',
+    code: 'program test; function f integer; begin end; begin end.',
+    purpose: 'ISO 6.6.2：函数声明须给出 result-type',
+    expectedError: '',
+  },
+  {
+    name: '6.6.2 函数的结果类型非法应报错',
+    code: 'program test; function f: ; begin end; begin end.',
+    purpose: 'ISO 6.6.2：result-type 须为合法 type-denoter',
+    expectedError: '',
+  },
+  {
+    name: '6.6.2 函数头之后须有分号',
+    code: 'program test; function f: integer begin end; begin end.',
+    purpose: 'ISO 6.6.2：function-heading 之后为分号与 block',
+    expectedError: '',
+  },
+  {
+    name: '6.6.2 函数 forward 指令之后须有分号',
+    code: 'program test; function f: integer; forward begin end; begin end.',
+    purpose: 'ISO 6.6.2：函数声明的 forward-directive 之后以分号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.6.2 函数声明中的块非法应报错',
+    code: `program test;
+function f: integer;
+begin`,
+    purpose: 'ISO 6.6.2：function-declaration 须包含合法 function-block',
+    expectedError: '',
   },
 
   // 6.6.5.3 Dynamic allocation procedures

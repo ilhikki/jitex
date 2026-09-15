@@ -670,6 +670,97 @@ end.`,
     purpose: 'ISO 6.4.3.2/6.4.6 c：index-expression 的值须落在 index-type 的值域内',
     expectedError: '',
   },
+  {
+    name: '6.7.1 项位置的操作数前可带符号（实现宽化形式）',
+    code: `program test(output);
+var x: integer;
+begin
+  x := 1 - -2;
+  writeln(x);
+  x := 1 + +2;
+  writeln(x);
+end.`,
+    purpose:
+      'ISO 6.7.1 的 sign 只能出现在 simple-expression 起始处、factor 自身不带符号；本实现额外接受项位置的符号（扩展）',
+    expectedOutput: '3\n3\n',
+  },
+  {
+    name: '6.7.1 括号内的表达式非法应报错',
+    code: `program test;
+var x: integer;
+begin
+  x := (;
+end.`,
+    purpose: 'ISO 6.7.1：parenthesized-expression 的括号内须有合法 expression',
+    expectedError: '',
+  },
+  {
+    name: '6.7.3 函数指示符的实参表首项非法应报错',
+    code: `program test(output);
+begin
+  writeln(abs(;));
+end.`,
+    purpose: 'ISO 6.7.3：actual-parameter-list 每项都须是合法 expression',
+    expectedError: '',
+  },
+  {
+    name: '6.7.3 函数指示符的实参表缺少右圆括号应报错',
+    code: `program test(output);
+begin
+  writeln(abs(1;));
+end.`,
+    purpose: 'ISO 6.7.3：actual-parameter-list 以右圆括号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.5.3.2 数组访问的下标表缺少右方括号应报错',
+    code: `program test;
+var a: array[1..3] of integer;
+begin
+  a[1 := 2;
+end.`,
+    purpose: 'ISO 6.5.3.2：index-expression-list 以右方括号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 乘性运算符右侧的操作数非法应报错',
+    code: `program test;
+var x: integer;
+begin
+  x := 1 * ;
+end.`,
+    purpose: 'ISO 6.7.1：term = factor { multiplying-operator factor }，运算符右侧须为合法 factor',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 simple-expression 的符号之后缺少项应报错',
+    code: `program test;
+var x: integer;
+begin
+  x := - ;
+end.`,
+    purpose: 'ISO 6.7.1：simple-expression = [ sign ] term { adding-operator term }',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 加性运算符右侧的项非法应报错',
+    code: `program test;
+var x: integer;
+begin
+  x := 1 + ;
+end.`,
+    purpose: 'ISO 6.7.1：simple-expression 的 adding-operator 右侧须为合法 term',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 关系运算符右侧的 simple-expression 非法应报错',
+    code: `program test(output);
+begin
+  if 1 < then writeln(1);
+end.`,
+    purpose: 'ISO 6.7.1：expression = simple-expression [ relational-operator simple-expression ]',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.7 - Expressions', tests)

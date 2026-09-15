@@ -1528,6 +1528,247 @@ end.`,
     purpose: 'ISO 6.4.4/6.8.2.2：指针的赋值复制 identifying-value，故 a[1] 与 a[2] 标识同一个变量',
     expectedOutput: '8\n',
   },
+  {
+    name: '6.8.1 语句前缀的 label 不得超出允许范围',
+    code: `program test(output);
+begin
+  10000: writeln(1);
+end.`,
+    purpose: 'ISO 6.1.6/6.8.1：label 的取值为 0..9999',
+    expectedError: '',
+  },
+  {
+    name: '6.8.1 语句前缀的 label 之后须有冒号',
+    code: `program test(output);
+begin
+  1 writeln(1);
+end.`,
+    purpose: 'ISO 6.8.1：label : statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.1 带 label 的语句本身须合法',
+    code: `program test(output);
+begin
+  1: )
+end.`,
+    purpose: 'ISO 6.8.1：label 之后须为一合法 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.2.2 赋值语句缺少赋值号应报错',
+    code: `program test(output);
+var x: integer;
+begin
+  x 1;
+end.`,
+    purpose: 'ISO 6.8.2.2：assignment-statement = variable-access := expression',
+    expectedError: '',
+  },
+  {
+    name: '6.9.3 write 的实参表达式非法应报错',
+    code: `program test(output);
+begin
+  write(1 + );
+end.`,
+    purpose: 'ISO 6.9.3.1：write-parameter 的 expression 须合法',
+    expectedError: '',
+  },
+  {
+    name: '6.9.3.1 write 的小数位数位置缺少表达式应报错',
+    code: `program test(output);
+begin
+  write(1:2:);
+end.`,
+    purpose: 'ISO 6.9.3.1：write-parameter 给出第二个冒号后须有 expression',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.4 if 语句的条件表达式非法应报错',
+    code: `program test(output);
+begin
+  if + then writeln(1);
+end.`,
+    purpose: 'ISO 6.8.3.4：if Boolean-expression then statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.4 if 语句的 then 分支非法应报错',
+    code: `program test(output);
+begin
+  if true then )
+end.`,
+    purpose: 'ISO 6.8.3.4：then 之后须为合法 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.4 if 语句的 else 分支非法应报错',
+    code: `program test(output);
+begin
+  if true then writeln(1) else )
+end.`,
+    purpose: 'ISO 6.8.3.4：else 之后须为合法 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.5 while 语句的条件表达式非法应报错',
+    code: `program test(output);
+begin
+  while + do writeln(1);
+end.`,
+    purpose: 'ISO 6.8.3.5：while Boolean-expression do statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.5 while 语句的循环体非法应报错',
+    code: `program test(output);
+begin
+  while true do )
+end.`,
+    purpose: 'ISO 6.8.3.5：do 之后须为合法 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.6 repeat 语句的语句序列中某语句非法应报错',
+    code: `program test(output);
+begin
+  repeat ) until true;
+end.`,
+    purpose: 'ISO 6.8.3.6：repeat statement-sequence until Boolean-expression',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.6 repeat 语句序列中相邻语句须以分号分隔',
+    code: `program test(output);
+begin
+  repeat writeln(1) writeln(2) until true;
+end.`,
+    purpose: 'ISO 6.8.3.6：statement-sequence = statement { ; statement }',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.6 repeat 的 until 之后表达式非法应报错',
+    code: `program test(output);
+begin
+  repeat until + ;
+end.`,
+    purpose: 'ISO 6.8.3.6：until 之后须为合法 Boolean-expression',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.9 for 语句的控制变量须为标识符',
+    code: `program test(output);
+begin
+  for 5 := 1 to 2 do writeln(1);
+end.`,
+    purpose: 'ISO 6.8.3.9：for-statement 的控制变量为 variable-access（identifier）',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.9 for 语句的初值表达式非法应报错',
+    code: `program test(output);
+var i: integer;
+begin
+  for i := + to 2 do writeln(i);
+end.`,
+    purpose: 'ISO 6.8.3.9：initial-value 须为合法 expression',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.9 for 语句的终值表达式非法应报错',
+    code: `program test(output);
+var i: integer;
+begin
+  for i := 1 to + do writeln(i);
+end.`,
+    purpose: 'ISO 6.8.3.9：final-value 须为合法 expression',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.9 for 语句的循环体非法应报错',
+    code: `program test(output);
+var i: integer;
+begin
+  for i := 1 to 2 do )
+end.`,
+    purpose: 'ISO 6.8.3.9：do 之后须为合法 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.7 case 语句的选择器表达式非法应报错',
+    code: `program test(output);
+begin
+  case + of
+    1: writeln(1);
+  end;
+end.`,
+    purpose: 'ISO 6.8.3.7：case-statement = case case-index of ...',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.7 case 的 case-constant-list 非法应报错',
+    code: `program test(output);
+begin
+  case 1 of
+    : writeln(1);
+  end;
+end.`,
+    purpose: 'ISO 6.8.3.7：case-list-element = case-constant-list : statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.7 case 分支的语句非法应报错',
+    code: `program test(output);
+begin
+  case 1 of
+    1: )
+  end;
+end.`,
+    purpose: 'ISO 6.8.3.7：case-constant-list 的冒号后须为合法 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.7 case 默认分支的语句非法应报错',
+    code: `program test(output);
+begin
+  case 1 of
+    otherwise )
+  end;
+end.`,
+    purpose: 'ISO 6.8.3.7 的默认分支由本实现以 otherwise 扩展提供，其后须为合法 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.2.4 goto 之后须为 label',
+    code: `program test(output);
+label 1;
+begin
+  goto ;
+  1: writeln(1);
+end.`,
+    purpose: 'ISO 6.8.2.4：goto-statement = goto label',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.10 with 语句的 record-variable-list 非法应报错',
+    code: `program test(output);
+begin
+  with ; do writeln(1);
+end.`,
+    purpose: 'ISO 6.8.3.10：with record-variable-list do statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.10 with 语句的语句体非法应报错',
+    code: `program test(output);
+type r = record x: integer end;
+var v: r;
+begin
+  with v do )
+end.`,
+    purpose: 'ISO 6.8.3.10：do 之后须为合法 statement',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.8 - Statements', tests)

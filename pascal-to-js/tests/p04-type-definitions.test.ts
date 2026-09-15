@@ -830,6 +830,108 @@ begin end.`,
     purpose: 'ISO 6.2.2.9/6.4.1：type-denoter 中的标识符须有类型定义点，变量标识符不是类型',
     expectedError: '',
   },
+  {
+    name: '6.4.1 type-denoter 处出现非法记号应报错',
+    code: 'program test; type t = [1; begin end.',
+    purpose: 'ISO 6.4.1：type-denoter 须为 type-identifier 或合法 new-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.2 array 的 index-type 表为空应报错',
+    code: 'program test; type t = array[;] of integer; begin end.',
+    purpose: 'ISO 6.4.3.2：index-type 表中每项都须为合法 ordinal-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.4 set 的 base-type 非法应报错',
+    code: 'program test; type t = set of ; begin end.',
+    purpose: 'ISO 6.4.3.4：of 之后须为合法 ordinal-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 variant-part 的 tag-type 非法应报错',
+    code: 'program test; type r = record case tag: ; of 1: (a: integer) end; begin end.',
+    purpose: 'ISO 6.4.3.3：variant-part = case [ tag-field : ] tag-type of variant {; variant}',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 variant-part 缺少 of 应报错',
+    code: 'program test; type r = record case tag: integer 1: (a: integer) end; begin end.',
+    purpose: 'ISO 6.4.3.3：tag-type 之后须有 of',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 variant 的 case-constant-list 非法应报错',
+    code: 'program test; type r = record case tag: integer of : (a: integer) end; begin end.',
+    purpose: 'ISO 6.4.3.3：variant = case-constant-list : ( field-list )',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 variant 的 field-list 中字段声明非法应报错',
+    code: 'program test; type r = record case tag: integer of 1: (5) end; begin end.',
+    purpose: 'ISO 6.4.3.3：field-list 中的每项须为合法 field-declaration',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 variant 的 field-list 缺少右圆括号应报错',
+    code: 'program test; type r = record case tag: integer of 1: (a: integer end; begin end.',
+    purpose: 'ISO 6.4.3.3：field-list 以右圆括号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 variant 之间的多余分号被接受（实现宽化形式）',
+    code: `program test(output);
+type r = record
+  case tag: integer of
+    1: (a: integer);;
+    2: (b: integer)
+end;
+var v: r;
+begin
+  v.tag := 2;
+  v.b := 4;
+  writeln(v.b);
+end.`,
+    purpose: 'ISO 6.4.3.3 的 variant 之间以单个分号分隔，出现连续分号时按空 variant 处理；本实现直接跳过（扩展）',
+    expectedOutput: '4\n',
+  },
+  {
+    name: '6.4.3.3 variant 的 field-list 内可再嵌 variant-part（以 end 终止的实现形式）',
+    code: `program test(output);
+type r = record
+  case tag: integer of
+    1: (a: integer;
+        case inner: integer of
+          1: (p: char);
+          2: (q: char)
+        end)
+end;
+var v: r;
+begin
+  v.tag := 1;
+  v.inner := 1;
+  v.p := 'Z';
+  writeln(v.p);
+end.`,
+    purpose: 'ISO 6.4.3.3 允许 variant-part 嵌套在 field-list 内（此处按实现要求以内层 end 终止该嵌套部分）',
+    expectedOutput: 'Z\n',
+  },
+  {
+    name: '6.4.3.2 index-type 可为简单类型 integer',
+    code: `program test;
+type t = array[integer] of char;
+begin end.`,
+    purpose: 'ISO 6.4.3.2：index-type 是 ordinal-type，预定义类型 integer 本身即可作 index-type',
+    expectedOutput: '',
+  },
+  {
+    name: '6.4.3.5 file-type 可不给出分量类型',
+    code: `program test;
+type t = file;
+begin end.`,
+    purpose: 'ISO 6.4.3.5：file-type = file [ of component-type ]，省略 of 时分量类型为 undefined',
+    expectedOutput: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.4 - Type-definitions', tests)
