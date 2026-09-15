@@ -66,8 +66,7 @@ function readBytesFromState(
  */
 export function createBootTexSuite(): Suite {
   return suite('boot tex', ({ debug }) => {
-    // debug 构建开关：CLI 的 `-a debug=false` 会把它置为 'false'；默认开启
-    const isDebug = debug !== 'false'
+    const isDebug = debug === 'true'
     log(`debug = ${isDebug}`)
 
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
