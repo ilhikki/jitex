@@ -12,13 +12,20 @@
  *      域描述的是「这个 key 操作哪种 JS 值」，不是「对应哪个 Pascal 类型」。
  *      Pascal 概念名（record / array / set / pointer / memory …）会让人误以为
  *      一个 key 承载了一整个 Pascal 类型，进而容忍它按 Pascal 类型在运行期分派。
- *      例：record.clone 实参是「object 表示的任意值」，应叫 value.clone。
+ *      例：record.clone 的 record 是 Pascal 概念，而实参其实是 JS 普通对象，
+ *      应叫 object.clone（= object.new 的对偶，见第 3 条）。
  *
  *   2. **一个 key 只对应一种宿主表示**。值的形态差异必须由 rewrite 选进 key，
  *      不能靠实参承载后由 handler 再判。
  *      例：file.write 的实参曾是 Uint8Array | string | number 三种，只能靠
  *      `instanceof` + `String()` 猜；拆成 write.text / .byte / .bytes / .block
  *      后每个 handler 的实参形态都是唯一确定的。
+ *
+ *   3. **clone 与 create 一一对应**。clone 的粒度必须与 create 一致：构造某种
+ *      宿主表示有一个 key，深拷贝它就有一个同域 key。用一个泛型 clone 兜住
+ *      所有表示，等于把「这个值是什么表示」的问题原样还给运行期。
+ *      见 object.new/object.clone、objectarray.new/objectarray.clone、
+ *      bytes.alloc/bytes.clone。
  *
  * 与本文件对应的 lowering 侧 key（'lowering.' 前缀）定义在
  * src/middle/lowering/helpers.ts。lowering 产泛型 key + type 参数，
@@ -186,12 +193,20 @@ export const rtKeys = {
   // 对象（object 表示：宿主是 JS 普通对象，字段名 → 值）
   objectGet: 'runtime.object.get',
   objectSet: 'runtime.object.set',
-  /** 值语义深拷贝：实参是 object 表示的任意 JS 值（对象 / 数组视图 / 视图 / 标量） */
-  valueClone: 'runtime.value.clone',
 
-  // object 表示的默认值构造：字段名 / 元素值由 rewrite 在编译期展开为实参
+  // object 表示的构造 / 深拷贝。
+  //
+  // **clone 与 create 一一对应**：每个「构造某种宿主表示」的 key 都有一个同域的
+  // 深拷贝 key，粒度必须一致 —— 不能用一个泛型 clone 兜住所有表示（那等于把
+  // 「这个值是什么表示」重新丢给运行期判断）：
+  //   object.new      ↔ object.clone        普通对象
+  //   objectarray.new ↔ objectarray.clone   {base, offset} 视图
+  //   bytes.alloc     ↔ bytes.clone         Uint8Array
+  // file / cell 是引用语义（ISO 7185 拷 identifying-value），故无 clone。
   objectNew: 'runtime.object.new',
+  objectClone: 'runtime.object.clone',
   objectArrayNew: 'runtime.objectarray.new',
+  objectArrayClone: 'runtime.objectarray.clone',
 
   cellNew: 'runtime.cell.new',
   cellGet: 'runtime.cell.get',

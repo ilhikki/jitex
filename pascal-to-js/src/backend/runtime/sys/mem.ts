@@ -1,15 +1,16 @@
 /*
- * 内存原语：Uint8Array 视图上的操作。
+ * 内存原语：Uint8Array 视图与 JS 对象（object 表示）上的操作。
  *
- * 值的表示：array / record / set 都是裸 Uint8Array（不带类型）；
- * 类型由 rewrite 在编译期译成「偏移 + 具体 key」，运行期只剩标量常量，
- * 没有任何类型参数或类型分派。
+ * 值的表示由 rewrite 在编译期判定（见 isObjectRepr）：
+ *   - 不含 file / pointer 的 array / record / set → 裸 Uint8Array（不带类型），
+ *     类型译成「偏移 + 具体 key」，运行期只剩标量常量；
+ *   - 含 file / pointer 的 array / record → JS 普通对象 / {base, offset} 视图。
  *
  * 多字节标量一律大端。
  *
  * 已被 codegen 内联为宿主表达式（见 sys/pascal-semantic-compiler.ts 的 inlineSyscalls）
- * 的 key 不在此实现：memory.new / memory.clone / memory.copy、cell.new / cell.get /
- * cell.set、array.get.object / array.set.object / array.sublist。
+ * 的 key 不在此实现：bytes.alloc / bytes.clone / bytes.copy、cell.new / cell.get /
+ * cell.set、objectarray.get / objectarray.set / objectarray.sublist。
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
@@ -184,33 +185,50 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       ;(obj as Record<string, unknown>)[name as string] = v
       return undefined
     },
-    // 值语义深拷贝：实参是 object 表示的任意 JS 值
-    [rtKeys.valueClone]: (_ctx, v) => cloneValue(v),
+    // `object.new` 的对偶：普通对象的按值深拷贝
+    [rtKeys.objectClone]: (_ctx, v) => cloneObject(v as Record<string, unknown>),
+    // `objectarray.new` 的对偶：{base, offset} 视图的按值深拷贝（保留视图偏移）
+    [rtKeys.objectArrayClone]: (_ctx, v) => cloneObjectArray(v as ObjArrView),
   }
 }
 
+/** `object.new` 的对偶：逐字段深拷贝普通对象 */
+function cloneObject(src: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const k of Object.keys(src)) {
+    out[k] = cloneField(src[k])
+  }
+  return out
+}
+
+/** `objectarray.new` 的对偶：拷贝 base 数组，保留视图偏移 */
+function cloneObjectArray(view: ObjArrView): ObjArrView {
+  return { base: view.base.map(cloneField), offset: view.offset }
+}
+
 /**
- * 值语义拷贝：字节视图拷字节；对象表示的 record / 数组递归拷贝；
- * pointer 的 identifying-value 与 file 句柄拷引用（ISO 7185 的值语义要求如此）。
+ * 字段 / 元素的按值深拷贝，按「该值自己的宿主表示」分派。
+ *
+ * 这一层分派暂时无法上移到 key：字段的宿主表示只有在运行期取到值才可见。
+ * rewrite 其实知道静态类型，可以把 object 表示的 record 逐层展开成
+ * object.new + object.clone 的构造树（与 defaultValueExpr 对称），属后续优化。
+ *
+ * 当前语义：Uint8Array 拷字节；JS 数组逐元素；普通对象递归；
+ * file / cell 拷引用（ISO 7185 值语义要求 identifying-value 保持同一）；标量原样。
  */
-function cloneValue(v: unknown): unknown {
+function cloneField(v: unknown): unknown {
   if (v instanceof Uint8Array) {
     return v.slice()
   }
   if (Array.isArray(v)) {
-    return v.map(cloneValue)
+    return v.map(cloneField)
   }
   if (v !== null && typeof v === 'object') {
     const kind = (v as { kind?: string }).kind
     if (kind === 'file' || kind === 'cell') {
       return v
     }
-    const src = v as Record<string, unknown>
-    const out: Record<string, unknown> = {}
-    for (const k of Object.keys(src)) {
-      out[k] = cloneValue(src[k])
-    }
-    return out
+    return cloneObject(v as Record<string, unknown>)
   }
   return v
 }

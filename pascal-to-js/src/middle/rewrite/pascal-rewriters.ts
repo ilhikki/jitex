@@ -591,8 +591,12 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.rec.copy': (sys) => {
       const td = parseType(sys.args[1])
       if (td && isObjectRepr(td)) {
-        // 对象表示的 record / 数组：按值语义深拷贝（pointer / file 拷引用）
-        return sc(rtKeys.valueClone, [sys.args[0]])
+        // clone 与 create 一一对应：object 表示用同域的 clone key。
+        // 值参数只可能是 record / array（file / pointer 是引用语义，不会走到这里）
+        return sc(
+          td.tag === 'array' ? rtKeys.objectArrayClone : rtKeys.objectClone,
+          [sys.args[0]],
+        )
       }
       return sc(rtKeys.bytesClone, [sys.args[0], litInt(sizeOf(td!))])
     },
