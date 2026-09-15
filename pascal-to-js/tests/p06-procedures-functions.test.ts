@@ -1009,6 +1009,55 @@ end.`,
     expectedOutput: '1\n7\n',
   },
   {
+    name: '6.6.3.2 数组作为值参数，对形参元素的赋值不影响实参',
+    code: `program test(output);
+type intarray = array[1..3] of integer;
+var a: intarray;
+procedure modify(v: intarray);
+begin
+  v[1] := 99;
+  v[2] := 98;
+  v[3] := 97;
+end;
+begin
+  a[1] := 10;
+  a[2] := 20;
+  a[3] := 30;
+  modify(a);
+  writeln(a[1]);
+  writeln(a[2]);
+  writeln(a[3]);
+end.`,
+    purpose: 'ISO 6.6.3.2：数组值参数以赋值方式传递，数组整体拷贝，故对形参元素的赋值不影响实参',
+    expectedOutput: '10\n20\n30\n',
+  },
+  {
+    name: '6.6.3.2 含指针分量的数组作为值参数按值传递',
+    code: `program test(output);
+type intptr = ^integer;
+     ptrarray = array[1..2] of intptr;
+var a: ptrarray;
+procedure modify(v: ptrarray);
+begin
+  v[1] := nil;
+  v[2]^ := 77;
+end;
+begin
+  new(a[1]);
+  a[1]^ := 1;
+  new(a[2]);
+  a[2]^ := 2;
+  modify(a);
+  writeln(a[1] <> nil);
+  writeln(a[2]^);
+  dispose(a[1]);
+  dispose(a[2]);
+end.`,
+    purpose:
+      'ISO 6.6.3.2/6.4.4：数组值参数整体拷贝，故对形参元素赋 nil 不影响实参；而元素中的指针分量复制 identifying-value，故所指变量的修改可见',
+    expectedOutput: 'TRUE\n77\n',
+  },
+  {
     name: '6.6.6.2 required 函数须给出规定个数的实参',
     code: `program test;
 var x: integer;

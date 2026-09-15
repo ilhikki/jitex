@@ -689,9 +689,11 @@ function loweringUserCallStmt(
       argExprs.push(ref(cellVar))
       cellVars.push({ cellVar, target: argNode })
     } else {
-      // Pascal value 参数传递是值拷贝语义（ISO 7185），record 类型需深拷贝
+      // Pascal 值参数是赋值传递（ISO 7185 6.6.3.2）。record / array 这类复合值
+      // 的宿主表示可能是可变的字节视图或对象，必须整体拷贝——否则形参改元素
+      // 会直接回写到实参（标量与 set 无需拷贝：set 的运算都是函数式的，不就地改）
       let argExpr = loweringExpr(args[i], a, ws)
-      if (param.typeInfo.tag === 'record') {
+      if (param.typeInfo.tag === 'record' || param.typeInfo.tag === 'array') {
         argExpr = syscall(syscallKeys.recCopy, [argExpr, typeDescLiteral(param.typeInfo)])
       }
       argExprs.push(argExpr)
