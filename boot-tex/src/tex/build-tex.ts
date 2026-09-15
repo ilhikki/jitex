@@ -1,5 +1,5 @@
 import { ExtraCallable, PascalFile, SyscallHandler, TextFile, transform } from '@jitex/pascal-to-js'
-import { ConsoleFile, extraSyscalls } from '../utils.ts'
+import { ConsoleFile, extraSyscalls, normalizeFileOpen, runtimeFileSyscalls } from '../utils.ts'
 
 const texExtraCallables: Record<string, ExtraCallable> = {
   'BREAK': {
@@ -17,6 +17,15 @@ const texExtraCallables: Record<string, ExtraCallable> = {
   'ERSTAT': {
     sysCallName: 'extra.erStat',
     kind: 'function',
+  },
+  // 由 normalizeFileOpen 从 reset(f, name, opts) / rewrite(f, name, opts) 改写而来
+  'OPENIN': {
+    sysCallName: 'extra.openIn',
+    kind: 'procedure',
+  },
+  'OPENOUT': {
+    sysCallName: 'extra.openOut',
+    kind: 'procedure',
   },
 }
 
@@ -46,10 +55,11 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.erStat': extraSyscalls['extra.erStat'],
   'extra.break': extraSyscalls['extra.break'],
   'runtime.file.eoln': eolnSyscall,
+  ...runtimeFileSyscalls,
 }
 
 export function transformTex(texPascalContent: string) {
-  const jsCode = transform(texPascalContent, {
+  const jsCode = transform(normalizeFileOpen(texPascalContent), {
     extraCallables: texExtraCallables,
   })
   return jsCode

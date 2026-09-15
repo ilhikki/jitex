@@ -116,57 +116,6 @@ function pick(ctx: RuntimeContext, f: unknown, isOutput: boolean): TextFile {
 }
 
 /**
- * file-name 归一化为字符串。
- *
- * 运行时的 file-name 可能是 Pascal 字符串（Uint8Array）、char 值（以序数表示）或宿主字符串。
- */
-function fileNameToString(fileName: unknown): string {
-  if (typeof fileName === 'string') {
-    return fileName.trim()
-  }
-  if (typeof fileName === 'number') {
-    return String.fromCharCode(fileName)
-  }
-  if (fileName instanceof Uint8Array) {
-    return bytesToString(fileName).trim()
-  }
-  return ''
-}
-
-/**
- * 处理非 ISO 的 `reset(f, name)` / `rewrite(f, name)` 形式：
- * 按名字在 ctx.files 中查找并绑定到句柄。
- *
- * - `create=false`（reset，输入）：文件不存在即**打开失败**，句柄保持
- *   `value === undefined`，由 `erstat(f)` 报告（TeX 的 `b_open_in` 依赖此语义）。
- * - `create=true`（rewrite，输出）：文件不存在则新建。
- */
-function bindByName(
-  ctx: RuntimeContext,
-  p: PascalFile,
-  fileName: unknown,
-  tag: string,
-  create: boolean,
-): boolean {
-  if (fileName === undefined) {
-    return true
-  }
-  const name = fileNameToString(fileName)
-  ctx.debugLog.push(`${tag} ${name}`)
-  let store = ctx.files.get(name)
-  if (store === undefined) {
-    if (!create) {
-      p.value = undefined
-      return false
-    }
-    store = (isBlockFile(p) ? new ByteBlockFile() : new MemoryTextFile()) as unknown as PascalFileStore
-    ctx.files.set(name, store)
-  }
-  p.value = store
-  return true
-}
-
-/**
  * 无 file-name 的 reset / rewrite：按元素类型建立初始存储。
  *
  * ISO 7185 6.6.5.2 把「文件未定义时使用」定为 error，而 reset / rewrite 的作用正是让
@@ -239,22 +188,14 @@ function skipLine(store: TextFile): void {
 
 export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
   return {
-    // 第二参数（非 ISO 的 `reset(f, name)` 形式）用于按名字绑定/新建文件存储
-    [rtKeys.fileReset]: (ctx, f, fileName) => {
-      const p = f as PascalFile
-      if (!bindByName(ctx, p, fileName, 'file.reset', false)) {
-        // 具名输入文件不存在：打开失败，句柄保持未初始化
-        return undefined
-      }
-      const store = ensureStore(p)
+    [rtKeys.fileReset]: (_ctx, f) => {
+      const store = ensureStore(f as PascalFile)
       store.seek(0)
       store.setMode('inspection')
       return undefined
     },
-    [rtKeys.fileRewrite]: (ctx, f, fileName) => {
-      const p = f as PascalFile
-      bindByName(ctx, p, fileName, 'file.rewrite', true)
-      const store = ensureStore(p)
+    [rtKeys.fileRewrite]: (_ctx, f) => {
+      const store = ensureStore(f as PascalFile)
       store.clear()
       store.seek(0)
       store.setMode('generation')

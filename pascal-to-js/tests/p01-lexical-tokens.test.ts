@@ -326,36 +326,6 @@ end.`,
     purpose: 'ISO 6.1.8：commentary 是任意字符序列，正文内容不影响注释的识别与跳过',
     expectedOutput: '6\n',
   },
-  {
-    name: '6.1 十六进制记号（非 ISO 记号）不可用',
-    code: `program p(output);
-begin
-  writeln($1A);
-end.`,
-    purpose:
-      'ISO 6.1.5 的 number 只由十进制 digit-sequence 构成，$ 前缀记号不属 ISO 记号；本实现虽能扫出该记号，但其应用不可用（以错误终止）',
-    expectedError: '',
-  },
-  {
-    name: '6.1 字符码记号的扫描（非 ISO 记号）',
-    code: `program p(output);
-begin
-  write(#65);
-  writeln(#$41);
-end.`,
-    purpose: "ISO 6.1.6 的字符记号只有 'c' 一种形式，# 前缀的字符码不属 ISO 记号；本实现无条件接受（扩展）",
-    expectedOutput: 'AA\n',
-  },
-  {
-    name: '6.7.2.2 双等号比较（非 ISO 记号）不构成关系运算',
-    code: `program p(output);
-begin
-  if 1 == 1 then writeln('eq') else writeln('ne');
-end.`,
-    purpose:
-      'ISO 6.7.2.2 的关系运算符只有 =、<>、<、>、<=、>=、in；== 不属 ISO 记号，其应用不产生 Boolean 结果（以错误终止）',
-    expectedError: '',
-  },
 ]
 
 runPascalTests('ISO 7185 6.1 - Lexical tokens', tests)

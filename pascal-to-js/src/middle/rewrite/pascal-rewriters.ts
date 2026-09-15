@@ -442,8 +442,8 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
 
     // 类型只用到「文件行为类别」，句柄不携带类型描述符
     'lowering.file.create': (sys) => sc(rtKeys.fileCreate, [litStr(fileKind(parseType(sys.args[0])))]),
-    'lowering.file.reset': (sys) => sc(rtKeys.fileReset, [sys.args[0], ...sys.args.slice(2)]),
-    'lowering.file.rewrite': (sys) => sc(rtKeys.fileRewrite, [sys.args[0], ...sys.args.slice(2)]),
+    'lowering.file.reset': (sys) => sc(rtKeys.fileReset, [sys.args[0]]),
+    'lowering.file.rewrite': (sys) => sc(rtKeys.fileRewrite, [sys.args[0]]),
     'lowering.file.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
     // `f^ := x` 的形态在编译期定死：字符文件走 putCharacter（ord 值转回字符），
     // 其余走 put；`put(f)`（无 unit）也由同一个 put 承担

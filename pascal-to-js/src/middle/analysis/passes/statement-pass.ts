@@ -796,6 +796,12 @@ class StatementPass {
     formals: VarSymbol[],
     args: ExpressionNode[],
   ): void {
+    // ISO 7185 6.6.3.1：actual-parameter-list 须与 formal-parameter-list 一一对应
+    if (args.length > formals.length) {
+      throw new Error(
+        `'${calleeName}' expects ${formals.length} actual parameter(s) but got ${args.length} (ISO 7185 6.6.3.1)`,
+      )
+    }
     for (let i = 0; i < formals.length && i < args.length; i++) {
       const formal = formals[i]
       if (formal.callable) {

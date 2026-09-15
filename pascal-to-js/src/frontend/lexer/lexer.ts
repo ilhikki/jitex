@@ -83,10 +83,6 @@ function isDigit(c: string): boolean {
   return c >= '0' && c <= '9'
 }
 
-function isHexDigit(c: string): boolean {
-  return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
 function isWhitespace(c: string): boolean {
   return c === ' ' || c === '\t' || c === '\n' || c === '\r'
 }
@@ -111,19 +107,7 @@ export function tokenize(input: LexerInput): Token[] {
     // Skip comments: { ... } or (* ... *)
     if (src[pos] === '{') {
       pos++
-      // Check for compiler directives like {$C-,A+,D-}
-      if (src[pos] === '$') {
-        // It's a compiler directive — skip the whole thing
-        pos++
-        while (pos < src.length && src[pos] !== '}') {
-          pos++
-        }
-        if (pos < src.length) {
-          pos++
-        }
-        continue
-      }
-      // Regular comment. ISO 6.1.8: the construct
+      // ISO 6.1.8: the construct
       // (`{' | `(*') commentary (`*)' | `}') shall be a comment, so either closing
       // delimiter terminates the comment regardless of which opening delimiter was used.
       while (pos < src.length && src[pos] !== '}' && !(src[pos] === '*' && src[pos + 1] === ')')) {
@@ -283,12 +267,7 @@ export function tokenize(input: LexerInput): Token[] {
         }
         break
       case '=':
-        if (src[pos + 1] === '=') {
-          type = 'EQEQ'
-          consumed = 2
-        } else {
-          type = 'EQUAL'
-        }
+        type = 'EQUAL'
         break
       case '+':
         type = 'PLUS'
@@ -323,39 +302,6 @@ export function tokenize(input: LexerInput): Token[] {
       case '^':
         type = 'CARET'
         break
-      case '#':
-        // Character constant: #65 or #$41
-        pos++
-        if (pos < src.length && src[pos] === '$') {
-          pos++
-          while (pos < src.length && isHexDigit(src[pos])) {
-            pos++
-          }
-        } else {
-          while (pos < src.length && isDigit(src[pos])) {
-            pos++
-          }
-        }
-        tokens.push({
-          type: 'CHAR_CODE',
-          content: src.substring(start, pos),
-          start: offsetToPos(start),
-          end: offsetToPos(pos),
-        })
-        continue
-      case '$':
-        // Hex number: $1A2B
-        pos++
-        while (pos < src.length && isHexDigit(src[pos])) {
-          pos++
-        }
-        tokens.push({
-          type: 'HEX_NUMBER',
-          content: src.substring(start, pos),
-          start: offsetToPos(start),
-          end: offsetToPos(pos),
-        })
-        continue
       default:
         type = 'UNKNOWN'
         break

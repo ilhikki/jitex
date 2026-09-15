@@ -1728,17 +1728,6 @@ end.`,
     expectedError: '',
   },
   {
-    name: '6.8.3.7 case 默认分支的语句非法应报错',
-    code: `program test(output);
-begin
-  case 1 of
-    otherwise )
-  end;
-end.`,
-    purpose: 'ISO 6.8.3.7 的默认分支由本实现以 otherwise 扩展提供，其后须为合法 statement',
-    expectedError: '',
-  },
-  {
     name: '6.8.2.4 goto 之后须为 label',
     code: `program test(output);
 label 1;
@@ -1786,7 +1775,7 @@ end.`,
     expectedOutput: '56\n',
   },
   {
-    name: '6.6.3.1 实参个数多于形参个数时的接受行为（实现宽化）',
+    name: '6.6.3.1 实参个数多于形参个数应报错',
     code: `program test(output);
 procedure q(a: integer);
 begin
@@ -1795,9 +1784,8 @@ end;
 begin
   q(1, 2);
 end.`,
-    purpose:
-      'ISO 6.6.3.1 要求 actual-parameter-list 与 formal-parameter-list 一一对应；本实现接受多余实参并忽略之（扩展）',
-    expectedOutput: '1\n',
+    purpose: 'ISO 6.6.3.1：actual-parameter-list 须与 formal-parameter-list 一一对应',
+    expectedError: '',
   },
 ]
 

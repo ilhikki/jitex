@@ -537,28 +537,30 @@ function loweringProcedureCall(
     case 'read':
       return loweringReadln(node.arguments, a, ws, true)
     case 'reset': {
-      // ISO 6.6.5.2 reset(f)：句柄自带类型，rewrite 据此产出 runtime.file.reset
+      // ISO 6.6.5.2 reset(f)：只接受一个 file-variable 实参，句柄自带类型
+      if (node.arguments.length !== 1) {
+        throw new Error('reset takes exactly one file-variable actual parameter (ISO 7185 6.6.5.2)')
+      }
       const f = loweringExpr(node.arguments[0], a, ws)
-      const extra = node.arguments.slice(1).map((x) => loweringExpr(x, a, ws))
       return [
         evalStmt(
           syscall(syscallKeys.fileReset, [
             f,
             typeDescLiteral(a.typeOf(node.arguments[0])),
-            ...extra,
           ]),
         ),
       ]
     }
     case 'rewrite': {
+      if (node.arguments.length !== 1) {
+        throw new Error('rewrite takes exactly one file-variable actual parameter (ISO 7185 6.6.5.2)')
+      }
       const f = loweringExpr(node.arguments[0], a, ws)
-      const extra = node.arguments.slice(1).map((x) => loweringExpr(x, a, ws))
       return [
         evalStmt(
           syscall(syscallKeys.fileRewrite, [
             f,
             typeDescLiteral(a.typeOf(node.arguments[0])),
-            ...extra,
           ]),
         ),
       ]
@@ -668,11 +670,8 @@ function loweringUserCallStmt(
   const cellVars: { cellVar: number; target: ExpressionNode }[] = []
 
   for (let i = 0; i < args.length; i++) {
-    const param = info.params[i]
-    if (!param) {
-      argExprs.push(loweringExpr(args[i], a, ws))
-      continue
-    }
+    // 实参个数已由 analysis 按 ISO 7185 6.6.3.1 校验
+    const param = info.params[i]!
     if (param.callable) {
       // ISO 7185 6.6.3.4/6.6.3.5：可调用形参的实参是过程/函数标识符 → 传其函数值
       argExprs.push(loweringCallableArgument(args[i], a, ws))

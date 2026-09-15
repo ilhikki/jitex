@@ -1,4 +1,4 @@
-import { extraSyscalls, stringToBytes } from '../utils.ts'
+import { extraSyscalls, normalizeFileOpen, runtimeFileSyscalls, stringToBytes } from '../utils.ts'
 import {
   ExtraCallable,
   MemoryTextFile,
@@ -22,10 +22,20 @@ const tangleExtraCallables: Record<string, ExtraCallable> = {
     sysCallName: 'extra.break',
     kind: 'procedure',
   },
+  // 由 normalizeFileOpen 从 reset(f, name, opts) / rewrite(f, name, opts) 改写而来
+  'OPENIN': {
+    sysCallName: 'extra.openIn',
+    kind: 'procedure',
+  },
+  'OPENOUT': {
+    sysCallName: 'extra.openOut',
+    kind: 'procedure',
+  },
 }
 
 const tangleExtraSyscalls: Record<string, SyscallHandler> = {
   'extra.break': extraSyscalls['extra.break'],
+  ...runtimeFileSyscalls,
 }
 
 export type TangleInput = {
@@ -121,7 +131,7 @@ export function runTangleJs(
 }
 
 export function transformTangle(tangleContent: string) {
-  const jsCode = transform(tangleContent, {
+  const jsCode = transform(normalizeFileOpen(tangleContent), {
     extraCallables: tangleExtraCallables,
   })
   return jsCode

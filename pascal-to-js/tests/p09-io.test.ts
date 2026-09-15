@@ -469,19 +469,6 @@ end.`,
     purpose: 'ISO 6.4.3.3 / 6.6.5.2：record 的 file 字段是 variable-access，可作 rewrite/write/reset 的实参',
   },
   {
-    name: '6.6 file 作 record 字段并带 file-name 的 reset',
-    code: `program test(output);
-type r = record f: file of char end;
-var x: r;
-begin
-  reset(x.f, 'F');
-  write('OK');
-end.`,
-    purpose: '非标 reset(f, name)：file-name 绑定对 record 内 file 字段同样适用',
-    textFiles: new Map<string, Uint8Array>([['F', new Uint8Array([0x5a])]]),
-    expectedContains: 'OK',
-  },
-  {
     name: '6.6 file 作数组元素时的 rewrite/write/reset',
     code: `program test(output);
 var a: array[1..2] of file of char;

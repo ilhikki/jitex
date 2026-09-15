@@ -779,28 +779,14 @@ end.`,
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 reset(f, name) 打开不存在的输入文件后句柄未定义',
+    name: '6.6.5.2 reset 只接受一个 file-variable 实参',
     code: `program test(output);
 var f: text;
 begin
-  reset(f, 'MISSING');
-  writeln('CONTINUED');
+  reset(f, 'NAME');
 end.`,
-    purpose:
-      '非标 reset(f, name)（ISO 6.6.5.2 的 reset 无 file-name 参数）：输入文件不存在时为打开失败而非报错，句柄保持未定义，程序可继续',
-    expectedOutput: 'CONTINUED\n',
-  },
-  {
-    name: '6.6 rewrite(f, name) 对不存在的具名文件新建存储',
-    code: `program test(output);
-var f: text;
-begin
-  rewrite(f, 'NEWFILE');
-  writeln(f, 'HI');
-end.`,
-    purpose:
-      '非标 rewrite(f, name)：具名输出文件不存在时新建并绑定（ISO 6.6.5.2 的 rewrite 无 file-name 参数，命名机制属实现相关）',
-    expectedFileContains: [{ url: 'NEWFILE', contains: 'HI' }],
+    purpose: 'ISO 6.6.5.2：reset(f) 只有一个 file-variable 实参，file-name 不是 ISO 形式',
+    expectedError: '',
   },
   {
     name: '6.6 program 参数中的文件变量在算法开始前绑定外部文件',
@@ -1578,19 +1564,6 @@ begin`,
     purpose: 'ISO 6.6.6.5：eoln 省略实参时应用于 input，此时 eof(input) 须为假',
     input: '\n',
     expectedOutput: 'IN_EOLN',
-  },
-  {
-    name: '6.6.6.5 eof 带空实参表的书写形式（非 ISO 形式）',
-    code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOF() THEN WRITE('E');END.`,
-    purpose: 'ISO 6.6.6.5 的 eof 省略实参即应用于 input（不带括号）；带空的实参表是本实现接受的书写形式',
-    expectedOutput: 'E',
-  },
-  {
-    name: '6.6.6.5 eoln 带空实参表的书写形式（非 ISO 形式）',
-    code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOLN() THEN WRITE('L');END.`,
-    purpose: 'ISO 6.6.6.5 的 eoln 省略实参即应用于 input（不带括号）；带空的实参表是本实现接受的书写形式',
-    input: '\n',
-    expectedOutput: 'L',
   },
 ]
 

@@ -50,9 +50,7 @@ export function parseType(input: ParserInput): ParseResult<TypeNode> {
     case 'MINUS':
     case 'PLUS':
     case 'INTEGER':
-    case 'HEX_NUMBER':
     case 'STRING':
-    case 'CHAR_CODE':
     case 'IDENTIFIER':
     case 'TRUE':
     case 'FALSE':

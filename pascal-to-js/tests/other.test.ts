@@ -260,13 +260,6 @@ end.`,
 
   // 控制流测试
   {
-    name: 'CASE 仅有 OTHERWISE 分支',
-    code:
-      'program test(output);\nvar\n  x: integer;\nbegin\n  x := 5;\n  case x of\n    otherwise\n      x := 0;\n  end;\n  writeln(x);\nend.',
-    purpose: 'ISO §6.8.3.5 的 case 无 otherwise 子句；本实现支持以 otherwise 兜底无匹配值，分支执行后 x 变为 0',
-    expectedOutput: '0\n',
-  },
-  {
     name: '标签用于 GOTO',
     code:
       'program test(output);\nlabel 99;\nvar\n  x: integer;\nbegin\n  x := 1;\n  goto 99;\n  x := 2;\n99:\n  writeln(x);\nend.',
@@ -338,70 +331,6 @@ END.`,
     ],
   },
 
-  // OTHERS: case 分支（UCSD Pascal 风格，UCSD/Turbo 扩展，Knuth 在 TANGLE 中使用）
-
-  {
-    name: 'OTHERS: 作为 case 默认分支',
-    code: `PROGRAM TANGLE(output);
-VAR A: INTEGER;
-BEGIN
-  A := 5;
-  CASE A OF
-    0: WRITELN('zero');
-    1: WRITELN('one');
-    OTHERS: WRITELN('other:', A);
-  END;
-END.`,
-    purpose: 'Knuth 风格：OTHERS: 作为 case 默认分支（无匹配 case 常量时执行）',
-    expectedOutput: 'other:5\n',
-  },
-  {
-    name: 'OTHERS: 命中分支',
-    code: `PROGRAM TANGLE(output);
-VAR A: INTEGER;
-BEGIN
-  A := 9;
-  CASE A OF
-    9: WRITELN('tab');
-    10: WRITELN('lf');
-    13: WRITELN('cr');
-    OTHERS: WRITELN('char');
-  END;
-END.`,
-    purpose: 'Knuth 风格：OTHERS: 之前的显式分支命中，不进入默认分支',
-    expectedOutput: 'tab\n',
-  },
-  {
-    name: 'OTHERS: 命中默认分支（无匹配）',
-    code: `PROGRAM TANGLE(output);
-VAR A: INTEGER;
-BEGIN
-  A := 125;
-  CASE A OF
-    9: WRITELN('tab');
-    10: WRITELN('lf');
-    OTHERS: WRITELN('default');
-  END;
-END.`,
-    purpose: 'Knuth 风格：无显式分支匹配时走 OTHERS: 默认分支',
-    expectedOutput: 'default\n',
-  },
-  {
-    name: 'OTHERS: 后续语句继续执行',
-    code: `PROGRAM TANGLE(output);
-VAR A: INTEGER;
-BEGIN
-  A := 99;
-  CASE A OF
-    1: WRITELN('one');
-    OTHERS: WRITELN('other');
-  END;
-  WRITELN('after case');
-END.`,
-    purpose: 'Knuth 风格：OTHERS: 分支执行后继续执行 case 之后的语句',
-    expectedOutput: 'other\nafter case\n',
-  },
-
   // PAGE 系统过程（ISO 7185 6.9.5 定义其为 implementation-defined 效果）
 
   {
@@ -432,23 +361,6 @@ END.`,
 
   // 综合测试：模仿 TANGLE 中的代码片段
 
-  {
-    name: 'TANGLE 风格字符转义 case',
-    code: `PROGRAM TANGLE(output);
-VAR A: INTEGER;
-BEGIN
-  A := 125;
-  CASE A OF
-    9: WRITELN('tab');
-    10: WRITELN('lf');
-    13: WRITELN('cr');
-    125: WRITELN('dollar');
-    OTHERS: WRITELN('char');
-  END;
-END.`,
-    purpose: '模仿 tangle-official.pas 的字符转义 case 语句，A=125 命中显式分支',
-    expectedOutput: 'dollar\n',
-  },
   {
     name: 'TANGLE 风格文件变量声明',
     code: `PROGRAM TANGLE(WEBFILE, CHANGEFILE, PASCALFILE, POOL);

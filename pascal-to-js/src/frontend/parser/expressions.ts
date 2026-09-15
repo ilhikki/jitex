@@ -54,21 +54,6 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
       )
     }
 
-    case 'HEX_NUMBER': {
-      return ok(
-        input.position + 1,
-        withLoc(
-          {
-            kind: 'IntegerLiteral',
-            value: parseInt(token.content.substring(1), 16),
-            raw: token.content,
-          } as IntegerLiteralNode,
-          token.start,
-          token.end,
-        ),
-      )
-    }
-
     case 'REAL': {
       return ok(
         input.position + 1,
@@ -107,29 +92,6 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
             value: token.content,
             raw: token.content,
           } as StringLiteralNode,
-          token.start,
-          token.end,
-        ),
-      )
-    }
-
-    case 'CHAR_CODE': {
-      // #65 or #$41
-      const content = token.content
-      let value: number
-      if (content[1] === '$') {
-        value = parseInt(content.substring(2), 16)
-      } else {
-        value = parseInt(content.substring(1), 10)
-      }
-      return ok(
-        input.position + 1,
-        withLoc(
-          {
-            kind: 'CharLiteral',
-            value: String.fromCharCode(value),
-            raw: token.content,
-          } as CharLiteralNode,
           token.start,
           token.end,
         ),
@@ -201,52 +163,6 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
 
     case 'NOT':
       return parseNot(input)
-
-    case 'MINUS': {
-      // Unary minus
-      const startToken = token
-      const afterMinus = { tokens: input.tokens, position: input.position + 1 }
-      const operandResult = parseFactor(afterMinus)
-      if (!operandResult.success) {
-        return fail(operandResult.error, operandResult.position)
-      }
-      const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
-      return ok(
-        operandResult.newPosition,
-        withLoc(
-          {
-            kind: 'UnaryExpression',
-            operator: '-',
-            operand: operandResult.astNode,
-          } as UnaryExpressionNode,
-          startToken.start,
-          endToken.end,
-        ),
-      )
-    }
-
-    case 'PLUS': {
-      // Unary plus (no-op but still parse)
-      const startToken = token
-      const afterPlus = { tokens: input.tokens, position: input.position + 1 }
-      const operandResult = parseFactor(afterPlus)
-      if (!operandResult.success) {
-        return fail(operandResult.error, operandResult.position)
-      }
-      const endToken = peek({ tokens: input.tokens, position: operandResult.newPosition - 1 })
-      return ok(
-        operandResult.newPosition,
-        withLoc(
-          {
-            kind: 'UnaryExpression',
-            operator: '+',
-            operand: operandResult.astNode,
-          } as UnaryExpressionNode,
-          startToken.start,
-          endToken.end,
-        ),
-      )
-    }
 
     default:
       return fail(
@@ -602,9 +518,6 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
         break
       case 'GE':
         operator = '>='
-        break
-      case 'EQEQ':
-        operator = '=='
         break
       case 'IN':
         operator = 'IN'

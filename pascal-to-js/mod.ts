@@ -64,6 +64,7 @@ export type {
   TextFile,
 } from '@/backend/runtime/runtime-type.ts'
 export { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
+export { ByteBlockFile } from '@/backend/runtime/sys/file-runtime.ts'
 export { MemoryTextFile } from '@/backend/runtime/sys/memory-text-file.ts'
 export { parse } from '@/run.ts'
 

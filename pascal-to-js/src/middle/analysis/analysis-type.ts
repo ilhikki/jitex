@@ -204,19 +204,10 @@ export const BUILTIN_FUNCTIONS = new Set([
 /** 内置无参标识符（parser 将无参调用解析为 Identifier） */
 export const BUILTIN_IDENTIFIERS = new Set(['maxint', 'nil', 'eof', 'eoln'])
 
-// 简单类型表
-
+// 简单类型表（ISO 7185 6.4.2.2 的 required simple-type 与 text）
 export const SIMPLE_TYPES: Record<string, TypeInfo> = {
   integer: { tag: 'integer' },
-  longint: { tag: 'integer' },
-  shortint: { tag: 'integer' },
-  byte: { tag: 'integer' },
-  word: { tag: 'integer' },
-  cardinal: { tag: 'integer' },
   real: { tag: 'real' },
-  single: { tag: 'real' },
-  double: { tag: 'real' },
-  extended: { tag: 'real' },
   boolean: { tag: 'boolean' },
   char: { tag: 'char' },
   text: { tag: 'file', elem: { tag: 'char' } },

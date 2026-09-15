@@ -185,11 +185,8 @@ function quoteString(raw: string): string {
   return `'${raw.replace(/'/g, "''")}'`
 }
 
-/** 字符字面量：CHAR_CODE 格式（#开头）直接输出，否则加引号 */
+/** 字符字面量加引号，内部单引号转义为双单引号 */
 function quoteChar(raw: string): string {
-  if (raw.startsWith('#')) {
-    return raw
-  }
   return `'${raw.replace(/'/g, "''")}'`
 }
 

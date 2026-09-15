@@ -671,20 +671,6 @@ end.`,
     expectedError: '',
   },
   {
-    name: '6.7.1 项位置的操作数前可带符号（实现宽化形式）',
-    code: `program test(output);
-var x: integer;
-begin
-  x := 1 - -2;
-  writeln(x);
-  x := 1 + +2;
-  writeln(x);
-end.`,
-    purpose:
-      'ISO 6.7.1 的 sign 只能出现在 simple-expression 起始处、factor 自身不带符号；本实现额外接受项位置的符号（扩展）',
-    expectedOutput: '3\n3\n',
-  },
-  {
     name: '6.7.1 括号内的表达式非法应报错',
     code: `program test;
 var x: integer;

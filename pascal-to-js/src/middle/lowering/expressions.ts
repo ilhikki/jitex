@@ -290,15 +290,16 @@ function loweringFunctionCall(
     case 'odd':
       return syscall(syscallKeys.odd, argExprs)
     case 'eof':
-      if (args.length > 0) {
-        return syscall(syscallKeys.fileEof, [...argExprs, typeDescLiteral(a.typeOf(args[0]))])
+      // ISO 7185 6.6.6.5：eof 的形式为 eof（无括号）或 eof(f)，空实参表不是 ISO 形式
+      if (args.length === 0) {
+        throw new Error('eof requires a file-variable actual parameter (ISO 7185 6.6.6.5)')
       }
-      return syscall(syscallKeys.ioEof, [])
+      return syscall(syscallKeys.fileEof, [...argExprs, typeDescLiteral(a.typeOf(args[0]))])
     case 'eoln':
-      if (args.length > 0) {
-        return syscall(syscallKeys.fileEoln, argExprs)
+      if (args.length === 0) {
+        throw new Error('eoln requires a file-variable actual parameter (ISO 7185 6.6.6.5)')
       }
-      return syscall(syscallKeys.ioEoln, [])
+      return syscall(syscallKeys.fileEoln, argExprs)
     default: {
       throw new Error(`loweringFunctionCall: unknown function ${name}`)
     }
