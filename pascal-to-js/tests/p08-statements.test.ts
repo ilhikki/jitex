@@ -1190,6 +1190,27 @@ end.`,
     purpose: '6.8.3.9：for 语句出现在过程块 statement-part 中，语句体为赋值语句',
     expectedOutput: '15\n',
   },
+  {
+    name: '6.8 for 循环体内递归调用后循环上界仍然有效',
+    code: `program test(output);
+function f(k: integer): integer;
+var i, s: integer;
+begin
+  s := 0;
+  for i := 1 to k do
+  begin
+    s := s + 1;
+    if i = 1 then
+      s := s + f(k - 1);
+  end;
+  f := s;
+end;
+begin
+  writeln(f(3));
+end.`,
+    purpose: '6.8.3.9：final-value 在循环开始前求值一次，循环体内递归调用不得改变本层的循环上界（f(3)=6）',
+    expectedOutput: '6\n',
+  },
 
   // 6.8.3.10 with 语句
 

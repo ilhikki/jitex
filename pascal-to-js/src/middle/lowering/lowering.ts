@@ -32,10 +32,6 @@ function loweringBlock(
   const info = analysis.funcInfo(funcId)
 
   const params = info.params.map((p) => p.varId)
-  const locals = info.locals.map((l) => l.varId)
-  if (info.retval) {
-    locals.push(info.retval.varId)
-  }
 
   // children
   const children: JsonCode.Function[] = []
@@ -67,17 +63,13 @@ function loweringBlock(
     }
   }
 
-  // body
-  const body: JsonCode.Statement[] = []
-  const debugName = analysis.debugNames().get(info.funcId) ?? ''
-  body.push(evalStmt(syscall(syscallKeys.hookFunctionEnter, [litField(info.funcId.toString()), litField(debugName)])))
-  // 变量初始化
-  for (const local of info.locals) {
-    body.push(assignStmt(ref(local.varId), defaultExpr(local.typeInfo)))
-  }
-  if (info.retval) {
-    body.push(assignStmt(ref(info.retval.varId), defaultExpr(info.retval.typeInfo)))
-  }
+  // body：先 lowering statement-part，再组装整个函数体。
+  //
+  // 顺序很关键：for / case / with 的编译期临时变量是在 lowering 语句期间由
+  // allocTempLocal 追加到 info.locals 的，因此 locals 快照与默认初始化都必须
+  // 放在 lowering 之后 —— 否则这些临时变量既拿不到 let 声明（赋值落到全局，
+  // 递归时被内层激活覆盖），也拿不到默认初始化。
+  const statements: JsonCode.Statement[] = []
 
   // program 头的文件参数初始化（ISO 7185 6.10）：
   // PROGRAM X(INFILE, OUTFILE); 中声明的参数必须在算法开始前绑定到外部文件。
@@ -90,7 +82,7 @@ function loweringBlock(
       const sym = analysis.globalSymbolOf(p.name)
       if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
         const varSym = sym as VarSymbol
-        body.push(
+        statements.push(
           evalStmt(
             syscall(syscallKeys.programFileUrl, [
               ref(varSym.varId),
@@ -105,14 +97,34 @@ function loweringBlock(
 
   // compound 语句
   for (const stmt of loweringStmt(block.compound, analysis, funcId, [])) {
-    body.push(stmt)
+    statements.push(stmt)
   }
 
   // 末尾 return
   if (info.retval) {
-    body.push(returnStmt(ref(info.retval.varId)))
+    statements.push(returnStmt(ref(info.retval.varId)))
   } else {
-    body.push(returnStmt())
+    statements.push(returnStmt())
+  }
+
+  // locals 声明（含 lowering 期间新增的编译期临时变量）
+  const locals = info.locals.map((l) => l.varId)
+  if (info.retval) {
+    locals.push(info.retval.varId)
+  }
+
+  // 函数体 = 进入钩子 → 变量默认初始化 → 语句 → 末尾 return
+  const body: JsonCode.Statement[] = []
+  const debugName = analysis.debugNames().get(info.funcId) ?? ''
+  body.push(evalStmt(syscall(syscallKeys.hookFunctionEnter, [litField(info.funcId.toString()), litField(debugName)])))
+  for (const local of info.locals) {
+    body.push(assignStmt(ref(local.varId), defaultExpr(local.typeInfo)))
+  }
+  if (info.retval) {
+    body.push(assignStmt(ref(info.retval.varId), defaultExpr(info.retval.typeInfo)))
+  }
+  for (const stmt of statements) {
+    body.push(stmt)
   }
 
   return {
