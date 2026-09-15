@@ -1769,6 +1769,36 @@ end.`,
     purpose: 'ISO 6.8.3.10：do 之后须为合法 statement',
     expectedError: '',
   },
+  {
+    name: '6.8.3.10 with 语句体内可对记录的分量赋值',
+    code: `program test(output);
+type r = record a: array[1..2] of integer end;
+var v: r;
+begin
+  with v do
+  begin
+    a[1] := 5;
+    a[2] := 6;
+  end;
+  writeln(v.a[1], v.a[2]);
+end.`,
+    purpose: 'ISO 6.8.3.10/6.5.3：with 体内字段标识符指称记录变量的分量，其分量可作赋值目标',
+    expectedOutput: '56\n',
+  },
+  {
+    name: '6.6.3.1 实参个数多于形参个数时的接受行为（实现宽化）',
+    code: `program test(output);
+procedure q(a: integer);
+begin
+  writeln(a);
+end;
+begin
+  q(1, 2);
+end.`,
+    purpose:
+      'ISO 6.6.3.1 要求 actual-parameter-list 与 formal-parameter-list 一一对应；本实现接受多余实参并忽略之（扩展）',
+    expectedOutput: '1\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.8 - Statements', tests)

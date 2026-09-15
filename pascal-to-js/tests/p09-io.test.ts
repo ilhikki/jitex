@@ -702,6 +702,13 @@ end.`,
     input: 'true',
     expectedOutput: 'T\n',
   },
+  {
+    name: '6.9.1 在文件尾读取字符单位',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READ(F,C);WRITELN(ORD(C));END.`,
+    purpose: 'ISO 6.9.1b/6.6.5.2：read 的前断言为 not eof(f)；f.R 为空序列时本实现给出一个空白字符',
+    textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+    expectedOutput: '32\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.9 - Input and output', tests)

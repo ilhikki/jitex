@@ -1579,6 +1579,19 @@ begin`,
     input: '\n',
     expectedOutput: 'IN_EOLN',
   },
+  {
+    name: '6.6.6.5 eof 带空实参表的书写形式（非 ISO 形式）',
+    code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOF() THEN WRITE('E');END.`,
+    purpose: 'ISO 6.6.6.5 的 eof 省略实参即应用于 input（不带括号）；带空的实参表是本实现接受的书写形式',
+    expectedOutput: 'E',
+  },
+  {
+    name: '6.6.6.5 eoln 带空实参表的书写形式（非 ISO 形式）',
+    code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOLN() THEN WRITE('L');END.`,
+    purpose: 'ISO 6.6.6.5 的 eoln 省略实参即应用于 input（不带括号）；带空的实参表是本实现接受的书写形式',
+    input: '\n',
+    expectedOutput: 'L',
+  },
 ]
 
 runPascalTests('ISO 7185 6.6 - Procedure and function declarations', tests)

@@ -501,6 +501,54 @@ END.`,
     purpose: '模仿 tangle-official.pas 的 BYTEMEM 二维数组：下标 [1,3] 写入 1*10+3=13',
     expectedOutput: 'byte=13\n',
   },
+
+  // 注入（AGENTS.md 原则 A.7/A.8：注入优先）
+  {
+    name: '注入：宿主注入的函数可作为表达式使用',
+    code: `program test(output);
+begin
+  writeln(triple(4));
+end.`,
+    purpose: 'AGENTS.md 原则 A.7/A.8：非标能力优先以注入提供，注入的函数在编译期即有定义点',
+    extraCallables: { triple: { kind: 'function', sysCallName: 'test.triple' } },
+    extraSyscalls: { 'test.triple': (_ctx, x) => (x as number) * 3 },
+    expectedOutput: '12\n',
+  },
+  {
+    name: '注入：宿主注入的过程可作为语句使用',
+    code: `program test(output);
+begin
+  emit(7);
+  writeln('done');
+end.`,
+    purpose: 'AGENTS.md 原则 A.7/A.8：注入的过程在编译期即有定义点，可作为过程语句调用',
+    extraCallables: { emit: { kind: 'procedure', sysCallName: 'test.emit' } },
+    extraSyscalls: { 'test.emit': (_ctx, x) => x },
+    expectedOutput: 'done\n',
+  },
+  {
+    name: '注入：与原生过程同名的注入须显式允许覆盖',
+    code: `program test(output);
+begin
+  writeln('x');
+end.`,
+    purpose: 'AGENTS.md 原则 A.7：注入默认不得覆盖原生 required 过程/函数，须以 allowOverrideNative 显式允许',
+    extraCallables: { writeln: { kind: 'procedure', sysCallName: 'test.writeln' } },
+    expectedError: '',
+  },
+  {
+    name: '注入：注入表中大小写不同的同名项视为冲突',
+    code: `program test(output);
+begin
+  writeln('x');
+end.`,
+    purpose: 'AGENTS.md 原则 A.7：Pascal 标识符大小写不敏感，注入表中同名的不同拼写构成冲突',
+    extraCallables: {
+      Foo: { kind: 'function', sysCallName: 'test.foo' },
+      foo: { kind: 'function', sysCallName: 'test.fooOther' },
+    },
+    expectedError: '',
+  },
 ]
 
 runPascalTests('Other / unclassified', tests)

@@ -761,6 +761,28 @@ end.`,
     purpose: 'ISO 6.7.1：expression = simple-expression [ relational-operator simple-expression ]',
     expectedError: '',
   },
+  {
+    name: '6.5.3.2 对非数组变量使用下标应报错',
+    code: `program test;
+var x: integer;
+begin
+  x := 1;
+  x := x[1];
+end.`,
+    purpose: 'ISO 6.5.3.2：indexed-variable 的变量须具有数组类型',
+    expectedError: '',
+  },
+  {
+    name: '6.5.3.3 对非记录变量使用字段指示符应报错',
+    code: `program test;
+var i: integer;
+begin
+  i := 1;
+  i := i.f;
+end.`,
+    purpose: 'ISO 6.5.3.3：field-designator 的 record-variable 须具有记录类型',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.7 - Expressions', tests)
