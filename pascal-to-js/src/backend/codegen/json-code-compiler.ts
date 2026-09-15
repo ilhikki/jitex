@@ -1,5 +1,5 @@
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { emitSNode, structurize, type StructurizeContext } from './control-flow-structurer.ts'
+import { emitSNode, structurize, type StructurizeContext } from './structurizer/index.ts'
 
 export interface ToJsOptions {
   semantic?: SemanticCompiler
@@ -34,9 +34,13 @@ export function toJs(fn: JsonCode.Function, options: ToJsOptions = {}): ToJsResu
 
 function collectLongJumpTargets(fn: JsonCode.Function, out: Set<number>): void {
   for (const stmt of fn.body) {
-    if (stmt.kind === 'longJump') out.add(stmt.functionId)
+    if (stmt.kind === 'longJump') {
+      out.add(stmt.functionId)
+    }
   }
-  for (const child of fn.children) collectLongJumpTargets(child, out)
+  for (const child of fn.children) {
+    collectLongJumpTargets(child, out)
+  }
 }
 
 class JsCompilerImpl implements JsCompiler {
@@ -91,7 +95,9 @@ class JsCompilerImpl implements JsCompiler {
     const result = structurize(fn, this.structCtx)
     if (result.kind === 'structured') {
       const text = emitSNode(result.body, indent)
-      if (text.length > 0) lines.push(text)
+      if (text.length > 0) {
+        lines.push(text)
+      }
       return
     }
     this.compileStateBody(fn, lines, indent)
