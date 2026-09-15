@@ -4,9 +4,6 @@ import { BlockStore, MemoryTextFile } from '@jitex/pascal-to-js'
 import { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
 import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@^1.0.0'
 
-/** 非标扩展标识符，如 'string'、'allowUndeclaredLabels' */
-type Extension = string
-
 /**
  * 单个 Pascal 测试用例。
  *
@@ -41,9 +38,6 @@ export interface PascalTest {
 
   /** 模拟输入（按行），供 readln/read 使用 */
   input?: string
-
-  /** 非标扩展列表 */
-  extensions?: Extension[]
 
   /** 额外 callable 注入（编译期声明） */
   extraCallables?: Record<string, ExtraCallable>
@@ -85,7 +79,6 @@ export function runPascal(t: PascalTest): RunState {
     files,
     programFileUrls: t.programFileUrls,
     maxSteps: t.maxSteps ?? 1e5,
-    extensions: t.extensions,
     extraCallables: t.extraCallables,
     extraSyscalls: t.extraSyscalls,
   })

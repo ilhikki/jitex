@@ -325,11 +325,6 @@ class DeclarationPass {
     switch (node.kind) {
       case 'SimpleType': {
         const name = node.name.name.toLowerCase()
-        if (name === 'string' && !this.ctx.hasExtension('string')) {
-          throw new Error(
-            `Non-standard type 'string' used without extension 'string' (ISO 7185 has no string type)`,
-          )
-        }
         const builtin = SIMPLE_TYPES[name]
         if (builtin) {
           info = builtin

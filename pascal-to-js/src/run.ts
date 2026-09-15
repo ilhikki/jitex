@@ -29,8 +29,6 @@ export function parse(source: string): ParseResult<ProgramNode> {
 }
 
 export interface TransformOptions {
-  /** 非标特性扩展（传递给 analysis 做语义检查） */
-  extensions?: string[]
   /** 额外 callable 注入（编译期声明非标过程/函数，AGENTS.md 原则 A.7：注入优先） */
   extraCallables?: Record<string, ExtraCallable>
   /**
@@ -60,7 +58,7 @@ function parseSource(source: string): ProgramNode {
 export function transform(source: string, options: TransformOptions = {}): string {
   const ast = parseSource(source)
 
-  const analysis = analyzeProgram(ast, options.extensions, options.extraCallables)
+  const analysis = analyzeProgram(ast, options.extraCallables)
 
   const jsonCode = loweringProgram(ast, analysis)
 
@@ -142,7 +140,6 @@ export function run(source: string, options: RunOptions = {}): RunState {
   let jsCode
   try {
     jsCode = transform(source, {
-      extensions: options.extensions,
       extraCallables: options.extraCallables,
     })
   } catch (e: unknown) {

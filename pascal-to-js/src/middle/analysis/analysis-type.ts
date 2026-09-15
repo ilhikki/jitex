@@ -219,8 +219,9 @@ export const SIMPLE_TYPES: Record<string, TypeInfo> = {
   extended: { tag: 'real' },
   boolean: { tag: 'boolean' },
   char: { tag: 'char' },
-  // string 是非标扩展（ISO 7185 无 string 类型，只有 packed array[1..n] of char）。
-  // 启用 extension 'string' 时映射为 char 数组（长度不定，dims.high 用 0 占位）。
+  // string 是非标类型（ISO 7185 6.4.2 的 simple-type-identifier 中无 string，
+  // 只有 packed array[1..n] of char）；本实现无条件支持，映射为长度不定的 char 数组
+  // （dims.high 用 0 占位）。
   string: { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } },
   text: { tag: 'file', elem: { tag: 'char' } },
 }

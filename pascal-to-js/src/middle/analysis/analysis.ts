@@ -21,11 +21,10 @@ import { runTypeCheckPass } from './passes/type-check-pass.ts'
 
 export function analyzeProgram(
   program: ProgramNode,
-  extensions?: string[],
   extraCallables?: Record<string, ExtraCallable>,
 ): Analysis {
   const merged = mergeExtraCallables(extraCallables)
-  const ctx = new AnalysisContext(extensions, merged)
+  const ctx = new AnalysisContext(merged)
   const declResult = runDeclarationPass(program, ctx)
   const stmtResult = runStatementPass(program, ctx, declResult)
   runCheckPass(declResult, stmtResult)

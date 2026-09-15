@@ -17,19 +17,10 @@ import { AnalysisSymbol, ExtraCallable, FuncInfo, TypeInfo, VarSymbol } from './
 // AnalysisContext — 只读配置（非可变 state）
 
 export class AnalysisContext {
-  readonly extensions: Set<string>
   readonly extraCallables: Map<string, ExtraCallable> | undefined
 
-  constructor(
-    extensions?: string[],
-    extraCallables?: Map<string, ExtraCallable> | undefined,
-  ) {
-    this.extensions = extensions ? new Set(extensions) : new Set()
+  constructor(extraCallables?: Map<string, ExtraCallable> | undefined) {
     this.extraCallables = extraCallables
-  }
-
-  hasExtension(name: string): boolean {
-    return this.extensions.has(name)
   }
 
   hasExtraProcedure(name: string): boolean {
