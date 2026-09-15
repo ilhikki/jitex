@@ -716,6 +716,105 @@ const tests: PascalTest[] = [
     purpose: 'ISO 6.6.5.2：非 text 文件的 read(f,v) 等价于 v:=f^; get(f)，write(f,e) 等价于 f^:=e; put(f)',
     expectedOutput: '42\n',
   },
+  {
+    name: '6.6 file of record 的 f^ 缓冲变量与 put/get',
+    code: `program test(output);
+type r = record a: integer; b: char end;
+var f: file of r;
+    x, y: r;
+begin
+  rewrite(f);
+  x.a := 7;
+  x.b := 'Z';
+  f^ := x;
+  put(f);
+  reset(f);
+  if eof(f) then writeln('EMPTY') else writeln('HAS');
+  y := f^;
+  writeln(y.a, y.b);
+  get(f);
+  if eof(f) then writeln('DONE') else writeln('MORE');
+end.`,
+    purpose:
+      'ISO 6.6.5.2/6.5.5：元素为 record 的文件，f^ 是该类型的缓冲变量；f^:=x 使缓冲变量取 x 的值，put(f) 把 f^ 追加为 f.L 的新组件，reset 后 f^ 为 f.R.first，get(f) 令 f.R=f.R.rest',
+    expectedOutput: 'HAS\n7Z\nDONE\n',
+  },
+  {
+    name: '6.6 file of 单字节子界 的逐字节 write/read',
+    code: `program test(output);
+var f: packed file of 0..255;
+    b: 0..255;
+    n: integer;
+begin
+  rewrite(f);
+  write(f, 65);
+  write(f, 66);
+  reset(f);
+  read(f, b);
+  n := b;
+  writeln(n);
+  n := f^;
+  writeln(n);
+  get(f);
+  if eof(f) then writeln('EOF') else writeln('MORE');
+end.`,
+    purpose:
+      'ISO 6.6.5.3/6.6.5.2：非 text 文件上 write(f,e) 等价于 f^:=e; put(f)、read(f,v) 等价于 v:=f^; get(f)；read 后再 get 使 f.R 为空，eof 为真',
+    expectedOutput: '65\n66\nEOF\n',
+  },
+  {
+    name: '6.6 file of integer 上 f^ 赋值后再 put(f)',
+    code: `program test(output);
+var f: file of integer;
+    v: integer;
+begin
+  rewrite(f);
+  f^ := 42;
+  put(f);
+  reset(f);
+  read(f, v);
+  writeln(v);
+end.`,
+    purpose: 'ISO 6.6.5.2：f^:=e 与 put(f) 使 e 成为文件的新组件，reset 后 read(f,v) 取回同一值（f^ 的编码实现相关）',
+    expectedOutput: '42\n',
+  },
+  {
+    name: '6.6 reset(f, name) 打开不存在的输入文件后句柄未定义',
+    code: `program test(output);
+var f: text;
+begin
+  reset(f, 'MISSING');
+  writeln('CONTINUED');
+end.`,
+    purpose:
+      '非标 reset(f, name)（ISO 6.6.5.2 的 reset 无 file-name 参数）：输入文件不存在时为打开失败而非报错，句柄保持未定义，程序可继续',
+    expectedOutput: 'CONTINUED\n',
+  },
+  {
+    name: '6.6 rewrite(f, name) 对不存在的具名文件新建存储',
+    code: `program test(output);
+var f: text;
+begin
+  rewrite(f, 'NEWFILE');
+  writeln(f, 'HI');
+end.`,
+    purpose:
+      '非标 rewrite(f, name)：具名输出文件不存在时新建并绑定（ISO 6.6.5.2 的 rewrite 无 file-name 参数，命名机制属实现相关）',
+    expectedFileContains: [{ url: 'NEWFILE', contains: 'HI' }],
+  },
+  {
+    name: '6.6 program 参数中的文件变量在算法开始前绑定外部文件',
+    code: `program test(output, f);
+var f: text;
+begin
+  rewrite(f);
+  writeln(f, 'DATA');
+end.`,
+    purpose:
+      'ISO 6.10：program-parameter-list 中的文件变量须在算法开始前绑定到外部文件，绑定机制为 implementation-defined',
+    programFileUrls: { f: 'MYFILE' },
+    expectedFileContains: [{ url: 'f', contains: 'DATA' }],
+  },
 
   // 6.6.5.3 Dynamic allocation procedures
 

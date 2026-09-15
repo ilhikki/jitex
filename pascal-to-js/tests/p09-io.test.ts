@@ -575,6 +575,65 @@ end.`,
     purpose: 'ISO 6.6.2：function 的 result-type 必须是 simple-type 或 pointer-type；file 作结果类型应报错',
     expectedError: 'function',
   },
+  {
+    name: '6.9.2 readln 跳过以 CRLF 结束的整行',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;C:CHAR;BEGIN RESET(F);READLN(F);READ(F,C);WRITELN(C);END.`,
+    purpose:
+      'ISO 6.9.2：readln(f) 等价于 while not eoln(f) do get(f); get(f)，把位置置于当前行末之后；行结束符的具体字符由实现确定（Annex E）',
+    textFiles: new Map<string, Uint8Array>([['F', text('AB\r\nCD')]]),
+    expectedOutput: 'C\n',
+  },
+  {
+    name: '6.9 空文本文件的 eoln 为真',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOLN(F)THEN WRITE('EOLN');END.`,
+    purpose: 'ISO 6.6.6.5/6.9.5：eoln(f) 在 f.R 为空序列（即 eof(f) 为真）时亦为 true',
+    textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+    expectedOutput: 'EOLN',
+  },
+  {
+    name: '6.9.3 对 Inspection 模式的非文本文件 write 为错误',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:PACKED FILE OF 0..255;BEGIN RESET(F);WRITE(F,1);END.`,
+    purpose: 'ISO 6.6.5.2/6.9.3：write 要求 f.M=Generation；reset 后文件处于 Inspection，此时 write(f,e) 为 error',
+    textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+    expectedError: 'generation',
+  },
+  {
+    name: '6.9.1 在 eof 处读取非文本文件为错误',
+    code: `PROGRAM TEST(OUTPUT,F);VAR F:PACKED FILE OF 0..255;B:0..255;BEGIN RESET(F);READ(F,B);END.`,
+    purpose: 'ISO 6.9.1/6.6.5.2：read 的前断言要求 not eof(f)，f.R 为空序列时读取为 error',
+    textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
+    expectedError: '',
+  },
+  {
+    name: '6.9.3.1 TotalWidth 小于 1 为错误',
+    code: `program test(output);
+begin
+  write('abc':0);
+end.`,
+    purpose: 'ISO 6.9.3.1：write-parameter 的 TotalWidth 须大于 0，TotalWidth < 1 为 error',
+    expectedError: 'width',
+  },
+  {
+    name: '6.9.3 写空字符串不产生输出',
+    code: `program test(output);
+begin
+  write('');
+  writeln('X');
+end.`,
+    purpose: 'ISO 6.9.3.6：string-type 值的分量数为 0 时写出 0 个字符',
+    expectedOutput: 'X\n',
+  },
+  {
+    name: '6.9.5 page 在文件起始处不写隐式 writeln',
+    code: `program test(output);
+begin
+  page;
+  writeln('X');
+end.`,
+    purpose:
+      'ISO 6.9.5：page(f) 仅在 f.L 非空且 f.L.last 不是 end-of-line 时才隐式 writeln(f)；文件起始处 f.L 为空，故不写行结束符',
+    expectedOutput: '\fX\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.9 - Input and output', tests)
