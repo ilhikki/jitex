@@ -1,6 +1,6 @@
 import { run } from '@jitex/pascal-to-js'
 import type { ExtraCallable, PascalFileStore, RunState, SyscallHandler } from '@jitex/pascal-to-js'
-import { MemoryTextFile, RecordFile } from '@jitex/pascal-to-js'
+import { BlockStore, MemoryTextFile } from '@jitex/pascal-to-js'
 import { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
 import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@^1.0.0'
 
@@ -52,7 +52,7 @@ export interface PascalTest {
 
   /** 内存文件系统：文件名 → 文件内容 */
   textFiles?: Map<string, Uint8Array>
-  recordFiles?: Map<string, RecordFile>
+  recordFiles?: Map<string, BlockStore>
   /** 程序文件变量名 → files 中的键名 */
   programFileUrls?: Record<string, string>
 

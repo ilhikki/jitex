@@ -1,22 +1,11 @@
 import type { JsCompiler, SemanticCompiler } from '@/backend/codegen/json-code-compiler.ts'
 import * as JsonCode from '@/middle/ir/json-code.ts'
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import type { PascalSet, SyscallHandler } from '../runtime-type.ts'
+import type { SyscallHandler } from '../runtime-type.ts'
 
-function newPascalSet(set: Set<number>): PascalSet {
-  return {
-    kind: 'set',
-    value: set,
-  }
-}
-
-function unboxPascalSet(set: unknown): Set<number> {
-  return (set as PascalSet).value
-}
-
+/** 运行期基础设施：边界检查 / 步数限制 / 函数进入钩子 */
 export function basicSyscall(): Record<string, SyscallHandler> {
-  // subrange 运行时边界检查。'range.check'（lowering 直接产）与
-  // 'runtime.range.check'（rewrite 产，如 pred/succ 展开）共用同一实现。
+  // subrange 运行时边界检查（rewrite 在 pred / succ 展开等处产 runtime.range.check）
   const rangeCheck: SyscallHandler = (_ctx, index, min, max) => {
     if ((index as number) < (min as number) || (index as number) > (max as number)) {
       throw new Error(`subrange value ${index} out of range ${min}..${max}`)
@@ -33,29 +22,8 @@ export function basicSyscall(): Record<string, SyscallHandler> {
   }
 
   return {
-    [rtKeys.setUnion]: (_ctx, v1, v2): PascalSet => {
-      return newPascalSet(new Set<number>([...unboxPascalSet(v1), ...unboxPascalSet(v2)]))
-    },
-    [rtKeys.setIntersection]: (_ctx, set, other) => {
-      const jsSet = unboxPascalSet(set)
-      return newPascalSet(new Set([...jsSet].filter((x) => unboxPascalSet(other).has(x))))
-    },
-    [rtKeys.setDifference]: (_ctx, set, other) =>
-      newPascalSet(new Set([...(unboxPascalSet(set))].filter((x) => !(unboxPascalSet(other)).has(x)))),
-    [rtKeys.setEqual]: (_ctx, left, right) =>
-      (unboxPascalSet(left)).size === (unboxPascalSet(right)).size &&
-      [...unboxPascalSet(left)].every((x: number) => (unboxPascalSet(right)).has(x)),
-    [rtKeys.setNotEqual]: (_ctx, left, right) =>
-      !((unboxPascalSet(left)).size === (unboxPascalSet(right)).size &&
-        [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x))),
-    [rtKeys.setSubset]: (_ctx, left, right) =>
-      [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x)),
-    [rtKeys.setSuperset]: (_ctx, left, right) =>
-      [...(unboxPascalSet(left))].every((x: number) => unboxPascalSet(right).has(x)),
-    [rtKeys.setContains]: (_ctx, value, set) => (unboxPascalSet(set)).has(value as number),
-
-    'runtime.steps.check': stepsCheck,
-    'runtime.hook.function.enter': () => undefined,
+    [rtKeys.stepsCheck]: stepsCheck,
+    [rtKeys.hookFunctionEnter]: () => undefined,
     [rtKeys.rangeCheck]: rangeCheck,
   }
 }
@@ -164,8 +132,7 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         // 字符串字面量（packed array of char）→ Uint8Array 字面量
         return `new Uint8Array(${literal.arg})`
       case 'string':
-        // key 'string' 是字符串内容的字面量编码（非类型）。
-        // 直接产出 JS 字符串；由 str.to.char.array syscall 包装时才转为 PascalArray。
+        // 字符串内容的字面量编码（非类型）：直接产出 JS 字符串
         return JSON.stringify(literal.arg)
 
       case 'char':

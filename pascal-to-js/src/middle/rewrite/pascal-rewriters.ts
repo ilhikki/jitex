@@ -580,8 +580,8 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     // 可调用形参的间接调用：callee 为函数值，是个原子操作，无需类型分派
     'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
     'lowering.range.check': (sys) => sc(rtKeys.rangeCheck, sys.args),
-    'lowering.steps.check': () => sc('runtime.steps.check', []),
-    'lowering.hook.function.enter': () => sc('runtime.hook.function.enter', []),
+    'lowering.steps.check': () => sc(rtKeys.stepsCheck, []),
+    'lowering.hook.function.enter': () => sc(rtKeys.hookFunctionEnter, []),
   }
 }
 

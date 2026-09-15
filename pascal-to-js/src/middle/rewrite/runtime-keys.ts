@@ -80,6 +80,8 @@ export const rtKeys = {
   pointerDisposeCheck: 'runtime.pointer.disposeCheck',
 
   rangeCheck: 'runtime.range.check',
+  stepsCheck: 'runtime.steps.check',
+  hookFunctionEnter: 'runtime.hook.function.enter',
 
   // 文件
   fileReset: 'runtime.file.reset',

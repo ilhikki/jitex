@@ -56,17 +56,12 @@ export { nodeToCode } from '@/frontend/printer/printer.ts'
 export type { Position, Token } from '@/frontend/token.ts'
 export type { ParseResult, ParserInput } from '@/frontend/types.ts'
 export { parseProgram } from '@/frontend/parser/declarations.ts'
-export { MemoryRecordFile } from '@/backend/runtime/sys/memory-record-file.ts'
 export type {
-  PascalArray,
+  BlockStore,
   PascalFile,
   PascalFileStore,
-  PascalRecord,
-  RecordFile,
-  RecordHandler,
   SyscallHandler,
   TextFile,
-  TypeHandler,
 } from '@/backend/runtime/runtime-type.ts'
 export { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
 export { MemoryTextFile } from '@/backend/runtime/sys/memory-text-file.ts'

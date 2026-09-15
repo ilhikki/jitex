@@ -242,9 +242,6 @@ function cloneValue(v: unknown): unknown {
  *
  * bit i ↔ ord 值 (low + i)；由 rewrite 在产出时减去 low，
  * 因此这里只接收「位下标」，不需要知道类型。
- *
- * 注：Step 2 期间不与旧 PascalSet 版本同时注册（由 runtime.ts 控制），
- * 待 Step 3 lowering 全面改产新 key 后启用。
  */
 export function setSyscalls(): Record<string, SyscallHandler> {
   return {
