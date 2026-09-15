@@ -1808,6 +1808,38 @@ end.`,
     purpose: 'ISO 6.6.3.1：actual-parameter-list 须与 formal-parameter-list 一一对应',
     expectedError: '',
   },
+  {
+    name: '6.8 goto 从内层循环一次跳出外层循环并执行跳转目标处的语句',
+    code: `program test(output);
+label 97, 98, 99;
+var i, j: integer;
+begin
+  i := 0;
+  while i < 5 do
+  begin
+    i := i + 1;
+    j := 0;
+    while j < 2 do
+    begin
+      j := j + 1;
+      if i = 2 then goto 97;
+    end;
+    if i = 3 then goto 98;
+    write(i, ' ');
+  end;
+  write('Y');
+  goto 99;
+97:
+  write('A');
+  goto 99;
+98:
+  write('B');
+99:
+  writeln('C');
+end.`,
+    purpose: 'ISO 6.8.2.4：goto 终止其间所有激活，并在 tag 所指程序点继续，标签处语句须执行',
+    expectedOutput: '1 AC\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.8 - Statements', tests)

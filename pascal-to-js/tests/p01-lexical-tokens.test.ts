@@ -118,6 +118,40 @@ end.`,
     expectedOutput: '123\n0\n',
   },
   {
+    name: '6.1 无符号整数带前导零时仍是十进制',
+    code: `program p(output);
+begin
+  writeln(0100000);
+  writeln(010);
+  writeln(010 + 1);
+end.`,
+    purpose:
+      'unsigned-integer 是十进制 digit-sequence，前导零只表示位数、不表示进制（0100000 = 100000，010 = 10）；生成的 JS 里不能把它写成前导 0 的字面量（JS 宽松模式下按八进制解析）',
+    expectedOutput: '100000\n10\n11\n',
+  },
+  {
+    name: '6.1 const 值带前导零时仍是十进制',
+    code: `program p(output);
+const
+  k = 0100000;
+begin
+  writeln(k);
+end.`,
+    purpose:
+      '常量值经 evalLiteral 进入 IR，同样必须按十进制处理：const k = 0100000 的 k 是 100000',
+    expectedOutput: '100000\n',
+  },
+  {
+    name: '6.1 实数带前导零与比例因子时仍是十进制',
+    code: `program p(output);
+begin
+  writeln(trunc(010E2));
+end.`,
+    purpose:
+      'unsigned-real 的 digit-sequence 允许前导零：010E2 = 1000；在 JS 里前导 0 的整数后紧跟 E 是指数写法不合法（八进制字面量不能带比例因子）',
+    expectedOutput: '1000\n',
+  },
+  {
     name: '6.1 实数带小数点与小数部分',
     code: `program p(output);
 begin

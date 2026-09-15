@@ -40,6 +40,18 @@ export function basicSyscall(): Record<string, SyscallHandler> {
 /** 内联表达式生成器：返回 undefined 表示放弃内联、回退 dispatcher */
 type InlineGen = (args: string[]) => string | undefined
 
+/**
+ * Pascal 数字字面量 → 合法的 JS 数字字面量。
+ *
+ * Pascal 的 digit-sequence 是十进制，前导零只表示位数（0100000 = 100000，ISO 6.1.5）；
+ * 而 JS 宽松模式（`new Function` 的函数体即宽松模式）把前导 0 的整数按八进制解析
+ * （0100000 → 32768），前导 0 后接比例因子更是语法错误（010E2 无法 parse）。
+ * 因此以 0 开头且紧跟数字的字面量一律按十进制重新求值再输出。
+ */
+function jsNumberLiteral(raw: string): string {
+  return /^0[0-9]/.test(raw) ? String(Number(raw)) : raw
+}
+
 const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.int32Add]: (a) => `((${a[0]} + ${a[1]}) | 0)`,
   [rtKeys.int32Subtract]: (a) => `((${a[0]} - ${a[1]}) | 0)`,
@@ -107,8 +119,8 @@ export class PascalSemanticCompiler implements SemanticCompiler {
   literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
     switch (literal.key) {
       case 'number':
-        // 数值字面量：整型 / 实型 / 布尔序数值，arg 直接作为 JS 数字
-        return literal.arg
+        // 数值字面量：整型 / 实型 / 布尔序数值
+        return jsNumberLiteral(literal.arg)
       case 'string':
         // 字符串 / 字符字面量的内容
         return JSON.stringify(literal.arg)

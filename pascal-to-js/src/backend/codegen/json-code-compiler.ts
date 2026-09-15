@@ -1,4 +1,5 @@
 import * as JsonCode from '@/middle/ir/json-code.ts'
+import { emitSNode, structurize, type StructurizeContext } from './control-flow-structurer.ts'
 
 export interface ToJsOptions {
   semantic?: SemanticCompiler
@@ -24,20 +25,40 @@ export interface ToJsResult {
 }
 
 export function toJs(fn: JsonCode.Function, options: ToJsOptions = {}): ToJsResult {
-  const compiler = new JsCompilerImpl(options)
+  const longJumpTargets = new Set<number>()
+  collectLongJumpTargets(fn, longJumpTargets)
+  const compiler = new JsCompilerImpl(options, longJumpTargets)
   const code = compiler.compileFunction(fn, true)
   return { code, mainName: compiler.compileId(fn.id) }
 }
 
+function collectLongJumpTargets(fn: JsonCode.Function, out: Set<number>): void {
+  for (const stmt of fn.body) {
+    if (stmt.kind === 'longJump') out.add(stmt.functionId)
+  }
+  for (const child of fn.children) collectLongJumpTargets(child, out)
+}
+
 class JsCompilerImpl implements JsCompiler {
-  constructor(private readonly options: ToJsOptions) {}
+  constructor(
+    private readonly options: ToJsOptions,
+    private readonly longJumpTargets: ReadonlySet<number>,
+  ) {}
+
+  private get structCtx(): StructurizeContext {
+    return {
+      longJumpTargets: this.longJumpTargets,
+      compileExpr: (expr) => this.compileExpr(expr),
+      compileStatement: (stmt) => this.compileStatement(stmt),
+    }
+  }
 
   compileFunction(fn: JsonCode.Function, top: boolean, indent = ''): string {
     const lines: string[] = []
 
     lines.push(`${indent}${this.functionHeader(fn, top)}`)
 
-    if (top) {
+    if (top && this.longJumpTargets.size > 0) {
       lines.push(`${indent}  let __is_long_jump_mode = false;`)
       lines.push(`${indent}  let __long_jump_label_id = 0;`)
       lines.push(`${indent}  let __long_jump_function_id = 0;`)
@@ -67,17 +88,13 @@ class JsCompilerImpl implements JsCompiler {
   }
 
   private compileBody(fn: JsonCode.Function, lines: string[], indent: string) {
-    if (this.needStateMachine(fn.body)) {
-      this.compileStateBody(fn, lines, indent)
-    } else {
-      this.compileLinearBody(fn, lines, indent)
+    const result = structurize(fn, this.structCtx)
+    if (result.kind === 'structured') {
+      const text = emitSNode(result.body, indent)
+      if (text.length > 0) lines.push(text)
+      return
     }
-  }
-
-  private compileLinearBody(fn: JsonCode.Function, lines: string[], indent: string) {
-    for (const stmt of fn.body) {
-      lines.push(indent + this.compileStatement(stmt))
-    }
+    this.compileStateBody(fn, lines, indent)
   }
 
   private compileStateBody(fn: JsonCode.Function, lines: string[], indent: string) {
@@ -172,12 +189,6 @@ class JsCompilerImpl implements JsCompiler {
       return `v${id}_${name}`
     }
     return `v${id}`
-  }
-
-  private needStateMachine(body: JsonCode.Statement[]): boolean {
-    return body.some(
-      (x) => x.kind === 'label' || x.kind === 'jump' || x.kind === 'jumpIf' || x.kind === 'longJump',
-    )
   }
 
   private error(message: string): never {
