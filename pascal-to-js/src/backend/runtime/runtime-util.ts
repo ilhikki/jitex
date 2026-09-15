@@ -1,10 +1,12 @@
-// 辅助函数：real 格式化
+// 辅助函数：real 格式化（单精度：7 位有效小数为本实现的输出精度，ISO 6.9.3.6 允许实现定义）
+
+const REAL_FRACTION_DIGITS = 7
 
 export function formatReal(n: number): string {
   if (Number.isInteger(n)) {
-    return `${n}.00000000000000E+000`
+    return `${n}.${'0'.repeat(REAL_FRACTION_DIGITS)}E+000`
   }
-  const s = n.toExponential(14)
+  const s = n.toExponential(REAL_FRACTION_DIGITS)
   const eIdx = s.indexOf('e')
   if (eIdx < 0) {
     return s

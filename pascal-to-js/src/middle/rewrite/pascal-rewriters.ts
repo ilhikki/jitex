@@ -13,16 +13,16 @@ import type { TypeDescriptor } from '@/middle/lowering/type.ts'
 import {
   arrayCount,
   arraySlot,
-  codecOf,
   fieldSlot,
   isByteScalar,
   isObjectRepr,
   isScalar,
   remainingArrayType,
+  scalarKindOf,
   setSize,
   sizeOf,
 } from './type-layout.ts'
-import { rtKeys } from './runtime-keys.ts'
+import { bytesGetKey, bytesSetKey, rtKeys } from './runtime-keys.ts'
 import type { SyscallRewriteTable } from './rewrite.ts'
 
 // 工具
@@ -39,8 +39,12 @@ function litStr(s: string): JsonCode.Literal {
   return { kind: 'literal', key: 'str', arg: s }
 }
 
-function litType(td: TypeDescriptor): JsonCode.Literal {
-  return { kind: 'literal', key: 'type', arg: JSON.stringify(td) }
+function litReal(v: string): JsonCode.Literal {
+  return { kind: 'literal', key: 'f64', arg: v }
+}
+
+function litChar(ch: string): JsonCode.Literal {
+  return { kind: 'literal', key: 'char', arg: ch }
 }
 
 function isNullLit(e: JsonCode.Expr | undefined): boolean {
@@ -81,6 +85,86 @@ function isBinaryFile(fileType: TypeDescriptor | undefined): boolean {
  */
 function isByteFile(fileType: TypeDescriptor | undefined): boolean {
   return fileType?.tag === 'file' && isByteScalar(fileType.elem)
+}
+
+// 类型 → 无类型常量的降级
+
+/**
+ * 文件句柄的编译期行为类别。
+ *
+ * 文件行为（记录 / 字节 / char 单位 / 文本）由元素类型在编译期定死，
+ * runtime 只认这个标量，不再接触类型描述符。
+ */
+function fileKind(fileType: TypeDescriptor | undefined): string {
+  const elem = fileType?.elem
+  if (elem?.tag === 'rec') {
+    return 'rec'
+  }
+  if (isByteScalar(elem)) {
+    return 'byte'
+  }
+  if (elem?.tag === 'char') {
+    return 'char'
+  }
+  return 'text'
+}
+
+/**
+ * object 表示的类型的默认值表达式，编译期整棵树展开。
+ *
+ * 含 file / pointer 的类型无法字节化，值由 JS 对象承载（见 isObjectRepr），
+ * 因此默认值必须在编译期展开成构造表达式——运行期不再接收类型描述符。
+ */
+function defaultValueExpr(td: TypeDescriptor): JsonCode.Expr {
+  switch (td.tag) {
+    case 'i32':
+      // 子界型取下界（ISO 7185 6.4.2.4 的变量初始值约定）
+      return litInt(td.low ?? 0)
+    case 'enum':
+    case 'bool':
+      return litInt(0)
+    case 'f64':
+      return litReal('0')
+    case 'char':
+      return litChar('\x00')
+    case 'set':
+      return sc(rtKeys.memoryNew, [litInt(setSize(td))])
+    case 'pointer':
+      // ISO 7185 6.4.4: 未初始化的指针为 nil-value
+      return litNullLiteral()
+    case 'file':
+      return sc(rtKeys.fileCreate, [litStr(fileKind(td))])
+    case 'array':
+      return isObjectRepr(td)
+        ? sc(
+          rtKeys.objectNewArray,
+          Array.from({ length: arrayCount(td) }, () => defaultValueExpr(td.elem!)),
+        )
+        : sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
+    case 'rec':
+      return isObjectRepr(td)
+        ? sc(rtKeys.objectNewRecord, recordDefaultArgs(td))
+        : sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
+    default:
+      return litInt(0)
+  }
+}
+
+/**
+ * record 默认值的字段名/值实参序列。
+ * variant 各分支字段一并预置（union 语义由赋值方负责）。
+ */
+function recordDefaultArgs(td: TypeDescriptor): JsonCode.Expr[] {
+  const args: JsonCode.Expr[] = []
+  for (const f of td.fields ?? []) {
+    args.push(litStr(f.name), defaultValueExpr(f.type))
+  }
+  for (const b of td.variant?.branches ?? []) {
+    for (const f of b.fields) {
+      args.push(litStr(f.name), defaultValueExpr(f.type))
+    }
+  }
+  return args
 }
 
 // 阶段1：算术 / 逻辑 / 比较 / 转换
@@ -141,8 +225,8 @@ function unary(key: string) {
 }
 
 function predSucc(isSucc: boolean) {
-  const i32Key = isSucc ? rtKeys.i32Add : rtKeys.i32Sub
-  const f32Key = isSucc ? rtKeys.f32Add : rtKeys.f32Sub
+  const i32Key = isSucc ? rtKeys.int32Add : rtKeys.int32Subtract
+  const f32Key = isSucc ? rtKeys.float32Add : rtKeys.float32Subtract
   return (sys: JsonCode.Syscall): JsonCode.Expr => {
     const t = parseType(sys.args[1])
     const x = sys.args[0]
@@ -176,10 +260,10 @@ function offsetExpr(indices: JsonCode.Expr[], lows: number[], strides: number[])
   const terms = indices.map((idx, i) => {
     const low = lows[i] ?? 0
     const stride = strides[i] ?? 1
-    const base = low === 0 ? idx : sc(rtKeys.i32Sub, [idx, litInt(low)])
-    return stride === 1 ? base : sc(rtKeys.i32Mul, [base, litInt(stride)])
+    const base = low === 0 ? idx : sc(rtKeys.int32Subtract, [idx, litInt(low)])
+    return stride === 1 ? base : sc(rtKeys.int32Multiply, [base, litInt(stride)])
   })
-  return terms.reduce((a, b) => sc(rtKeys.i32Add, [a, b]))
+  return terms.reduce((a, b) => sc(rtKeys.int32Add, [a, b]))
 }
 
 /** object 数组的下标表达式：同 offsetExpr，但步长以「元素」为单位（不是字节） */
@@ -218,22 +302,22 @@ function toConvertKey(td: TypeDescriptor | undefined, binary: boolean): string {
   if (binary) {
     switch (td?.tag) {
       case 'f64':
-        return rtKeys.f64ToBytes
+        return rtKeys.convertFloat32ToBytes
       case 'bool':
-        return rtKeys.boolToBytes
+        return rtKeys.convertBooleanToBytes
       default:
-        return rtKeys.i32ToBytes
+        return rtKeys.convertInt32ToBytes
     }
   }
   switch (td?.tag) {
     case 'f64':
-      return rtKeys.f64ToStr
+      return rtKeys.convertFloat32ToText
     case 'bool':
-      return rtKeys.boolToStr
+      return rtKeys.convertBooleanToText
     case 'char':
-      return rtKeys.i32ToChar
+      return rtKeys.convertInt32ToChar
     default:
-      return rtKeys.i32ToStr
+      return rtKeys.convertInt32ToText
   }
 }
 
@@ -242,22 +326,22 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
   if (binary) {
     switch (td?.tag) {
       case 'f64':
-        return rtKeys.bytesToF64
+        return rtKeys.convertBytesToFloat32
       case 'bool':
-        return rtKeys.bytesToBool
+        return rtKeys.convertBytesToBoolean
       default:
-        return rtKeys.bytesToI32
+        return rtKeys.convertBytesToInt32
     }
   }
   switch (td?.tag) {
     case 'f64':
-      return rtKeys.strToF64
+      return rtKeys.convertTextToFloat32
     case 'bool':
-      return rtKeys.strToBool
+      return rtKeys.convertTextToBoolean
     case 'char':
-      return rtKeys.charToI32
+      return rtKeys.convertCharToInt32
     default:
-      return rtKeys.strToI32
+      return rtKeys.convertTextToInt32
   }
 }
 
@@ -265,81 +349,81 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
 
 export function buildPascalRewriteTable(): SyscallRewriteTable {
   return {
-    'lowering.add': binary(rtKeys.i32Add, rtKeys.f32Add, rtKeys.setUnion),
-    'lowering.sub': binary(rtKeys.i32Sub, rtKeys.f32Sub, rtKeys.setDiff),
-    'lowering.mul': binary(rtKeys.i32Mul, rtKeys.f32Mul, rtKeys.setIntersect),
-    'lowering.div': binaryFixed(rtKeys.f32Div),
-    'lowering.intDiv': binaryFixed(rtKeys.i32Div),
-    'lowering.mod': binaryFixed(rtKeys.i32Mod),
+    'lowering.add': binary(rtKeys.int32Add, rtKeys.float32Add, rtKeys.setUnion),
+    'lowering.sub': binary(rtKeys.int32Subtract, rtKeys.float32Subtract, rtKeys.setDifference),
+    'lowering.mul': binary(rtKeys.int32Multiply, rtKeys.float32Multiply, rtKeys.setIntersection),
+    'lowering.div': binaryFixed(rtKeys.float32Divide),
+    'lowering.intDiv': binaryFixed(rtKeys.int32Divide),
+    'lowering.mod': binaryFixed(rtKeys.int32Modulo),
 
-    'lowering.and': logical(rtKeys.i32And, rtKeys.boolAnd),
-    'lowering.or': logical(rtKeys.i32Or, rtKeys.boolOr),
+    'lowering.and': logical(rtKeys.int32And, rtKeys.booleanAnd),
+    'lowering.or': logical(rtKeys.int32Or, rtKeys.booleanOr),
 
-    'lowering.neg': unaryFloatOrI32(rtKeys.f32Neg, rtKeys.i32Neg),
-    'lowering.not': unaryI32OrOther(rtKeys.i32Not, rtKeys.boolNot),
-    'lowering.abs': unaryFloatOrI32(rtKeys.f32Abs, rtKeys.i32Abs),
+    'lowering.neg': unaryFloatOrI32(rtKeys.float32Negate, rtKeys.int32Negate),
+    'lowering.not': unaryI32OrOther(rtKeys.int32Not, rtKeys.booleanNot),
+    'lowering.abs': unaryFloatOrI32(rtKeys.float32Absolute, rtKeys.int32Absolute),
 
     'lowering.sqr': (sys) => {
       const t = parseType(sys.args[1])
       const x = sys.args[0]
-      return sc(isFloat(t) ? rtKeys.f32Mul : rtKeys.i32Mul, [x, x])
+      return sc(isFloat(t) ? rtKeys.float32Multiply : rtKeys.int32Multiply, [x, x])
     },
-    'lowering.sqrt': unary(rtKeys.f32Sqrt),
-    'lowering.sin': unary(rtKeys.f32Sin),
-    'lowering.cos': unary(rtKeys.f32Cos),
-    'lowering.exp': unary(rtKeys.f32Exp),
-    'lowering.ln': unary(rtKeys.f32Ln),
-    'lowering.arctan': unary(rtKeys.f32Arctan),
-    'lowering.odd': unary(rtKeys.i32Odd),
+    'lowering.sqrt': unary(rtKeys.float32SquareRoot),
+    'lowering.sin': unary(rtKeys.float32Sine),
+    'lowering.cos': unary(rtKeys.float32Cosine),
+    'lowering.exp': unary(rtKeys.float32Exponential),
+    'lowering.ln': unary(rtKeys.float32Logarithm),
+    'lowering.arctan': unary(rtKeys.float32Arctangent),
+    'lowering.odd': unary(rtKeys.int32Odd),
 
-    'lowering.trunc': unary(rtKeys.castF32ToI32),
-    'lowering.round': unary(rtKeys.castF32ToI32Round),
+    'lowering.trunc': unary(rtKeys.castFloat32ToInt32),
+    'lowering.round': unary(rtKeys.castFloat32ToInt32Round),
     'lowering.ord': ordRewrite,
     'lowering.chr': ordRewrite,
     'lowering.pred': predSucc(false),
     'lowering.succ': predSucc(true),
 
-    'lowering.eq': compare(rtKeys.setEq, rtKeys.cmpEq),
-    'lowering.ne': compare(rtKeys.setNe, rtKeys.cmpNe),
-    'lowering.lt': compare(undefined, rtKeys.cmpLt),
-    'lowering.le': compare(rtKeys.setLe, rtKeys.cmpLe),
-    'lowering.gt': compare(undefined, rtKeys.cmpGt),
-    'lowering.ge': compare(rtKeys.setGe, rtKeys.cmpGe),
+    'lowering.eq': compare(rtKeys.setEqual, rtKeys.compareEqual),
+    'lowering.ne': compare(rtKeys.setNotEqual, rtKeys.compareNotEqual),
+    'lowering.lt': compare(undefined, rtKeys.compareLess),
+    'lowering.le': compare(rtKeys.setSubset, rtKeys.compareLessOrEqual),
+    'lowering.gt': compare(undefined, rtKeys.compareGreater),
+    'lowering.ge': compare(rtKeys.setSuperset, rtKeys.compareGreaterOrEqual),
 
     'lowering.in': (sys) => {
       const st = parseType(sys.args[3])
-      return sc(rtKeys.setIn, [sys.args[0], sys.args[2], litInt(setSize(st!))])
+      return sc(rtKeys.setContains, [sys.args[0], sys.args[2], litInt(setSize(st!))])
     },
-    'lowering.ptr.deref': (sys) => sc(rtKeys.ptrDeref, sys.args),
-    'lowering.ptr.assign': (sys) => sc(rtKeys.ptrAssign, sys.args),
-    'lowering.ptr.dispose.check': (sys) => sc(rtKeys.ptrDisposeCheck, sys.args),
+    'lowering.ptr.deref': (sys) => sc(rtKeys.pointerDereference, sys.args),
+    'lowering.ptr.assign': (sys) => sc(rtKeys.pointerAssign, sys.args),
+    'lowering.ptr.dispose.check': (sys) => sc(rtKeys.pointerDisposeCheck, sys.args),
 
     'lowering.mem.default': (sys) => {
       const td = parseType(sys.args[0])
       if (!td) {
         throw new Error('rewrite: mem.default expects a type descriptor')
       }
-      // 含 file / pointer 的类型无法字节化 → 用 JS 对象 / object[] 承载（见 isObjectRepr）
+      // 含 file / pointer 的类型无法字节化 → 编译期展开为无类型构造表达式（见 isObjectRepr）
       if (isObjectRepr(td)) {
-        return sc(rtKeys.objNew, [litType(td)])
+        return defaultValueExpr(td)
       }
       if (td.tag === 'set') {
-        return sc(rtKeys.memNew, [litInt(setSize(td))])
+        return sc(rtKeys.memoryNew, [litInt(setSize(td))])
       }
-      return sc(rtKeys.memNew, [litInt(sizeOf(td))])
+      return sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
     },
     'lowering.mem.copy': (sys) => {
       const td = parseType(sys.args[3])
-      return sc(rtKeys.memCopy, [sys.args[0], sys.args[1], sys.args[2], litInt(sizeOf(td!))])
+      return sc(rtKeys.memoryCopy, [sys.args[0], sys.args[1], sys.args[2], litInt(sizeOf(td!))])
     },
 
     'lowering.set.empty': (sys) => {
       const td = parseType(sys.args[0])
-      return sc(rtKeys.memNew, [litInt(setSize(td!))])
+      return sc(rtKeys.memoryNew, [litInt(setSize(td!))])
     },
     'lowering.set.elem': (sys) => {
       const td = parseType(sys.args[1])
-      return sc(rtKeys.setElem, [sys.args[0], litInt(setSize(td!))])
+      return sc(rtKeys.setSingleton, [sys.args[0], litInt(setSize(td!))])
     },
     'lowering.set.range': (sys) => {
       const td = parseType(sys.args[2])
@@ -350,16 +434,23 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const elems = sys.args.slice(0, -1)
       const size = litInt(setSize(td!))
       if (elems.length === 0) {
-        return sc(rtKeys.memNew, [size])
+        return sc(rtKeys.memoryNew, [size])
       }
       return elems.reduce((a, b) => sc(rtKeys.setUnion, [a, b, size]))
     },
 
-    'lowering.file.create': (sys) => sc(rtKeys.fileCreate, [sys.args[0]]),
+    // 类型只用到「文件行为类别」，句柄不携带类型描述符
+    'lowering.file.create': (sys) => sc(rtKeys.fileCreate, [litStr(fileKind(parseType(sys.args[0])))]),
     'lowering.file.reset': (sys) => sc(rtKeys.fileReset, [sys.args[0], ...sys.args.slice(2)]),
     'lowering.file.rewrite': (sys) => sc(rtKeys.fileRewrite, [sys.args[0], ...sys.args.slice(2)]),
     'lowering.file.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
-    'lowering.file.put': (sys) => sc(rtKeys.filePut, [sys.args[0], ...sys.args.slice(2)]),
+    // fileKind 随行：char 文件的 `f^ := ch` 需把 ord 值转回字符写
+    'lowering.file.put': (sys) =>
+      sc(rtKeys.filePut, [
+        sys.args[0],
+        litStr(fileKind(parseType(sys.args[1]))),
+        ...sys.args.slice(2),
+      ]),
     'lowering.file.peek': (sys) => {
       const td = parseType(sys.args[1])
       // record 文件：传元素字节大小，供首次分配缓冲区
@@ -370,7 +461,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     },
     'lowering.file.eof': (sys) => sc(rtKeys.fileEof, [sys.args[0]]),
     'lowering.file.eoln': (sys) => sc(rtKeys.fileEoln, [sys.args[0]]),
-    'lowering.program.fileUrl': (sys) => sc(rtKeys.programFileUrl, [sys.args[0], sys.args[1]]),
+    'lowering.program.fileUrl': (sys) => sc(rtKeys.fileProgramUrl, [sys.args[0], sys.args[1]]),
 
     'lowering.io.write': (sys) => {
       const [target, targetType, value, valueType, width, prec] = sys.args
@@ -387,7 +478,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
         if (isNullLit(width)) {
           return sc(rtKeys.fileWrite, [target, value])
         }
-        return sc(rtKeys.fileWrite, [target, sc(rtKeys.bytesToStrField, [value, width])])
+        return sc(rtKeys.fileWrite, [target, sc(rtKeys.convertBytesToTextField, [value, width])])
       }
       const binary = isBinaryFile(tt)
       const key = toConvertKey(vt, binary)
@@ -407,10 +498,10 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const tt = parseType(targetType)
       // 字节文件：读到的就是字节值，零转换
       if (isByteFile(tt)) {
-        return sc(rtKeys.fileReadChar, [target])
+        return sc(rtKeys.fileReadCharacter, [target])
       }
       const binary = isBinaryFile(tt)
-      const readKey = binary || vt?.tag === 'char' ? rtKeys.fileReadChar : rtKeys.fileReadToken
+      const readKey = binary || vt?.tag === 'char' ? rtKeys.fileReadCharacter : rtKeys.fileReadToken
       const raw = sc(readKey, [target])
       if (isCharArray(vt)) {
         return raw
@@ -426,7 +517,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.pack': (sys) => {
       const [src, start, dst, srcType, dstType] = sys.args
       const srcArr = arraySlot(parseType(srcType)!)
-      return sc(rtKeys.packArray, [
+      return sc(rtKeys.arrayPack, [
         src,
         litInt(srcArr.lows[0] ?? 0),
         litInt(srcArr.elemSize),
@@ -438,7 +529,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.unpack': (sys) => {
       const [src, dst, start, srcType, dstType] = sys.args
       const dstArr = arraySlot(parseType(dstType)!)
-      return sc(rtKeys.unpackArray, [
+      return sc(rtKeys.arrayUnpack, [
         src,
         dst,
         litInt(dstArr.lows[0] ?? 0),
@@ -474,9 +565,9 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const td = parseType(sys.args[1])
       if (td && isObjectRepr(td)) {
         // 对象表示的 record / 数组：按值语义深拷贝（pointer / file 拷引用）
-        return sc(rtKeys.recClone, [sys.args[0]])
+        return sc(rtKeys.recordClone, [sys.args[0]])
       }
-      return sc(rtKeys.memClone, [sys.args[0], litInt(sizeOf(td!))])
+      return sc(rtKeys.memoryClone, [sys.args[0], litInt(sizeOf(td!))])
     },
 
     'lowering.cell.create': (sys) => sc(rtKeys.cellNew, [sys.args[0]]),
@@ -503,7 +594,7 @@ function litNullLiteral(): JsonCode.Literal {
  * 分配）。折叠后读写的绝对位置不变，语义等价。
  */
 function foldViewSub(base: JsonCode.Expr): { base: JsonCode.Expr; delta?: JsonCode.Expr } {
-  if (base.kind === 'syscall' && base.key === rtKeys.viewSub) {
+  if (base.kind === 'syscall' && base.key === rtKeys.viewSubarray) {
     return { base: base.args[0], delta: base.args[1] }
   }
   return { base }
@@ -517,7 +608,7 @@ function addOffset(delta: JsonCode.Expr | undefined, offset: JsonCode.Expr): Jso
   if (offset.kind === 'literal' && offset.key === 'i32' && offset.arg === '0') {
     return delta
   }
-  return sc(rtKeys.i32Add, [delta, offset])
+  return sc(rtKeys.int32Add, [delta, offset])
 }
 
 /** 取容器内的槽位（数组元素 / 记录字段），产出标量读或子视图 */
@@ -532,9 +623,9 @@ function accessAt(
     const dims = arrayDims(td)
     if (indices.length < dims.length) {
       const flatOff = elementOffset(indices, dims)
-      return sc(rtKeys.arrSublist, [base, flatOff])
+      return sc(rtKeys.arraySublist, [base, flatOff])
     }
-    return sc(rtKeys.arrGet, [base, elemIndexExpr(td, indices)])
+    return sc(rtKeys.arrayGetObject, [base, elemIndexExpr(td, indices)])
   }
 
   const folded = foldViewSub(base)
@@ -544,7 +635,7 @@ function accessAt(
   if (fieldName !== undefined) {
     if (isObjectRepr(td)) {
       // 对象表示的 record（含 file / pointer 字段）：字段按名字读取
-      return sc(rtKeys.recGetField, [base, litStr(fieldName)])
+      return sc(rtKeys.recordGetField, [base, litStr(fieldName)])
     }
     const slot = fieldSlot(td, fieldName)
     if (!slot) {
@@ -567,9 +658,9 @@ function accessAt(
 
   offset = addOffset(folded.delta, offset)
   if (isScalar(slotType)) {
-    return sc(rtKeys.numGet, [folded.base, offset, litStr(codecOf(slotType))])
+    return sc(bytesGetKey[scalarKindOf(slotType)], [folded.base, offset])
   }
-  return sc(rtKeys.viewSub, [folded.base, offset, litInt(sizeOf(slotType))])
+  return sc(rtKeys.viewSubarray, [folded.base, offset, litInt(sizeOf(slotType))])
 }
 
 /** 写容器内的槽位 */
@@ -581,8 +672,8 @@ function assignAt(
   fieldName?: string,
 ): JsonCode.Expr {
   if (fieldName === undefined && isObjectRepr(td)) {
-    // 对象数组：下标数等于维数时写元素；少于维数时（子数组视图）交由 arrSet 处理
-    return sc(rtKeys.arrSet, [base, elemIndexExpr(td, indices), value])
+    // 对象数组：下标数等于维数时写元素；少于维数时（子数组视图）交由 arraySetObject 处理
+    return sc(rtKeys.arraySetObject, [base, elemIndexExpr(td, indices), value])
   }
 
   const folded = foldViewSub(base)
@@ -592,7 +683,7 @@ function assignAt(
   if (fieldName !== undefined) {
     if (isObjectRepr(td)) {
       // 对象表示的 record（含 file / pointer 字段）：字段按名字写入
-      return sc(rtKeys.recSetField, [base, litStr(fieldName), value])
+      return sc(rtKeys.recordSetField, [base, litStr(fieldName), value])
     }
     const slot = fieldSlot(td, fieldName)
     if (!slot) {
@@ -615,7 +706,7 @@ function assignAt(
 
   offset = addOffset(folded.delta, offset)
   if (isScalar(slotType)) {
-    return sc(rtKeys.numSet, [folded.base, offset, litStr(codecOf(slotType)), value])
+    return sc(bytesSetKey[scalarKindOf(slotType)], [folded.base, offset, value])
   }
-  return sc(rtKeys.memCopy, [folded.base, offset, value, litInt(sizeOf(slotType))])
+  return sc(rtKeys.memoryCopy, [folded.base, offset, value, litInt(sizeOf(slotType))])
 }

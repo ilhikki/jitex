@@ -258,21 +258,24 @@ export interface Call {
 /**
  * 系统调用：运行时原语。
  *
- * 所有 JsonCode 自身不表达的语义都走 Syscall。典型类别：
+ * 所有 JsonCode 自身不表达的语义都走 Syscall。典型类别（终态 key 见
+ * middle/rewrite/runtime-keys.ts；段名写完整单词，不用缩写）：
  *
- *   算术与位      : i32.add / i32.sub / i32.mul / i32.div / i32.mod / i32.neg
- *                   f64.add / f64.sub / f64.mul / f64.div / f64.neg
- *   布尔          : bool.and / bool.or / bool.not
- *   比较          : cmp.eq / cmp.ne / cmp.lt / cmp.le / cmp.gt / cmp.ge
- *   数组          : array.get / array.set / array.len
- *   记录/结构体   : rec.field / rec.set
- *   集合          : set.in / set.union / set.diff / set.isect
- *   字符串        : str.cat / str.len
- *   类型转换      : cast.i32->f64 / cast.char->i32 / cast.i32->char …
- *   复合类型复制  : mem.copy           （数组/记录整体赋值）
- *   IO            : io.write / io.writeln / io.read / io.readln
+ *   整数与位      : int32.add / int32.subtract / int32.multiply / int32.modulo / int32.negate
+ *   实数（单精度）: float32.add / float32.subtract / float32.squareRoot / float32.sine
+ *   布尔          : boolean.and / boolean.or / boolean.not
+ *   比较          : compare.equal / compare.notEqual / compare.less / compare.greaterOrEqual
+ *   字节标量存取  : bytes.get.int32 / bytes.set.float32 / bytes.get.uint8 …
+ *   数组          : array.get.object / array.set.object / array.pack
+ *   记录/结构体   : record.get.field / record.set.field / record.clone
+ *   集合          : set.contains / set.union / set.difference / set.intersection
+ *   类型转换      : cast.float32.to.int32 / cast.char.to.int32 / cast.int32.to.char …
+ *   值 ↔ 文件单位 : convert.int32.to.text / convert.text.to.float32 …
+ *   复合类型复制  : memory.copy           （数组/记录整体赋值）
+ *   内存与视图    : memory.new / memory.clone / view.subarray
+ *   IO            : file.write / file.writeln / file.readCharacter / file.readToken
  *   文件          : file.reset / file.rewrite / file.get / file.put / file.eof / file.eoln …
- *   堆            : mem.alloc / mem.free …
+ *   指针          : pointer.dereference / pointer.assign
  *
  * key 用点分命名空间分层。命名空间只用于组织，JsonCode 不对 key 做解析；
  * key 是否存在、签名如何完全由运行时 / codegen 决定。

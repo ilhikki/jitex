@@ -2,8 +2,8 @@
  * 文件原语：runtime.file.*
  *
  * 设计要点：
- *   - **不接类型参数**。句柄（PascalFile）在 create 时已带 `type: TypeDescriptor`，
- *     runtime 据 `f.type.elem.tag` 自行区分「文本」与「二进制（record）」行为。
+ *   - **不接类型参数**。句柄（PascalFile）在 create 时已带编译期算定的
+ *     `fileKind`，runtime 据该标量区分「文本 / 字节 / 记录」行为。
  *   - key 与 Pascal 原生 io 过程一一对应：reset / rewrite / get / put / read / write /
  *     readln / writeln / eof / eoln / page / peek(f^)。
  *   - rewrite 只负责「值 → 文件单位」的转换（convert.*）；语义（如 read = 读+推进）
@@ -11,15 +11,12 @@
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import { isByteScalar } from '@/middle/rewrite/type-layout.ts'
 import type { PascalFile, PascalFileStore, RuntimeContext, SyscallHandler, TextFile } from '../runtime-type.ts'
 import { bytesToString, encodeUtf8 } from '../runtime-util.ts'
 import { MemoryTextFile } from './memory-text-file.ts'
 
 /** byte 版 record 存储的接口（与旧 RecordFile 的差别：记录是 Uint8Array） */
 export interface RecStore {
-  getType(): unknown
-  setType(t: unknown): void
   seek(p: number): void
   peekRecord(): Uint8Array | undefined
   advance(): void
@@ -39,7 +36,6 @@ export class ByteRecordFile implements RecStore {
   private pos = 0
   private buffer: Uint8Array | undefined
   private mode: 'inspection' | 'generation' = 'inspection'
-  private type: unknown
 
   constructor(initial?: Uint8Array[]) {
     if (initial) {
@@ -47,12 +43,6 @@ export class ByteRecordFile implements RecStore {
     }
   }
 
-  getType(): unknown {
-    return this.type
-  }
-  setType(t: unknown): void {
-    this.type = t
-  }
   seek(p: number): void {
     this.pos = p
   }
@@ -96,7 +86,7 @@ export class ByteRecordFile implements RecStore {
 // 辅助
 
 function isRec(f: PascalFile): boolean {
-  return f.type?.elem?.tag === 'rec'
+  return f.fileKind === 'rec'
 }
 
 /**
@@ -105,7 +95,7 @@ function isRec(f: PascalFile): boolean {
  * （TeX 的 `dvi_file`、`tfm_file`）。
  */
 function isByteFile(f: PascalFile): boolean {
-  return isByteScalar(f.type?.elem)
+  return f.fileKind === 'byte'
 }
 
 function textStore(f: PascalFile): TextFile {
@@ -263,9 +253,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       const store = ensureStore(p)
       store.seek(0)
       store.setMode('inspection')
-      if (isRec(p)) {
-        recStore(p).setType(p.type.elem)
-      }
       return undefined
     },
     [rtKeys.fileRewrite]: (ctx, f, fileName) => {
@@ -275,9 +262,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       store.clear()
       store.seek(0)
       store.setMode('generation')
-      if (isRec(p)) {
-        recStore(p).setType(p.type.elem)
-      }
       return undefined
     },
 
@@ -337,7 +321,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
 
     // unit 存在 → `f^ := x`（设缓冲区）；unit 缺失 → `put(f)`（把缓冲区写入文件）
-    [rtKeys.filePut]: (_ctx, f, unit) => {
+    [rtKeys.filePut]: (_ctx, f, kind, unit) => {
       const p = f as PascalFile
       if (isRec(p)) {
         const rs = recStore(p)
@@ -361,7 +345,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         const store = textStore(p)
         if (isByteFile(p)) {
           store.writeByte((unit as number) & 0xff)
-        } else if (typeof unit === 'number' && p.type?.elem?.tag === 'char') {
+        } else if (typeof unit === 'number' && kind === 'char') {
           // text file 的 f^ := ch：char 用 ord 值表示，需转回字符写
           store.writeBytes(encodeUtf8(String.fromCharCode(unit)))
         } else {
@@ -371,7 +355,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    [rtKeys.fileReadChar]: (ctx, f) => {
+    [rtKeys.fileReadCharacter]: (ctx, f) => {
       if (f === undefined) {
         return readCharUnit(defaultStore(ctx, false))
       }
@@ -460,8 +444,8 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return b === 10 || b === 13 ? 1 : 0
     },
 
-    [rtKeys.fileCreate]: (_ctx, type) => ({ kind: 'file', value: undefined, type } as PascalFile),
-    [rtKeys.programFileUrl]: (ctx, f, name) => {
+    [rtKeys.fileCreate]: (_ctx, kind) => ({ kind: 'file', value: undefined, fileKind: kind } as PascalFile),
+    [rtKeys.fileProgramUrl]: (ctx, f, name) => {
       const p = f as PascalFile
       const key = name as string
       const url = ctx.programFileUrls[key] ?? key

@@ -11,17 +11,17 @@ import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 export function arithSyscalls(): Record<string, SyscallHandler> {
   return {
-    [rtKeys.i32Add]: (_ctx, a, b) => ((a as number) + (b as number)) | 0,
-    [rtKeys.i32Sub]: (_ctx, a, b) => ((a as number) - (b as number)) | 0,
-    [rtKeys.i32Mul]: (_ctx, a, b) => ((a as number) * (b as number)) | 0,
-    [rtKeys.i32Div]: (_ctx, a, b) => {
+    [rtKeys.int32Add]: (_ctx, a, b) => ((a as number) + (b as number)) | 0,
+    [rtKeys.int32Subtract]: (_ctx, a, b) => ((a as number) - (b as number)) | 0,
+    [rtKeys.int32Multiply]: (_ctx, a, b) => ((a as number) * (b as number)) | 0,
+    [rtKeys.int32Divide]: (_ctx, a, b) => {
       const d = b as number
       if (d === 0) {
         throw new Error('JS VM: division by zero')
       }
       return Math.trunc((a as number) / d) | 0
     },
-    [rtKeys.i32Mod]: (_ctx, a, b) => {
+    [rtKeys.int32Modulo]: (_ctx, a, b) => {
       const m = b as number
       // ISO 7185 6.7.2.2: i mod j 在 j 为 0 或负数时为 error
       if (m <= 0) {
@@ -31,20 +31,20 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
       // ISO 7185 6.7.2.2: i mod j = i - k*j，其中 k 使 0 <= i mod j < j（floor 语义）
       return (l - Math.floor(l / m) * m) | 0
     },
-    [rtKeys.i32Neg]: (_ctx, a) => -(a as number) | 0,
-    [rtKeys.i32And]: (_ctx, a, b) => ((a as number) & (b as number)) | 0,
-    [rtKeys.i32Or]: (_ctx, a, b) => ((a as number) | (b as number)) | 0,
-    [rtKeys.i32Not]: (_ctx, a) => ~(a as number) | 0,
-    [rtKeys.i32Abs]: (_ctx, a) => Math.abs(a as number) | 0,
-    [rtKeys.i32Odd]: (_ctx, a) => (((a as number) % 2) !== 0 ? 1 : 0),
+    [rtKeys.int32Negate]: (_ctx, a) => -(a as number) | 0,
+    [rtKeys.int32And]: (_ctx, a, b) => ((a as number) & (b as number)) | 0,
+    [rtKeys.int32Or]: (_ctx, a, b) => ((a as number) | (b as number)) | 0,
+    [rtKeys.int32Not]: (_ctx, a) => ~(a as number) | 0,
+    [rtKeys.int32Absolute]: (_ctx, a) => Math.abs(a as number) | 0,
+    [rtKeys.int32Odd]: (_ctx, a) => (((a as number) % 2) !== 0 ? 1 : 0),
 
-    [rtKeys.f32Add]: (_ctx, a, b) => Math.fround((a as number) + (b as number)),
-    [rtKeys.f32Sub]: (_ctx, a, b) => Math.fround((a as number) - (b as number)),
-    [rtKeys.f32Mul]: (_ctx, a, b) => Math.fround((a as number) * (b as number)),
-    [rtKeys.f32Div]: (_ctx, a, b) => Math.fround((a as number) / (b as number)),
-    [rtKeys.f32Neg]: (_ctx, a) => Math.fround(-(a as number)),
-    [rtKeys.f32Abs]: (_ctx, a) => Math.fround(Math.abs(a as number)),
-    [rtKeys.f32Sqrt]: (_ctx, a) => {
+    [rtKeys.float32Add]: (_ctx, a, b) => Math.fround((a as number) + (b as number)),
+    [rtKeys.float32Subtract]: (_ctx, a, b) => Math.fround((a as number) - (b as number)),
+    [rtKeys.float32Multiply]: (_ctx, a, b) => Math.fround((a as number) * (b as number)),
+    [rtKeys.float32Divide]: (_ctx, a, b) => Math.fround((a as number) / (b as number)),
+    [rtKeys.float32Negate]: (_ctx, a) => Math.fround(-(a as number)),
+    [rtKeys.float32Absolute]: (_ctx, a) => Math.fround(Math.abs(a as number)),
+    [rtKeys.float32SquareRoot]: (_ctx, a) => {
       const x = a as number
       // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
       if (!(x >= 0)) {
@@ -52,10 +52,10 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
       }
       return Math.sqrt(x)
     },
-    [rtKeys.f32Sin]: (_ctx, a) => Math.sin(a as number),
-    [rtKeys.f32Cos]: (_ctx, a) => Math.cos(a as number),
-    [rtKeys.f32Exp]: (_ctx, a) => Math.exp(a as number),
-    [rtKeys.f32Ln]: (_ctx, a) => {
+    [rtKeys.float32Sine]: (_ctx, a) => Math.sin(a as number),
+    [rtKeys.float32Cosine]: (_ctx, a) => Math.cos(a as number),
+    [rtKeys.float32Exponential]: (_ctx, a) => Math.exp(a as number),
+    [rtKeys.float32Logarithm]: (_ctx, a) => {
       const x = a as number
       // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
       if (!(x > 0)) {
@@ -63,39 +63,39 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
       }
       return Math.log(x)
     },
-    [rtKeys.f32Arctan]: (_ctx, a) => Math.atan(a as number),
+    [rtKeys.float32Arctangent]: (_ctx, a) => Math.atan(a as number),
 
     // and / or 用 && / ||：对 0/1 输入结果仍是 0/1，且保短路
-    [rtKeys.boolAnd]: (_ctx, a, b) => (a as number) && (b as number),
-    [rtKeys.boolOr]: (_ctx, a, b) => (a as number) || (b as number),
-    [rtKeys.boolNot]: (_ctx, a) => ((a as number) ? 0 : 1),
+    [rtKeys.booleanAnd]: (_ctx, a, b) => (a as number) && (b as number),
+    [rtKeys.booleanOr]: (_ctx, a, b) => (a as number) || (b as number),
+    [rtKeys.booleanNot]: (_ctx, a) => ((a as number) ? 0 : 1),
 
-    [rtKeys.cmpEq]: (_ctx, a, b) => (a === b ? 1 : 0),
-    [rtKeys.cmpNe]: (_ctx, a, b) => (a !== b ? 1 : 0),
-    [rtKeys.cmpLt]: (_ctx, a, b) => ((a as number) < (b as number) ? 1 : 0),
-    [rtKeys.cmpLe]: (_ctx, a, b) => ((a as number) <= (b as number) ? 1 : 0),
-    [rtKeys.cmpGt]: (_ctx, a, b) => ((a as number) > (b as number) ? 1 : 0),
-    [rtKeys.cmpGe]: (_ctx, a, b) => ((a as number) >= (b as number) ? 1 : 0),
+    [rtKeys.compareEqual]: (_ctx, a, b) => (a === b ? 1 : 0),
+    [rtKeys.compareNotEqual]: (_ctx, a, b) => (a !== b ? 1 : 0),
+    [rtKeys.compareLess]: (_ctx, a, b) => ((a as number) < (b as number) ? 1 : 0),
+    [rtKeys.compareLessOrEqual]: (_ctx, a, b) => ((a as number) <= (b as number) ? 1 : 0),
+    [rtKeys.compareGreater]: (_ctx, a, b) => ((a as number) > (b as number) ? 1 : 0),
+    [rtKeys.compareGreaterOrEqual]: (_ctx, a, b) => ((a as number) >= (b as number) ? 1 : 0),
 
-    [rtKeys.castF32ToI32]: (_ctx, a) => Math.trunc(a as number),
+    [rtKeys.castFloat32ToInt32]: (_ctx, a) => Math.trunc(a as number),
     // ISO 7185 6.6.6.3: round(x) = trunc(x+0.5) if x>=0, trunc(x-0.5) if x<0
     // （JS Math.round 对 -3.5 返回 -3，不符合 ISO 的 -4）
-    [rtKeys.castF32ToI32Round]: (_ctx, a) => {
+    [rtKeys.castFloat32ToInt32Round]: (_ctx, a) => {
       const x = a as number
       return Math.trunc(x >= 0 ? x + 0.5 : x - 0.5) | 0
     },
-    [rtKeys.castCharToI32]: (_ctx, a) => typeof a === 'string' ? a.charCodeAt(0) : (a as number),
-    [rtKeys.castBoolToI32]: (_ctx, a) => (a ? 1 : 0),
-    [rtKeys.castI32ToChar]: (_ctx, a) => String.fromCharCode(a as number),
+    [rtKeys.castCharToInt32]: (_ctx, a) => typeof a === 'string' ? a.charCodeAt(0) : (a as number),
+    [rtKeys.castBooleanToInt32]: (_ctx, a) => (a ? 1 : 0),
+    [rtKeys.castInt32ToChar]: (_ctx, a) => String.fromCharCode(a as number),
 
     // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
-    [rtKeys.ptrDeref]: (_ctx, p) => {
+    [rtKeys.pointerDereference]: (_ctx, p) => {
       if (p === undefined) {
         throw new Error('dereference of nil pointer (ISO 7185 6.4.4)')
       }
       return (p as PascalCell).value
     },
-    [rtKeys.ptrAssign]: (_ctx, p, v) => {
+    [rtKeys.pointerAssign]: (_ctx, p, v) => {
       if (p === undefined) {
         throw new Error('dereference of nil pointer (ISO 7185 6.4.4)')
       }
@@ -103,7 +103,7 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
     // dispose(p) 前置检查：p 为 nil 是 error (ISO 7185 6.6.5.3)
-    [rtKeys.ptrDisposeCheck]: (_ctx, p) => {
+    [rtKeys.pointerDisposeCheck]: (_ctx, p) => {
       if (p === undefined) {
         throw new Error('dispose of nil-value (ISO 7185 6.6.5.3)')
       }

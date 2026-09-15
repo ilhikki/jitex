@@ -2,15 +2,13 @@
  * 内存原语：Uint8Array 视图上的操作。
  *
  * 值的表示：array / record / set 都是裸 Uint8Array（不带类型）；
- * 类型信息只在 get / set 那一刻由 rewrite 传入（offset + codec / size）。
+ * 类型由 rewrite 在编译期译成「偏移 + 具体 key」，运行期只剩标量常量，
+ * 没有任何类型参数或类型分派。
  *
- * codec 的字节序与 boot-tex 一致（big-endian）。
+ * 多字节标量一律大端。
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import { arrayCount, isObjectRepr, setSize, sizeOf } from '@/middle/rewrite/type-layout.ts'
-import type { Codec } from '@/middle/rewrite/type-layout.ts'
-import type { TypeDescriptor } from '@/middle/lowering/type.ts'
 import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 /**
@@ -49,51 +47,46 @@ function assertView(view: unknown, what: string): asserts view is Uint8Array {
   }
 }
 
-/** 按 codec 读标量 */
-function getNum(view: Uint8Array, offset: number, codec: Codec): number {
-  assertView(view, 'num.get')
-  const d = dv(view.buffer)
-  const o = view.byteOffset + offset
-  switch (codec) {
-    case 'i8':
-      return d.getInt8(o)
-    case 'u8':
-      return d.getUint8(o)
-    case 'i16':
-      return d.getInt16(o, false)
-    case 'u16':
-      return d.getUint16(o, false)
-    case 'i32':
-      return d.getInt32(o, false)
-    case 'f64':
-      return d.getFloat64(o, false)
+/**
+ * 字节视图上的标量读写。
+ *
+ * 每个 key 固定一种标量种类，handler 直接调用对应的 DataView 方法——
+ * 运行期既没有类型参数，也没有分支。
+ */
+function bytesAccessSyscalls(): Record<string, SyscallHandler> {
+  const reader = (
+    read: (data: DataView, offset: number) => number,
+  ): SyscallHandler =>
+  (_ctx, view, offset) => {
+    const v = view as Uint8Array
+    assertView(v, 'bytes.get')
+    return read(dv(v.buffer), v.byteOffset + (offset as number))
   }
-}
 
-/** 按 codec 写标量 */
-function setNum(view: Uint8Array, offset: number, codec: Codec, v: number): void {
-  assertView(view, 'num.set')
-  const d = dv(view.buffer)
-  const o = view.byteOffset + offset
-  switch (codec) {
-    case 'i8':
-      d.setInt8(o, v)
-      return
-    case 'u8':
-      d.setUint8(o, v)
-      return
-    case 'i16':
-      d.setInt16(o, v, false)
-      return
-    case 'u16':
-      d.setUint16(o, v, false)
-      return
-    case 'i32':
-      d.setInt32(o, v | 0, false)
-      return
-    case 'f64':
-      d.setFloat64(o, v, false)
-      return
+  const writer = (
+    write: (data: DataView, offset: number, value: number) => void,
+  ): SyscallHandler =>
+  (_ctx, view, offset, value) => {
+    const v = view as Uint8Array
+    assertView(v, 'bytes.set')
+    write(dv(v.buffer), v.byteOffset + (offset as number), value as number)
+    return undefined
+  }
+
+  return {
+    [rtKeys.bytesGetInt8]: reader((d, o) => d.getInt8(o)),
+    [rtKeys.bytesGetUint8]: reader((d, o) => d.getUint8(o)),
+    [rtKeys.bytesGetInt16]: reader((d, o) => d.getInt16(o, false)),
+    [rtKeys.bytesGetUint16]: reader((d, o) => d.getUint16(o, false)),
+    [rtKeys.bytesGetInt32]: reader((d, o) => d.getInt32(o, false)),
+    [rtKeys.bytesGetFloat32]: reader((d, o) => d.getFloat32(o, false)),
+
+    [rtKeys.bytesSetInt8]: writer((d, o, v) => d.setInt8(o, v)),
+    [rtKeys.bytesSetUint8]: writer((d, o, v) => d.setUint8(o, v)),
+    [rtKeys.bytesSetInt16]: writer((d, o, v) => d.setInt16(o, v, false)),
+    [rtKeys.bytesSetUint16]: writer((d, o, v) => d.setUint16(o, v, false)),
+    [rtKeys.bytesSetInt32]: writer((d, o, v) => d.setInt32(o, v | 0, false)),
+    [rtKeys.bytesSetFloat32]: writer((d, o, v) => d.setFloat32(o, v, false)),
   }
 }
 
@@ -143,25 +136,21 @@ function withBit(bits: number[], size: number): Uint8Array {
 
 export function memSyscalls(): Record<string, SyscallHandler> {
   return {
-    [rtKeys.memNew]: (_ctx, size) => new Uint8Array(size as number),
-    [rtKeys.memClone]: (_ctx, src, size) => (src as Uint8Array).slice(0, size as number),
-    [rtKeys.memCopy]: (_ctx, dst, dstOff, src, size) => {
+    [rtKeys.memoryNew]: (_ctx, size) => new Uint8Array(size as number),
+    [rtKeys.memoryClone]: (_ctx, src, size) => (src as Uint8Array).slice(0, size as number),
+    [rtKeys.memoryCopy]: (_ctx, dst, dstOff, src, size) => {
       const d = dst as Uint8Array
       const s = src as Uint8Array
       d.set(s.subarray(0, size as number), dstOff as number)
       return undefined
     },
-    [rtKeys.viewSub]: (_ctx, view, offset, size) => {
+    [rtKeys.viewSubarray]: (_ctx, view, offset, size) => {
       const v = view as Uint8Array
       const off = offset as number
       return v.subarray(off, off + (size as number))
     },
 
-    [rtKeys.numGet]: (_ctx, view, offset, codec) => getNum(view as Uint8Array, offset as number, codec as Codec),
-    [rtKeys.numSet]: (_ctx, view, offset, codec, v) => {
-      setNum(view as Uint8Array, offset as number, codec as Codec, v as number)
-      return undefined
-    },
+    ...bytesAccessSyscalls(),
 
     [rtKeys.cellNew]: (_ctx, v): PascalCell => ({ kind: 'cell', value: v }),
     [rtKeys.cellGet]: (_ctx, c) => (c as PascalCell).value,
@@ -170,31 +159,23 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // 所有 object 数组，无论是否部分下标，都表示为视图；arrGet/arrSet/arrSublist 无需分支
-    [rtKeys.arrNew]: (_ctx, count, elemType): ObjArrView => {
-      const n = count as number
-      const base = new Array<unknown>(n)
-      for (let i = 0; i < n; i++) {
-        base[i] = { kind: 'file', value: undefined, type: elemType }
-      }
-      return { base, offset: 0 }
-    },
-    [rtKeys.arrGet]: (_ctx, arr, idx) => {
+    // 所有 object 数组，无论是否部分下标，都表示为视图；get / set / sublist 无需分支
+    [rtKeys.arrayGetObject]: (_ctx, arr, idx) => {
       const v = arr as ObjArrView
       return v.base[v.offset + (idx as number)]
     },
-    [rtKeys.arrSet]: (_ctx, arr, idx, val) => {
+    [rtKeys.arraySetObject]: (_ctx, arr, idx, val) => {
       const v = arr as ObjArrView
       v.base[v.offset + (idx as number)] = val
       return undefined
     },
     // 部分下标：在已有视图上叠加偏移，共享同一 base（同一分量）
-    [rtKeys.arrSublist]: (_ctx, arr, offset) => {
+    [rtKeys.arraySublist]: (_ctx, arr, offset) => {
       const v = arr as ObjArrView
       return { base: v.base, offset: v.offset + (offset as number) }
     },
 
-    [rtKeys.packArray]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
+    [rtKeys.arrayPack]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
       const s = src as Uint8Array
       const d = dst as Uint8Array
       const size = elemSize as number
@@ -202,7 +183,7 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       d.set(s.subarray(from, from + (count as number) * size), 0)
       return undefined
     },
-    [rtKeys.unpackArray]: (_ctx, src, dst, dstLow, elemSize, start, count) => {
+    [rtKeys.arrayUnpack]: (_ctx, src, dst, dstLow, elemSize, start, count) => {
       const s = src as Uint8Array
       const d = dst as Uint8Array
       const size = elemSize as number
@@ -211,61 +192,23 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    [rtKeys.objNew]: (_ctx, td) => defaultValueOf(td as TypeDescriptor),
-    [rtKeys.recGetField]: (_ctx, obj, name) => (obj as Record<string, unknown>)[name as string],
-    [rtKeys.recSetField]: (_ctx, obj, name, v) => {
+    // object 表示的 record / 数组的默认值：字段名与元素值均已由 rewrite 在编译期展开
+    [rtKeys.objectNewRecord]: (_ctx, ...pairs) => {
+      const out: Record<string, unknown> = {}
+      for (let i = 0; i < pairs.length; i += 2) {
+        out[pairs[i] as string] = pairs[i + 1]
+      }
+      return out
+    },
+    [rtKeys.objectNewArray]: (_ctx, ...elems): ObjArrView => ({ base: elems, offset: 0 }),
+
+    [rtKeys.recordGetField]: (_ctx, obj, name) => (obj as Record<string, unknown>)[name as string],
+    [rtKeys.recordSetField]: (_ctx, obj, name, v) => {
       ;(obj as Record<string, unknown>)[name as string] = v
       return undefined
     },
-    [rtKeys.recClone]: (_ctx, v) => cloneValue(v),
+    [rtKeys.recordClone]: (_ctx, v) => cloneValue(v),
   }
-}
-
-/** 类型的默认值：能字节化的用 Uint8Array，含 file / pointer 的用 JS 对象 / object[] */
-function defaultValueOf(td: TypeDescriptor): unknown {
-  switch (td.tag) {
-    case 'i32':
-      // 子界型取上界…取下界（ISO 7185 6.4.2.4 的变量初始值约定）
-      return td.low ?? 0
-    case 'enum':
-    case 'bool':
-      return 0
-    case 'f64':
-      return 0
-    case 'char':
-      return '\x00'
-    case 'set':
-      return new Uint8Array(setSize(td))
-    case 'pointer':
-      // ISO 7185 6.4.4: 未初始化的指针为 nil-value
-      return undefined
-    case 'file':
-      return { kind: 'file', value: undefined, type: td }
-    case 'array':
-      if (isObjectRepr(td)) {
-        const base = Array.from({ length: arrayCount(td) }, () => defaultValueOf(td.elem!))
-        return { base, offset: 0 } satisfies ObjArrView
-      }
-      return new Uint8Array(sizeOf(td))
-    case 'rec':
-      return isObjectRepr(td) ? newRecordValue(td) : new Uint8Array(sizeOf(td))
-    default:
-      return 0
-  }
-}
-
-function newRecordValue(td: TypeDescriptor): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const f of td.fields ?? []) {
-    out[f.name] = defaultValueOf(f.type)
-  }
-  // variant 各分支的字段一并预置（union 语义由赋值方负责）
-  for (const b of td.variant?.branches ?? []) {
-    for (const f of b.fields) {
-      out[f.name] = defaultValueOf(f.type)
-    }
-  }
-  return out
 }
 
 /**
@@ -307,23 +250,23 @@ export function setSyscalls(): Record<string, SyscallHandler> {
   return {
     [rtKeys.setUnion]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x | y),
-    [rtKeys.setIntersect]: (_ctx, a, b, size) =>
+    [rtKeys.setIntersection]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & y),
-    [rtKeys.setDiff]: (_ctx, a, b, size) =>
+    [rtKeys.setDifference]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & ~y),
-    [rtKeys.setEq]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setNe]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
-    [rtKeys.setLe]: (_ctx, a, b, size) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setGe]: (_ctx, a, b, size) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setIn]: (_ctx, bit, s, size) => {
+    [rtKeys.setEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setNotEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
+    [rtKeys.setSubset]: (_ctx, a, b, size) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setSuperset]: (_ctx, a, b, size) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.setContains]: (_ctx, bit, s, size) => {
       const bmp = s as Uint8Array
       const i = bit as number
       if (i < 0 || i >= (size as number) * 8) {
         return 0
       }
-      return ((bmp[i >> 3] ?? 0) >> (i & 7)) & 1
+      return ((bmp[i >> 3] ?? 0) & (1 << (i & 7))) !== 0
     },
-    [rtKeys.setElem]: (_ctx, bit, size) => withBit([bit as number], size as number),
+    [rtKeys.setSingleton]: (_ctx, bit, size) => withBit([bit as number], size as number),
     [rtKeys.setRange]: (_ctx, lo, hi, size) => {
       const bits: number[] = []
       for (let i = lo as number; i <= (hi as number); i++) {

@@ -1,8 +1,8 @@
 /*
- * 类型布局：TypeDescriptor → 字节大小 / codec / 字段偏移。
+ * 类型布局：TypeDescriptor → 字节大小 / 标量种类 / 字段偏移。
  *
  * 纯函数，供 rewrite 在编译期计算。
- * codec 选择与 boot-tex 的 selectCodec 保持一致（二进制布局以 boot-tex 为标准）。
+ * 布局以 runtime 为准（runtime 侧只认这些编译期算好的标量常量）。
  *
  * 布局约定：
  *   array  —— 扁平化为一维字节序列，offset 由各维 low/stride 算出
@@ -13,16 +13,21 @@
 
 import type { TypeDescriptor, VariantPartDescriptor } from '@/middle/lowering/type.ts'
 
-/** 标量编解码器（f64 表示 8 字节 real，与 boot-tex 一致） */
-export type Codec = 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'f64'
+/**
+ * 标量种类：标量在字节视图中的宽度 + 解释方式。
+ *
+ * 每个种类对应 `runtime.bytes.get.<kind>` / `runtime.bytes.set.<kind>` 一个终态 key，
+ * 不再作为运行期参数传递。
+ */
+export type ScalarKind = 'int8' | 'uint8' | 'int16' | 'uint16' | 'int32' | 'float32'
 
-const CODEC_SIZE: Record<Codec, number> = {
-  i8: 1,
-  u8: 1,
-  i16: 2,
-  u16: 2,
-  i32: 4,
-  f64: 8,
+const SCALAR_WIDTH: Record<ScalarKind, number> = {
+  int8: 1,
+  uint8: 1,
+  int16: 2,
+  uint16: 2,
+  int32: 4,
+  float32: 4,
 }
 
 /** variant tag 字段占用的字节数（仅**具名** tag 分配空间） */
@@ -38,25 +43,25 @@ function tagSize(vp: VariantPartDescriptor | undefined): number {
   return vp?.tagName !== undefined ? TAG_SIZE : 0
 }
 
-export function codecSize(c: Codec): number {
-  return CODEC_SIZE[c]
+export function scalarWidth(kind: ScalarKind): number {
+  return SCALAR_WIDTH[kind]
 }
 
-/** 序数子界的 codec（与 boot-tex selectCodec 的 subrange 分支一致） */
-function rangeCodec(low: number, high: number): Codec {
+/** 序数子界的标量种类：按范围取最窄宽度 */
+function rangeScalarKind(low: number, high: number): ScalarKind {
   if (low >= -128 && high <= 127) {
-    return 'i8'
+    return 'int8'
   }
   if (low >= 0 && high <= 255) {
-    return 'u8'
+    return 'uint8'
   }
   if (low >= -32768 && high <= 32767) {
-    return 'i16'
+    return 'int16'
   }
   if (low >= 0 && high <= 65535) {
-    return 'u16'
+    return 'uint16'
   }
-  return 'i32'
+  return 'int32'
 }
 
 /**
@@ -121,7 +126,7 @@ export function arrayCount(td: TypeDescriptor): number {
 /**
  * 「单字节标量」：`packed file of byte` 这类原始字节文件的元素类型。
  *
- * 只有元素的 codec 宽度为 1 才算（`0..255` 子界 / 1 字节 enum / boolean）；
+ * 只有元素的标量宽度为 1 才算（`0..255` 子界 / 1 字节 enum / boolean）；
  * `file of char` 是文本文件，`file of integer`（4 字节）走文本式单位读写。
  */
 export function isByteScalar(td: TypeDescriptor | undefined): boolean {
@@ -140,28 +145,28 @@ export function isByteScalar(td: TypeDescriptor | undefined): boolean {
   }
 }
 
-/** 标量类型的 codec；非标量抛错 */
-export function codecOf(td: TypeDescriptor): Codec {
+/** 标量类型的标量种类；非标量抛错 */
+export function scalarKindOf(td: TypeDescriptor): ScalarKind {
   switch (td.tag) {
     case 'i32':
       // 带 low/high 视为子界，按范围选宽度
-      return td.low !== undefined && td.high !== undefined ? rangeCodec(td.low, td.high) : 'i32'
+      return td.low !== undefined && td.high !== undefined ? rangeScalarKind(td.low, td.high) : 'int32'
     case 'enum':
-      return rangeCodec(0, (td.enumCount ?? 1) - 1)
+      return rangeScalarKind(0, (td.enumCount ?? 1) - 1)
     case 'f64':
-      return 'f64'
+      return 'float32'
     case 'bool':
     case 'char':
-      return 'u8'
+      return 'uint8'
     default:
-      throw new Error(`codecOf: not a scalar type: ${td.tag}`)
+      throw new Error(`scalarKindOf: not a scalar type: ${td.tag}`)
   }
 }
 
 /** 类型占用的字节数 */
 export function sizeOf(td: TypeDescriptor): number {
   if (isScalar(td)) {
-    return codecSize(codecOf(td))
+    return scalarWidth(scalarKindOf(td))
   }
   switch (td.tag) {
     case 'array': {

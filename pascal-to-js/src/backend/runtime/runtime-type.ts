@@ -1,42 +1,11 @@
 // RuntimeContext
 
-/** 类型描述符（compiler.ts serializeTypeInfo 生成的序列化 TypeInfo，runtime 消费） */
-export interface TypeDescriptor {
-  tag: string
-  low?: number
-  high?: number
-  dims?: Array<{ low: number; high: number }>
-  elem?: TypeDescriptor
-  fields?: Array<{ name: string; type: TypeDescriptor }>
-  /** 变体部分：一棵树，对应 AST 的 RecordVariantPartNode */
-  variant?: VariantPartDescriptor
-  /** enum：序数个数（pred/succ 边界检查用） */
-  enumCount?: number
-}
-
-/** 变体部分描述符（对应 AST 的 RecordVariantPartNode） */
-export interface VariantPartDescriptor {
-  /** tag 字段名（case tag: type 中的 tag；无则 undefined） */
-  tagName?: string
-  branches: VariantBranchDescriptor[]
-}
-
-/** 单个变体分支描述符（对应 AST 的 RecordVariantNode） */
-export interface VariantBranchDescriptor {
-  /** case 标签的 ord 值集合（多标签共享同一分支） */
-  labels: number[]
-  /** 该分支的字段列表 */
-  fields: Array<{ name: string; type: TypeDescriptor }>
-  /** 嵌套变体（分支内还有 case 时） */
-  nested?: VariantPartDescriptor
-}
-
 // Handler 接口（预编译的类型行为，与值分离）
 
 /**
  * Record 行为 handler。
  * 编译期由 createRecHandler 一次性构建，运行时不变。
- * 不持有 TypeDescriptor，嵌套 record/array 通过子 handler 引用表达。
+ * 不持有类型描述符，嵌套 record/array 通过子 handler 引用表达。
  * 大部分标量类型无 handler（undefined）。
  *
  * create/copy 返回包装后的 PascalRecord（带 handler），以便嵌套 record 字段
@@ -110,7 +79,8 @@ export type Syscall = (...args: unknown[]) => unknown
 export type PascalFile = {
   kind: 'file'
   value: PascalFileStore | undefined
-  type: TypeDescriptor
+  /** 编译期算定的文件行为类别：rec / byte / char / text（由 rewrite 传入） */
+  fileKind: string
 }
 export type PascalFileStore = TextFile | RecordFile
 
@@ -164,10 +134,6 @@ export interface RecordFile {
 
   // 查询
   hasMore(): boolean
-
-  getType(): unknown | undefined
-
-  setType(type: unknown): void
 }
 
 export interface DimsLink {

@@ -5,13 +5,6 @@ export class MemoryRecordFile implements RecordFile {
   private pos: number = 0
   private buffer: PascalRecord | undefined = undefined
   private mode: 'inspection' | 'generation' = 'inspection'
-  private type: unknown | undefined = undefined
-  getType(): unknown | undefined {
-    return this.type
-  }
-  setType(type: unknown) {
-    this.type = type
-  }
 
   constructor(initialRecords?: PascalRecord[]) {
     if (initialRecords) {
