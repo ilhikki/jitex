@@ -151,7 +151,7 @@ export function memSyscalls(): Record<string, SyscallHandler> {
 
     ...bytesAccessSyscalls(),
 
-    [rtKeys.arrayPack]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
+    [rtKeys.bytesPack]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
       const s = src as Uint8Array
       const d = dst as Uint8Array
       const size = elemSize as number
@@ -159,7 +159,7 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       d.set(s.subarray(from, from + (count as number) * size), 0)
       return undefined
     },
-    [rtKeys.arrayUnpack]: (_ctx, src, dst, dstLow, elemSize, start, count) => {
+    [rtKeys.bytesUnpack]: (_ctx, src, dst, dstLow, elemSize, start, count) => {
       const s = src as Uint8Array
       const d = dst as Uint8Array
       const size = elemSize as number
@@ -168,22 +168,24 @@ export function memSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // object 表示的 record / 数组的默认值：字段名与元素值均已由 rewrite 在编译期展开
-    [rtKeys.objectNewRecord]: (_ctx, ...pairs) => {
+    // object 表示的默认值构造：字段名与元素值均已由 rewrite 在编译期展开
+    [rtKeys.objectNew]: (_ctx, ...pairs) => {
       const out: Record<string, unknown> = {}
       for (let i = 0; i < pairs.length; i += 2) {
         out[pairs[i] as string] = pairs[i + 1]
       }
       return out
     },
-    [rtKeys.objectNewArray]: (_ctx, ...elems): ObjArrView => ({ base: elems, offset: 0 }),
+    [rtKeys.objectArrayNew]: (_ctx, ...elems): ObjArrView => ({ base: elems, offset: 0 }),
 
-    [rtKeys.recordGetField]: (_ctx, obj, name) => (obj as Record<string, unknown>)[name as string],
-    [rtKeys.recordSetField]: (_ctx, obj, name, v) => {
+    // JS 普通对象上的字段读写（object 表示的 record / 数组元素）
+    [rtKeys.objectGet]: (_ctx, obj, name) => (obj as Record<string, unknown>)[name as string],
+    [rtKeys.objectSet]: (_ctx, obj, name, v) => {
       ;(obj as Record<string, unknown>)[name as string] = v
       return undefined
     },
-    [rtKeys.recordClone]: (_ctx, v) => cloneValue(v),
+    // 值语义深拷贝：实参是 object 表示的任意 JS 值
+    [rtKeys.valueClone]: (_ctx, v) => cloneValue(v),
   }
 }
 
@@ -214,24 +216,24 @@ function cloneValue(v: unknown): unknown {
 }
 
 /**
- * set 的位图运算。
+ * 位图运算（宿主表示：Uint8Array 位图）。
  *
  * bit i ↔ ord 值 (low + i)；由 rewrite 在产出时减去 low，
  * 因此这里只接收「位下标」，不需要知道类型。
  */
 export function setSyscalls(): Record<string, SyscallHandler> {
   return {
-    [rtKeys.setUnion]: (_ctx, a, b, size) =>
+    [rtKeys.bitmapUnion]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x | y),
-    [rtKeys.setIntersection]: (_ctx, a, b, size) =>
+    [rtKeys.bitmapIntersection]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & y),
-    [rtKeys.setDifference]: (_ctx, a, b, size) =>
+    [rtKeys.bitmapDifference]: (_ctx, a, b, size) =>
       bitmapOp(a as Uint8Array, b as Uint8Array, size as number, (x, y) => x & ~y),
-    [rtKeys.setEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setNotEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
-    [rtKeys.setSubset]: (_ctx, a, b, size) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setSuperset]: (_ctx, a, b, size) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
-    [rtKeys.setContains]: (_ctx, bit, s, size) => {
+    [rtKeys.bitmapEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.bitmapNotEqual]: (_ctx, a, b, size) => bitEquals(a as Uint8Array, b as Uint8Array, size as number) ? 0 : 1,
+    [rtKeys.bitmapSubset]: (_ctx, a, b, size) => subset(a as Uint8Array, b as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.bitmapSuperset]: (_ctx, a, b, size) => subset(b as Uint8Array, a as Uint8Array, size as number) ? 1 : 0,
+    [rtKeys.bitmapContains]: (_ctx, bit, s, size) => {
       const bmp = s as Uint8Array
       const i = bit as number
       if (i < 0 || i >= (size as number) * 8) {
@@ -239,8 +241,8 @@ export function setSyscalls(): Record<string, SyscallHandler> {
       }
       return ((bmp[i >> 3] ?? 0) & (1 << (i & 7))) !== 0
     },
-    [rtKeys.setSingleton]: (_ctx, bit, size) => withBit([bit as number], size as number),
-    [rtKeys.setRange]: (_ctx, lo, hi, size) => {
+    [rtKeys.bitmapSingleton]: (_ctx, bit, size) => withBit([bit as number], size as number),
+    [rtKeys.bitmapRange]: (_ctx, lo, hi, size) => {
       const bits: number[] = []
       for (let i = lo as number; i <= (hi as number); i++) {
         bits.push(i)

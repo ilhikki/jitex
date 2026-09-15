@@ -6,6 +6,20 @@
  *   - 段名一律写完整单词，不用 i32 / f32 / arr / rec / mem / num / ptr 之类缩写；
  *   - 结构为 runtime.<域>.<动作>[.<限定>]。
  *
+ * 两条比结构更要紧的约定（违反它们 = 把类型泄漏到运行期）：
+ *
+ *   1. **域 = 值的宿主表示，不是 Pascal 概念**。
+ *      域描述的是「这个 key 操作哪种 JS 值」，不是「对应哪个 Pascal 类型」。
+ *      Pascal 概念名（record / array / set / pointer / memory …）会让人误以为
+ *      一个 key 承载了一整个 Pascal 类型，进而容忍它按 Pascal 类型在运行期分派。
+ *      例：record.clone 实参是「object 表示的任意值」，应叫 value.clone。
+ *
+ *   2. **一个 key 只对应一种宿主表示**。值的形态差异必须由 rewrite 选进 key，
+ *      不能靠实参承载后由 handler 再判。
+ *      例：file.write 的实参曾是 Uint8Array | string | number 三种，只能靠
+ *      `instanceof` + `String()` 猜；拆成 write.text / .byte / .bytes / .block
+ *      后每个 handler 的实参形态都是唯一确定的。
+ *
  * 与本文件对应的 lowering 侧 key（'lowering.' 前缀）定义在
  * src/middle/lowering/helpers.ts。lowering 产泛型 key + type 参数，
  * rewrite 消费 type 后产出这里的终态 key。
@@ -54,18 +68,17 @@ export const rtKeys = {
   compareGreater: 'runtime.compare.greater',
   compareGreaterOrEqual: 'runtime.compare.greaterOrEqual',
 
-  // 集合
-  setUnion: 'runtime.set.union',
-  setIntersection: 'runtime.set.intersection',
-  setDifference: 'runtime.set.difference',
-  setEqual: 'runtime.set.equal',
-  setNotEqual: 'runtime.set.notEqual',
-  setSubset: 'runtime.set.subset',
-  setSuperset: 'runtime.set.superset',
-  setContains: 'runtime.set.contains',
-  setRange: 'runtime.set.range',
-  setSingleton: 'runtime.set.singleton',
-  setLiteral: 'runtime.set.literal',
+  // 位图集合运算（宿主表示：Uint8Array 位图）
+  bitmapUnion: 'runtime.bitmap.union',
+  bitmapIntersection: 'runtime.bitmap.intersection',
+  bitmapDifference: 'runtime.bitmap.difference',
+  bitmapEqual: 'runtime.bitmap.equal',
+  bitmapNotEqual: 'runtime.bitmap.notEqual',
+  bitmapSubset: 'runtime.bitmap.subset',
+  bitmapSuperset: 'runtime.bitmap.superset',
+  bitmapContains: 'runtime.bitmap.contains',
+  bitmapRange: 'runtime.bitmap.range',
+  bitmapSingleton: 'runtime.bitmap.singleton',
 
   // 值表示转换
   castCharToInt32: 'runtime.cast.char.to.int32',
@@ -84,23 +97,45 @@ export const rtKeys = {
   hookFunctionEnter: 'runtime.hook.function.enter',
 
   // 文件
+  //
+  // 多态边界：reset / rewrite / get / peek / eof 按「存储实现形态」（text / bytes /
+  // blocks）分派，这是**存储接口**的多态（TextFile vs BlockStore），不是 Pascal 类型
+  // 泄漏 —— fileKind 本身是 rewrite 算定的宿主表示常量。
+  // 写入路径（write.* / put.buffer.*）不在此列：值的宿主表示已由 rewrite 选进 key，
+  // handler 不再做任何类型判断。
   fileReset: 'runtime.file.reset',
   fileRewrite: 'runtime.file.rewrite',
   fileGet: 'runtime.file.get',
   filePeek: 'runtime.file.peek',
+  /** put(f)：把缓冲区落盘；仅定长块存储需要 */
   filePut: 'runtime.file.put',
-  // 文本文件的 `f^ := ch`：char 以 ord 值承载，需转回字符写（由 rewrite 按元素类型选定）
-  filePutCharacter: 'runtime.file.putCharacter',
-  fileReadCharacter: 'runtime.file.readCharacter',
-  fileReadToken: 'runtime.file.readToken',
-  fileWrite: 'runtime.file.write',
+  /** `f^ := x`（blocks）：值是记录字节视图 */
+  filePutBufferBlock: 'runtime.file.put.buffer.block',
+  /** `f^ := x`（file of byte）：值是单个字节 */
+  filePutBufferByte: 'runtime.file.put.buffer.byte',
+  /** `f^ := x`（text，elem 为 char）：值是 1 字符 string */
+  filePutBufferCharacter: 'runtime.file.put.buffer.character',
+  /** `f^ := x`（text，elem 非 char）：值是格式化后的文本 */
+  filePutBufferText: 'runtime.file.put.buffer.text',
+  /** 读一个文本单位（含行结束符语义） */
+  fileReadCharacter: 'runtime.file.read.character',
+  /** 读一个 token（跳过前导空白，读到下一空白） */
+  fileReadToken: 'runtime.file.read.token',
+  /** 写文本单位：值是 string */
+  fileWriteText: 'runtime.file.write.text',
+  /** 写单个字节：值是 number（file of byte） */
+  fileWriteByte: 'runtime.file.write.byte',
+  /** 写字节序列：值是 Uint8Array（char 数组 / 二进制转换结果） */
+  fileWriteBytes: 'runtime.file.write.bytes',
+  /** 写一个定长块：值是 Uint8Array（file of record） */
+  fileWriteBlock: 'runtime.file.write.block',
   fileReadln: 'runtime.file.readln',
   fileWriteln: 'runtime.file.writeln',
   fileEof: 'runtime.file.eof',
   fileEoln: 'runtime.file.eoln',
   filePage: 'runtime.file.page',
   fileCreate: 'runtime.file.create',
-  fileProgramUrl: 'runtime.file.programUrl',
+  fileProgramUrl: 'runtime.file.program.url',
 
   // 值 ↔ 文件单位转换
   convertInt32ToText: 'runtime.convert.int32.to.text',
@@ -119,10 +154,10 @@ export const rtKeys = {
   convertBytesToBoolean: 'runtime.convert.bytes.to.boolean',
   convertCharToInt32: 'runtime.convert.char.to.int32',
 
-  // 内存与视图
-  memoryNew: 'runtime.memory.new',
-  memoryCopy: 'runtime.memory.copy',
-  memoryClone: 'runtime.memory.clone',
+  // 内存与视图（宿主表示：Uint8Array）
+  bytesAlloc: 'runtime.bytes.alloc',
+  bytesCopy: 'runtime.bytes.copy',
+  bytesClone: 'runtime.bytes.clone',
   viewSubarray: 'runtime.view.subarray',
 
   // 字节视图上的标量读写：每个 key 固定一种标量种类，无运行期类型分派
@@ -139,22 +174,24 @@ export const rtKeys = {
   bytesSetInt32: 'runtime.bytes.set.int32',
   bytesSetFloat32: 'runtime.bytes.set.float32',
 
-  // 数组（object 表示：元素是 file / pointer 等 JS 值）
-  arrayGetObject: 'runtime.array.get.object',
-  arraySetObject: 'runtime.array.set.object',
+  // 数组（object 表示：宿主是 {base, offset} 视图，元素为 file / pointer 等 JS 值）
+  objectArrayGet: 'runtime.objectarray.get',
+  objectArraySet: 'runtime.objectarray.set',
   // 部分下标视图（a[i] 对二维数组返回子数组视图，而非元素）
-  arraySublist: 'runtime.array.sublist',
-  arrayPack: 'runtime.array.pack',
-  arrayUnpack: 'runtime.array.unpack',
+  objectArraySublist: 'runtime.objectarray.sublist',
+  // 子数组 ↔ 字节视图的搬运
+  bytesPack: 'runtime.bytes.pack',
+  bytesUnpack: 'runtime.bytes.unpack',
 
-  // 记录（object 表示）
-  recordGetField: 'runtime.record.get.field',
-  recordSetField: 'runtime.record.set.field',
-  recordClone: 'runtime.record.clone',
+  // 对象（object 表示：宿主是 JS 普通对象，字段名 → 值）
+  objectGet: 'runtime.object.get',
+  objectSet: 'runtime.object.set',
+  /** 值语义深拷贝：实参是 object 表示的任意 JS 值（对象 / 数组视图 / 视图 / 标量） */
+  valueClone: 'runtime.value.clone',
 
   // object 表示的默认值构造：字段名 / 元素值由 rewrite 在编译期展开为实参
-  objectNewRecord: 'runtime.object.new.record',
-  objectNewArray: 'runtime.object.new.array',
+  objectNew: 'runtime.object.new',
+  objectArrayNew: 'runtime.objectarray.new',
 
   cellNew: 'runtime.cell.new',
   cellGet: 'runtime.cell.get',

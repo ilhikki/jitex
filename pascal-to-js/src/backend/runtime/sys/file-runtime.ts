@@ -3,11 +3,15 @@
  *
  * 设计要点：
  *   - **不接类型参数**。句柄（PascalFile）在 create 时已带编译期算定的
- *     `fileKind`（存储形态：text / bytes / blocks），runtime 据此区分读写路径，
- *     不做 Pascal 类型判断。
+ *     `fileKind`（存储形态：text / bytes / blocks），用于区分读写路径。
+ *   - **值的宿主表示由 key 承载，不由实参承载**：写入路径按值形态拆成
+ *     write.text（string）/ write.byte（number）/ write.bytes、write.block（Uint8Array），
+ *     以及 put.buffer.block / .byte / .character / .text。handler 内不做类型判断。
+ *   - 仍在运行期分派的只剩**存储实现多态**（TextFile vs BlockStore，见 reset /
+ *     rewrite / get / peek / eof）——那是宿主接口的形态差异，不是 Pascal 类型泄漏。
  *   - key 与 Pascal 原生 io 过程一一对应：reset / rewrite / get / put / read / write /
  *     readln / writeln / eof / eoln / page / peek(f^)。
- *   - rewrite 只负责「值 → 文件单位」的转换（convert.*）；语义（如 read = 读+推进）
+ *   - rewrite 只负责「值 → 文件单位」的转换（convert.*)；语义（如 read = 读+推进）
  *     由本文件承担。
  */
 
@@ -113,6 +117,11 @@ function defaultStore(ctx: RuntimeContext, isOutput: boolean): TextFile {
 
 function pick(ctx: RuntimeContext, f: unknown, isOutput: boolean): TextFile {
   return f === undefined ? defaultStore(ctx, isOutput) : textStore(f as PascalFile)
+}
+
+/** 写目标存储：f 缺省表示默认 output（ISO 的 write 不带文件参数的形式） */
+function writeStore(ctx: RuntimeContext, f: unknown): TextFile {
+  return f === undefined ? defaultStore(ctx, true) : textStore(f as PascalFile)
 }
 
 /**
@@ -257,42 +266,53 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return b
     },
 
-    // unit 存在 → `f^ := x`（设缓冲区）；unit 缺失 → `put(f)`（把缓冲区写入文件）
-    [rtKeys.filePut]: (_ctx, f, unit) => {
+    // put(f)：把缓冲区落盘。仅定长块存储需要落盘，text / bytes 无缓冲语义
+    [rtKeys.filePut]: (_ctx, f) => {
       const p = f as PascalFile
       if (isBlockFile(p)) {
         const rs = blockStore(p)
-        if (unit !== undefined) {
-          // ISO 6.6.5.2: 写缓冲区的前置条件是文件处于写状态
-          if (rs.getMode() !== 'generation') {
-            throw new Error('f^ := x before rewrite: pre-assertion violated')
-          }
-          // `f^ := x` 是赋值（值语义），x 可能是共享视图（如 mem[k]），
-          // 必须深拷贝后落缓冲：否则改 x 会连带改掉已写入的缓冲内容。
-          rs.setBuffer((unit as Uint8Array).slice())
-        } else {
-          if (rs.getMode() !== 'generation') {
-            throw new Error('put(f) before rewrite: pre-assertion violated')
-          }
-          rs.writeBlock()
+        if (rs.getMode() !== 'generation') {
+          throw new Error('put(f) before rewrite: pre-assertion violated')
         }
-        return undefined
-      }
-      if (unit !== undefined) {
-        const store = textStore(p)
-        if (isByteFile(p)) {
-          store.writeByte((unit as number) & 0xff)
-        } else {
-          writeText(store, unit)
-        }
+        rs.writeBlock()
       }
       return undefined
     },
 
-    // 字符来源的 `f^ := ch`：char 以 ord 值承载，需转回字符写
-    [rtKeys.filePutCharacter]: (_ctx, f, unit) => {
+    // `f^ := x`（blocks）：x 是记录字节视图
+    [rtKeys.filePutBufferBlock]: (_ctx, f, unit) => {
+      const rs = blockStore(f as PascalFile)
+      // ISO 6.6.5.2: 写缓冲区的前置条件是文件处于写状态
+      if (rs.getMode() !== 'generation') {
+        throw new Error('f^ := x before rewrite: pre-assertion violated')
+      }
+      // `f^ := x` 是赋值（值语义），x 可能是共享视图（如 mem[k]），
+      // 必须深拷贝后落缓冲：否则改 x 会连带改掉已写入的缓冲内容。
+      rs.setBuffer((unit as Uint8Array).slice())
+      return undefined
+    },
+
+    // `f^ := x`（file of byte）：x 是单个字节
+    [rtKeys.filePutBufferByte]: (_ctx, f, unit) => {
+      textStore(f as PascalFile).writeByte((unit as number) & 0xff)
+      return undefined
+    },
+
+    // `f^ := x`（text，elem 为 char）：char 以 ord 值承载，需转回字符写
+    [rtKeys.filePutBufferCharacter]: (_ctx, f, unit) => {
       const store = textStore(f as PascalFile)
-      store.writeBytes(encodeUtf8(String.fromCharCode(unit as number)))
+      const code = unit as number
+      if (code < 0x80) {
+        store.writeByte(code)
+        return undefined
+      }
+      store.writeBytes(encodeUtf8(String.fromCharCode(code)))
+      return undefined
+    },
+
+    // `f^ := x`（text，elem 非 char）：rewrite 已按元素类型格式化为文本
+    [rtKeys.filePutBufferText]: (_ctx, f, unit) => {
+      writeTextUnit(textStore(f as PascalFile), unit as string)
       return undefined
     },
 
@@ -324,25 +344,26 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return readTokenUnit(textStore(p))
     },
 
-    [rtKeys.fileWrite]: (ctx, f, unit) => {
-      if (f === undefined) {
-        writeText(defaultStore(ctx, true), unit)
-        return undefined
-      }
-      const p = f as PascalFile
-      if (isBlockFile(p)) {
-        const rs = blockStore(p)
-        rs.setBuffer(unit as Uint8Array)
-        rs.writeBlock()
-        return undefined
-      }
-      const store = textStore(p)
-      // 字节文件：值即字节，原样写出
-      if (isByteFile(p)) {
-        store.writeByte((unit as number) & 0xff)
-        return undefined
-      }
-      writeText(store, unit)
+    // 写文本单位：值是 string（char 与格式化文本的宿主表示都是 string）
+    [rtKeys.fileWriteText]: (ctx, f, unit) => {
+      writeTextUnit(writeStore(ctx, f), unit as string)
+      return undefined
+    },
+    // 写单个字节：值是 number（file of byte）
+    [rtKeys.fileWriteByte]: (ctx, f, unit) => {
+      writeStore(ctx, f).writeByte((unit as number) & 0xff)
+      return undefined
+    },
+    // 写字节序列：值是 Uint8Array（char 数组 / 二进制转换结果）
+    [rtKeys.fileWriteBytes]: (ctx, f, unit) => {
+      writeStore(ctx, f).writeBytes(unit as Uint8Array)
+      return undefined
+    },
+    // 写一个定长块：值是 Uint8Array（file of record）
+    [rtKeys.fileWriteBlock]: (_ctx, f, unit) => {
+      const rs = blockStore(f as PascalFile)
+      rs.setBuffer(unit as Uint8Array)
+      rs.writeBlock()
       return undefined
     },
 
@@ -402,11 +423,21 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
   }
 }
 
-/** 文本写入：string → UTF-8 字节；Uint8Array → 原样 */
-function writeText(store: TextFile, unit: unknown): void {
-  if (unit instanceof Uint8Array) {
-    store.writeBytes(unit)
-    return
+/**
+ * 文本单位写入：string → UTF-8 字节。
+ *
+ * ASCII 单字符直接写字节（与 UTF-8 编码结果逐位相同），跳过 TextEncoder。
+ * 这是 TeX / TANGLE 的主输出路径（WEB 的 print_char 逐字符写出），
+ * 走 TextEncoder 时每个字符都要分配一个 1 字节缓冲、再穿过 JS/Rust 边界调
+ * op_encode，实测约 2µs/字符，比直写字节贵一个数量级。
+ */
+function writeTextUnit(store: TextFile, s: string): void {
+  if (s.length === 1) {
+    const code = s.charCodeAt(0)
+    if (code < 0x80) {
+      store.writeByte(code)
+      return
+    }
   }
-  store.writeBytes(encodeUtf8(String(unit)))
+  store.writeBytes(encodeUtf8(s))
 }

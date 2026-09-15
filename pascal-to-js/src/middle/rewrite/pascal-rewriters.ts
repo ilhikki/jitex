@@ -129,7 +129,7 @@ function defaultValueExpr(td: TypeDescriptor): JsonCode.Expr {
     case 'char':
       return litChar('\x00')
     case 'set':
-      return sc(rtKeys.memoryNew, [litInt(setSize(td))])
+      return sc(rtKeys.bytesAlloc, [litInt(setSize(td))])
     case 'pointer':
       // ISO 7185 6.4.4: 未初始化的指针为 nil-value
       return litNullLiteral()
@@ -138,14 +138,14 @@ function defaultValueExpr(td: TypeDescriptor): JsonCode.Expr {
     case 'array':
       return isObjectRepr(td)
         ? sc(
-          rtKeys.objectNewArray,
+          rtKeys.objectArrayNew,
           Array.from({ length: arrayCount(td) }, () => defaultValueExpr(td.elem!)),
         )
-        : sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
+        : sc(rtKeys.bytesAlloc, [litInt(sizeOf(td))])
     case 'record':
       return isObjectRepr(td)
-        ? sc(rtKeys.objectNewRecord, recordDefaultArgs(td))
-        : sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
+        ? sc(rtKeys.objectNew, recordDefaultArgs(td))
+        : sc(rtKeys.bytesAlloc, [litInt(sizeOf(td))])
     default:
       return litInt(0)
   }
@@ -350,9 +350,9 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
 
 export function buildPascalRewriteTable(): SyscallRewriteTable {
   return {
-    'lowering.add': binary(rtKeys.int32Add, rtKeys.float32Add, rtKeys.setUnion),
-    'lowering.sub': binary(rtKeys.int32Subtract, rtKeys.float32Subtract, rtKeys.setDifference),
-    'lowering.mul': binary(rtKeys.int32Multiply, rtKeys.float32Multiply, rtKeys.setIntersection),
+    'lowering.add': binary(rtKeys.int32Add, rtKeys.float32Add, rtKeys.bitmapUnion),
+    'lowering.sub': binary(rtKeys.int32Subtract, rtKeys.float32Subtract, rtKeys.bitmapDifference),
+    'lowering.mul': binary(rtKeys.int32Multiply, rtKeys.float32Multiply, rtKeys.bitmapIntersection),
     'lowering.div': binaryFixed(rtKeys.float32Divide),
     'lowering.intDiv': binaryFixed(rtKeys.int32Divide),
     'lowering.mod': binaryFixed(rtKeys.int32Modulo),
@@ -384,16 +384,16 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.pred': predSucc(false),
     'lowering.succ': predSucc(true),
 
-    'lowering.eq': compare(rtKeys.setEqual, rtKeys.compareEqual),
-    'lowering.ne': compare(rtKeys.setNotEqual, rtKeys.compareNotEqual),
+    'lowering.eq': compare(rtKeys.bitmapEqual, rtKeys.compareEqual),
+    'lowering.ne': compare(rtKeys.bitmapNotEqual, rtKeys.compareNotEqual),
     'lowering.lt': compare(undefined, rtKeys.compareLess),
-    'lowering.le': compare(rtKeys.setSubset, rtKeys.compareLessOrEqual),
+    'lowering.le': compare(rtKeys.bitmapSubset, rtKeys.compareLessOrEqual),
     'lowering.gt': compare(undefined, rtKeys.compareGreater),
-    'lowering.ge': compare(rtKeys.setSuperset, rtKeys.compareGreaterOrEqual),
+    'lowering.ge': compare(rtKeys.bitmapSuperset, rtKeys.compareGreaterOrEqual),
 
     'lowering.in': (sys) => {
       const st = parseType(sys.args[3])
-      return sc(rtKeys.setContains, [sys.args[0], sys.args[2], litInt(setSize(st!))])
+      return sc(rtKeys.bitmapContains, [sys.args[0], sys.args[2], litInt(setSize(st!))])
     },
     'lowering.ptr.deref': (sys) => sc(rtKeys.pointerDereference, sys.args),
     'lowering.ptr.assign': (sys) => sc(rtKeys.pointerAssign, sys.args),
@@ -409,35 +409,35 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
         return defaultValueExpr(td)
       }
       if (td.tag === 'set') {
-        return sc(rtKeys.memoryNew, [litInt(setSize(td))])
+        return sc(rtKeys.bytesAlloc, [litInt(setSize(td))])
       }
-      return sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
+      return sc(rtKeys.bytesAlloc, [litInt(sizeOf(td))])
     },
     'lowering.mem.copy': (sys) => {
       const td = parseType(sys.args[3])
-      return sc(rtKeys.memoryCopy, [sys.args[0], sys.args[1], sys.args[2], litInt(sizeOf(td!))])
+      return sc(rtKeys.bytesCopy, [sys.args[0], sys.args[1], sys.args[2], litInt(sizeOf(td!))])
     },
 
     'lowering.set.empty': (sys) => {
       const td = parseType(sys.args[0])
-      return sc(rtKeys.memoryNew, [litInt(setSize(td!))])
+      return sc(rtKeys.bytesAlloc, [litInt(setSize(td!))])
     },
     'lowering.set.elem': (sys) => {
       const td = parseType(sys.args[1])
-      return sc(rtKeys.setSingleton, [sys.args[0], litInt(setSize(td!))])
+      return sc(rtKeys.bitmapSingleton, [sys.args[0], litInt(setSize(td!))])
     },
     'lowering.set.range': (sys) => {
       const td = parseType(sys.args[2])
-      return sc(rtKeys.setRange, [sys.args[0], sys.args[1], litInt(setSize(td!))])
+      return sc(rtKeys.bitmapRange, [sys.args[0], sys.args[1], litInt(setSize(td!))])
     },
     'lowering.set.literal': (sys) => {
       const td = parseType(sys.args[sys.args.length - 1])
       const elems = sys.args.slice(0, -1)
       const size = litInt(setSize(td!))
       if (elems.length === 0) {
-        return sc(rtKeys.memoryNew, [size])
+        return sc(rtKeys.bytesAlloc, [size])
       }
-      return elems.reduce((a, b) => sc(rtKeys.setUnion, [a, b, size]))
+      return elems.reduce((a, b) => sc(rtKeys.bitmapUnion, [a, b, size]))
     },
 
     // 类型只用到「文件行为类别」，句柄不携带类型描述符
@@ -445,15 +445,29 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.file.reset': (sys) => sc(rtKeys.fileReset, [sys.args[0]]),
     'lowering.file.rewrite': (sys) => sc(rtKeys.fileRewrite, [sys.args[0]]),
     'lowering.file.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
-    // `f^ := x` 的形态在编译期定死：字符文件走 putCharacter（ord 值转回字符），
-    // 其余走 put；`put(f)`（无 unit）也由同一个 put 承担
+    // `f^ := x` / `put(f)` 的形态在编译期定死（值形态由 key 承载，运行期不再判断）：
+    //   blocks + 值 → put.buffer.block      值缺失 → put（仅块存储需要落盘）
+    //   bytes  + 值 → put.buffer.byte
+    //   text   + 值 → put.buffer.character（elem 为 char）/ put.buffer.text（其余元素）
     'lowering.file.put': (sys) => {
       const [f, fileType, unit] = sys.args
-      const characterUnit = unit !== undefined && parseType(fileType)?.elem?.tag === 'char'
-      return sc(
-        characterUnit ? rtKeys.filePutCharacter : rtKeys.filePut,
-        unit === undefined ? [f] : [f, unit],
-      )
+      // put(f)：无值参数
+      if (unit === undefined) {
+        return sc(rtKeys.filePut, [f])
+      }
+      const tt = parseType(fileType)
+      const kind = fileKind(tt)
+      if (kind === 'blocks') {
+        return sc(rtKeys.filePutBufferBlock, [f, unit])
+      }
+      if (kind === 'bytes') {
+        return sc(rtKeys.filePutBufferByte, [f, unit])
+      }
+      if (tt?.elem?.tag === 'char') {
+        return sc(rtKeys.filePutBufferCharacter, [f, unit])
+      }
+      // 其余文本单位：按元素类型的文本表示写出（与 write(f, x) 同规则）
+      return sc(rtKeys.filePutBufferText, [f, sc(toConvertKey(tt?.elem, false), [unit])])
     },
     'lowering.file.peek': (sys) => {
       const td = parseType(sys.args[1])
@@ -471,18 +485,25 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const [target, targetType, value, valueType, width, prec] = sys.args
       const vt = parseType(valueType)
       const tt = parseType(targetType)
-      // 字符串（char 数组）零转换，直接写字节；
-      // 字节文件（file of byte）的值本身就是字节，同样零转换
+      // 值的宿主表示在编译期定死，写 key 随之选定（运行期 handler 不再判类型）：
+      //   blocks 目标 → write.block（记录字节视图）
+      //   file of byte → write.byte（值即字节）
+      //   char 数组 → write.bytes（已是字节视图）
+      //   其余值类型 → 先按目标是否为二进制 convert，再按结果形态选 write.bytes / write.text
+      if (fileKind(tt) === 'blocks') {
+        return sc(rtKeys.fileWriteBlock, [target, value])
+      }
       if (isByteFile(tt)) {
-        return sc(rtKeys.fileWrite, [target, value])
+        return sc(rtKeys.fileWriteByte, [target, value])
       }
       if (isCharArray(vt)) {
         // ISO 6.9.3.6：string 值带字段宽度时须左补空格或截断（与 integer 等类型不同，
         // 后者的字段宽度只保证最小宽度、不截断）
         if (isNullLit(width)) {
-          return sc(rtKeys.fileWrite, [target, value])
+          return sc(rtKeys.fileWriteBytes, [target, value])
         }
-        return sc(rtKeys.fileWrite, [target, sc(rtKeys.convertBytesToTextField, [value, width])])
+        // 补/截后是文本，按文本单位写
+        return sc(rtKeys.fileWriteText, [target, sc(rtKeys.convertBytesToTextField, [value, width])])
       }
       const binary = isBinaryFile(tt)
       const key = toConvertKey(vt, binary)
@@ -493,7 +514,9 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
           convArgs.push(prec)
         }
       }
-      return sc(rtKeys.fileWrite, [target, sc(key, convArgs)])
+      // convert.* 的结果形态由 binary 决定：二进制 → Uint8Array，文本 → string
+      const converted = sc(key, convArgs)
+      return binary ? sc(rtKeys.fileWriteBytes, [target, converted]) : sc(rtKeys.fileWriteText, [target, converted])
     },
     'lowering.io.writeln': (sys) => sc(rtKeys.fileWriteln, [sys.args[0]]),
     'lowering.io.read': (sys) => {
@@ -521,7 +544,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.pack': (sys) => {
       const [src, start, dst, srcType, dstType] = sys.args
       const srcArr = arraySlot(parseType(srcType)!)
-      return sc(rtKeys.arrayPack, [
+      return sc(rtKeys.bytesPack, [
         src,
         litInt(srcArr.lows[0] ?? 0),
         litInt(srcArr.elemSize),
@@ -533,7 +556,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.unpack': (sys) => {
       const [src, dst, start, srcType, dstType] = sys.args
       const dstArr = arraySlot(parseType(dstType)!)
-      return sc(rtKeys.arrayUnpack, [
+      return sc(rtKeys.bytesUnpack, [
         src,
         dst,
         litInt(dstArr.lows[0] ?? 0),
@@ -569,9 +592,9 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const td = parseType(sys.args[1])
       if (td && isObjectRepr(td)) {
         // 对象表示的 record / 数组：按值语义深拷贝（pointer / file 拷引用）
-        return sc(rtKeys.recordClone, [sys.args[0]])
+        return sc(rtKeys.valueClone, [sys.args[0]])
       }
-      return sc(rtKeys.memoryClone, [sys.args[0], litInt(sizeOf(td!))])
+      return sc(rtKeys.bytesClone, [sys.args[0], litInt(sizeOf(td!))])
     },
 
     'lowering.cell.create': (sys) => sc(rtKeys.cellNew, [sys.args[0]]),
@@ -627,9 +650,9 @@ function accessAt(
     const dims = arrayDims(td)
     if (indices.length < dims.length) {
       const flatOff = elementOffset(indices, dims)
-      return sc(rtKeys.arraySublist, [base, flatOff])
+      return sc(rtKeys.objectArraySublist, [base, flatOff])
     }
-    return sc(rtKeys.arrayGetObject, [base, elemIndexExpr(td, indices)])
+    return sc(rtKeys.objectArrayGet, [base, elemIndexExpr(td, indices)])
   }
 
   const folded = foldViewSub(base)
@@ -639,7 +662,7 @@ function accessAt(
   if (fieldName !== undefined) {
     if (isObjectRepr(td)) {
       // 对象表示的 record（含 file / pointer 字段）：字段按名字读取
-      return sc(rtKeys.recordGetField, [base, litStr(fieldName)])
+      return sc(rtKeys.objectGet, [base, litStr(fieldName)])
     }
     const slot = fieldSlot(td, fieldName)
     if (!slot) {
@@ -676,8 +699,8 @@ function assignAt(
   fieldName?: string,
 ): JsonCode.Expr {
   if (fieldName === undefined && isObjectRepr(td)) {
-    // 对象数组：下标数等于维数时写元素；少于维数时（子数组视图）交由 arraySetObject 处理
-    return sc(rtKeys.arraySetObject, [base, elemIndexExpr(td, indices), value])
+    // 对象数组：下标数等于维数时写元素；少于维数时（子数组视图）交由 objectarray.set 处理
+    return sc(rtKeys.objectArraySet, [base, elemIndexExpr(td, indices), value])
   }
 
   const folded = foldViewSub(base)
@@ -687,7 +710,7 @@ function assignAt(
   if (fieldName !== undefined) {
     if (isObjectRepr(td)) {
       // 对象表示的 record（含 file / pointer 字段）：字段按名字写入
-      return sc(rtKeys.recordSetField, [base, litStr(fieldName), value])
+      return sc(rtKeys.objectSet, [base, litStr(fieldName), value])
     }
     const slot = fieldSlot(td, fieldName)
     if (!slot) {
@@ -712,5 +735,5 @@ function assignAt(
   if (isScalar(slotType)) {
     return sc(bytesSetKey[scalarKindOf(slotType)], [folded.base, offset, value])
   }
-  return sc(rtKeys.memoryCopy, [folded.base, offset, value, litInt(sizeOf(slotType))])
+  return sc(rtKeys.bytesCopy, [folded.base, offset, value, litInt(sizeOf(slotType))])
 }

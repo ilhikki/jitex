@@ -84,10 +84,10 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.castBooleanToInt32]: (a) => `((${a[0]}) ? 1 : 0)`,
   [rtKeys.castInt32ToChar]: (a) => `(String.fromCharCode(${a[0]}))`,
 
-  // memory.new / memory.clone / memory.copy：每个实参只出现一次
-  [rtKeys.memoryNew]: (a) => `(new Uint8Array(${a[0]}))`,
-  [rtKeys.memoryClone]: (a) => `(${a[0]}.slice(0, ${a[1]}))`,
-  [rtKeys.memoryCopy]: (a) => `(${a[0]}.set(${a[2]}.subarray(0, ${a[3]}), ${a[1]}))`,
+  // bytes.alloc / bytes.clone / bytes.copy：每个实参只出现一次
+  [rtKeys.bytesAlloc]: (a) => `(new Uint8Array(${a[0]}))`,
+  [rtKeys.bytesClone]: (a) => `(${a[0]}.slice(0, ${a[1]}))`,
+  [rtKeys.bytesCopy]: (a) => `(${a[0]}.set(${a[2]}.subarray(0, ${a[3]}), ${a[1]}))`,
   // view.subarray：offset 在生成代码里出现两次，仅当它是简单表达式时才展开
   [rtKeys.viewSubarray]: (a) => {
     if (!SIMPLE_EXPR_RE.test(a[1])) {
@@ -103,11 +103,11 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // cell.set 的 handler 返回 undefined，用 void 保持返回值语义
   [rtKeys.cellSet]: (a) => `(void (${a[0]}.value = ${a[1]}))`,
 
-  // array.get.object / array.set.object / array.sublist 都是类型无知的原子操作：
-  // 统一走 base[offset+idx]，无需在运行时区分「完整数组」与「子数组视图」。
-  [rtKeys.arrayGetObject]: (a) => `(${a[0]}.base[${a[0]}.offset + ${a[1]}])`,
-  [rtKeys.arraySetObject]: (a) => `(void (${a[0]}.base[${a[0]}.offset + ${a[1]}] = ${a[2]}))`,
-  [rtKeys.arraySublist]: (a) => `({base: ${a[0]}.base, offset: (${a[0]}.offset + ${a[1]}) | 0})`,
+  // objectarray.* 都是类型无知的原子操作：统一走 base[offset+idx]，
+  // 无需在运行时区分「完整数组」与「子数组视图」。
+  [rtKeys.objectArrayGet]: (a) => `(${a[0]}.base[${a[0]}.offset + ${a[1]}])`,
+  [rtKeys.objectArraySet]: (a) => `(void (${a[0]}.base[${a[0]}.offset + ${a[1]}] = ${a[2]}))`,
+  [rtKeys.objectArraySublist]: (a) => `({base: ${a[0]}.base, offset: (${a[0]}.offset + ${a[1]}) | 0})`,
 
   // callee 是函数值；每个实参只出现一次，语义与 dispatcher 一致
   [rtKeys.callIndirect]: (a) => `(${a[0]})(${a.slice(1).join(', ')})`,
