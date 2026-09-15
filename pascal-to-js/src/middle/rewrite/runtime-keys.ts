@@ -99,9 +99,21 @@ export const rtKeys = {
   pointerAssign: 'runtime.pointer.assign',
   pointerDisposeCheck: 'runtime.pointer.disposeCheck',
 
-  rangeCheck: 'runtime.range.check',
-  stepsCheck: 'runtime.steps.check',
   hookFunctionEnter: 'runtime.hook.function.enter',
+
+  // debug 构建专属的检查原语。
+  //
+  // **只有 debug 构建才会产出这些 key**（见 TransformOptions.debug，默认 true）：
+  // 非 debug 构建里 rewrite 根本不生成它们，运行期零开销；debug 构建里它们
+  // 是独立 syscall，不追求性能。
+  //
+  // 注意：非 debug 构建跳过这些检查时，ISO 7185 定为 error 的情形
+  // （6.7.2.2 除数为 0 / 负数、6.4.2.4 子界越界）变为实现定义行为。
+  debugRangeCheck: 'runtime.debug.range.check', // [v, lo, hi]
+  debugStepsCheck: 'runtime.debug.steps.check', // []
+  debugDivideCheck: 'runtime.debug.divide.check', // [divisor] → divisor
+  debugModuloCheck: 'runtime.debug.modulo.check', // [divisor] → divisor
+  debugAssertView: 'runtime.debug.assert.view', // [view, label] → view
 
   // 文件
   //

@@ -2,7 +2,10 @@ import { assertEquals, attachText, cache, stage, suite } from '@jitex/integratio
 import { createTangleStage, TangleInput, transformTangle } from './build-tangle.ts'
 import { readTextFile } from '../utils.ts'
 
-const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
+const tangleBootstrapSuite = suite('TANGLE Bootstrap', ({ debug }) => {
+  // debug 构建开关：CLI 的 --no-debug 会把它置为 'false'；默认开启
+  const isDebug = debug !== 'false'
+
   const stageLoadTangleSource = cache(
     stage('load tangle source', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
@@ -17,21 +20,25 @@ const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
     'tangleV0 => tangleV1',
     [stageLoadTangleSource],
     ([tangleSource]): TangleInput => {
-      return { tangleContent: tangleSource.tanglePas, webContent: tangleSource.tangleWeb }
+      return {
+        tangleContent: tangleSource.tanglePas,
+        webContent: tangleSource.tangleWeb,
+        debug: isDebug,
+      }
     },
   )
   const getTangleV2 = createTangleStage(
     'tangleV1 => tangleV2',
     [stageLoadTangleSource, getTangleV1],
     ([src, tangleOutput]) => {
-      return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb }
+      return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb, debug: isDebug }
     },
   )
   const getTangleV3 = createTangleStage(
     'tangleV2 => tangleV3',
     [stageLoadTangleSource, getTangleV2],
     ([src, tangleOutput]) => {
-      return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb }
+      return { tangleContent: tangleOutput.pasFile, webContent: src.tangleWeb, debug: isDebug }
     },
   )
 
@@ -40,7 +47,7 @@ const tangleBootstrapSuite = suite('TANGLE Bootstrap', () => {
   })
 
   stage('storeJs', [getTangleV2, valid], (results) => {
-    const tangleJs = transformTangle(results[0].pasFile)
+    const tangleJs = transformTangle(results[0].pasFile, isDebug)
     attachText('tangle.js', tangleJs)
   })
 })

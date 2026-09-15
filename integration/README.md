@@ -91,14 +91,14 @@ deno run -A src/cli.ts run my-pipeline.ts --no-report
 
 ### 六个核心原语
 
-| 原语                                                | 说明                                                | 调用位置    |
-| --------------------------------------------------- | --------------------------------------------------- | ----------- |
-| `stage(name, deps, fn)`                             | 声明一个有依赖的执行单元（惰性）                    | suite fn 内 |
-| `suite(name, fn)`                                   | 立即执行 fn 并登记 stages/hooks，产出 `Suite` 对象  | 顶层入口    |
-| `cache(stage)`                                      | 标记 stage 可缓存（返回同一对象，幂等）             | suite fn 内 |
-| `assert(cond, msg)`                                 | 断言失败 → 抛 `AssertionError`，当前 stage `failed` | stage fn 内 |
-| `attach(name, bytes)` / `attachText` / `attachJson` | 把字节/text/JSON 作为产物挂到当前 stage             | stage fn 内 |
-| `log(msg)`                                          | 追加一行日志到当前 stage                            | stage fn 内 |
+| 原语                                                | 说明                                                                                                          | 调用位置    |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- |
+| `stage(name, deps, fn)`                             | 声明一个有依赖的执行单元（惰性）                                                                              | suite fn 内 |
+| `suite(name, fn)`                                   | 立即执行 `fn(config)` 并登记 stages/hooks，产出 `Suite` 对象。`config` 是 CLI `-a` 传入的配置字典（永远非空） | 顶层入口    |
+| `cache(stage)`                                      | 标记 stage 可缓存（返回同一对象，幂等）                                                                       | suite fn 内 |
+| `assert(cond, msg)`                                 | 断言失败 → 抛 `AssertionError`，当前 stage `failed`                                                           | stage fn 内 |
+| `attach(name, bytes)` / `attachText` / `attachJson` | 把字节/text/JSON 作为产物挂到当前 stage                                                                       | stage fn 内 |
+| `log(msg)`                                          | 追加一行日志到当前 stage                                                                                      | stage fn 内 |
 
 ### 两个 hook
 
@@ -157,18 +157,33 @@ deno run -A src/cli.ts run my-pipeline.ts --no-report
 deno run -A src/cli.ts run <entry.ts> [options]
 ```
 
-| 选项                  | 默认值                    | 说明                                                          |
-| --------------------- | ------------------------- | ------------------------------------------------------------- |
-| `--report-dir <path>` | `./reports`               | 报告输出目录                                                  |
-| `--run-id <id>`       | `YYYY-MM-DD_HH-MM-SS_001` | 自定义 run 编号                                               |
-| `--filter <glob>`     | 无（全跑）                | 按 stage name 做 minimatch（支持 `*` `?`），仅保留匹配 stages |
-| `--fail-fast`         | `false`                   | 任一 stage failed 立即停止（默认继续执行无依赖分支）          |
-| `--cache-dir <path>`  | `{reportDir}/.cache`      | 缓存根目录                                                    |
-| `--with-cache`        | `false`                   | 严格缓存模式：全部 cacheable stages 必须命中缓存              |
-| `--purge`             | `false`                   | 启动前清空 `cacheDir`                                         |
-| `--no-report`         | `false`                   | 只跑不写任何报告文件（省 IO，快速迭代用）                     |
+| 选项                      | 默认值                    | 说明                                                                                                         |
+| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--report-dir <path>`     | `./reports`               | 报告输出目录                                                                                                 |
+| `--run-id <id>`           | `YYYY-MM-DD_HH-MM-SS_001` | 自定义 run 编号                                                                                              |
+| `--filter <glob>`         | 无（全跑）                | 按 stage name 做 minimatch（支持 `*` `?`），仅保留匹配 stages                                                |
+| `--fail-fast`             | `false`                   | 任一 stage failed 立即停止（默认继续执行无依赖分支）                                                         |
+| `--cache-dir <path>`      | `{reportDir}/.cache`      | 缓存根目录                                                                                                   |
+| `--with-cache`            | `false`                   | 严格缓存模式：全部 cacheable stages 必须命中缓存                                                             |
+| `--purge`                 | `false`                   | 启动前清空 `cacheDir`                                                                                        |
+| `--no-report`             | `false`                   | 只跑不写任何报告文件（省 IO，快速迭代用）                                                                    |
+| `-a`, `--arguments <k=v>` | 无（空字典）              | 通用透传：把 `key=value` 收进配置字典，交给 `suite(name, fn)` 的 `fn(config)`；可重复。CLI 不解释 key 的语义 |
 
 `<entry.ts>` 必须 `export default` 一个 `suite(...)` 对象。
+
+### 配置透传
+
+`-a` / `--arguments` 是 CLI **唯一**的透传通道：CLI 自己的选项（`--report-dir` 等）与
+被测对象的配置互不干扰。`fn(config)` 收到的是 `Record<string, string>`，无论是否传 `-a` 都非空：
+
+```ts
+export default suite('my pipeline', ({ debug, mode }) => {
+  // deno run -A src/cli.ts run my-pipeline.ts -a debug=false -a mode=fast
+  // → { debug: 'false', mode: 'fast' }
+  const isDebug = debug !== 'false'
+  ...
+})
+```
 
 ---
 

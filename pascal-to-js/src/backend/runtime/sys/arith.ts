@@ -14,22 +14,32 @@ import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 export function arithSyscalls(): Record<string, SyscallHandler> {
   return {
-    [rtKeys.int32Divide]: (_ctx, a, b) => {
+    // 纯运算。除数检查由 rewrite 在 debug 构建下包一层 runtime.debug.*.check：
+    // 非 debug 构建不检查，ISO 7185 6.7.2.2 的 error 条款变为实现定义行为。
+    [rtKeys.int32Divide]: (_ctx, a, b) => Math.trunc((a as number) / (b as number)) | 0,
+    [rtKeys.int32Modulo]: (_ctx, a, b) => {
+      const l = a as number
+      const m = b as number
+      // ISO 7185 6.7.2.2: i mod j = i - k*j，其中 k 使 0 <= i mod j < j（floor 语义）
+      return (l - Math.floor(l / m) * m) | 0
+    },
+
+    // debug 构建专属：除数检查。返回被检查的值本身，以便作为实参包裹在
+    // runtime.int32.divide/modulo 的除数位置上（实参仍只求值一次）。
+    [rtKeys.debugDivideCheck]: (_ctx, b) => {
       const d = b as number
       if (d === 0) {
         throw new Error('JS VM: division by zero')
       }
-      return Math.trunc((a as number) / d) | 0
+      return d
     },
-    [rtKeys.int32Modulo]: (_ctx, a, b) => {
+    [rtKeys.debugModuloCheck]: (_ctx, b) => {
       const m = b as number
       // ISO 7185 6.7.2.2: i mod j 在 j 为 0 或负数时为 error
       if (m <= 0) {
         throw new Error(`JS VM: i mod j requires j > 0 (ISO 7185 6.7.2.2), got ${m}`)
       }
-      const l = a as number
-      // ISO 7185 6.7.2.2: i mod j = i - k*j，其中 k 使 0 <= i mod j < j（floor 语义）
-      return (l - Math.floor(l / m) * m) | 0
+      return m
     },
 
     [rtKeys.float32SquareRoot]: (_ctx, a) => {

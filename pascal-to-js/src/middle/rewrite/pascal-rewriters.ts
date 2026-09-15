@@ -225,9 +225,12 @@ function unary(key: string) {
   return (sys: JsonCode.Syscall): JsonCode.Expr => sc(key, [sys.args[0]])
 }
 
-function predSucc(isSucc: boolean) {
+function predSucc(isSucc: boolean, debug: boolean) {
   const i32Key = isSucc ? rtKeys.int32Add : rtKeys.int32Subtract
   const f32Key = isSucc ? rtKeys.float32Add : rtKeys.float32Subtract
+  // 结果须落在类型范围内（ISO 6.6.6.4）；非 debug 构建不产出检查
+  const checked = (expr: JsonCode.Expr, lo: number, hi: number): JsonCode.Expr =>
+    debug ? sc(rtKeys.debugRangeCheck, [expr, litInt(lo), litInt(hi)]) : expr
   return (sys: JsonCode.Syscall): JsonCode.Expr => {
     const t = parseType(sys.args[1])
     const x = sys.args[0]
@@ -236,14 +239,10 @@ function predSucc(isSucc: boolean) {
       return sc(i32Key, [x, litInt(1)])
     }
     if (t?.tag === 'enum' && t.enumCount !== undefined) {
-      return sc(rtKeys.rangeCheck, [
-        sc(i32Key, [x, litInt(1)]),
-        litInt(0),
-        litInt(t.enumCount - 1),
-      ])
+      return checked(sc(i32Key, [x, litInt(1)]), 0, t.enumCount - 1)
     }
     if (t?.low !== undefined && t?.high !== undefined) {
-      return sc(rtKeys.rangeCheck, [sc(i32Key, [x, litInt(1)]), litInt(t.low), litInt(t.high)])
+      return checked(sc(i32Key, [x, litInt(1)]), t.low, t.high)
     }
     return sc(isFloat(t) ? f32Key : i32Key, [x, litInt(1)])
   }
@@ -348,14 +347,30 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
 
 // 表
 
-export function buildPascalRewriteTable(): SyscallRewriteTable {
+/**
+ * 构建 Pascal → runtime 的 IR 重写表。
+ *
+ * `debug` 决定是否产出 `runtime.debug.*` 检查（边界 / 步数 / 除零 / 视图断言）。
+ * 默认 true；置 false 时这些检查完全不进入生成的代码。
+ */
+export function buildPascalRewriteTable(debug = true): SyscallRewriteTable {
   return {
     'lowering.add': binary(rtKeys.int32Add, rtKeys.float32Add, rtKeys.bitmapUnion),
     'lowering.sub': binary(rtKeys.int32Subtract, rtKeys.float32Subtract, rtKeys.bitmapDifference),
     'lowering.mul': binary(rtKeys.int32Multiply, rtKeys.float32Multiply, rtKeys.bitmapIntersection),
     'lowering.div': binaryFixed(rtKeys.float32Divide),
-    'lowering.intDiv': binaryFixed(rtKeys.int32Divide),
-    'lowering.mod': binaryFixed(rtKeys.int32Modulo),
+    // ISO 6.7.2.2：i div j / i mod j 在 j 为 0（mod 还要求 j > 0）时是 error。
+    // 除数检查只在 debug 构建里产出（见 runtime.debug.divide/modulo.check）。
+    'lowering.intDiv': (sys) =>
+      sc(rtKeys.int32Divide, [
+        sys.args[0],
+        debug ? sc(rtKeys.debugDivideCheck, [sys.args[1]]) : sys.args[1],
+      ]),
+    'lowering.mod': (sys) =>
+      sc(rtKeys.int32Modulo, [
+        sys.args[0],
+        debug ? sc(rtKeys.debugModuloCheck, [sys.args[1]]) : sys.args[1],
+      ]),
 
     'lowering.and': logical(rtKeys.int32And, rtKeys.booleanAnd),
     'lowering.or': logical(rtKeys.int32Or, rtKeys.booleanOr),
@@ -381,8 +396,8 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.round': unary(rtKeys.castFloat32ToInt32Round),
     'lowering.ord': ordRewrite,
     'lowering.chr': ordRewrite,
-    'lowering.pred': predSucc(false),
-    'lowering.succ': predSucc(true),
+    'lowering.pred': predSucc(false, debug),
+    'lowering.succ': predSucc(true, debug),
 
     'lowering.eq': compare(rtKeys.bitmapEqual, rtKeys.compareEqual),
     'lowering.ne': compare(rtKeys.bitmapNotEqual, rtKeys.compareNotEqual),
@@ -569,24 +584,24 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
       const td = parseType(sys.args[sys.args.length - 1])
       const indices = sys.args.slice(0, -1)
       const arr = indices.shift()!
-      return accessAt(arr, td!, indices)
+      return accessAt(arr, td!, indices, undefined, debug)
     },
     'lowering.array.assign': (sys) => {
       const td = parseType(sys.args[sys.args.length - 1])
       const rest = sys.args.slice(0, -1)
       const arr = rest.shift()!
       const value = rest.pop()!
-      return assignAt(arr, td!, rest, value)
+      return assignAt(arr, td!, rest, value, undefined, debug)
     },
     'lowering.rec.access': (sys) => {
       const td = parseType(sys.args[2])
       const name = (sys.args[1] as JsonCode.Literal).arg
-      return accessAt(sys.args[0], td!, [], name)
+      return accessAt(sys.args[0], td!, [], name, debug)
     },
     'lowering.rec.assign': (sys) => {
       const td = parseType(sys.args[3])
       const name = (sys.args[1] as JsonCode.Literal).arg
-      return assignAt(sys.args[0], td!, [], sys.args[2], name)
+      return assignAt(sys.args[0], td!, [], sys.args[2], name, debug)
     },
     'lowering.rec.copy': (sys) => {
       const td = parseType(sys.args[1])
@@ -606,8 +621,9 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.cell.set': (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),
     // 可调用形参的间接调用：callee 为函数值，是个原子操作，无需类型分派
     'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
-    'lowering.range.check': (sys) => sc(rtKeys.rangeCheck, sys.args),
-    'lowering.steps.check': () => sc(rtKeys.stepsCheck, []),
+    // debug 构建才产出：非 debug 时返回原值 / 常量占位（均无副作用）
+    'lowering.range.check': (sys) => debug ? sc(rtKeys.debugRangeCheck, sys.args) : sys.args[0],
+    'lowering.steps.check': () => debug ? sc(rtKeys.debugStepsCheck, []) : litInt(0),
     'lowering.hook.function.enter': () => sc(rtKeys.hookFunctionEnter, []),
   }
 }
@@ -642,12 +658,22 @@ function addOffset(delta: JsonCode.Expr | undefined, offset: JsonCode.Expr): Jso
   return sc(rtKeys.int32Add, [delta, offset])
 }
 
+/**
+ * debug 构建下为字节视图实参加断言（runtime.debug.assert.view）。
+ *
+ * 非 debug 时原样返回视图，断言完全不进入生成的代码。
+ */
+function checkedView(view: JsonCode.Expr, key: string, debug: boolean): JsonCode.Expr {
+  return debug ? sc(rtKeys.debugAssertView, [view, litStr(key)]) : view
+}
+
 /** 取容器内的槽位（数组元素 / 记录字段），产出标量读或子视图 */
 function accessAt(
   base: JsonCode.Expr,
   td: TypeDescriptor,
   indices: JsonCode.Expr[],
-  fieldName?: string,
+  fieldName: string | undefined,
+  debug: boolean,
 ): JsonCode.Expr {
   if (fieldName === undefined && isObjectRepr(td)) {
     // 对象数组：下标数等于维数时取元素；少于维数时返回子数组视图（ISO 6.4.3.2）
@@ -689,7 +715,8 @@ function accessAt(
 
   offset = addOffset(folded.delta, offset)
   if (isScalar(slotType)) {
-    return sc(bytesGetKey[scalarKindOf(slotType)], [folded.base, offset])
+    const key = bytesGetKey[scalarKindOf(slotType)]
+    return sc(key, [checkedView(folded.base, key, debug), offset])
   }
   return sc(rtKeys.viewSubarray, [folded.base, offset, litInt(sizeOf(slotType))])
 }
@@ -700,7 +727,8 @@ function assignAt(
   td: TypeDescriptor,
   indices: JsonCode.Expr[],
   value: JsonCode.Expr,
-  fieldName?: string,
+  fieldName: string | undefined,
+  debug: boolean,
 ): JsonCode.Expr {
   if (fieldName === undefined && isObjectRepr(td)) {
     // 对象数组：下标数等于维数时写元素；少于维数时（子数组视图）交由 objectarray.set 处理
@@ -737,7 +765,8 @@ function assignAt(
 
   offset = addOffset(folded.delta, offset)
   if (isScalar(slotType)) {
-    return sc(bytesSetKey[scalarKindOf(slotType)], [folded.base, offset, value])
+    const key = bytesSetKey[scalarKindOf(slotType)]
+    return sc(key, [checkedView(folded.base, key, debug), offset, value])
   }
   return sc(rtKeys.bytesCopy, [folded.base, offset, value, litInt(sizeOf(slotType))])
 }

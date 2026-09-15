@@ -1545,6 +1545,24 @@ begin`,
     expectedOutput: 'OK',
   },
   {
+    name: '6.6.6.4 succ/pred 作用于运行期取值的子界与枚举',
+    code: `program test(output);
+type r = 1..10;
+     c = (a1, b1, c1);
+var x: r;
+    y: c;
+begin
+  x := 5;
+  writeln(succ(x));
+  writeln(pred(x));
+  y := a1;
+  writeln(ord(succ(y)));
+end.`,
+    purpose:
+      'ISO 6.6.6.4：succ/pred 的结果即其序数值 —— 实参不是编译期常量时同样成立（子界与枚举都要过运行期边界检查）',
+    expectedOutput: '6\n4\n1\n',
+  },
+  {
     name: '6.6 succ 对枚举类型末值应报错',
     code: `PROGRAM TEST(OUTPUT);TYPE COLOR=(RED,GREEN,BLUE);VAR C:COLOR;BEGIN C:=BLUE;C:=SUCC(C);END.`,
     purpose: 'ISO 6.6.6.4：不存在序数更大一的值时为 error',

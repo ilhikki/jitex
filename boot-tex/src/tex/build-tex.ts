@@ -58,9 +58,10 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
   ...runtimeFileSyscalls,
 }
 
-export function transformTex(texPascalContent: string) {
+export function transformTex(texPascalContent: string, debug = true) {
   const jsCode = transform(normalizeFileOpen(texPascalContent), {
     extraCallables: texExtraCallables,
+    debug,
   })
   return jsCode
 }

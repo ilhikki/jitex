@@ -42,6 +42,8 @@ export type TangleInput = {
   tangleContent: string
   webContent: string
   changeContent?: string
+  /** debug 构建开关（默认 true），透传给 transform */
+  debug?: boolean
 }
 export type TangleOutput = {
   pasFile: string
@@ -130,15 +132,16 @@ export function runTangleJs(
   }
 }
 
-export function transformTangle(tangleContent: string) {
+export function transformTangle(tangleContent: string, debug = true) {
   const jsCode = transform(normalizeFileOpen(tangleContent), {
     extraCallables: tangleExtraCallables,
+    debug,
   })
   return jsCode
 }
 
 export function runTangle(input: TangleInput) {
-  const { tangleContent, webContent, changeContent } = input
-  const jsCode = transformTangle(tangleContent)
+  const { tangleContent, webContent, changeContent, debug } = input
+  const jsCode = transformTangle(tangleContent, debug ?? true)
   return runTangleJs(jsCode, webContent, changeContent)
 }

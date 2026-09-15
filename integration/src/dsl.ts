@@ -42,6 +42,18 @@ export type UnwrapAll<T extends readonly Stage<unknown>[]> = {
 let currentDeclSuite: Suite | undefined = undefined
 let nextStageId = 1
 
+/**
+ * 声明期配置：CLI 的任意 `--key[=value]` 都会解析进这里。
+ *
+ * 必须在动态 import 入口（即触发 suite() 调用）之前注入；suite 会把同一个
+ * 对象交给它的回调。未注入时是空对象，因此回调参数**保证非空**。
+ */
+let declConfig: Record<string, string> = {}
+
+export function _setDeclConfig(config: Record<string, string>): void {
+  declConfig = config
+}
+
 export function _resetDeclState(): void {
   currentDeclSuite = undefined
   nextStageId = 1
@@ -49,7 +61,11 @@ export function _resetDeclState(): void {
 
 // suite
 
-export function suite(name: string, fn: () => void): Suite {
+/**
+ * 声明一个 suite。`fn` 立即执行以登记 stages/hooks，参数是本次 run 的配置
+ * （CLI 的 `--key[=value]` 解析结果，形如 `{debug: 'false'}`），永远非空。
+ */
+export function suite(name: string, fn: (config: Record<string, string>) => void): Suite {
   if (currentDeclSuite) {
     throw new Error(`nested suites not allowed: already inside '${currentDeclSuite.name}'`)
   }
@@ -63,7 +79,7 @@ export function suite(name: string, fn: () => void): Suite {
   currentDeclSuite = s
   nextStageId = 1
   try {
-    fn()
+    fn(declConfig)
   } finally {
     currentDeclSuite = undefined
   }

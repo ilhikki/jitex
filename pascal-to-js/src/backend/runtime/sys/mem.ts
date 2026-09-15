@@ -56,6 +56,10 @@ function assertView(view: unknown, what: string): asserts view is Uint8Array {
  * 每个 key 固定一种标量种类，handler 直接调用对应的 DataView 方法——
  * 运行期既没有类型参数，也没有分支。
  *
+ * 实参的视图断言不在这里做：它由 rewrite 在 debug 构建下包一层
+ * `runtime.debug.assert.view`（见 assertViewSyscall），非 debug 构建
+ * 完全不生成，两个 handler 便都不含检查。
+ *
  * 刻意不内联：内联版每次读写都要重新构造 DataView，
  * 而这里按底层 ArrayBuffer 复用（见 dv 的说明）。
  */
@@ -65,7 +69,6 @@ function bytesAccessSyscalls(): Record<string, SyscallHandler> {
   ): SyscallHandler =>
   (_ctx, view, offset) => {
     const v = view as Uint8Array
-    assertView(v, 'bytes.get')
     return read(dv(v.buffer), v.byteOffset + (offset as number))
   }
 
@@ -74,7 +77,6 @@ function bytesAccessSyscalls(): Record<string, SyscallHandler> {
   ): SyscallHandler =>
   (_ctx, view, offset, value) => {
     const v = view as Uint8Array
-    assertView(v, 'bytes.set')
     write(dv(v.buffer), v.byteOffset + (offset as number), value as number)
     return undefined
   }
@@ -142,6 +144,13 @@ function withBit(bits: number[], size: number): Uint8Array {
 
 export function memSyscalls(): Record<string, SyscallHandler> {
   return {
+    // debug 构建专属：字节视图实参断言。rewrite 在 bytes.get.* / bytes.set.*
+    // 的视图实参外包裹本 key；非 debug 构建不生成，故运行期零开销。
+    [rtKeys.debugAssertView]: (_ctx, view, label) => {
+      assertView(view, label as string)
+      return view
+    },
+
     // 视图切分。codegen 仅在 offset 为简单表达式时内联（避免重复求值），
     // 其余情形仍走 dispatcher，故保留本 handler。
     [rtKeys.viewSubarray]: (_ctx, view, offset, size) => {

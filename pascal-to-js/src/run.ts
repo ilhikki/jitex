@@ -43,6 +43,16 @@ export interface TransformOptions {
    * 不传则使用 id 函数（原样返回 syscall）。
    */
   defaultRewriter?: SyscallRewriter
+  /**
+   * debug 构建（默认 true）。
+   *
+   * true 时 rewrite 产出 `runtime.debug.*` 系列检查：子界边界、循环步数、
+   * 除零、字节视图断言。false 时这些 key 根本不生成，运行期零开销。
+   *
+   * 注意：非 debug 构建下，ISO 7185 定为 error 的情形（6.7.2.2 除数为 0 /
+   * 负数、6.4.2.4 子界越界）不再被捕获，行为由宿主实现决定。
+   */
+  debug?: boolean
 }
 
 function parseSource(source: string): ProgramNode {
@@ -63,7 +73,8 @@ export function transform(source: string, options: TransformOptions = {}): strin
   const jsonCode = loweringProgram(ast, analysis)
 
   // IR 重写：合并内部 pascal 表与用户表，合成单一映射后执行后序 DFS 替换
-  const table = mergeRewriteTables(buildPascalRewriteTable(), options.syscallRewriters)
+  const debug = options.debug ?? true
+  const table = mergeRewriteTables(buildPascalRewriteTable(debug), options.syscallRewriters)
   const ir = rewrite(jsonCode, composeMapping(table, options.defaultRewriter))
 
   const semantic = new PascalSemanticCompiler()
@@ -141,6 +152,7 @@ export function run(source: string, options: RunOptions = {}): RunState {
   try {
     jsCode = transform(source, {
       extraCallables: options.extraCallables,
+      debug: options.debug,
     })
   } catch (e: unknown) {
     const ctx = getRunTimeContextFromOptions(options)

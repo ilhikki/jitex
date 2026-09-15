@@ -65,19 +65,24 @@ function readBytesFromState(
  * 各阶段耗时由 runner 记录在 RunReport.stages[].duration 中。
  */
 export function createBootTexSuite(): Suite {
-  return suite('boot tex', () => {
+  return suite('boot tex', ({ debug }) => {
+    // debug 构建开关：CLI 的 --no-debug 会把它置为 'false'；默认开启
+    const isDebug = debug !== 'false'
+
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
       const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
       const tangleV1 = runTanglePascal({
         tangleContent: tanglePas,
         webContent: tangleWeb,
+        debug: isDebug,
       })
       const tangleV2 = runTanglePascal({
         tangleContent: tangleV1.pasFile,
         webContent: tangleWeb,
+        debug: isDebug,
       })
-      const tangleJs = transformTangle(tangleV2.pasFile)
+      const tangleJs = transformTangle(tangleV2.pasFile, isDebug)
       attachText('tangle.js', tangleJs)
       return { tangleJs }
     }))
@@ -92,7 +97,7 @@ export function createBootTexSuite(): Suite {
     }))
 
     const tripTexJsStage = cache(stage('compile tex.trip.pas => tex.trip.js', [tripPasStage], ([{ pasFile }]) => {
-      const texTripJs = transformTex(pasFile)
+      const texTripJs = transformTex(pasFile, isDebug)
       attachText('tex.trip.js', texTripJs)
       return { texTripJs }
     }))
