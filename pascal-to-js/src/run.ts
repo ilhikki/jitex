@@ -118,7 +118,6 @@ function getRunTimeContextFromOptions(options: RuntimeOptions) {
     files: options.files,
     programFileUrls: options.programFileUrls,
     maxSteps: options.maxSteps,
-    extensions: options.extensions,
   })
   return ctx
 }

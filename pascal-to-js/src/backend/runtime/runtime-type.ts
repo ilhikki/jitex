@@ -10,10 +10,6 @@ export interface RuntimeContext {
   steps: number
   maxSteps: number
   programFileUrls: Record<string, string>
-  /** 非标特性扩展列表（见 AGENTS.md 原则 A 标准锚定）。
-   * 默认未启用的非标特性遇到即抛错。
-   */
-  extensions: Set<string>
   /** 调试日志（e2e 报告消费，不写入临时文件）。
    * file.ts 不再使用；transform.ts 在编译/运行出错时追加诊断信息。 */
   debugLog: string[]
@@ -24,8 +20,6 @@ export interface RuntimeOptions {
   files?: Map<string, PascalFileStore>
   programFileUrls?: Record<string, string>
   maxSteps?: number
-  /** 非标特性扩展列表 */
-  extensions?: string[]
   /** 额外 syscall 实现（key=syscallName，value=SyscallHandler；与编译期 extraCallables 的 sysCallName 对应） */
   extraSyscalls?: Record<string, SyscallHandler>
 }

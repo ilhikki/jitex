@@ -28,7 +28,6 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
     steps: 0,
     maxSteps: options.maxSteps ?? Infinity,
     programFileUrls: options.programFileUrls ?? {},
-    extensions: new Set(options.extensions ?? []),
     debugLog: [],
     jsCode: undefined,
   }
