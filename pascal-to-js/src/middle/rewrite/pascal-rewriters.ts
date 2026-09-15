@@ -90,21 +90,22 @@ function isByteFile(fileType: TypeDescriptor | undefined): boolean {
 // 类型 → 无类型常量的降级
 
 /**
- * 文件句柄的编译期行为类别。
+ * 文件的存储形态。
  *
- * 文件行为（记录 / 字节 / char 单位 / 文本）由元素类型在编译期定死，
- * runtime 只认这个标量，不再接触类型描述符。
+ * 只描述「单位是什么」，不含 Pascal 类型语义：
+ *   text   —— 单位是字符（UTF-8 文本，含行结束符语义）
+ *   bytes  —— 单位是单个字节
+ *   blocks —— 单位是定长字节块
+ *
+ * runtime 据该标量决定存储实现与读写路径，不做 Pascal 类型判断。
  */
 function fileKind(fileType: TypeDescriptor | undefined): string {
   const elem = fileType?.elem
   if (elem?.tag === 'record') {
-    return 'record'
+    return 'blocks'
   }
   if (isByteScalar(elem)) {
-    return 'byte'
-  }
-  if (elem?.tag === 'char') {
-    return 'char'
+    return 'bytes'
   }
   return 'text'
 }
@@ -444,13 +445,16 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.file.reset': (sys) => sc(rtKeys.fileReset, [sys.args[0], ...sys.args.slice(2)]),
     'lowering.file.rewrite': (sys) => sc(rtKeys.fileRewrite, [sys.args[0], ...sys.args.slice(2)]),
     'lowering.file.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
-    // fileKind 随行：char 文件的 `f^ := ch` 需把 ord 值转回字符写
-    'lowering.file.put': (sys) =>
-      sc(rtKeys.filePut, [
-        sys.args[0],
-        litStr(fileKind(parseType(sys.args[1]))),
-        ...sys.args.slice(2),
-      ]),
+    // `f^ := x` 的形态在编译期定死：字符文件走 putCharacter（ord 值转回字符），
+    // 其余走 put；`put(f)`（无 unit）也由同一个 put 承担
+    'lowering.file.put': (sys) => {
+      const [f, fileType, unit] = sys.args
+      const characterUnit = unit !== undefined && parseType(fileType)?.elem?.tag === 'char'
+      return sc(
+        characterUnit ? rtKeys.filePutCharacter : rtKeys.filePut,
+        unit === undefined ? [f] : [f, unit],
+      )
+    },
     'lowering.file.peek': (sys) => {
       const td = parseType(sys.args[1])
       // record 文件：传元素字节大小，供首次分配缓冲区

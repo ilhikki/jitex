@@ -87,6 +87,8 @@ export const rtKeys = {
   fileGet: 'runtime.file.get',
   filePeek: 'runtime.file.peek',
   filePut: 'runtime.file.put',
+  // 文本文件的 `f^ := ch`：char 以 ord 值承载，需转回字符写（由 rewrite 按元素类型选定）
+  filePutCharacter: 'runtime.file.putCharacter',
   fileReadCharacter: 'runtime.file.readCharacter',
   fileReadToken: 'runtime.file.readToken',
   fileWrite: 'runtime.file.write',

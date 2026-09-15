@@ -3,7 +3,8 @@
  *
  * 设计要点：
  *   - **不接类型参数**。句柄（PascalFile）在 create 时已带编译期算定的
- *     `fileKind`，runtime 据该标量区分「文本 / 字节 / 记录」行为。
+ *     `fileKind`（存储形态：text / bytes / blocks），runtime 据此区分读写路径，
+ *     不做 Pascal 类型判断。
  *   - key 与 Pascal 原生 io 过程一一对应：reset / rewrite / get / put / read / write /
  *     readln / writeln / eof / eoln / page / peek(f^)。
  *   - rewrite 只负责「值 → 文件单位」的转换（convert.*）；语义（如 read = 读+推进）
@@ -85,17 +86,20 @@ export class ByteRecordFile implements RecStore {
 
 // 辅助
 
-function isRec(f: PascalFile): boolean {
-  return f.fileKind === 'record'
+/**
+ * 定长字节块文件（元素含 record）：每条记录是一段定长字节。
+ */
+function isBlockFile(f: PascalFile): boolean {
+  return f.fileKind === 'blocks'
 }
 
 /**
- * 二进制字节文件（`packed file of byte`）：元素是单字节标量。
+ * 单字节单位文件（`packed file of byte`）：元素是单字节标量。
  * 这类文件按 `Uint8Array` 逐字节语义处理，不做行结束符 / 编码转换
  * （TeX 的 `dvi_file`、`tfm_file`）。
  */
 function isByteFile(f: PascalFile): boolean {
-  return f.fileKind === 'byte'
+  return f.fileKind === 'bytes'
 }
 
 function textStore(f: PascalFile): TextFile {
@@ -163,7 +167,7 @@ function bindByName(
       p.value = undefined
       return false
     }
-    store = (isRec(p) ? new ByteRecordFile() : new MemoryTextFile()) as unknown as PascalFileStore
+    store = (isBlockFile(p) ? new ByteRecordFile() : new MemoryTextFile()) as unknown as PascalFileStore
     ctx.files.set(name, store)
   }
   p.value = store
@@ -180,7 +184,7 @@ function bindByName(
 function ensureStore(p: PascalFile): PascalFileStore {
   let store = p.value
   if (store === undefined) {
-    store = (isRec(p) ? new ByteRecordFile() : new MemoryTextFile()) as unknown as PascalFileStore
+    store = (isBlockFile(p) ? new ByteRecordFile() : new MemoryTextFile()) as unknown as PascalFileStore
     p.value = store
   }
   return store
@@ -267,7 +271,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
 
     [rtKeys.fileGet]: (_ctx, f) => {
       const p = f as PascalFile
-      if (isRec(p)) {
+      if (isBlockFile(p)) {
         const rs = recStore(p)
         if (!rs.hasMore()) {
           throw new Error('get(f) at EOF: pre-assertion violated')
@@ -290,7 +294,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.filePeek]: (_ctx, f, size) => {
       const p = f as PascalFile
-      if (isRec(p)) {
+      if (isBlockFile(p)) {
         const rs = recStore(p)
         // 写模式：f^ 恒为当前缓冲区（每次 put 后重建），保证多次 f^.field := x 互不干扰
         if (rs.getMode() === 'generation') {
@@ -321,9 +325,9 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
 
     // unit 存在 → `f^ := x`（设缓冲区）；unit 缺失 → `put(f)`（把缓冲区写入文件）
-    [rtKeys.filePut]: (_ctx, f, kind, unit) => {
+    [rtKeys.filePut]: (_ctx, f, unit) => {
       const p = f as PascalFile
-      if (isRec(p)) {
+      if (isBlockFile(p)) {
         const rs = recStore(p)
         if (unit !== undefined) {
           // ISO 6.6.5.2: 写缓冲区的前置条件是文件处于写状态
@@ -345,13 +349,17 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         const store = textStore(p)
         if (isByteFile(p)) {
           store.writeByte((unit as number) & 0xff)
-        } else if (typeof unit === 'number' && kind === 'char') {
-          // text file 的 f^ := ch：char 用 ord 值表示，需转回字符写
-          store.writeBytes(encodeUtf8(String.fromCharCode(unit)))
         } else {
           writeText(store, unit)
         }
       }
+      return undefined
+    },
+
+    // 字符来源的 `f^ := ch`：char 以 ord 值承载，需转回字符写
+    [rtKeys.filePutCharacter]: (_ctx, f, unit) => {
+      const store = textStore(f as PascalFile)
+      store.writeBytes(encodeUtf8(String.fromCharCode(unit as number)))
       return undefined
     },
 
@@ -360,7 +368,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         return readCharUnit(defaultStore(ctx, false))
       }
       const p = f as PascalFile
-      if (isRec(p)) {
+      if (isBlockFile(p)) {
         const rs = recStore(p)
         const rec = rs.peekRecord()
         rs.advance()
@@ -389,7 +397,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         return undefined
       }
       const p = f as PascalFile
-      if (isRec(p)) {
+      if (isBlockFile(p)) {
         const rs = recStore(p)
         rs.setBuffer(unit as Uint8Array)
         rs.writeRecord()
@@ -430,7 +438,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         return defaultStore(ctx, false).hasMore() ? 0 : 1
       }
       const p = f as PascalFile
-      if (isRec(p)) {
+      if (isBlockFile(p)) {
         return recStore(p).hasMore() ? 0 : 1
       }
       return textStore(p).hasMore() ? 0 : 1
@@ -451,8 +459,8 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       const url = ctx.programFileUrls[key] ?? key
       let fileStore = ctx.files.get(url)
       if (fileStore === undefined) {
-        // record 文件用字节版存储；其余用文本存储
-        fileStore = (isRec(p) ? new ByteRecordFile() : new MemoryTextFile()) as unknown as PascalFileStore
+        // 定长块文件用字节版存储；其余用文本存储
+        fileStore = (isBlockFile(p) ? new ByteRecordFile() : new MemoryTextFile()) as unknown as PascalFileStore
       }
       p.value = fileStore
       ctx.files.set(key, fileStore)
