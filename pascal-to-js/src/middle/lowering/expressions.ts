@@ -115,7 +115,7 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
 
   if (sym?.kind === 'const') {
     // const 字符串字面量 → Uint8Array；char → ord 值；其它直接用 literal
-    if (sym.literal.key === 'str') {
+    if (sym.literal.key === 'string') {
       return litBytes(sym.literal.arg)
     }
     if (sym.literal.key === 'char') {
@@ -183,7 +183,7 @@ function loweringBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding
       return syscall(syscallKeys.intDiv, [L, R])
     case 'MOD':
       return syscall(syscallKeys.mod, [L, R])
-    // 布尔/位运算（i32 为位运算，bool 为逻辑，由 rewrite 按 type 分发）
+    // 布尔/位运算（integer 为位运算，boolean 为逻辑，由 rewrite 按 type 分发）
     case 'AND':
       return withTypes(syscallKeys.and)
     case 'OR':

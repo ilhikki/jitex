@@ -300,7 +300,7 @@ class DeclarationPass {
     }
     if (node.kind === 'UnaryExpression' && (node.operator === '-' || node.operator === '+')) {
       const inner = this.evalConstValue(node.operand)
-      if (inner && (inner.key === 'i32' || inner.key === 'f64')) {
+      if (inner && (inner.key === 'integer' || inner.key === 'real')) {
         return node.operator === '-' ? { key: inner.key, arg: `-${inner.arg}` } : inner
       }
       return undefined
@@ -352,11 +352,11 @@ class DeclarationPass {
       case 'RangeType': {
         const low = evalConstInt(node.start, (n) => this.lookup(n))
         const high = evalConstInt(node.end, (n) => this.lookup(n))
-        let baseTag: TypeTag = 'i32'
+        let baseTag: TypeTag = 'integer'
         if (node.start.kind === 'CharLiteral' || node.end.kind === 'CharLiteral') {
           baseTag = 'char'
         } else if (node.start.kind === 'BooleanLiteral' || node.end.kind === 'BooleanLiteral') {
-          baseTag = 'bool'
+          baseTag = 'boolean'
         }
         info = { tag: 'subrange', low, high, baseTag }
         break
@@ -416,7 +416,7 @@ class DeclarationPass {
           }
         }
         const variant = node.variant ? this.buildVariantInfo(node.variant) : undefined
-        info = { tag: 'rec', fields, variant }
+        info = { tag: 'record', fields, variant }
         break
       }
       case 'SetType': {
@@ -435,8 +435,8 @@ class DeclarationPass {
         for (let i = 0; i < node.values.length; i++) {
           this.bind(node.values[i].name, {
             kind: 'const',
-            literal: { key: 'i32', arg: String(i) },
-            typeInfo: { tag: 'i32' },
+            literal: { key: 'integer', arg: String(i) },
+            typeInfo: { tag: 'integer' },
           })
         }
         break

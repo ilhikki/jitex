@@ -86,7 +86,7 @@ export class ByteRecordFile implements RecStore {
 // 辅助
 
 function isRec(f: PascalFile): boolean {
-  return f.fileKind === 'rec'
+  return f.fileKind === 'record'
 }
 
 /**

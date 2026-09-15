@@ -79,7 +79,7 @@ export type Syscall = (...args: unknown[]) => unknown
 export type PascalFile = {
   kind: 'file'
   value: PascalFileStore | undefined
-  /** 编译期算定的文件行为类别：rec / byte / char / text（由 rewrite 传入） */
+  /** 编译期算定的文件行为类别：record / byte / char / text（由 rewrite 传入） */
   fileKind: string
 }
 export type PascalFileStore = TextFile | RecordFile

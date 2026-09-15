@@ -16,8 +16,8 @@ import { TypeInfo } from './analysis-type.ts'
 /** ISO 6.4.2.1：ordinal-type = 枚举型、子界型、char、boolean、integer */
 export function isOrdinalType(t: TypeInfo): boolean {
   switch (t.tag) {
-    case 'i32':
-    case 'bool':
+    case 'integer':
+    case 'boolean':
     case 'char':
     case 'enum':
     case 'subrange':
@@ -50,11 +50,11 @@ function stringLength(t: TypeInfo): number {
 /** ordinal-type 的值域闭区间，供 6.4.5 b) 判定「是否为子界」使用 */
 function intervalOf(t: TypeInfo): { low: number; high: number } | undefined {
   switch (t.tag) {
-    case 'i32':
+    case 'integer':
       return { low: -2147483648, high: 2147483647 }
     case 'char':
       return { low: 0, high: 255 }
-    case 'bool':
+    case 'boolean':
       return { low: 0, high: 1 }
     case 'enum':
       return { low: 0, high: (t.enumCount ?? 1) - 1 }
@@ -75,7 +75,7 @@ export function isSameType(a: TypeInfo, b: TypeInfo): boolean {
   if (a.tag !== b.tag) {
     return false
   }
-  if (a.tag === 'i32' || a.tag === 'f64' || a.tag === 'bool' || a.tag === 'char') {
+  if (a.tag === 'integer' || a.tag === 'real' || a.tag === 'boolean' || a.tag === 'char') {
     return true
   }
   if (a.tag === 'subrange') {
@@ -137,7 +137,7 @@ export function isAssignCompatible(target: TypeInfo, value: TypeInfo): boolean {
     return true
   }
   // b) real-type ← integer-type
-  if (target.tag === 'f64' && value.tag === 'i32') {
+  if (target.tag === 'real' && value.tag === 'integer') {
     return true
   }
   // c) 兼容的 ordinal-types

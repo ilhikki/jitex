@@ -16,12 +16,12 @@ import {
 // 类型系统
 
 export type TypeTag =
-  | 'i32'
-  | 'f64'
-  | 'bool'
+  | 'integer'
+  | 'real'
+  | 'boolean'
   | 'char'
   | 'array'
-  | 'rec'
+  | 'record'
   | 'set'
   | 'file'
   | 'enum'
@@ -195,17 +195,17 @@ export const BUILTIN_IDENTIFIERS = new Set(['maxint', 'nil', 'eof', 'eoln'])
 // 简单类型表
 
 export const SIMPLE_TYPES: Record<string, TypeInfo> = {
-  integer: { tag: 'i32' },
-  longint: { tag: 'i32' },
-  shortint: { tag: 'i32' },
-  byte: { tag: 'i32' },
-  word: { tag: 'i32' },
-  cardinal: { tag: 'i32' },
-  real: { tag: 'f64' },
-  single: { tag: 'f64' },
-  double: { tag: 'f64' },
-  extended: { tag: 'f64' },
-  boolean: { tag: 'bool' },
+  integer: { tag: 'integer' },
+  longint: { tag: 'integer' },
+  shortint: { tag: 'integer' },
+  byte: { tag: 'integer' },
+  word: { tag: 'integer' },
+  cardinal: { tag: 'integer' },
+  real: { tag: 'real' },
+  single: { tag: 'real' },
+  double: { tag: 'real' },
+  extended: { tag: 'real' },
+  boolean: { tag: 'boolean' },
   char: { tag: 'char' },
   // string 是非标扩展（ISO 7185 无 string 类型，只有 packed array[1..n] of char）。
   // 启用 extension 'string' 时映射为 char 数组（长度不定，dims.high 用 0 占位）。
@@ -263,7 +263,7 @@ export function evalConstInt(
     }
     case 'Identifier': {
       const sym = lookup(node.name)
-      if (sym?.kind === 'const' && sym.literal.key === 'i32') {
+      if (sym?.kind === 'const' && sym.literal.key === 'integer') {
         return parseInt(sym.literal.arg, 10)
       }
       return undefined
@@ -290,15 +290,15 @@ export function evalLiteral(
 ): { key: string; arg: string } | undefined {
   switch (node.kind) {
     case 'IntegerLiteral':
-      return { key: 'i32', arg: node.raw }
+      return { key: 'integer', arg: node.raw }
     case 'RealLiteral':
-      return { key: 'f64', arg: node.raw }
+      return { key: 'real', arg: node.raw }
     case 'StringLiteral':
-      return { key: 'str', arg: node.value }
+      return { key: 'string', arg: node.value }
     case 'CharLiteral':
       return { key: 'char', arg: node.value }
     case 'BooleanLiteral':
-      return { key: 'bool', arg: node.value ? 'true' : 'false' }
+      return { key: 'boolean', arg: node.value ? 'true' : 'false' }
     default:
       return undefined
   }
@@ -307,17 +307,17 @@ export function evalLiteral(
 /** literal key → TypeInfo（const 声明的类型推断） */
 export function typeInfoOfLiteralKey(key: string): TypeInfo {
   switch (key) {
-    case 'i32':
-      return { tag: 'i32' }
-    case 'f64':
-      return { tag: 'f64' }
-    case 'bool':
-      return { tag: 'bool' }
+    case 'integer':
+      return { tag: 'integer' }
+    case 'real':
+      return { tag: 'real' }
+    case 'boolean':
+      return { tag: 'boolean' }
     case 'char':
       return { tag: 'char' }
-    // key 'str' 是字符串字面量的编码层 key（非类型），
+    // key 'string' 是字符串字面量的编码层 key（非类型），
     // ISO 7185 中字符串字面量类型为 packed array[1..n] of char。
-    case 'str':
+    case 'string':
       return { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } }
     default:
       return { tag: 'unknown' }

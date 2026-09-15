@@ -227,11 +227,11 @@ export interface Ref {
  * key  分类；arg 具体内容。下游 codegen 负责按 key 解释 arg。
  *
  * 推荐但非强制的 key 集合：
- *   - 'i32'     : arg = 十进制整数字符串（有符号）。
- *   - 'f64'     : arg = 浮点数字符串。
- *   - 'str'     : arg = 字符串内容（不含边界引号，已还原转义）。
+ *   - 'integer' : arg = 十进制整数字符串（有符号）。
+ *   - 'real'    : arg = 浮点数字符串。
+ *   - 'string'  : arg = 字符串内容（不含边界引号，已还原转义）。
  *   - 'char'    : arg = 单个字符（已还原转义）。
- *   - 'bool'    : arg = 'true' 或 'false'。
+ *   - 'boolean' : arg = 'true' 或 'false'。
  *   - 'unit'    : arg = ''。表示"无值"占位。
  */
 export interface Literal {

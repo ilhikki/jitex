@@ -118,7 +118,7 @@ function loweringAssignTarget(
   ws: WithBinding[],
 ): JsonCode.Statement[] {
   const lvalueType = a.typeOf(target)
-  const isComposite = lvalueType.tag === 'array' || lvalueType.tag === 'rec' || lvalueType.tag === 'set'
+  const isComposite = lvalueType.tag === 'array' || lvalueType.tag === 'record' || lvalueType.tag === 'set'
 
   // 简单变量
   if (target.kind === 'Identifier') {
@@ -310,16 +310,16 @@ function loweringFor(
   const initE = loweringExpr(node.initial, a, ws)
   const finalE = loweringExpr(node.final, a, ws)
 
-  const limitVar = a.allocTempLocal(funcId, { tag: 'i32' })
+  const limitVar = a.allocTempLocal(funcId, { tag: 'integer' })
   const L_top = a.nextId()
   const L_body = a.nextId()
   const L_end = a.nextId()
 
   const isDown = node.direction === 'DOWNTO'
-  // Pascal for 变量为序数类型；此处比较/步进按 i32 语义，类型分派下沉到 rewrite
+  // Pascal for 变量为序数类型；此处比较/步进按 integer 语义，类型分派下沉到 rewrite
   const cmpKey = isDown ? syscallKeys.ge : syscallKeys.le
   const stepKey = isDown ? syscallKeys.sub : syscallKeys.add
-  const i32Td = typeDescLiteral({ tag: 'i32' })
+  const i32Td = typeDescLiteral({ tag: 'integer' })
 
   const varRef = varSym.isVarParam ? syscall(syscallKeys.cellGet, [ref(vid)]) : ref(vid)
 
@@ -692,7 +692,7 @@ function loweringUserCallStmt(
     } else {
       // Pascal value 参数传递是值拷贝语义（ISO 7185），record 类型需深拷贝
       let argExpr = loweringExpr(args[i], a, ws)
-      if (param.typeInfo.tag === 'rec') {
+      if (param.typeInfo.tag === 'record') {
         argExpr = syscall(syscallKeys.recCopy, [argExpr, typeDescLiteral(param.typeInfo)])
       }
       argExprs.push(argExpr)

@@ -32,15 +32,15 @@ function sc(key: string, args: JsonCode.Expr[]): JsonCode.Syscall {
 }
 
 function litInt(v: number): JsonCode.Literal {
-  return { kind: 'literal', key: 'i32', arg: String(v) }
+  return { kind: 'literal', key: 'integer', arg: String(v) }
 }
 
 function litStr(s: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'str', arg: s }
+  return { kind: 'literal', key: 'string', arg: s }
 }
 
 function litReal(v: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'f64', arg: v }
+  return { kind: 'literal', key: 'real', arg: v }
 }
 
 function litChar(ch: string): JsonCode.Literal {
@@ -60,7 +60,7 @@ function parseType(arg: JsonCode.Expr | undefined): TypeDescriptor | undefined {
 }
 
 function isFloat(t: TypeDescriptor | undefined): boolean {
-  return t?.tag === 'f64'
+  return t?.tag === 'real'
 }
 
 function isSet(t: TypeDescriptor | undefined): boolean {
@@ -72,9 +72,9 @@ function isCharArray(t: TypeDescriptor | undefined): boolean {
   return t?.tag === 'array' && t.elem?.tag === 'char'
 }
 
-/** 目标文件是否为二进制 record 文件（file of rec）—— 只有它走字节转换 */
+/** 目标文件是否为二进制 record 文件（file of record）—— 只有它走字节转换 */
 function isBinaryFile(fileType: TypeDescriptor | undefined): boolean {
-  return fileType?.tag === 'file' && fileType.elem?.tag === 'rec'
+  return fileType?.tag === 'file' && fileType.elem?.tag === 'record'
 }
 
 /**
@@ -97,8 +97,8 @@ function isByteFile(fileType: TypeDescriptor | undefined): boolean {
  */
 function fileKind(fileType: TypeDescriptor | undefined): string {
   const elem = fileType?.elem
-  if (elem?.tag === 'rec') {
-    return 'rec'
+  if (elem?.tag === 'record') {
+    return 'record'
   }
   if (isByteScalar(elem)) {
     return 'byte'
@@ -117,13 +117,13 @@ function fileKind(fileType: TypeDescriptor | undefined): string {
  */
 function defaultValueExpr(td: TypeDescriptor): JsonCode.Expr {
   switch (td.tag) {
-    case 'i32':
+    case 'integer':
       // 子界型取下界（ISO 7185 6.4.2.4 的变量初始值约定）
       return litInt(td.low ?? 0)
     case 'enum':
-    case 'bool':
+    case 'boolean':
       return litInt(0)
-    case 'f64':
+    case 'real':
       return litReal('0')
     case 'char':
       return litChar('\x00')
@@ -141,7 +141,7 @@ function defaultValueExpr(td: TypeDescriptor): JsonCode.Expr {
           Array.from({ length: arrayCount(td) }, () => defaultValueExpr(td.elem!)),
         )
         : sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
-    case 'rec':
+    case 'record':
       return isObjectRepr(td)
         ? sc(rtKeys.objectNewRecord, recordDefaultArgs(td))
         : sc(rtKeys.memoryNew, [litInt(sizeOf(td))])
@@ -190,7 +190,7 @@ function binaryFixed(key: string) {
 function logical(i32Key: string, boolKey: string) {
   return (sys: JsonCode.Syscall): JsonCode.Expr => {
     const lt = parseType(sys.args[1])
-    return sc(lt?.tag === 'i32' ? i32Key : boolKey, [sys.args[0], sys.args[2]])
+    return sc(lt?.tag === 'integer' ? i32Key : boolKey, [sys.args[0], sys.args[2]])
   }
 }
 
@@ -209,7 +209,7 @@ function compare(setKey: string | undefined, cmpKey: string) {
 function unaryI32OrOther(i32Key: string, otherKey: string) {
   return (sys: JsonCode.Syscall): JsonCode.Expr => {
     const t = parseType(sys.args[1])
-    return sc(t?.tag === 'i32' ? i32Key : otherKey, [sys.args[0]])
+    return sc(t?.tag === 'integer' ? i32Key : otherKey, [sys.args[0]])
   }
 }
 
@@ -230,7 +230,7 @@ function predSucc(isSucc: boolean) {
   return (sys: JsonCode.Syscall): JsonCode.Expr => {
     const t = parseType(sys.args[1])
     const x = sys.args[0]
-    // char 即 ord 值 → 直接 i32 加减（ISO 6.6.6.4）
+    // char 即 ord 值 → 直接整数加减（ISO 6.6.6.4）
     if (t?.tag === 'char') {
       return sc(i32Key, [x, litInt(1)])
     }
@@ -301,18 +301,18 @@ function elementOffset(
 function toConvertKey(td: TypeDescriptor | undefined, binary: boolean): string {
   if (binary) {
     switch (td?.tag) {
-      case 'f64':
+      case 'real':
         return rtKeys.convertFloat32ToBytes
-      case 'bool':
+      case 'boolean':
         return rtKeys.convertBooleanToBytes
       default:
         return rtKeys.convertInt32ToBytes
     }
   }
   switch (td?.tag) {
-    case 'f64':
+    case 'real':
       return rtKeys.convertFloat32ToText
-    case 'bool':
+    case 'boolean':
       return rtKeys.convertBooleanToText
     case 'char':
       return rtKeys.convertInt32ToChar
@@ -325,18 +325,18 @@ function toConvertKey(td: TypeDescriptor | undefined, binary: boolean): string {
 function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string {
   if (binary) {
     switch (td?.tag) {
-      case 'f64':
+      case 'real':
         return rtKeys.convertBytesToFloat32
-      case 'bool':
+      case 'boolean':
         return rtKeys.convertBytesToBoolean
       default:
         return rtKeys.convertBytesToInt32
     }
   }
   switch (td?.tag) {
-    case 'f64':
+    case 'real':
       return rtKeys.convertTextToFloat32
-    case 'bool':
+    case 'boolean':
       return rtKeys.convertTextToBoolean
     case 'char':
       return rtKeys.convertCharToInt32
@@ -454,7 +454,7 @@ export function buildPascalRewriteTable(): SyscallRewriteTable {
     'lowering.file.peek': (sys) => {
       const td = parseType(sys.args[1])
       // record 文件：传元素字节大小，供首次分配缓冲区
-      if (td?.elem?.tag === 'rec') {
+      if (td?.elem?.tag === 'record') {
         return sc(rtKeys.filePeek, [sys.args[0], litInt(sizeOf(td.elem))])
       }
       return sc(rtKeys.filePeek, [sys.args[0]])
@@ -605,7 +605,7 @@ function addOffset(delta: JsonCode.Expr | undefined, offset: JsonCode.Expr): Jso
   if (delta === undefined) {
     return offset
   }
-  if (offset.kind === 'literal' && offset.key === 'i32' && offset.arg === '0') {
+  if (offset.kind === 'literal' && offset.key === 'integer' && offset.arg === '0') {
     return delta
   }
   return sc(rtKeys.int32Add, [delta, offset])

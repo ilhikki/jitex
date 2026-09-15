@@ -18,20 +18,20 @@ import { litBool, litChar, litInt, litNull, litReal, syscall, syscallKeys } from
 
 export function defaultExpr(ti: TypeInfo): JsonCode.Expr {
   switch (ti.tag) {
-    case 'i32':
+    case 'integer':
     case 'enum':
       return litInt(0)
     case 'subrange':
       // subrange 默认值为 lower bound（ISO 7185: 子界变量未初始化时取下界）
       return litInt(ti.low ?? 0)
-    case 'f64':
+    case 'real':
       return litReal('0')
-    case 'bool':
+    case 'boolean':
       return litBool(false)
     case 'char':
       return litChar('\x00')
     case 'array':
-    case 'rec':
+    case 'record':
       return syscall(syscallKeys.memDefault, [typeDescLiteral(ti)])
     case 'set':
       return syscall(syscallKeys.setEmpty, [typeDescLiteral(ti)])
@@ -52,7 +52,7 @@ export function typeDescLiteral(ti: TypeInfo): JsonCode.Literal {
 }
 
 export interface TypeDescriptor {
-  /** 类型本质：i32 / f64 / bool / char / enum / array / rec / set / file / pointer */
+  /** 类型本质：integer / real / boolean / char / enum / array / record / set / file / pointer */
   tag: string
   /** 序数类型的下界（与 high 同时存在即为子界） */
   low?: number
@@ -81,7 +81,7 @@ export interface VariantBranchDescriptor {
 export function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
   // subrange 展平：tag 即基类型，low/high 表范围
   if (ti.tag === 'subrange') {
-    return { tag: ti.baseTag ?? 'i32', low: ti.low, high: ti.high }
+    return { tag: ti.baseTag ?? 'integer', low: ti.low, high: ti.high }
   }
   // set：基类型放进 elem（唯一泛型参数）
   if (ti.tag === 'set') {

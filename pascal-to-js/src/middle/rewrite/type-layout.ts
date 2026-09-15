@@ -78,7 +78,7 @@ export function isObjectRepr(td: TypeDescriptor): boolean {
       return true
     case 'array':
       return td.elem !== undefined && isObjectRepr(td.elem)
-    case 'rec':
+    case 'record':
       for (const f of td.fields ?? []) {
         if (isObjectRepr(f.type)) {
           return true
@@ -107,10 +107,10 @@ function variantHasObject(vp: VariantPartDescriptor | undefined): boolean {
 /** 是否为标量类型 */
 export function isScalar(td: TypeDescriptor): boolean {
   switch (td.tag) {
-    case 'i32':
+    case 'integer':
     case 'enum':
-    case 'f64':
-    case 'bool':
+    case 'real':
+    case 'boolean':
     case 'char':
       return true
     default:
@@ -134,11 +134,11 @@ export function isByteScalar(td: TypeDescriptor | undefined): boolean {
     return false
   }
   switch (td.tag) {
-    case 'bool':
+    case 'boolean':
       return true
     case 'enum':
       return (td.enumCount ?? 1) - 1 <= 255
-    case 'i32':
+    case 'integer':
       return td.low !== undefined && td.high !== undefined && td.low >= -128 && td.high <= 255
     default:
       return false
@@ -148,14 +148,14 @@ export function isByteScalar(td: TypeDescriptor | undefined): boolean {
 /** 标量类型的标量种类；非标量抛错 */
 export function scalarKindOf(td: TypeDescriptor): ScalarKind {
   switch (td.tag) {
-    case 'i32':
+    case 'integer':
       // 带 low/high 视为子界，按范围选宽度
       return td.low !== undefined && td.high !== undefined ? rangeScalarKind(td.low, td.high) : 'int32'
     case 'enum':
       return rangeScalarKind(0, (td.enumCount ?? 1) - 1)
-    case 'f64':
+    case 'real':
       return 'float32'
-    case 'bool':
+    case 'boolean':
     case 'char':
       return 'uint8'
     default:
@@ -176,7 +176,7 @@ export function sizeOf(td: TypeDescriptor): number {
       }
       return count * sizeOf(td.elem!)
     }
-    case 'rec':
+    case 'record':
       return recordSize(td)
     case 'set':
       return setSize(td)
@@ -250,7 +250,7 @@ export function fieldSlot(td: TypeDescriptor, name: string): FieldSlot | undefin
   if (td.variant) {
     const tagOff = offset
     if (td.variant.tagName === name) {
-      return { offset: tagOff, size: TAG_SIZE, type: { tag: 'i32' }, isTag: true }
+      return { offset: tagOff, size: TAG_SIZE, type: { tag: 'integer' }, isTag: true }
     }
     return variantFieldSlot(td.variant, name, tagOff + tagSize(td.variant))
   }
@@ -272,7 +272,7 @@ function variantFieldSlot(
     }
     if (b.nested) {
       if (b.nested.tagName === name) {
-        return { offset: off, size: TAG_SIZE, type: { tag: 'i32' }, isTag: true }
+        return { offset: off, size: TAG_SIZE, type: { tag: 'integer' }, isTag: true }
       }
       const nested = variantFieldSlot(b.nested, name, off + tagSize(b.nested))
       if (nested) {

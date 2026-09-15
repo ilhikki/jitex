@@ -153,18 +153,18 @@ export class PascalSemanticCompiler implements SemanticCompiler {
 
   literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
     switch (literal.key) {
-      case 'i32':
+      case 'integer':
         return literal.arg // 十进制整数字符串，直接作为 JS 数字
-      case 'f64':
+      case 'real':
         return literal.arg // 浮点字符串，直接作为 JS 数字
-      case 'bool':
+      case 'boolean':
         // boolean 取序数值（ISO 6.4.2.2）：true → 1，false → 0
         return literal.arg === 'true' ? '1' : '0'
       case 'bytes':
         // 字符串字面量（packed array of char）→ Uint8Array 字面量
         return `new Uint8Array(${literal.arg})`
-      case 'str':
-        // key 'str' 是字符串内容的字面量编码（非类型）。
+      case 'string':
+        // key 'string' 是字符串内容的字面量编码（非类型）。
         // 直接产出 JS 字符串；由 str.to.char.array syscall 包装时才转为 PascalArray。
         return JSON.stringify(literal.arg)
 

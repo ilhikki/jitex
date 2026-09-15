@@ -367,10 +367,10 @@ class StatementPass {
     let info: TypeInfo
     switch (node.kind) {
       case 'IntegerLiteral':
-        info = { tag: 'i32' }
+        info = { tag: 'integer' }
         break
       case 'RealLiteral':
-        info = { tag: 'f64' }
+        info = { tag: 'real' }
         break
       case 'StringLiteral':
         info = {
@@ -383,7 +383,7 @@ class StatementPass {
         info = { tag: 'char' }
         break
       case 'BooleanLiteral':
-        info = { tag: 'bool' }
+        info = { tag: 'boolean' }
         break
 
       case 'Identifier': {
@@ -421,7 +421,7 @@ class StatementPass {
         } else {
           const lower = node.name.toLowerCase()
           if (lower === 'eof' || lower === 'eoln') {
-            info = { tag: 'bool' }
+            info = { tag: 'boolean' }
           } else if (lower === 'nil') {
             info = { tag: 'pointer' }
           } else {
@@ -440,19 +440,19 @@ class StatementPass {
         const rt = this.analyzeExpr(node.right)
         const op = node.operator
         if (op === 'AND' || op === 'OR') {
-          info = lt.tag === 'i32' ? { tag: 'i32' } : { tag: 'bool' }
+          info = lt.tag === 'integer' ? { tag: 'integer' } : { tag: 'boolean' }
         } else if (['=', '<>', '<', '<=', '>', '>='].includes(op)) {
-          info = { tag: 'bool' }
+          info = { tag: 'boolean' }
         } else if (op === '/') {
-          info = { tag: 'f64' }
+          info = { tag: 'real' }
         } else if (op === 'DIV' || op === 'MOD') {
-          info = { tag: 'i32' }
+          info = { tag: 'integer' }
         } else {
           if (lt.tag === 'set' && rt.tag === 'set') {
             info = { tag: 'set' }
-          } else if (lt.tag === 'f64' || rt.tag === 'f64') {
-            info = { tag: 'f64' }
-          } else info = { tag: 'i32' }
+          } else if (lt.tag === 'real' || rt.tag === 'real') {
+            info = { tag: 'real' }
+          } else info = { tag: 'integer' }
         }
         break
       }
@@ -460,9 +460,9 @@ class StatementPass {
       case 'UnaryExpression': {
         const ot = this.analyzeExpr(node.operand)
         if (node.operator === 'NOT') {
-          info = ot.tag === 'i32' ? { tag: 'i32' } : { tag: 'bool' }
+          info = ot.tag === 'integer' ? { tag: 'integer' } : { tag: 'boolean' }
         } else if (node.operator === '-') {
-          info = ot.tag === 'f64' ? { tag: 'f64' } : { tag: 'i32' }
+          info = ot.tag === 'real' ? { tag: 'real' } : { tag: 'integer' }
         } else {
           info = ot
         }
@@ -566,9 +566,9 @@ class StatementPass {
 
       case 'FieldAccess': {
         const objType = this.analyzeExpr(node.object)
-        if (objType.tag === 'rec' && objType.fields) {
+        if (objType.tag === 'record' && objType.fields) {
           const f = this.findRecordField(objType, node.field.name.toLowerCase())
-          info = f ?? this.unknown(node, `record 无字段 '${node.field.name}' (objType.tag=rec)`)
+          info = f ?? this.unknown(node, `record 无字段 '${node.field.name}' (objType.tag=${objType.tag})`)
         } else if (node.field.name === '^' && objType.tag === 'pointer') {
           info = objType.domainType ??
             this.unknown(node, `pointer 无 domainType（解引用 '^'）`)
@@ -596,7 +596,7 @@ class StatementPass {
       case 'InExpression':
         this.analyzeExpr(node.left)
         this.analyzeExpr(node.right)
-        info = { tag: 'bool' }
+        info = { tag: 'boolean' }
         break
 
       default:
@@ -664,19 +664,19 @@ class StatementPass {
       if (args.length > 0) {
         return this.analyzeExpr(args[0])
       }
-      return { tag: 'i32' }
+      return { tag: 'integer' }
     }
     if (['sqrt', 'sin', 'cos', 'exp', 'ln', 'arctan'].includes(n)) {
-      return { tag: 'f64' }
+      return { tag: 'real' }
     }
     if (['trunc', 'round', 'ord', 'length'].includes(n)) {
-      return { tag: 'i32' }
+      return { tag: 'integer' }
     }
     if (['chr'].includes(n)) {
       return { tag: 'char' }
     }
     if (['odd', 'eof', 'eoln'].includes(n)) {
-      return { tag: 'bool' }
+      return { tag: 'boolean' }
     }
     return { tag: 'unknown' }
   }
@@ -700,10 +700,10 @@ class StatementPass {
     ) {
       return
     }
-    // 实现把枚举值常量建模为 i32（见 Pass 1 的 EnumerationType 分支），类型层面无法区分
+    // 实现把枚举值常量建模为 integer（见 Pass 1 的 EnumerationType 分支），类型层面无法区分
     // 「枚举常量」与「整数字面量」：此处仅放行常量标识符（如 `c := red`），
     // 整数字面量（如 `c := 5`）仍按 6.4.6 判定为不兼容。
-    if (target.tag === 'enum' && value.tag === 'i32' && valueNode.kind === 'Identifier') {
+    if (target.tag === 'enum' && value.tag === 'integer' && valueNode.kind === 'Identifier') {
       if (this.lookup(valueNode.name)?.kind === 'const') {
         return
       }
@@ -718,7 +718,7 @@ class StatementPass {
 
   /** ISO 6.7.2.3 / 6.8.3.4：if/while/repeat 的条件须是 Boolean-expression */
   private requireBoolean(t: TypeInfo, what: string): void {
-    if (t.tag === 'bool' || t.tag === 'unknown') {
+    if (t.tag === 'boolean' || t.tag === 'unknown') {
       return
     }
     throw new Error(
