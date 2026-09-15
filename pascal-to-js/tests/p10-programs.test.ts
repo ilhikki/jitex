@@ -153,6 +153,50 @@ const tests: PascalTest[] = [
     textFiles: new Map<string, Uint8Array>([['LOG', new Uint8Array(0)]]),
     expectedFileContains: [{ url: 'LOG', contains: '42\n' }],
   },
+  {
+    name: '6.10 源文本缺少 program-heading 应报错',
+    code: `begin
+  writeln('x');
+end.`,
+    purpose: 'ISO 6.10：program = program-heading ; block . ，源文本须以 program-heading 开始',
+    expectedError: '',
+  },
+  {
+    name: '6.10 program 名须为标识符',
+    code: 'program 5; begin end.',
+    purpose: 'ISO 6.10：program-heading = program identifier ...',
+    expectedError: '',
+  },
+  {
+    name: '6.10 program-parameter-list 的每项须为标识符',
+    code: 'program p(1); begin end.',
+    purpose: 'ISO 6.10：program-parameter-list 由标识符组成',
+    expectedError: '',
+  },
+  {
+    name: '6.10 program 参数表缺少右圆括号应报错',
+    code: 'program p(output; begin end.',
+    purpose: 'ISO 6.10：program-parameter-list 以右圆括号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.10 program-heading 之后缺少分号应报错',
+    code: 'program p(output) begin end.',
+    purpose: 'ISO 6.10：program-heading 之后须有分号',
+    expectedError: '',
+  },
+  {
+    name: '6.10 程序末尾缺少句点应报错',
+    code: 'program p(output); begin end',
+    purpose: 'ISO 6.10：程序以句点结束',
+    expectedError: '',
+  },
+  {
+    name: '6.10 程序结束句点之后不得再有其它记号',
+    code: 'program p(output); begin end. begin end.',
+    purpose: 'ISO 6.10：句点表示源程序的结束，其后不应再有记号',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.10 - Programs', tests)

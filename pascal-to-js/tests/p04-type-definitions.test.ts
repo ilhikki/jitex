@@ -651,6 +651,185 @@ end.`,
     purpose: "6.4.2.2 d 2)+6.4.6 c：A..Z 字典有序，'Z' 不在 'A'..'C' 内",
     expectedError: '',
   },
+  {
+    name: '6.4.3.1 packed 可前缀于 record 类型',
+    code: `program test(output);
+type r = packed record x: integer; y: char end;
+var v: r;
+begin
+  v.x := 3;
+  v.y := 'A';
+  writeln(v.x, v.y);
+end.`,
+    purpose: 'ISO 6.4.3.1：packed 可前缀于 array/record/file/set 四种结构类型，packed record 的字段仍可访问',
+    expectedOutput: '3A\n',
+  },
+  {
+    name: '6.4.3.1 packed 不得前缀于非结构类型',
+    code: 'program test; type t = packed integer; begin end.',
+    purpose: 'ISO 6.4.3.1：packed 只允许前缀于 array、record、file、set 类型',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.2 array 缺少 index-type 表应报错',
+    code: 'program test; type t = array of integer; begin end.',
+    purpose: 'ISO 6.4.3.2：array-type 须给出方括号括起的 index-type 表',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.2 array 缺少 of 应报错',
+    code: 'program test; type t = array[1..3] integer; begin end.',
+    purpose: 'ISO 6.4.3.2：index-type 表之后须有 of 与 component-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.2 array 缺少右方括号应报错',
+    code: 'program test; type t = array[1..3 of integer; begin end.',
+    purpose: 'ISO 6.4.3.2：index-type 表须以右方括号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.2 array 的 component-type 非法应报错',
+    code: 'program test; type t = array[1..3] of 5; begin end.',
+    purpose: 'ISO 6.4.3.2：of 之后须为合法 type-denoter',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 record 缺少 end 应报错',
+    code: 'program test; type t = record x: integer; begin end.',
+    purpose: 'ISO 6.4.3.3：record-type 以 end 结束',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 record 字段缺少类型应报错',
+    code: 'program test; type t = record x; end; begin end.',
+    purpose: 'ISO 6.4.3.3：field-declaration 为 identifier-list : type-denoter',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 变体分支的 field-list 可含多个字段',
+    code: `program test(output);
+type r = record
+  case tag: integer of
+    1: (a: integer; b: char);
+    2: (c: real);
+end;
+var v: r;
+begin
+  v.tag := 1;
+  v.a := 5;
+  v.b := 'X';
+  writeln(v.a, v.b);
+end.`,
+    purpose: 'ISO 6.4.3.3：variant 的分支为 ( field-list )，其中可含多个以分号分隔的字段',
+    expectedOutput: '5X\n',
+  },
+  {
+    name: '6.4.3.3 variant 的 case-constant 之后缺少冒号应报错',
+    code: 'program test; type r = record case tag: integer of 1 (a: integer) end; begin end.',
+    purpose: 'ISO 6.4.3.3：variant = case-constant-list : ( field-list )',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.3 variant 的 field-list 缺少左圆括号应报错',
+    code: 'program test; type r = record case tag: integer of 1: a: integer end; begin end.',
+    purpose: 'ISO 6.4.3.3：case-constant-list 的冒号之后须为左圆括号',
+    expectedError: '',
+  },
+  {
+    name: '6.4.2.3 枚举值表须为 identifier-list',
+    code: 'program test; type t = (1, 2); begin end.',
+    purpose: 'ISO 6.4.2.3：enumeration-type 的值表由标识符组成',
+    expectedError: '',
+  },
+  {
+    name: '6.4.2.3 枚举值表缺少右圆括号应报错',
+    code: 'program test; type t = (a, b; begin end.',
+    purpose: 'ISO 6.4.2.3：enumeration-type = ( identifier-list )',
+    expectedError: '',
+  },
+  {
+    name: '6.4.4 指针类型缺少 domain-type 应报错',
+    code: 'program test; type t = ^; begin end.',
+    purpose: 'ISO 6.4.4：pointer-type = ^ domain-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.5 file of 之后缺少分量类型应报错',
+    code: 'program test; type t = file of ; begin end.',
+    purpose: 'ISO 6.4.3.5：file-type 给出 of 之后须有 component-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.3.4 set 类型缺少 of 应报错',
+    code: 'program test; type t = set 1..3; begin end.',
+    purpose: 'ISO 6.4.3.4：set-type = set of base-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.1 type-denoter 不得是孤立常量',
+    code: 'program test; type t = 5; begin end.',
+    purpose: 'ISO 6.4.1：type-denoter 为 type-identifier 或 new-type，孤立的常量不构成任何 new-type',
+    expectedError: '',
+  },
+  {
+    name: '6.4.2.4 子界类型缺少右边界应报错',
+    code: 'program test; type t = 1..; begin end.',
+    purpose: 'ISO 6.4.2.4：subrange-type = constant .. constant',
+    expectedError: '',
+  },
+  {
+    name: '6.4.2.4 Boolean 是 ordinal-type，可作为子界的 base-type',
+    code: `program test(output);
+type t = false..true;
+var b: t;
+begin
+  b := true;
+  if b = true then writeln('T') else writeln('F');
+end.`,
+    purpose:
+      'ISO 6.4.2.2 d/6.4.2.4：Boolean 是序数类型，其值可作为子界的两端常量，该子界与其宿主的宿主类型 Boolean 兼容',
+    expectedOutput: 'T\n',
+  },
+  {
+    name: '6.4.3.2 index-type 可为已定义的子界类型标识符',
+    code: `program test(output);
+type idx = 1..3;
+     t = array[idx] of integer;
+var a: t;
+begin
+  a[2] := 7;
+  writeln(a[2]);
+end.`,
+    purpose: 'ISO 6.4.3.2/6.4.1：index-type 是 ordinal-type，可写成先前定义的子界类型标识符',
+    expectedOutput: '7\n',
+  },
+  {
+    name: '6.4.3.2 分量数不同的 string-type 之间不得赋值',
+    code: `program test;
+var a: array[1..2, 1..2] of char;
+begin
+  a := 'ab';
+end.`,
+    purpose:
+      'ISO 6.4.3.2/6.4.6 e：string-type 是分量数为 n 的一维 packed char 数组，二维 char 数组不属 string-type，分量数亦不同',
+    expectedError: '',
+  },
+  {
+    name: '6.4.1 类型定义缺少等号应报错',
+    code: 'program test; type t integer; begin end.',
+    purpose: 'ISO 6.4.1：type-definition = identifier = type-denoter',
+    expectedError: '',
+  },
+  {
+    name: '6.2.2.9 非类型标识符不得用作类型名',
+    code: `program test;
+var v: integer;
+type t = v;
+begin end.`,
+    purpose: 'ISO 6.2.2.9/6.4.1：type-denoter 中的标识符须有类型定义点，变量标识符不是类型',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.4 - Type-definitions', tests)

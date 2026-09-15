@@ -244,6 +244,70 @@ end.`,
     programFileUrls: { f: 'F' },
     expectedOutput: 'A\n',
   },
+  {
+    name: '6.5.1 变量声明的标识符表不得含空项',
+    code: 'program test; var a, : integer; begin end.',
+    purpose: 'ISO 6.5.1：variable-declaration = identifier-list : type-denoter，identifier-list 的每一项都须是标识符',
+    expectedError: '',
+  },
+  {
+    name: '6.5.1 变量声明缺少冒号应报错',
+    code: 'program test; var a integer; begin end.',
+    purpose: 'ISO 6.5.1：标识符表之后须为冒号与 type-denoter',
+    expectedError: '',
+  },
+  {
+    name: '6.5.1 变量声明的 type-denoter 非法应报错',
+    code: 'program test; var a: 5; begin end.',
+    purpose: 'ISO 6.5.1/6.4.1：type-denoter 须为 type-identifier 或 new-type',
+    expectedError: '',
+  },
+  {
+    name: '6.5.1 变量定义部分存在非法条目应报错',
+    code: 'program test; var a: integer; b = 1; begin end.',
+    purpose: 'ISO 6.5.1：variable-declaration-part 中每一项都须为 variable-declaration',
+    expectedError: '',
+  },
+  {
+    name: '6.5.3.1 数组分量可为枚举类型',
+    code: `program test(output);
+type color = (red, green, blue);
+var a: array[1..3] of color;
+begin
+  a[1] := red;
+  a[2] := green;
+  a[3] := blue;
+  writeln(ord(a[2]));
+  if a[3] > a[1] then writeln('ordered');
+end.`,
+    purpose: 'ISO 6.4.2.3/6.5.3.1：component-type 可为枚举类型，其分量按序数参与 ord 与关系运算',
+    expectedOutput: '1\nordered\n',
+  },
+  {
+    name: '6.5.3.1 子界类型分量的取值覆盖整个闭区间',
+    code: `program test(output);
+var a: array[1..2] of 0..255;
+begin
+  a[1] := 200;
+  a[2] := a[1] + 5;
+  writeln(a[1]);
+  writeln(a[2]);
+end.`,
+    purpose: 'ISO 6.4.2.4：子界类型变量的值可取到上界一侧，不因符号位而被解释为负值',
+    expectedOutput: '200\n205\n',
+  },
+  {
+    name: '6.6.6.4 succ 超出子界上界应报错',
+    code: `program test;
+type small = 1..5;
+var s: small;
+begin
+  s := 5;
+  s := succ(s);
+end.`,
+    purpose: 'ISO 6.6.6.4/6.4.6 c：succ 的结果须落在子界类型的值域内，否则为 error',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.5 - Declarations and denotations of variables', tests)

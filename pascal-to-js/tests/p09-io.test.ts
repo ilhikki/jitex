@@ -634,6 +634,40 @@ end.`,
       'ISO 6.9.5：page(f) 仅在 f.L 非空且 f.L.last 不是 end-of-line 时才隐式 writeln(f)；文件起始处 f.L 为空，故不写行结束符',
     expectedOutput: '\fX\n',
   },
+  {
+    name: '6.9.3.1 write 的 TotalWidth 位置缺少表达式应报错',
+    code: `program test(output);
+begin
+  write(1:);
+end.`,
+    purpose: 'ISO 6.9.3.1：write-parameter = expression [ : expression [ : expression ] ]',
+    expectedError: '',
+  },
+  {
+    name: '6.9.3 write 的实参表缺少右圆括号应报错',
+    code: `program test(output);
+begin
+  write(1;
+end.`,
+    purpose: 'ISO 6.9.3：write 的 actual-parameter-list 以右圆括号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.9.1 read 的实参可为变量参数',
+    code: `program test(input, output);
+var v: integer;
+procedure rd(var x: integer);
+begin
+  read(x);
+end;
+begin
+  rd(v);
+  writeln(v);
+end.`,
+    purpose: 'ISO 6.9.1/6.6.3.3：read 的 v 须为变量，变量参数在其块内表示实参变量',
+    input: '5',
+    expectedOutput: '5\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.9 - Input and output', tests)

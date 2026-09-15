@@ -815,6 +815,285 @@ end.`,
     programFileUrls: { f: 'MYFILE' },
     expectedFileContains: [{ url: 'f', contains: 'DATA' }],
   },
+  {
+    name: '6.6.3.1 形参表可含多个以分号分隔的 parameter-section',
+    code: `program test(output);
+procedure p(a: integer; b: char);
+begin
+  writeln(a, b);
+end;
+begin
+  p(1, 'x');
+end.`,
+    purpose: 'ISO 6.6.3.1：formal-parameter-list = ( formal-parameter-section {; formal-parameter-section} )',
+    expectedOutput: '1x\n',
+  },
+  {
+    name: '6.6.3.1 形参表缺少右圆括号应报错',
+    code: 'program test; procedure p(a: integer; begin end; begin end.',
+    purpose: 'ISO 6.6.3.1：formal-parameter-list 以右圆括号结束',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.2 形参名表之后缺少冒号应报错',
+    code: 'program test; procedure p(a integer); begin end; begin end.',
+    purpose: 'ISO 6.6.3.1：formal-parameter-section 为 identifier-list : type-denoter 等形式',
+    expectedError: '',
+  },
+  {
+    name: '6.6.1 过程头之后缺少分号应报错',
+    code: 'program test; procedure p begin end; begin end.',
+    purpose: 'ISO 6.6.1：procedure-declaration 的 heading 之后为分号与 procedure-block',
+    expectedError: '',
+  },
+  {
+    name: '6.6.1 同一过程标识符不得有两次 forward 声明',
+    code: `program test;
+procedure p; forward;
+procedure p; forward;
+procedure p; begin end;
+begin end.`,
+    purpose: 'ISO 6.6.1：forward 指令对应的标识符须恰有一个应用出现在同一声明部分内',
+    expectedError: '',
+  },
+  {
+    name: '6.6.1 已给出过程体的标识符之后不得再出现 forward',
+    code: `program test;
+procedure p; begin end;
+procedure p; forward;
+begin end.`,
+    purpose: 'ISO 6.6.1：标识符至多关联一个 procedure-block，forward 声明须先于其定义',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.4 过程形参不得用作表达式',
+    code: `program test;
+procedure p(procedure r);
+var x: integer;
+begin
+  x := r + 1;
+end;
+begin end.`,
+    purpose: 'ISO 6.6.3.4：过程形参标识符只能作过程语句使用，不得出现在表达式中',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.4 过程形参不得作函数调用',
+    code: `program test;
+procedure p(procedure r(n: integer));
+var x: integer;
+begin
+  x := r(1);
+end;
+begin end.`,
+    purpose: 'ISO 6.6.3.4：过程形参不得被当作函数指示符用于表达式',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 函数形参的实参个数须与其 heading 一致',
+    code: `program test;
+function g(a: integer): integer;
+begin g := a; end;
+procedure p(function f(a: integer): integer);
+var x: integer;
+begin
+  x := f(1, 2);
+end;
+begin p(g); end.`,
+    purpose: 'ISO 6.6.3.5/6.7.3：函数形参的应用须给出与其 heading 的形参表相适应的实参表',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 可调用形参的实参须为过程/函数标识符',
+    code: `program test;
+function g(a: integer): integer;
+begin g := a; end;
+procedure p(function f(a: integer): integer);
+begin end;
+begin p(g(1)); end.`,
+    purpose: 'ISO 6.6.3.5/6.6.3.4：可调用形参对应的实参须是对应类型的标识符，而非函数调用的结果',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.6 可调用形参的实参须与形参表 congruous（个数相同）',
+    code: `program test;
+function g(a: integer): integer;
+begin g := a; end;
+procedure p(function f(a: integer; b: integer): integer);
+begin end;
+begin p(g); end.`,
+    purpose: 'ISO 6.6.3.6：两个 formal-parameter-list congruous 要求个数相同',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.6 可调用形参的实参须与形参表 congruous（var 属性相同）',
+    code: `program test;
+function g(a: integer): integer;
+begin g := a; end;
+procedure p(function f(var a: integer): integer);
+begin end;
+begin p(g); end.`,
+    purpose: 'ISO 6.6.3.6：对应段须同为值参数段或同为变量参数段',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.6 可调用形参的实参须与形参表 congruous（类型相同）',
+    code: `program test;
+function g(a: integer): integer;
+begin g := a; end;
+procedure p(function f(a: char): integer);
+begin end;
+begin p(g); end.`,
+    purpose: 'ISO 6.6.3.6：对应位置的形式参数类型须表示同一类型',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.5 函数形参对应的实参须为函数标识符',
+    code: `program test;
+procedure q;
+begin end;
+procedure p(function f: integer);
+begin end;
+begin p(q); end.`,
+    purpose: 'ISO 6.6.3.5：函数形参对应的实参须是函数标识符（procedure 与 function 不可互换）',
+    expectedError: '',
+  },
+  {
+    name: '6.6.3.3 变量参数可沿调用链继续作为变量参数传递',
+    code: `program test(output);
+var g: integer;
+procedure b(var y: integer);
+begin
+  y := y + 1;
+end;
+procedure a(var x: integer);
+begin
+  b(x);
+end;
+begin
+  g := 1;
+  a(g);
+  writeln(g);
+end.`,
+    purpose: 'ISO 6.6.3.3：变量参数表示实参变量本身，沿传递链的赋值对最初实参可见',
+    expectedOutput: '2\n',
+  },
+  {
+    name: '6.6.3.3 值参数在其块内是变量，可作为变量参数的实参',
+    code: `program test(output);
+var g: integer;
+procedure b(var y: integer);
+begin
+  y := 9;
+end;
+procedure a(z: integer);
+begin
+  b(z);
+  writeln(z);
+end;
+begin
+  g := 1;
+  a(g);
+  writeln(g);
+end.`,
+    purpose: 'ISO 6.6.3.3/6.6.3.2：值参数是局部变量，被取地址修改后不影响调用方的实参变量',
+    expectedOutput: '9\n1\n',
+  },
+  {
+    name: '6.6.3.2 含指针分量的记录作为值参数按值传递',
+    code: `program test(output);
+type node = record v: integer; next: ^node end;
+var p: node;
+procedure modify(r: node);
+begin
+  r.v := 99;
+  r.next^.v := 7;
+end;
+begin
+  new(p.next);
+  p.v := 1;
+  p.next^.v := 2;
+  modify(p);
+  writeln(p.v);
+  writeln(p.next^.v);
+  dispose(p.next);
+end.`,
+    purpose:
+      'ISO 6.6.3.2/6.4.4：值参数以赋值方式传递，记录整体拷贝故普通字段的修改不影响调用方，而指针分量复制 identifying-value，故所指变量的修改可见',
+    expectedOutput: '1\n7\n',
+  },
+  {
+    name: '6.6.6.2 required 函数须给出规定个数的实参',
+    code: `program test;
+var x: integer;
+begin
+  x := abs();
+end.`,
+    purpose: 'ISO 6.6.6.1/6.6.6.2：abs 等 required 函数须给出与其定义一致的实参个数',
+    expectedError: '',
+  },
+  {
+    name: '6.6.5.2 file of record 在 f.R 为空时 get 违反前断言应报错',
+    code: `program test;
+type r = record a: integer end;
+var f: file of r;
+begin
+  rewrite(f);
+  reset(f);
+  get(f);
+end.`,
+    purpose: 'ISO 6.6.5.2：get(f) 的前断言为 not eof(f)，元素类型为 record 的文件同样适用',
+    expectedError: '',
+  },
+  {
+    name: '6.6.5.2 读状态下对 f^ 赋值违反前断言应报错',
+    code: `program test;
+type r = record a: integer end;
+var f: file of r;
+    x: r;
+begin
+  rewrite(f);
+  x.a := 1;
+  f^ := x;
+  put(f);
+  reset(f);
+  f^ := x;
+end.`,
+    purpose: 'ISO 6.6.5.2：对 f^ 赋值与 put(f) 的前断言要求 f.M = Generation，reset 后文件处于 Inspection',
+    expectedError: '',
+  },
+  {
+    name: '6.6.5.2 单字节元素文件上 f^ 赋值与 put',
+    code: `program test(output);
+var f: packed file of 0..255;
+    n: 0..255;
+begin
+  rewrite(f);
+  f^ := 42;
+  put(f);
+  reset(f);
+  n := f^;
+  writeln(n);
+end.`,
+    purpose: 'ISO 6.6.5.2：f^ 是缓冲变量，对 f^ 赋值后 put(f) 使其成为 f.L 的新分量，reset 后 f^ 即该分量',
+    expectedOutput: '42\n',
+  },
+  {
+    name: '6.6.5.2 file of 枚举类型 的写读往返',
+    code: `program test(output);
+type color = (red, green, blue);
+var f: file of color;
+    c: color;
+begin
+  rewrite(f);
+  write(f, green);
+  reset(f);
+  read(f, c);
+  if c = green then writeln('green');
+end.`,
+    purpose: 'ISO 6.4.3.5/6.6.5.3：file-type 的分量类型可为枚举类型，write/read 与 f^ 赋值、get 等价',
+    expectedOutput: 'green\n',
+  },
 
   // 6.6.5.3 Dynamic allocation procedures
 

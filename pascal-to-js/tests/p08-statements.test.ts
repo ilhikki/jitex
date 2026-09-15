@@ -1316,6 +1316,218 @@ end.`,
     purpose: '6.8.3.10 示例：with 语句体中字段标识符直接指称记录变量的分量',
     expectedOutput: '1\n2000\n',
   },
+  {
+    name: '6.6.2 函数标识符的赋值可嵌于各结构化语句内',
+    code: `program test(output);
+function f1: integer;
+var i: integer;
+begin
+  i := 0;
+  while i < 1 do
+  begin
+    f1 := 1;
+    i := i + 1;
+  end;
+end;
+function f2: integer;
+begin
+  repeat
+    f2 := 2;
+  until true;
+end;
+function f3: integer;
+var i: integer;
+begin
+  for i := 1 to 1 do
+    f3 := 3;
+end;
+function f4: integer;
+var i: integer;
+begin
+  i := 1;
+  case i of
+    1: f4 := 4;
+    2: f4 := 0;
+  end;
+end;
+function f5: integer;
+type r = record x: integer end;
+var v: r;
+begin
+  with v do
+    f5 := 5;
+end;
+function f6: integer;
+label 1;
+begin
+  1: f6 := 6;
+end;
+begin
+  writeln(f1, f2, f3, f4, f5, f6);
+end.`,
+    purpose: 'ISO 6.6.2：function-block 须含至少一条以函数标识符为赋值目标的赋值语句，该赋值可位于任何语句位置',
+    expectedOutput: '123456\n',
+  },
+  {
+    name: '6.8.3.4 if 语句缺少 then 应报错',
+    code: 'program test(output); var b: boolean; begin b := true; if b writeln(1); end.',
+    purpose: 'ISO 6.8.3.4：if-statement = if Boolean-expression then statement [ else statement ]',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.5 while 语句缺少 do 应报错',
+    code: 'program test(output); var b: boolean; begin b := false; while b writeln(1); end.',
+    purpose: 'ISO 6.8.3.5：while-statement = while Boolean-expression do statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.9 for 语句的方向词只能是 to 或 downto',
+    code: 'program test(output); var i: integer; begin for i := 1 by 2 do writeln(i); end.',
+    purpose: 'ISO 6.8.3.9：for-statement = for ... := ... ( to | downto ) ... do statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.9 for 语句缺少 do 应报错',
+    code: 'program test(output); var i: integer; begin for i := 1 to 2 writeln(i); end.',
+    purpose: 'ISO 6.8.3.9：final-value 之后须有 do 与 statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.5 case 语句缺少 of 应报错',
+    code: 'program test(output); var i: integer; begin i := 1; case i 1: writeln(1); end; end.',
+    purpose: 'ISO 6.8.3.5：case-statement = case case-index of case-list-element ... end',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.5 case 常量之后缺少冒号应报错',
+    code: 'program test(output); var i: integer; begin i := 1; case i of 1 writeln(1); end; end.',
+    purpose: 'ISO 6.8.3.5：case-list-element = case-constant-list : statement',
+    expectedError: '',
+  },
+  {
+    name: '6.8.2.4 goto 的目标须为 label',
+    code: `program test(output);
+label 1;
+begin
+  goto 1x;
+  1: writeln(1);
+end.`,
+    purpose: 'ISO 6.8.2.4：goto-statement = goto label，label 为数字序列',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.10 with 语句缺少 do 应报错',
+    code: 'program test; type r = record x: integer end; var v: r; begin with v x := 1; end.',
+    purpose: 'ISO 6.8.3.10：with-statement = with record-variable-list do statement',
+    expectedError: '',
+  },
+  {
+    name: '6.6.5.3 new 的实参须为指针类型的变量',
+    code: 'program test; var i: integer; begin new(i); end.',
+    purpose: 'ISO 6.6.5.3：new(q) 要求 q 具有 pointer-type',
+    expectedError: '',
+  },
+  {
+    name: '6.6.5.3 dispose 的实参须为指针类型的变量',
+    code: 'program test; var i: integer; begin dispose(i); end.',
+    purpose: 'ISO 6.6.5.3：dispose(q) 要求 q 具有 pointer-type',
+    expectedError: '',
+  },
+  {
+    name: '6.8.3.5 case 标签可为 char 类型的常量标识符',
+    code: `program test(output);
+const A = 'a';
+      B = 'b';
+var c: char;
+begin
+  c := 'b';
+  case c of
+    A: writeln('a');
+    B: writeln('b');
+  end;
+end.`,
+    purpose: 'ISO 6.8.3.5/6.3：case-constant 可为 constant-identifier，其值须互异',
+    expectedOutput: 'b\n',
+  },
+  {
+    name: '6.8.3.5 case 索引可为 Boolean 类型',
+    code: `program test(output);
+const T = true;
+      F = false;
+var b: boolean;
+begin
+  b := true;
+  case b of
+    F: writeln('F');
+    T: writeln('T');
+  end;
+end.`,
+    purpose:
+      'ISO 6.8.3.5/6.4.2.2：Boolean 是序数类型，可作 case-index 的类型，其 required constant-identifier 可作 case-constant',
+    expectedOutput: 'T\n',
+  },
+  {
+    name: '6.8.2.2 同一类型的数组变量可整体赋值',
+    code: `program test(output);
+type t = array[1..3] of integer;
+var a, b: t;
+begin
+  a[1] := 1;
+  a[2] := 2;
+  a[3] := 3;
+  b := a;
+  writeln(b[1], b[2], b[3]);
+end.`,
+    purpose: 'ISO 6.8.2.2/6.4.6：赋值的左部与右部表示同一类型时，整体赋值把值复制到每个分量',
+    expectedOutput: '123\n',
+  },
+  {
+    name: '6.8.2.2 元素为 record 的数组分量可整体赋值',
+    code: `program test(output);
+type r = record x: integer; y: char end;
+var a: array[1..2] of r;
+    v: r;
+begin
+  v.x := 5;
+  v.y := 'Q';
+  a[2] := v;
+  writeln(a[2].x, a[2].y);
+end.`,
+    purpose: 'ISO 6.5.3.1/6.8.2.2：数组分量是变量，可作赋值目标并接受同类型记录值',
+    expectedOutput: '5Q\n',
+  },
+  {
+    name: '6.8.2.2 含数组字段的记录可整体赋值',
+    code: `program test(output);
+type r = record n: integer; s: array[1..2] of integer end;
+var a, b: r;
+begin
+  a.n := 1;
+  a.s[1] := 2;
+  a.s[2] := 3;
+  b := a;
+  writeln(b.n, b.s[1], b.s[2]);
+end.`,
+    purpose: 'ISO 6.8.2.2：结构化类型的整体赋值递归复制全部分量的值',
+    expectedOutput: '123\n',
+  },
+  {
+    name: '6.8.2.2 指针元素的数组赋值复制 identifying-value',
+    code: `program test(output);
+type ip = ^integer;
+var a: array[1..2] of ip;
+    p: ip;
+begin
+  new(p);
+  p^ := 8;
+  a[1] := p;
+  a[2] := a[1];
+  writeln(a[2]^);
+  dispose(p);
+end.`,
+    purpose: 'ISO 6.4.4/6.8.2.2：指针的赋值复制 identifying-value，故 a[1] 与 a[2] 标识同一个变量',
+    expectedOutput: '8\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.8 - Statements', tests)

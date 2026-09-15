@@ -139,6 +139,57 @@ end.`,
     purpose: 'ISO 6.3：若 constant 中含符号，则该 constant-identifier 必须已定义为表示 integer 或 real 的值',
     expectedError: '',
   },
+  {
+    name: '6.3 常量定义缺少等号应报错',
+    code: `program p(output);
+const N 1;
+begin
+  writeln(N);
+end.`,
+    purpose: 'ISO 6.3：constant-definition = identifier = constant',
+    expectedError: '',
+  },
+  {
+    name: '6.3 常量定义等号右侧缺少常量应报错',
+    code: `program p(output);
+const N = ;
+begin
+  writeln(N);
+end.`,
+    purpose: 'ISO 6.3：等号右侧须为 constant',
+    expectedError: '',
+  },
+  {
+    name: '6.3 常量定义部分存在非法条目应报错',
+    code: `program p(output);
+const N = 1; = 2;
+begin
+  writeln(N);
+end.`,
+    purpose: 'ISO 6.3：constant-definition-part 中每一项都须以标识符开始',
+    expectedError: '',
+  },
+  {
+    name: '6.3 布尔字面量可作常量值',
+    code: `program p(output);
+const F = true;
+begin
+  if F then writeln('T');
+end.`,
+    purpose: 'ISO 6.3/6.4.2.2：true 与 false 是 required constant-identifier，可作 constant',
+    expectedOutput: 'T\n',
+  },
+  {
+    name: '6.3 常量标识符前可带显式符号',
+    code: `program p(output);
+const A = 5;
+      B = +A;
+begin
+  writeln(B);
+end.`,
+    purpose: 'ISO 6.3：constant 允许带符号，操作数为表示 integer/real 的 constant-identifier',
+    expectedOutput: '5\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.3 - Constant-definitions', tests)

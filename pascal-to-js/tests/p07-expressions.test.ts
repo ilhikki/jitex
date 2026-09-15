@@ -563,6 +563,113 @@ end.`,
     purpose: 'ISO 6.7.3：实参个数须与形参个数相等，少传实参同样应报错',
     expectedError: '',
   },
+  {
+    name: '6.7.1 factor 位置出现非法记号应报错',
+    code: `program test;
+var x: integer;
+begin
+  x := * 3;
+end.`,
+    purpose: 'ISO 6.7.1：factor 只能是常数、变量访问、函数指示符、集合构造器、括号表达式或 not factor',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 括号表达式缺少右圆括号应报错',
+    code: `program test;
+var x: integer;
+begin
+  x := (1 + 2;
+end.`,
+    purpose: 'ISO 6.7.1：parenthesized-expression = ( expression )',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 not 之后缺少 factor 应报错',
+    code: `program test;
+var b: boolean;
+begin
+  b := not ;
+end.`,
+    purpose: 'ISO 6.7.1：not factor 要求 not 之后有合法 factor',
+    expectedError: '',
+  },
+  {
+    name: '6.5.3.2 数组下标表不得为空',
+    code: `program test;
+var a: array[1..3] of integer;
+begin
+  a[] := 1;
+end.`,
+    purpose: 'ISO 6.5.3.2：indexed-variable 的方括号内须有 index-expression-list',
+    expectedError: '',
+  },
+  {
+    name: '6.5.3.3 字段指示符的字段名须为标识符',
+    code: `program test;
+type r = record x: integer end;
+var v: r;
+begin
+  v.1 := 1;
+end.`,
+    purpose: 'ISO 6.5.3.3：field-designator = record-variable . field-identifier',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 集合构造器缺少右方括号应报错',
+    code: `program test;
+var s: set of 1..3;
+begin
+  s := [1, 2;
+end.`,
+    purpose: 'ISO 6.7.1：set-constructor = [ [ element {, element} ] ]',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 集合构造器的 element 非法应报错',
+    code: `program test;
+var s: set of 1..3;
+begin
+  s := [1, , 2];
+end.`,
+    purpose: 'ISO 6.7.1：element = expression [ .. expression ]，不允许空元素',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 集合构造器范围表达式的上端非法应报错',
+    code: `program test;
+var s: set of 1..3;
+begin
+  s := [1..];
+end.`,
+    purpose: 'ISO 6.7.1：element 给出 .. 之后须有第二个 expression',
+    expectedError: '',
+  },
+  {
+    name: '6.7.1 常量表达式可作数组下标（加、减、乘、整除、取余）',
+    code: `program test(output);
+const N = 2;
+var a: array[0..10] of integer;
+begin
+  a[N + 1] := 1;
+  a[N * 3] := 2;
+  a[7 - N] := 3;
+  a[8 div N] := 4;
+  a[9 mod 5] := 5;
+  writeln(a[3], a[6], a[5], a[4]);
+end.`,
+    purpose: 'ISO 6.7.1/6.4.3.2：index-expression-list 中的表达式可用加性/乘性运算符，仅要求其值与 index-type 赋值相容',
+    expectedOutput: '1235\n',
+  },
+  {
+    name: '6.4.3.2 数组下标超出 index-type 范围应报错',
+    code: `program test;
+var a: array[1..10] of integer;
+begin
+  a[11] := 1;
+end.`,
+    purpose: 'ISO 6.4.3.2/6.4.6 c：index-expression 的值须落在 index-type 的值域内',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.7 - Expressions', tests)

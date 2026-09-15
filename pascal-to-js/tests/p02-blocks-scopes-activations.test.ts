@@ -743,6 +743,60 @@ end.`,
     purpose: '局部作用域内未声明的变量引用同样违反先声明后使用',
     expectedError: 'undefined identifier',
   },
+  {
+    name: '6.2 一条 label 声明可含多个逗号分隔的 label',
+    code: `program p(output);
+label 1, 2;
+var x: integer;
+begin
+  x := 0;
+  goto 2;
+1: x := 1;
+2: writeln(x);
+end.`,
+    purpose: 'ISO 6.2.2：label-declaration = label {, label}，一条声明可列举多个标号',
+    expectedOutput: '0\n',
+  },
+  {
+    name: '6.2 同一 label 声明部分内不得重复声明同一 label',
+    code: `program p(output);
+label 1, 1;
+begin
+  1: writeln('x');
+end.`,
+    purpose: 'ISO 6.2.2.7：同一 region 内不得有重复的定义点',
+    expectedError: '',
+  },
+  {
+    name: '6.2 label 必须是数字序列',
+    code: `program p(output);
+label abc;
+begin
+  writeln('x');
+end.`,
+    purpose: 'ISO 6.1.6：label 是 digit-sequence，其余形式不是合法 label',
+    expectedError: '',
+  },
+  {
+    name: '6.2 label 声明须以分号结束',
+    code: `program p(output);
+label 1
+begin
+  writeln('x');
+end.`,
+    purpose: 'ISO 6.2.2：label-declaration-part 的每一项以分号终止',
+    expectedError: '',
+  },
+  {
+    name: '6.2 label 取值不得超出允许范围',
+    code: `program p(output);
+label 10000;
+begin
+  10000: writeln('x');
+end.`,
+    purpose: 'ISO 6.1.6：label 的取值范围为 0..9999',
+    expectedError: '',
+  },
 ]
 
 runPascalTests('ISO 7185 6.2 - Blocks, scopes, and activations', tests)

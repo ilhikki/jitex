@@ -306,6 +306,26 @@ end.`,
     purpose: '注释在遇到的第一个右定界符处结束，不会嵌套',
     expectedError: '',
   },
+  {
+    name: '6.1 圆括号星号注释可以右花括号结尾',
+    code: `program p(output);
+(* comment ends with }
+begin
+  writeln(5);
+end.`,
+    purpose: 'ISO 6.1.8：注释以 (* 开始时可被 } 结束，两种结束定界符都能终止注释',
+    expectedOutput: '5\n',
+  },
+  {
+    name: '6.1 注释正文以 $ 开头仍是注释',
+    code: `program p(output);
+{$commentary}
+begin
+  writeln(6);
+end.`,
+    purpose: 'ISO 6.1.8：commentary 是任意字符序列，正文内容不影响注释的识别与跳过',
+    expectedOutput: '6\n',
+  },
 ]
 
 runPascalTests('ISO 7185 6.1 - Lexical tokens', tests)
