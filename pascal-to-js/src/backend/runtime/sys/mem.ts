@@ -6,16 +6,18 @@
  * 没有任何类型参数或类型分派。
  *
  * 多字节标量一律大端。
+ *
+ * 已被 codegen 内联为宿主表达式（见 sys/pascal-semantic-compiler.ts 的 inlineSyscalls）
+ * 的 key 不在此实现：memory.new / memory.clone / memory.copy、cell.new / cell.get /
+ * cell.set、array.get.object / array.set.object / array.sublist。
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
+import type { SyscallHandler } from '../runtime-type.ts'
 
 /**
  * object 数组的统一表示：所有含 object 元素（file / pointer / 含它们的 record）
  * 的数组都用视图承载，下标 = base[offset + idx]。
- * 部分下标（a[i] on 二维数组）只是在视图上叠加 offset，共享同一 base，
- * 因此 arrGet / arrSet 对「完整数组」和「子数组视图」一视同仁，无需分支。
  */
 interface ObjArrView {
   base: unknown[]
@@ -52,6 +54,9 @@ function assertView(view: unknown, what: string): asserts view is Uint8Array {
  *
  * 每个 key 固定一种标量种类，handler 直接调用对应的 DataView 方法——
  * 运行期既没有类型参数，也没有分支。
+ *
+ * 刻意不内联：内联版每次读写都要重新构造 DataView，
+ * 而这里按底层 ArrayBuffer 复用（见 dv 的说明）。
  */
 function bytesAccessSyscalls(): Record<string, SyscallHandler> {
   const reader = (
@@ -136,14 +141,8 @@ function withBit(bits: number[], size: number): Uint8Array {
 
 export function memSyscalls(): Record<string, SyscallHandler> {
   return {
-    [rtKeys.memoryNew]: (_ctx, size) => new Uint8Array(size as number),
-    [rtKeys.memoryClone]: (_ctx, src, size) => (src as Uint8Array).slice(0, size as number),
-    [rtKeys.memoryCopy]: (_ctx, dst, dstOff, src, size) => {
-      const d = dst as Uint8Array
-      const s = src as Uint8Array
-      d.set(s.subarray(0, size as number), dstOff as number)
-      return undefined
-    },
+    // 视图切分。codegen 仅在 offset 为简单表达式时内联（避免重复求值），
+    // 其余情形仍走 dispatcher，故保留本 handler。
     [rtKeys.viewSubarray]: (_ctx, view, offset, size) => {
       const v = view as Uint8Array
       const off = offset as number
@@ -151,29 +150,6 @@ export function memSyscalls(): Record<string, SyscallHandler> {
     },
 
     ...bytesAccessSyscalls(),
-
-    [rtKeys.cellNew]: (_ctx, v): PascalCell => ({ kind: 'cell', value: v }),
-    [rtKeys.cellGet]: (_ctx, c) => (c as PascalCell).value,
-    [rtKeys.cellSet]: (_ctx, c, v) => {
-      ;(c as PascalCell).value = v
-      return undefined
-    },
-
-    // 所有 object 数组，无论是否部分下标，都表示为视图；get / set / sublist 无需分支
-    [rtKeys.arrayGetObject]: (_ctx, arr, idx) => {
-      const v = arr as ObjArrView
-      return v.base[v.offset + (idx as number)]
-    },
-    [rtKeys.arraySetObject]: (_ctx, arr, idx, val) => {
-      const v = arr as ObjArrView
-      v.base[v.offset + (idx as number)] = val
-      return undefined
-    },
-    // 部分下标：在已有视图上叠加偏移，共享同一 base（同一分量）
-    [rtKeys.arraySublist]: (_ctx, arr, offset) => {
-      const v = arr as ObjArrView
-      return { base: v.base, offset: v.offset + (offset as number) }
-    },
 
     [rtKeys.arrayPack]: (_ctx, src, srcLow, elemSize, start, dst, count) => {
       const s = src as Uint8Array
