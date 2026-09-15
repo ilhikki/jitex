@@ -36,6 +36,7 @@ import type {
   LabeledStatementNode,
   ParameterDeclarationNode,
   ParenthesizedExpressionNode,
+  PointerTypeNode,
   ProcedureCallNode,
   ProcedureDeclarationNode,
   ProgramNode,
@@ -140,6 +141,8 @@ function printNode(node: AstNode, ctx: PrintContext): string {
       return printSetType(node as SetTypeNode, ctx)
     case 'EnumerationType':
       return printEnumType(node as EnumerationTypeNode)
+    case 'PointerType':
+      return printPointerType(node as PointerTypeNode, ctx)
 
     // 表达式
     case 'Identifier':
@@ -373,14 +376,12 @@ function printLoopBody(stmt: StatementNode, ctx: PrintContext): string {
 function printCase(node: CaseStatementNode, ctx: PrintContext): string {
   const expr = printExpr(node.expression, ctx)
   const innerCtx = withIndent(ctx, 1)
-  const branches = node.branches.map((b) => printCaseBranch(b, innerCtx))
-  let result = `case ${expr} of\n${branches.join(';\n')}`
+  const parts = node.branches.map((b) => printCaseBranch(b, innerCtx))
   if (node.otherwise) {
     const otherwiseCode = printStatement(node.otherwise, innerCtx)
-    result += `;\n${indentStr(innerCtx)}otherwise ${otherwiseCode}`
+    parts.push(`${indentStr(innerCtx)}otherwise ${otherwiseCode}`)
   }
-  result += `\n${indentStr(ctx)}end`
-  return result
+  return `case ${expr} of\n${parts.join(';\n')}\n${indentStr(ctx)}end`
 }
 
 function printCaseBranch(branch: CaseBranchNode, ctx: PrintContext): string {
@@ -520,4 +521,8 @@ function printSetType(node: SetTypeNode, ctx: PrintContext): string {
 function printEnumType(node: EnumerationTypeNode): string {
   const values = node.values.map((v) => v.name).join(', ')
   return `(${values})`
+}
+
+function printPointerType(node: PointerTypeNode, ctx: PrintContext): string {
+  return `^${printType(node.domainType, ctx)}`
 }

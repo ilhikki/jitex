@@ -1,4 +1,4 @@
-import { run } from '@jitex/pascal-to-js'
+import { nodeToCode, parse, run } from '@jitex/pascal-to-js'
 import type { ExtraCallable, PascalFileStore, RunState, SyscallHandler } from '@jitex/pascal-to-js'
 import { BlockStore, MemoryTextFile } from '@jitex/pascal-to-js'
 import { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
@@ -104,6 +104,10 @@ export function runPascalTest(t: PascalTest): void {
 
   try {
     assertCase(t, state, output.getContent(), ctx)
+    // 期望编译通过的用例：额外验证源码往返（parse → print → parse → print）的稳定性
+    if (t.expectedError === undefined) {
+      assertPrintRoundTripStable(t.code, ctx)
+    }
   } catch (err) {
     if (state.jsCode) {
       console.error(state.jsCode)
@@ -113,6 +117,28 @@ export function runPascalTest(t: PascalTest): void {
     }
     throw err
   }
+}
+
+/**
+ * 源码往返检查：parse → print → parse → print。
+ *
+ * 期望编译通过的用例，其打印结果必须稳定：第二次打印须与第一次完全相同。
+ * 打印结果无法再次 parse、或两次打印不同，都说明 printer 丢失或改写了原 AST 的信息。
+ */
+function assertPrintRoundTripStable(code: string, ctx: string): void {
+  const first = parse(code)
+  if (!first.success) {
+    throw new Error(`${ctx}: parse 失败: ${first.error}`)
+  }
+  const printedOnce = nodeToCode(first.astNode)
+
+  const second = parse(printedOnce)
+  if (!second.success) {
+    throw new Error(`${ctx}: 打印结果无法再次 parse: ${second.error}`)
+  }
+  const printedTwice = nodeToCode(second.astNode)
+
+  assertEquals(printedTwice, printedOnce, `${ctx}: 两次 print 的结果不一致`)
 }
 
 /** 按用例声明的断言字段逐项校验 */
