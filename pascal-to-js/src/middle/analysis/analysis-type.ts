@@ -105,9 +105,21 @@ export interface FuncSymbol {
   retTypeInfo?: TypeInfo
 }
 
+/**
+ * 字面量编码 + 其类型。
+ *
+ * key 只描述宿主表示（number / string / bytes / field …），
+ * Pascal 类型由 typeInfo 单独携带，不从 key 反推。
+ */
+export interface LiteralValue {
+  key: string
+  arg: string
+  typeInfo: TypeInfo
+}
+
 export interface ConstSymbol {
   kind: 'const'
-  literal: { key: string; arg: string }
+  literal: LiteralValue
   typeInfo: TypeInfo
 }
 
@@ -263,7 +275,7 @@ export function evalConstInt(
     }
     case 'Identifier': {
       const sym = lookup(node.name)
-      if (sym?.kind === 'const' && sym.literal.key === 'integer') {
+      if (sym?.kind === 'const' && sym.typeInfo.tag === 'integer') {
         return parseInt(sym.literal.arg, 10)
       }
       return undefined
@@ -284,43 +296,29 @@ export function evalConstChar(node: ExpressionNode): string | undefined {
   return undefined
 }
 
-/** 字面量 → { key, arg } 编码（const 声明用） */
+/** 字面量 → 编码 + 类型（const 声明用） */
 export function evalLiteral(
   node: ExpressionNode,
-): { key: string; arg: string } | undefined {
+): LiteralValue | undefined {
   switch (node.kind) {
     case 'IntegerLiteral':
-      return { key: 'integer', arg: node.raw }
+      return { key: 'number', arg: node.raw, typeInfo: { tag: 'integer' } }
     case 'RealLiteral':
-      return { key: 'real', arg: node.raw }
+      return { key: 'number', arg: node.raw, typeInfo: { tag: 'real' } }
     case 'StringLiteral':
-      return { key: 'string', arg: node.value }
+      // ISO 7185 6.1.7：string-literal 的类型是 packed array[1..n] of char
+      return {
+        key: 'string',
+        arg: node.value,
+        typeInfo: { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } },
+      }
     case 'CharLiteral':
-      return { key: 'char', arg: node.value }
+      return { key: 'string', arg: node.value, typeInfo: { tag: 'char' } }
     case 'BooleanLiteral':
-      return { key: 'boolean', arg: node.value ? 'true' : 'false' }
+      // boolean 取序数值（ISO 6.4.2.2）：true → 1，false → 0
+      return { key: 'number', arg: node.value ? '1' : '0', typeInfo: { tag: 'boolean' } }
     default:
       return undefined
-  }
-}
-
-/** literal key → TypeInfo（const 声明的类型推断） */
-export function typeInfoOfLiteralKey(key: string): TypeInfo {
-  switch (key) {
-    case 'integer':
-      return { tag: 'integer' }
-    case 'real':
-      return { tag: 'real' }
-    case 'boolean':
-      return { tag: 'boolean' }
-    case 'char':
-      return { tag: 'char' }
-    // key 'string' 是字符串字面量的编码层 key（非类型），
-    // ISO 7185 中字符串字面量类型为 packed array[1..n] of char。
-    case 'string':
-      return { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } }
-    default:
-      return { tag: 'unknown' }
   }
 }
 

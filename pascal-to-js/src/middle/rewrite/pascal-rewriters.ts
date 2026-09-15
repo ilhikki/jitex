@@ -32,7 +32,7 @@ function sc(key: string, args: JsonCode.Expr[]): JsonCode.Syscall {
 }
 
 function litInt(v: number): JsonCode.Literal {
-  return { kind: 'literal', key: 'integer', arg: String(v) }
+  return { kind: 'literal', key: 'number', arg: String(v) }
 }
 
 function litStr(s: string): JsonCode.Literal {
@@ -40,11 +40,11 @@ function litStr(s: string): JsonCode.Literal {
 }
 
 function litReal(v: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'real', arg: v }
+  return { kind: 'literal', key: 'number', arg: v }
 }
 
 function litChar(ch: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'char', arg: ch }
+  return { kind: 'literal', key: 'string', arg: ch }
 }
 
 function isNullLit(e: JsonCode.Expr | undefined): boolean {
@@ -609,7 +609,7 @@ function addOffset(delta: JsonCode.Expr | undefined, offset: JsonCode.Expr): Jso
   if (delta === undefined) {
     return offset
   }
-  if (offset.kind === 'literal' && offset.key === 'integer' && offset.arg === '0') {
+  if (offset.kind === 'literal' && offset.key === 'number' && offset.arg === '0') {
     return delta
   }
   return sc(rtKeys.int32Add, [delta, offset])

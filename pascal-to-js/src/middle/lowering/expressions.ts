@@ -114,11 +114,11 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
   }
 
   if (sym?.kind === 'const') {
-    // const 字符串字面量 → Uint8Array；char → ord 值；其它直接用 literal
-    if (sym.literal.key === 'string') {
+    // const 字符串字面量 → Uint8Array；char → ord 值；数值 / 布尔直接用字面量
+    if (sym.typeInfo.tag === 'array') {
       return litBytes(sym.literal.arg)
     }
-    if (sym.literal.key === 'char') {
+    if (sym.typeInfo.tag === 'char') {
       return litInt(sym.literal.arg.charCodeAt(0))
     }
     return { kind: 'literal', key: sym.literal.key, arg: sym.literal.arg }

@@ -28,9 +28,9 @@ import {
   evalLiteral,
   FuncInfo,
   FuncKind,
+  LiteralValue,
   SIMPLE_TYPES,
   TypeInfo,
-  typeInfoOfLiteralKey,
   TypeTag,
   VariantBranchInfo,
   VariantPartInfo,
@@ -282,8 +282,7 @@ class DeclarationPass {
   private analyzeConst(decl: ConstDeclarationNode): void {
     const lit = this.evalConstValue(decl.value)
     if (lit) {
-      const ti = typeInfoOfLiteralKey(lit.key)
-      this.bind(decl.name.name, { kind: 'const', literal: lit, typeInfo: ti })
+      this.bind(decl.name.name, { kind: 'const', literal: lit, typeInfo: lit.typeInfo })
     } else {
       this.bind(decl.name.name, { kind: 'type', typeInfo: { tag: 'unknown' } })
     }
@@ -293,15 +292,15 @@ class DeclarationPass {
    * ISO 6.3：constant = [ sign ] ( unsigned-number | constant-identifier ) | character-string
    * 除字面量外，还须支持带符号常量（-5）与对已定义常量的引用（B = A）。
    */
-  private evalConstValue(node: ExpressionNode): { key: string; arg: string } | undefined {
+  private evalConstValue(node: ExpressionNode): LiteralValue | undefined {
     const lit = evalLiteral(node)
     if (lit) {
       return lit
     }
     if (node.kind === 'UnaryExpression' && (node.operator === '-' || node.operator === '+')) {
       const inner = this.evalConstValue(node.operand)
-      if (inner && (inner.key === 'integer' || inner.key === 'real')) {
-        return node.operator === '-' ? { key: inner.key, arg: `-${inner.arg}` } : inner
+      if (inner && (inner.typeInfo.tag === 'integer' || inner.typeInfo.tag === 'real')) {
+        return node.operator === '-' ? { ...inner, arg: `-${inner.arg}` } : inner
       }
       return undefined
     }
@@ -435,7 +434,7 @@ class DeclarationPass {
         for (let i = 0; i < node.values.length; i++) {
           this.bind(node.values[i].name, {
             kind: 'const',
-            literal: { key: 'integer', arg: String(i) },
+            literal: { key: 'number', arg: String(i), typeInfo: { tag: 'integer' } },
             typeInfo: { tag: 'integer' },
           })
         }

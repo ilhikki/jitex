@@ -224,14 +224,16 @@ export interface Ref {
  *   - JsonCode 可序列化。
  *   - 不绑定到具体宿主语言的数值精度 / 字符串编码。
  *
- * key  分类；arg 具体内容。下游 codegen 负责按 key 解释 arg。
+ * key 描述的是**宿主表示**（下游 codegen 据此解释 arg），不含 Pascal 类型语义；
+ * Pascal 类型由 analysis 的 TypeInfo 单独承载。
  *
  * 推荐但非强制的 key 集合：
- *   - 'integer' : arg = 十进制整数字符串（有符号）。
- *   - 'real'    : arg = 浮点数字符串。
- *   - 'string'  : arg = 字符串内容（不含边界引号，已还原转义）。
- *   - 'char'    : arg = 单个字符（已还原转义）。
- *   - 'boolean' : arg = 'true' 或 'false'。
+ *   - 'number'  : arg = 数字字符串（整型 / 实型 / 布尔序数值）。
+ *   - 'string'  : arg = 字符串或单字符内容（不含边界引号，已还原转义）。
+ *   - 'bytes'   : arg = 字节数组的 JSON 形式（字符串字面量 → Uint8Array）。
+ *   - 'field'   : arg = 记录字段名。
+ *   - 'null'    : arg = nil-value。
+ *   - 'type'    : arg = 序列化的类型描述（由 rewrite 消费，正常路径不进 codegen）。
  *   - 'unit'    : arg = ''。表示"无值"占位。
  */
 export interface Literal {

@@ -27,11 +27,11 @@ export function ref(varId: number): JsonCode.Ref {
 }
 
 export function litInt(v: number | string): JsonCode.Literal {
-  return { kind: 'literal', key: 'integer', arg: String(v) }
+  return { kind: 'literal', key: 'number', arg: String(v) }
 }
 
 export function litReal(v: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'real', arg: v }
+  return { kind: 'literal', key: 'number', arg: v }
 }
 
 export function litStr(v: string): JsonCode.Literal {
@@ -52,15 +52,15 @@ export function litField(v: string): JsonCode.Literal {
 }
 
 /**
- * char 字面量 → integer 字面量（char 用 ord 值表示，ISO 6.4.2.3）。
+ * char 字面量 → 数值字面量（char 用 ord 值表示，ISO 6.4.2.3）。
  */
 export function litChar(v: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'integer', arg: String(v.charCodeAt(0)) }
+  return { kind: 'literal', key: 'number', arg: String(v.charCodeAt(0)) }
 }
 
 export function litBool(v: boolean): JsonCode.Literal {
   // boolean 取序数值 0/1（ISO 6.4.2.2）
-  return { kind: 'literal', key: 'integer', arg: v ? '1' : '0' }
+  return { kind: 'literal', key: 'number', arg: v ? '1' : '0' }
 }
 
 export function litNull(): JsonCode.Literal {
