@@ -1,7 +1,7 @@
 /*
  * structurizer 入口。
  *
- * 流水线：cfg → simplify → normalize → analyze → plan → lower → print
+ * 流水线：cfg → simplify → normalize → analyze → plan → lower → tidy → print
  * 每一级都是纯函数，输入输出都是数据结构；唯一的副作用在最后一级（产出文本）。
  */
 
@@ -12,6 +12,7 @@ import { analyze } from './analysis.ts'
 import { normalize } from './normalize.ts'
 import { plan } from './plan.ts'
 import { lower } from './lower.ts'
+import { tidyTree } from './tidy.ts'
 import { emitSNode } from './print.ts'
 import type { SNode, StructurizeContext, StructurizeResult } from './types.ts'
 
@@ -58,5 +59,5 @@ export function structurize(fn: JsonCode.Function, ctx: StructurizeContext): Str
     return { kind: 'unstructured', reason: 'unrepresentable' }
   }
 
-  return { kind: 'structured', body: lower(normalized.cfg, planned.plan) }
+  return { kind: 'structured', body: tidyTree(lower(normalized.cfg, planned.plan)) }
 }

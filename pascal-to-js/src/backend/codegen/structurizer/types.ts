@@ -4,7 +4,7 @@
  * 数据流：
  *   JsonCode.Statement[]  ──cfg──▶  Cfg  ──simplify──▶  Cfg
  *     ──normalize──▶  Cfg  ──analysis──▶  Analysis
- *     ──plan──▶  Plan  ──lower──▶  SNode[]  ──print──▶  string
+ *     ──plan──▶  Plan  ──lower──▶  SNode[]  ──tidy──▶  SNode[]  ──print──▶  string
  */
 
 import type * as JsonCode from '@/middle/ir/json-code.ts'
