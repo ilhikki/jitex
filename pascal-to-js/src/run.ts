@@ -52,7 +52,7 @@ export interface TransformOptions {
    * 注意：非 debug 构建下，ISO 7185 定为 error 的情形（6.7.2.2 除数为 0 /
    * 负数、6.4.2.4 子界越界）不再被捕获，行为由宿主实现决定。
    */
-  debug?: boolean
+  debug: boolean
 }
 
 function parseSource(source: string): ProgramNode {
@@ -65,7 +65,7 @@ function parseSource(source: string): ProgramNode {
   return result.astNode as ProgramNode
 }
 
-export function transform(source: string, options: TransformOptions = {}): string {
+export function transform(source: string, options: TransformOptions = { debug: false }): string {
   const ast = parseSource(source)
 
   const analysis = analyzeProgram(ast, options.extraCallables)
@@ -81,6 +81,7 @@ export function transform(source: string, options: TransformOptions = {}): strin
   const { code: jsBody, mainName } = toJs(ir, {
     semantic,
     debugNames: analysis.debugNames(),
+    debug: options.debug === true,
   })
 
   return `${jsBody}\nexport default ${mainName};`
@@ -147,7 +148,7 @@ export function runJs(source: string, options: RuntimeOptions): RunState {
   }
 }
 
-export function run(source: string, options: RunOptions = {}): RunState {
+export function run(source: string, options: RunOptions = { debug: false }): RunState {
   let jsCode
   try {
     jsCode = transform(source, {

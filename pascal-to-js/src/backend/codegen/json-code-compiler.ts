@@ -5,16 +5,20 @@ export interface ToJsOptions {
   semantic?: SemanticCompiler
   /** id → 可读名字映射。提供时，生成的变量/函数名变为 v{id}_{name}，便于调试。 */
   debugNames?: Map<number, string>
+  debug: boolean
 }
 
 export interface SemanticCompiler {
   syscallToJs(syscall: JsonCode.Syscall, compiler: JsCompiler): string | undefined
+
   literalToJs(literal: JsonCode.Literal, compiler: JsCompiler): string | undefined
 }
 
 export interface JsCompiler {
   compileId(id: number): string
+
   compileExpr(expr: JsonCode.Expr): string
+
   compileStatement(stmt: JsonCode.Statement): string
 }
 
@@ -24,7 +28,7 @@ export interface ToJsResult {
   mainName: string
 }
 
-export function toJs(fn: JsonCode.Function, options: ToJsOptions = {}): ToJsResult {
+export function toJs(fn: JsonCode.Function, options: ToJsOptions = { debug: false }): ToJsResult {
   const longJumpTargets = new Set<number>()
   collectLongJumpTargets(fn, longJumpTargets)
   const compiler = new JsCompilerImpl(options, longJumpTargets)
@@ -47,7 +51,8 @@ class JsCompilerImpl implements JsCompiler {
   constructor(
     private readonly options: ToJsOptions,
     private readonly longJumpTargets: ReadonlySet<number>,
-  ) {}
+  ) {
+  }
 
   private get structCtx(): StructurizeContext {
     return {
@@ -191,7 +196,7 @@ class JsCompilerImpl implements JsCompiler {
 
   compileId(id: number): string {
     const name = this.options.debugNames?.get(id)
-    if (name) {
+    if (this.options.debug && name) {
       return `v${id}_${name}`
     }
     return `v${id}`

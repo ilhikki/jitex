@@ -137,8 +137,7 @@ const
 begin
   writeln(k);
 end.`,
-    purpose:
-      '常量值经 evalLiteral 进入 IR，同样必须按十进制处理：const k = 0100000 的 k 是 100000',
+    purpose: '常量值经 evalLiteral 进入 IR，同样必须按十进制处理：const k = 0100000 的 k 是 100000',
     expectedOutput: '100000\n',
   },
   {

@@ -81,6 +81,7 @@ export function runPascal(t: PascalTest): RunState {
     maxSteps: t.maxSteps ?? 1e5,
     extraCallables: t.extraCallables,
     extraSyscalls: t.extraSyscalls,
+    debug: true,
   })
 }
 

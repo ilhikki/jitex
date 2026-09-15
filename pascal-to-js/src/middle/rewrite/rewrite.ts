@@ -41,7 +41,7 @@ import type * as JsonCode from '@/middle/ir/json-code.ts'
  * 注意：若返回一个新的 Syscall 且其 args 中含未被处理过的 Syscall，
  * 这些"未处理"的 Syscall 不会被本 pass 再次调用重写函数。
  */
-export type SyscallRewriter = (sc: JsonCode.Syscall) => JsonCode.Expr
+export type SyscallRewriter = (sc: JsonCode.Syscall) => JsonCode.Expr | undefined
 
 /**
  * 按 syscall key 分发的重写表。
@@ -83,14 +83,14 @@ function rewriteFunction(
   return {
     ...fn,
     children: fn.children.map((c) => rewriteFunction(c, mapping)),
-    body: fn.body.map((stmt) => rewriteStatement(stmt, mapping)),
+    body: filterNotUndefined(fn.body.map((stmt) => rewriteStatement(stmt, mapping))),
   }
 }
 
 function rewriteStatement(
   stmt: JsonCode.Statement,
   mapping: SyscallMapping,
-): JsonCode.Statement {
+): JsonCode.Statement | undefined {
   switch (stmt.kind) {
     case 'label':
     case 'jump':
@@ -98,38 +98,60 @@ function rewriteStatement(
       // 这三类语句不含 Expr，无需重写
       return stmt
     case 'jumpIf':
-      return { ...stmt, condition: rewriteExpr(stmt.condition, mapping) }
+      return { ...stmt, condition: requireNotUndefined(rewriteExpr(stmt.condition, mapping)) }
     case 'assign':
       // target 是 Ref，不含 Syscall；只重写 value
-      return { ...stmt, value: rewriteExpr(stmt.value, mapping) }
-    case 'eval':
-      return { ...stmt, expr: rewriteExpr(stmt.expr, mapping) }
+      return { ...stmt, value: requireNotUndefined(rewriteExpr(stmt.value, mapping)) }
+    case 'eval': {
+      const expr = rewriteExpr(stmt.expr, mapping)
+      if (expr === undefined) {
+        return undefined
+      }
+      return { ...stmt, expr: requireNotUndefined(expr) }
+    }
     case 'return':
       // value 可选；过程调用风格的 Return 无 value
-      return stmt.value === undefined ? stmt : { ...stmt, value: rewriteExpr(stmt.value, mapping) }
+      return stmt.value === undefined ? stmt : { ...stmt, value: requireNotUndefined(rewriteExpr(stmt.value, mapping)) }
   }
+}
+
+function requireNotUndefined<T>(e: T | undefined): T {
+  if (e === undefined) {
+    throw new Error('expect not undefined')
+  }
+  return e
 }
 
 function rewriteExpr(
   expr: JsonCode.Expr,
   mapping: SyscallMapping,
-): JsonCode.Expr {
+): JsonCode.Expr | undefined {
   switch (expr.kind) {
     case 'syscall': {
       // 1) 先递归 args —— 保证叶子 syscall 先被 mapping 处理
       const args = expr.args.map((a) => rewriteExpr(a, mapping))
-      const rewritten: JsonCode.Syscall = { ...expr, args }
+      const rewritten: JsonCode.Syscall = { ...expr, args: filterNotUndefined(args) }
       // 2) 对本节点调 mapping；返回值不再递归处理
       return mapping(rewritten)
     }
     case 'call':
       // Call 本身不经过 mapping；但其 args 可能含 Syscall，需递归
-      return { ...expr, args: expr.args.map((a) => rewriteExpr(a, mapping)) }
+      return { ...expr, args: filterNotUndefined(expr.args.map((a) => rewriteExpr(a, mapping))) }
     case 'ref':
     case 'literal':
       // 叶子节点，不含 Syscall
       return expr
   }
+}
+
+function filterNotUndefined<T>(array: Array<undefined | T>): T[] {
+  const result: T[] = []
+  for (const element of array) {
+    if (element !== undefined) {
+      result.push(element)
+    }
+  }
+  return result
 }
 
 // 表合并与映射合成

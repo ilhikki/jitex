@@ -99,7 +99,7 @@ export const rtKeys = {
   pointerAssign: 'runtime.pointer.assign',
   pointerDisposeCheck: 'runtime.pointer.disposeCheck',
 
-  hookFunctionEnter: 'runtime.hook.function.enter',
+  hookFunctionEnter: 'runtime.debug.hook.function.enter',
 
   // debug 构建专属的检查原语。
   //

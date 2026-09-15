@@ -348,9 +348,8 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
  * 构建 Pascal → runtime 的 IR 重写表。
  *
  * `debug` 决定是否产出 `runtime.debug.*` 检查（边界 / 步数 / 除零 / 视图断言）。
- * 默认 true；置 false 时这些检查完全不进入生成的代码。
  */
-export function buildPascalRewriteTable(debug = true): SyscallRewriteTable {
+export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
   return {
     'lowering.add': binary(rtKeys.int32Add, rtKeys.float32Add, rtKeys.bitmapUnion),
     'lowering.sub': binary(rtKeys.int32Subtract, rtKeys.float32Subtract, rtKeys.bitmapDifference),
@@ -618,10 +617,9 @@ export function buildPascalRewriteTable(debug = true): SyscallRewriteTable {
     'lowering.cell.set': (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),
     // 可调用形参的间接调用：callee 为函数值，是个原子操作，无需类型分派
     'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
-    // debug 构建才产出：非 debug 时返回原值 / 常量占位（均无副作用）
     'lowering.range.check': (sys) => debug ? sc(rtKeys.debugRangeCheck, sys.args) : sys.args[0],
     'lowering.steps.check': () => debug ? sc(rtKeys.debugStepsCheck, []) : litInt(0),
-    'lowering.hook.function.enter': () => sc(rtKeys.hookFunctionEnter, []),
+    'lowering.hook.function.enter': () => debug ? sc(rtKeys.hookFunctionEnter, []) : undefined,
   }
 }
 
