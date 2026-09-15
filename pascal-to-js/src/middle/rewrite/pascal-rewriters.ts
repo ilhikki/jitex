@@ -43,10 +43,6 @@ function litReal(v: string): JsonCode.Literal {
   return { kind: 'literal', key: 'number', arg: v }
 }
 
-function litChar(ch: string): JsonCode.Literal {
-  return { kind: 'literal', key: 'string', arg: ch }
-}
-
 function isNullLit(e: JsonCode.Expr | undefined): boolean {
   return e !== undefined && e.kind === 'literal' && e.key === 'null'
 }
@@ -127,7 +123,8 @@ function defaultValueExpr(td: TypeDescriptor): JsonCode.Expr {
     case 'real':
       return litReal('0')
     case 'char':
-      return litChar('\x00')
+      // char 是字节序数，与 integer 同表示（具体宿主形态由 runtime 决定）
+      return litInt(0)
     case 'set':
       return sc(rtKeys.bytesAlloc, [litInt(setSize(td))])
     case 'pointer':

@@ -65,8 +65,8 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
       const x = a as number
       return Math.trunc(x >= 0 ? x + 0.5 : x - 0.5) | 0
     },
-    // 实参在本 handler 内被多次使用，内联会造成重复求值（与 dispatcher 语义不一致）
-    [rtKeys.castCharToInt32]: (_ctx, a) => typeof a === 'string' ? a.charCodeAt(0) : (a as number),
+    // char 的宿主表示统一为字节值（number），无类型分派
+    [rtKeys.castCharToInt32]: (_ctx, a) => (a as number) & 0xff,
 
     // ISO 7185 6.5.4: 指针解引用 p^ — nil 解引用是 error (6.4.4)
     [rtKeys.pointerDereference]: (_ctx, p) => {

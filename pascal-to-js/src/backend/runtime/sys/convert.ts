@@ -30,7 +30,7 @@ export function convertSyscalls(): Record<string, SyscallHandler> {
       return pad(text, w)
     },
     [rtKeys.convertBooleanToText]: (_ctx, b, w) => pad(b ? 'TRUE' : 'FALSE', w),
-    [rtKeys.convertInt32ToChar]: (_ctx, n, w) => pad(String.fromCharCode(n as number), w),
+    [rtKeys.convertInt32ToChar]: (_ctx, n, w) => pad(String.fromCharCode((n as number) & 0xff), w),
     /**
      * ISO 6.9.3.6：string-type 值的字段宽度。
      * TotalWidth > n 时先写 (TotalWidth - n) 个空格再写全部字符；
@@ -78,7 +78,7 @@ export function convertSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.convertBytesToFloat32]: (_ctx, b) => dataView(b as Uint8Array).getFloat32(0, false),
     [rtKeys.convertBytesToBoolean]: (_ctx, b) => ((b as Uint8Array)[0] ? 1 : 0),
 
-    [rtKeys.convertCharToInt32]: (_ctx, c) =>
-      typeof c === 'string' ? (c.length > 0 ? c.charCodeAt(0) : 0) : (c as number),
+    // char 的宿主表示统一为字节值（number），无类型分派
+    [rtKeys.convertCharToInt32]: (_ctx, c) => (c as number) & 0xff,
   }
 }

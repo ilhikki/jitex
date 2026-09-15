@@ -84,7 +84,7 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // 内联会造成实参重复求值（与 dispatcher 语义不一致），暂不内联。
   [rtKeys.castFloat32ToInt32]: (a) => `(Math.trunc(${a[0]}))`,
   [rtKeys.castBooleanToInt32]: (a) => `((${a[0]}) ? 1 : 0)`,
-  [rtKeys.castInt32ToChar]: (a) => `(String.fromCharCode(${a[0]}))`,
+  [rtKeys.castInt32ToChar]: (a) => `((${a[0]}) & 0xff)`,
 
   // bytes.alloc / bytes.clone / bytes.copy：每个实参只出现一次
   [rtKeys.bytesAlloc]: (a) => `(new Uint8Array(${a[0]}))`,

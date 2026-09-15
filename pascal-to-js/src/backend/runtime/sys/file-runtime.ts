@@ -298,15 +298,9 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // `f^ := x`（text，elem 为 char）：char 以 ord 值承载，需转回字符写
+    // `f^ := x`（text，elem 为 char）：char 即字节，直接写低 8 位
     [rtKeys.filePutBufferCharacter]: (_ctx, f, unit) => {
-      const store = textStore(f as PascalFile)
-      const code = unit as number
-      if (code < 0x80) {
-        store.writeByte(code)
-        return undefined
-      }
-      store.writeBytes(encodeUtf8(String.fromCharCode(code)))
+      textStore(f as PascalFile).writeByte((unit as number) & 0xff)
       return undefined
     },
 
@@ -424,20 +418,19 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
 }
 
 /**
- * 文本单位写入：string → UTF-8 字节。
+ * 文本单位写入。
  *
- * ASCII 单字符直接写字节（与 UTF-8 编码结果逐位相同），跳过 TextEncoder。
- * 这是 TeX / TANGLE 的主输出路径（WEB 的 print_char 逐字符写出），
- * 走 TextEncoder 时每个字符都要分配一个 1 字节缓冲、再穿过 JS/Rust 边界调
- * op_encode，实测约 2µs/字符，比直写字节贵一个数量级。
+ * 单字符即一个字节：按 code unit 写一字节，跳过 TextEncoder。这是 TeX / TANGLE
+ * 的主输出路径（WEB 的 print_char 逐字符写出），走 TextEncoder 时每个字符都要
+ * 分配一个 1 字节缓冲、再穿过 JS/Rust 边界调 op_encode，实测约 2µs/字符，
+ * 比直写字节贵一个数量级。
+ *
+ * 多字符（数字格式化结果等）是 ASCII 文本，仍走 UTF-8 编码。
  */
 function writeTextUnit(store: TextFile, s: string): void {
   if (s.length === 1) {
-    const code = s.charCodeAt(0)
-    if (code < 0x80) {
-      store.writeByte(code)
-      return
-    }
+    store.writeByte(s.charCodeAt(0) & 0xff)
+    return
   }
   store.writeBytes(encodeUtf8(s))
 }
