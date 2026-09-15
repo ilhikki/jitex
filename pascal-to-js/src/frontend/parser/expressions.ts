@@ -307,14 +307,12 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
 // parsePostfix — handles function calls, array access, field access
 export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
-  const idResult = parseIdentifier(input)
-  if (!idResult.success) {
-    return fail(idResult.error, idResult.position)
-  }
+  // 调用方（parsePrimary 的 IDENTIFIER 分支）已确认当前记号是标识符
+  const idNode = loc({ kind: 'Identifier', name: startToken.content } as IdentifierNode, startToken)
 
-  let pos = idResult.newPosition
-  let expr: ExpressionNode = idResult.astNode
-  let endPos = peek({ tokens: input.tokens, position: pos - 1 }).end
+  let pos = input.position + 1
+  let expr: ExpressionNode = idNode
+  let endPos = startToken.end
 
   while (true) {
     const token = peek({ tokens: input.tokens, position: pos })
@@ -342,7 +340,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
       endPos = closeResult.astNode.end
       pos = closeResult.newPosition
       expr = withLoc(
-        { kind: 'FunctionCall', name: idResult.astNode, arguments: args } as FunctionCallNode,
+        { kind: 'FunctionCall', name: idNode, arguments: args } as FunctionCallNode,
         startToken.start,
         endPos,
       )

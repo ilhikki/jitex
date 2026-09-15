@@ -77,9 +77,6 @@ export function loweringExpr(node: ExpressionNode, a: Analysis, ws: WithBinding[
 
     case 'InExpression':
       return loweringInExpression(node, a, ws)
-
-    default:
-      throw new Error(`loweringExpr: unknown kind ${(node as ExpressionNode).kind}`)
   }
 }
 

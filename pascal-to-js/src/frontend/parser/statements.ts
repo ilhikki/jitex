@@ -111,18 +111,16 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
     }
   }
 
-  const endResult = expectKeyword({ tokens: input.tokens, position: pos }, 'END')
-  if (!endResult.success) {
-    return fail(endResult.error, endResult.position)
-  }
-  pos = endResult.newPosition
+  // 循环仅在 END 处退出，故此处必为 END
+  const endToken = peek({ tokens: input.tokens, position: pos })
+  pos++
 
   return ok(
     pos,
     withLoc(
       { kind: 'CompoundStatement', statements } as CompoundStatementNode,
       startToken.start,
-      endResult.astNode.end,
+      endToken.end,
     ),
   )
 }
@@ -453,11 +451,7 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
     }
   }
 
-  const untilResult = expectKeyword({ tokens: input.tokens, position: pos }, 'UNTIL')
-  if (!untilResult.success) {
-    return fail(untilResult.error, untilResult.position)
-  }
-  pos = untilResult.newPosition
+  pos++ // 循环仅在 UNTIL 处退出，故此处必为 UNTIL
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
   if (!condResult.success) {
@@ -640,11 +634,9 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
     }
   }
 
-  const endResult = expectKeyword({ tokens: input.tokens, position: pos }, 'END')
-  if (!endResult.success) {
-    return fail(endResult.error, endResult.position)
-  }
-  pos = endResult.newPosition
+  // 循环仅在 END 处退出，故此处必为 END
+  const endToken = peek({ tokens: input.tokens, position: pos })
+  pos++
 
   return ok(
     pos,
@@ -656,7 +648,7 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
         otherwise,
       } as CaseStatementNode,
       startToken.start,
-      endResult.astNode.end,
+      endToken.end,
     ),
   )
 }

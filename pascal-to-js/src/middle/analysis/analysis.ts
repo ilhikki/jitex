@@ -55,27 +55,9 @@ function buildAnalysis(
     symbolOf: (node) => stmt.symbolCache.get(node),
     labelInfo: (funcId, labelNum) => findLabel(decl, funcId, labelNum),
     labelUseFuncOf: (labelId) => stmt.labelUseFunc.get(labelId),
-    funcOfBlock: (block) => {
-      const r = decl.blockFunc.get(block)
-      if (r === undefined) {
-        throw new Error('funcOfBlock: not found')
-      }
-      return r
-    },
-    funcOfDecl: (d) => {
-      const r = decl.declFunc.get(d)
-      if (r === undefined) {
-        throw new Error('funcOfDecl: not found')
-      }
-      return r
-    },
-    funcInfo: (id) => {
-      const r = decl.funcInfos.get(id)
-      if (!r) {
-        throw new Error('funcInfo: not found')
-      }
-      return r
-    },
+    funcOfBlock: (block) => decl.blockFunc.get(block)!,
+    funcOfDecl: (d) => decl.declFunc.get(d)!,
+    funcInfo: (id) => decl.funcInfos.get(id)!,
     withTempsOf: (node) => stmt.withTemps.get(node) ?? [],
     typeOf: (node) => stmt.exprType.get(node) ?? { tag: 'unknown' },
     typeTagOfTypeNode: (node) => decl.typeNodeInfo.get(node) ?? { tag: 'unknown' },

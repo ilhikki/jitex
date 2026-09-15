@@ -118,11 +118,7 @@ class StatementPass {
   // 作用域重建（只读 lookup，不 bind）
 
   private pushScope(block: BlockNode): void {
-    const scope = this.decl.blockScopes.get(block)
-    if (!scope) {
-      throw new Error(`StatementPass: no scope snapshot for block`)
-    }
-    this.scopeStack.push(scope)
+    this.scopeStack.push(this.decl.blockScopes.get(block)!)
   }
 
   private popScope(): void {
@@ -143,11 +139,7 @@ class StatementPass {
   }
 
   private currentFuncId(): number {
-    const s = this.scopeStack[this.scopeStack.length - 1]
-    if (!s) {
-      throw new Error('StatementPass: no active scope')
-    }
-    return s.funcId
+    return this.scopeStack[this.scopeStack.length - 1]!.funcId
   }
 
   // Block 语句遍历（递归进入子函数）
@@ -598,9 +590,6 @@ class StatementPass {
         this.analyzeExpr(node.right)
         info = { tag: 'boolean' }
         break
-
-      default:
-        info = this.unknown(node, '未处理的表达式 kind')
     }
 
     this.exprType.set(node, info)

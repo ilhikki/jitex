@@ -709,6 +709,18 @@ end.`,
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
     expectedOutput: '32\n',
   },
+  {
+    name: '6.9.3.4.1 数值为整数的 real 以浮点表示写出',
+    code: `program test(output);
+var r: real;
+begin
+  r := 4 / 2;
+  writeln(r:20);
+end.`,
+    purpose:
+      'ISO 6.9.3.4.1：单写参数时 real 以浮点表示写出，尾数与指数的具体字符由实现定义（E.13/E.14），故只断言与本实现形式相符的尾数部分',
+    expectedContains: '.0000000E+000',
+  },
 ]
 
 runPascalTests('ISO 7185 6.9 - Input and output', tests)

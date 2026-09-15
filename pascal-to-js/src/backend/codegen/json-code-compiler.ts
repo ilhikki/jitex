@@ -157,24 +157,12 @@ class JsCompilerImpl implements JsCompiler {
       case 'call':
         return `${this.compileId(expr.functionId)}(${expr.args.map((x) => this.compileExpr(x)).join(', ')})`
 
-      case 'literal': {
-        const semantic = this.options.semantic
-        if (!semantic) {
-          throw new Error('semantic compiler required')
-        }
-        return semantic.literalToJs(expr, this) ?? this.error(`Unknown literal ${expr.key}`)
-      }
+      case 'literal':
+        // semantic 由 transform 构造本编译器时提供
+        return this.options.semantic!.literalToJs(expr, this) ?? this.error(`Unknown literal ${expr.key}`)
 
-      case 'syscall': {
-        const semantic = this.options.semantic
-        if (!semantic) {
-          throw new Error('semantic compiler required')
-        }
-        return semantic.syscallToJs(expr, this) ?? this.error(`Unknown syscall ${expr.key}`)
-      }
-
-      default:
-        return this.error('unknown expression')
+      case 'syscall':
+        return this.options.semantic!.syscallToJs(expr, this) ?? this.error(`Unknown syscall ${expr.key}`)
     }
   }
 

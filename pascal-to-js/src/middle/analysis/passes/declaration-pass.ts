@@ -134,11 +134,7 @@ class DeclarationPass {
   }
 
   private currentScope(): MutableScope {
-    const s = this.scopeStack[this.scopeStack.length - 1]
-    if (!s) {
-      throw new Error('DeclarationPass: no active scope')
-    }
-    return s
+    return this.scopeStack[this.scopeStack.length - 1]!
   }
 
   private bind(name: string, sym: AnalysisSymbol): void {
@@ -439,8 +435,6 @@ class DeclarationPass {
         info = { tag: 'pointer', domainType: this.resolveTypeInfo(node.domainType) }
         break
       }
-      default:
-        info = { tag: 'unknown' }
     }
 
     this.typeNodeInfo.set(node, info)

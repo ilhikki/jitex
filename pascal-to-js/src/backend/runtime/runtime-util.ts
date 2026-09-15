@@ -8,9 +8,6 @@ export function formatReal(n: number): string {
   }
   const s = n.toExponential(REAL_FRACTION_DIGITS)
   const eIdx = s.indexOf('e')
-  if (eIdx < 0) {
-    return s
-  }
   const mantissa = s.slice(0, eIdx)
   const exp = s.slice(eIdx + 1)
   const sign = exp[0]

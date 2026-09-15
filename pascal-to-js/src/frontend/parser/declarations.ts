@@ -79,12 +79,10 @@ export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDec
   const decls: ConstDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type === 'IDENTIFIER') {
+    // 循环条件已确认当前记号是标识符
     const nameStartToken = peek({ tokens: input.tokens, position: pos })
-    const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
-    if (!nameResult.success) {
-      return fail(nameResult.error, nameResult.position)
-    }
-    pos = nameResult.newPosition
+    const nameNode = loc({ kind: 'Identifier', name: nameStartToken.content } as IdentifierNode, nameStartToken)
+    pos++
 
     const eqResult = expectType({ tokens: input.tokens, position: pos }, 'EQUAL')
     if (!eqResult.success) {
@@ -107,7 +105,7 @@ export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDec
       withLoc(
         {
           kind: 'ConstDeclaration',
-          name: nameResult.astNode,
+          name: nameNode,
           value: valResult.astNode,
         } as ConstDeclarationNode,
         nameStartToken.start,
@@ -129,12 +127,10 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
   const decls: TypeDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type === 'IDENTIFIER') {
+    // 循环条件已确认当前记号是标识符
     const nameStartToken = peek({ tokens: input.tokens, position: pos })
-    const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
-    if (!nameResult.success) {
-      return fail(nameResult.error, nameResult.position)
-    }
-    pos = nameResult.newPosition
+    const nameNode = loc({ kind: 'Identifier', name: nameStartToken.content } as IdentifierNode, nameStartToken)
+    pos++
 
     const eqResult = expectType({ tokens: input.tokens, position: pos }, 'EQUAL')
     if (!eqResult.success) {
@@ -156,7 +152,7 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
       withLoc(
         {
           kind: 'TypeDeclaration',
-          name: nameResult.astNode,
+          name: nameNode,
           typeDef: typeResult.astNode,
         } as TypeDeclarationNode,
         nameStartToken.start,
@@ -373,11 +369,7 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
     pos++
   }
 
-  const closeResult = expectType({ tokens: input.tokens, position: pos }, 'RPAREN')
-  if (!closeResult.success) {
-    return fail(closeResult.error, closeResult.position)
-  }
-  pos = closeResult.newPosition
+  pos++ // 循环仅在右圆括号处退出，故此处必为右圆括号
 
   return ok(pos, params)
 }

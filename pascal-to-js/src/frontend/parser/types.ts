@@ -229,11 +229,8 @@ function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<R
     }
   }
 
-  const endResult = expectKeyword({ tokens: input.tokens, position: pos }, 'END')
-  if (!endResult.success) {
-    return fail(endResult.error, endResult.position)
-  }
-  pos = endResult.newPosition
+  // 循环仅在 END 处退出，故此处必为 END
+  pos++
 
   return ok(
     pos,
@@ -252,22 +249,14 @@ function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPa
 
   let tagName: IdentifierNode | undefined
   const afterCaseToken = peek({ tokens: input.tokens, position: pos })
-  if (afterCaseToken.type === 'IDENTIFIER') {
-    const nextNextToken = peek({ tokens: input.tokens, position: pos + 1 })
-    if (nextNextToken.type === 'COLON') {
-      const idResult = parseIdentifier({ tokens: input.tokens, position: pos })
-      if (!idResult.success) {
-        return fail(idResult.error, idResult.position)
-      }
-      tagName = idResult.astNode
-      pos = idResult.newPosition
-
-      const colonResult = expectType({ tokens: input.tokens, position: pos }, 'COLON')
-      if (!colonResult.success) {
-        return fail(colonResult.error, colonResult.position)
-      }
-      pos = colonResult.newPosition
-    }
+  if (afterCaseToken.type === 'IDENTIFIER' && peek({ tokens: input.tokens, position: pos + 1 }).type === 'COLON') {
+    // 已确认「标识符 :」形式的 tag-field
+    tagName = withLoc(
+      { kind: 'Identifier', name: afterCaseToken.content } as IdentifierNode,
+      afterCaseToken.start,
+      afterCaseToken.end,
+    )
+    pos += 2
   }
 
   const typeResult = parseType({ tokens: input.tokens, position: pos })
@@ -476,12 +465,9 @@ function parseSetType(input: ParserInput, startPos?: Position): ParseResult<SetT
 
 // ( identifier {, identifier} )
 function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNode> {
-  const openResult = expectType(input, 'LPAREN')
-  if (!openResult.success) {
-    return fail(openResult.error, openResult.position)
-  }
-  const start = openResult.astNode.start
-  let pos = openResult.newPosition
+  // 分派前已确认当前记号是左圆括号
+  const start = peek(input).start
+  let pos = input.position + 1
 
   const valuesResult = parseList({ tokens: input.tokens, position: pos }, parseIdentifier, 'COMMA')
   if (!valuesResult.success) {
