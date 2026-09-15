@@ -120,6 +120,11 @@ export function requireRunContext(): RunContext {
   return globalCtx
 }
 
+/** 可空版本：suite 回调（声明期）里 run 尚未建立，需要问「现在有没有 run」 */
+export function tryRunContext(): RunContext | undefined {
+  return globalCtx
+}
+
 export function requireStageContext(): StageContext {
   return requireRunContext().currentStage()
 }

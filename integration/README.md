@@ -98,7 +98,7 @@ deno run -A src/cli.ts run my-pipeline.ts --no-report
 | `cache(stage)`                                      | 标记 stage 可缓存（返回同一对象，幂等）                                                                       | suite fn 内 |
 | `assert(cond, msg)`                                 | 断言失败 → 抛 `AssertionError`，当前 stage `failed`                                                           | stage fn 内 |
 | `attach(name, bytes)` / `attachText` / `attachJson` | 把字节/text/JSON 作为产物挂到当前 stage                                                                       | stage fn 内 |
-| `log(msg)`                                          | 追加一行日志到当前 stage                                                                                      | stage fn 内 |
+| `log(msg)`                                          | 追加一行日志：stage fn 内 → 该 stage；hook / suite 回调内 → run 级                                            | 任意位置    |
 
 ### 两个 hook
 

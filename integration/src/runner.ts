@@ -5,6 +5,7 @@
 // 执行顺序：before → stages(拓扑序, 含缓存判定) → after
 
 import { RunContext, setGlobalRunContext, setLogSink, StageContext } from './context.ts'
+import { _drainDeclLogs } from './dsl.ts'
 import type { CacheableRecord, Stage, Suite } from './dsl.ts'
 import type { DepChecksum } from './cache.ts'
 import { purgeCacheDir, tryRecoverCache, writeCache } from './cache.ts'
@@ -218,6 +219,11 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
   const runCtx = new RunContext(runId, suite.name)
   setGlobalRunContext(runCtx)
   setLogSink(options.log ?? ((msg: string) => console.log(msg)))
+
+  // suite 回调（声明期）里 log 的消息：此时才有 runLogs 和日志 sink，灌进去
+  for (const msg of _drainDeclLogs()) {
+    runCtx.log(msg)
+  }
 
   let suiteSuccess = true
 

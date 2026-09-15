@@ -6,7 +6,7 @@
 //
 // 类型体操：Unwrap / UnwrapAll 负责从 Stage<X> 元组解包结果元组。
 
-import { requireRunContext, requireStageContext } from './context.ts'
+import { requireRunContext, requireStageContext, tryRunContext } from './context.ts'
 import type { Artifact, AssertionRecord } from './context.ts'
 
 // 类型定义
@@ -50,8 +50,16 @@ let nextStageId = 1
  */
 let declConfig: Record<string, string> = {}
 
+/** 声明期（suite 回调）产生的日志：此时 run 还没建立，先缓冲 */
+const pendingDeclLogs: string[] = []
+
 export function _setDeclConfig(config: Record<string, string>): void {
   declConfig = config
+}
+
+/** runner 用：run 建立后取走声明期日志，灌入 run 级日志 */
+export function _drainDeclLogs(): string[] {
+  return pendingDeclLogs.splice(0)
 }
 
 export function _resetDeclState(): void {
@@ -181,9 +189,23 @@ export function attachJson(name: string, obj: unknown): void {
 
 // log
 
+/**
+ * 输出一行日志。三个位置都能直接调用，不需要自己判断身处哪一层：
+ *   - stage fn 内 → 当前 stage 的日志；
+ *   - before / after hook 内 → run 级日志；
+ *   - suite 回调（声明期，run 尚未建立）→ 先缓冲，run 开始时灌入 run 级日志。
+ */
 export function log(message: string): void {
-  const ctx = requireStageContext()
-  ctx.addLog(message)
+  const run = tryRunContext()
+  if (run === undefined) {
+    pendingDeclLogs.push(message)
+    return
+  }
+  if (run.hasActiveStage()) {
+    run.currentStage().addLog(message)
+    return
+  }
+  run.log(message)
 }
 
 // 供 runner 用：确认在 run 内但不在 stage 内（hook 期安全检查）
