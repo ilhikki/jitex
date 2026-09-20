@@ -71,7 +71,7 @@ export function createBootTexSuite(): Suite {
 
     const tangleJsStage = cache(stage('build tangle.js', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
-      const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
+      const tangleWeb = await readTextFile('./resources/knuth/tangle/tangle.web')
       const tangleV1 = runTanglePascal({
         tangleContent: tanglePas,
         webContent: tangleWeb,
@@ -88,7 +88,7 @@ export function createBootTexSuite(): Suite {
     }))
 
     const tripPasStage = cache(stage('tangle tex.web => tex.trip', [tangleJsStage], async ([{ tangleJs }]) => {
-      const texWeb = await readTextFile('./resources/kunth/tex/tex.web')
+      const texWeb = await readTextFile('./resources/knuth/tex/tex.web')
       const chFileContent = getTripChFile()
       const result = validRunTangleResult(runTangleJs(tangleJs, texWeb, chFileContent))
       attachText('tex.trip.web', result.pasFile)
@@ -103,13 +103,13 @@ export function createBootTexSuite(): Suite {
     }))
 
     const tripSourcesStage = cache(stage('load trip sources', [], async () => {
-      const tripTex = await readFile('./resources/kunth/tex/trip.tex')
-      const tripTfm = await readFile('./resources/kunth/tex/trip.tfm')
-      const tripinLog = await readTextFile('./resources/kunth/tex/tripin.log')
-      const tripLog = await readTextFile('./resources/kunth/tex/trip.log')
-      const tripDvi = await readFile('./resources/kunth/tex/trip.dvi')
-      const triposTex = await readTextFile('./resources/kunth/tex/tripos.tex')
-      const tripFot = await readTextFile('./resources/kunth/tex/trip.fot')
+      const tripTex = await readFile('./resources/knuth/tex/trip.tex')
+      const tripTfm = await readFile('./resources/knuth/tex/trip.tfm')
+      const tripinLog = await readTextFile('./resources/knuth/tex/tripin.log')
+      const tripLog = await readTextFile('./resources/knuth/tex/trip.log')
+      const tripDvi = await readFile('./resources/knuth/tex/trip.dvi')
+      const triposTex = await readTextFile('./resources/knuth/tex/tripos.tex')
+      const tripFot = await readTextFile('./resources/knuth/tex/trip.fot')
       attach('trip.tex', tripTex)
       attach('trip.tfm', tripTfm)
       attachText('tripin.log', tripinLog)

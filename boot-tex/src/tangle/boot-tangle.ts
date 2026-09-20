@@ -8,7 +8,7 @@ const tangleBootstrapSuite = suite('TANGLE Bootstrap', ({ debug }) => {
   const stageLoadTangleSource = cache(
     stage('load tangle source', [], async () => {
       const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
-      const tangleWeb = await readTextFile('./resources/kunth/tangle/tangle.web')
+      const tangleWeb = await readTextFile('./resources/knuth/tangle/tangle.web')
       attachText('tangle-v0.pas', tanglePas)
       attachText('tangle.web', tangleWeb)
       return { tanglePas, tangleWeb }
