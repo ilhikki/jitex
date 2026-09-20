@@ -116,8 +116,10 @@ export class PascalSemanticCompiler implements SemanticCompiler {
     return inlineSyscalls[key]
   }
 
-  literalToJs(literal: JsonCode.Literal, _compiler: JsCompiler): string | undefined {
+  literalToJs(literal: JsonCode.Literal, compiler: JsCompiler): string | undefined {
     switch (literal.key) {
+      case 'jsExpr':
+        return literal.arg
       case 'number':
         // 数值字面量：整型 / 实型 / 布尔序数值
         return jsNumberLiteral(literal.arg)
@@ -126,7 +128,15 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return JSON.stringify(literal.arg)
       case 'bytes':
         // 字符串字面量（packed array of char）→ 字节宿主
-        return `__sys["${rtKeys.bytesHost}"](${literal.arg})`
+        return compiler.compileExpr({
+          kind: 'syscall',
+          key: rtKeys.bytesHost,
+          args: [{
+            kind: 'literal',
+            key: 'jsExpr',
+            arg: literal.arg
+          }]
+        })
       case 'field':
         // 记录字段名
         return JSON.stringify(literal.arg)
@@ -155,11 +165,6 @@ export class PascalSemanticCompiler implements SemanticCompiler {
         return code
       }
     }
-
-    // 阶段1 起：其余 syscall 一律走 runtime dispatcher，不再 inline。
-    // 具体 handler 见 sys/arith.ts（算术/逻辑/比较/转换/指针）、
-    // sys/pascal-semantic-compiler.ts（cell/array/rec/mem/set）、sys/file.ts（IO/文件）。
-    // 重新 inline 属于后续优化阶段。
-    return `__sys[${JSON.stringify(key)}](${args.join(', ')})`
+    return undefined
   }
 }

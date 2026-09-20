@@ -190,7 +190,13 @@ class JsCompilerImpl implements JsCompiler {
         return this.options.semantic!.literalToJs(expr, this) ?? this.error(`Unknown literal ${expr.key}`)
 
       case 'syscall':
-        return this.options.semantic!.syscallToJs(expr, this) ?? this.error(`Unknown syscall ${expr.key}`)
+        const js = this.options.semantic!.syscallToJs(expr, this)
+        if (js !== undefined) {
+          return js
+        }
+        const key = JSON.stringify(expr.key)
+        const args = expr.args.map((arg) => this.compileExpr(arg)).join(', ')
+        return `__sys[${key}](${args})`
     }
   }
 
