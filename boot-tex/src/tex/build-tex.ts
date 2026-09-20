@@ -1,5 +1,7 @@
 import { ExtraCallable, PascalFile, SyscallHandler, TextFile, transform } from '@jitex/pascal-to-js'
-import { ConsoleFile, extraSyscalls, normalizeFileOpen, runtimeFileSyscalls } from '../utils.ts'
+import { ConsoleFile, extraSyscalls, normalizeFileOpen, readTextFile, runtimeFileSyscalls } from '../utils.ts'
+import { runTanglePascal, transformTangle } from '../tangle/build-tangle.ts'
+import { attachText, stage } from '@jitex/integration'
 
 const texExtraCallables: Record<string, ExtraCallable> = {
   'BREAK': {
@@ -64,4 +66,24 @@ export function transformTex(texPascalContent: string, debug = true) {
     debug,
   })
   return jsCode
+}
+
+export function createStageOfGetTangleJs(isDebug: boolean) {
+  return stage('build tangle.js', [], async () => {
+    const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
+    const tangleWeb = await readTextFile('./resources/knuth/tangle/tangle.web')
+    const tangleV1 = runTanglePascal({
+      tangleContent: tanglePas,
+      webContent: tangleWeb,
+      debug: isDebug,
+    })
+    const tangleV2 = runTanglePascal({
+      tangleContent: tangleV1.pasFile,
+      webContent: tangleWeb,
+      debug: isDebug,
+    })
+    const tangleJs = transformTangle(tangleV2.pasFile, isDebug)
+    attachText('tangle.js', tangleJs)
+    return { tangleJs }
+  })
 }

@@ -134,8 +134,8 @@ export class PascalSemanticCompiler implements SemanticCompiler {
           args: [{
             kind: 'literal',
             key: 'jsExpr',
-            arg: literal.arg
-          }]
+            arg: literal.arg,
+          }],
         })
       case 'field':
         // 记录字段名

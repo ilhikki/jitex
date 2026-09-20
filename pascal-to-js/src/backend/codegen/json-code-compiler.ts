@@ -189,7 +189,7 @@ class JsCompilerImpl implements JsCompiler {
         // semantic 由 transform 构造本编译器时提供
         return this.options.semantic!.literalToJs(expr, this) ?? this.error(`Unknown literal ${expr.key}`)
 
-      case 'syscall':
+      case 'syscall': {
         const js = this.options.semantic!.syscallToJs(expr, this)
         if (js !== undefined) {
           return js
@@ -197,6 +197,7 @@ class JsCompilerImpl implements JsCompiler {
         const key = JSON.stringify(expr.key)
         const args = expr.args.map((arg) => this.compileExpr(arg)).join(', ')
         return `__sys[${key}](${args})`
+      }
     }
   }
 

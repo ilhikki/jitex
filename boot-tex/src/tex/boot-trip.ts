@@ -1,10 +1,17 @@
 import { assert, assertEquals, attach, attachText, cache, log, stage, type Suite, suite } from '@jitex/integration'
 import { BlockStore, MemoryTextFile, PascalFileStore, runJs } from '@jitex/pascal-to-js'
 import { runTangleJs, runTanglePascal, transformTangle, validRunTangleResult } from '../tangle/build-tangle.ts'
-import { bytesToString, ConsoleFile, getTripChFile, readFile, readTextFile } from '../utils.ts'
-import { texExtraSyscalls, transformTex } from './build-tex.ts'
-
-// 辅助函数：运行 trip tex（pass1 / pass2 共享）
+import {
+  bytesToString,
+  ConsoleFile,
+  getTangleJs,
+  getTripChFile,
+  readBytesFromState,
+  readFile,
+  readTextFile,
+  readTextFromState,
+} from '../utils.ts'
+import { createStageOfGetTangleJs, texExtraSyscalls, transformTex } from './build-tex.ts'
 
 interface RunTripTexArgs {
   tripJs: string
@@ -34,28 +41,6 @@ function runTripTex(args: RunTripTexArgs) {
   return { state, consoleFile }
 }
 
-function readTextFromState(
-  state: ReturnType<typeof runJs>,
-  key: string,
-): string | undefined {
-  const value = state.files.get(key)
-  if (value === undefined) {
-    return undefined
-  }
-  return bytesToString((value as MemoryTextFile).getData())
-}
-
-function readBytesFromState(
-  state: ReturnType<typeof runJs>,
-  key: string,
-): Uint8Array | undefined {
-  const value = state.files.get(key)
-  if (value === undefined) {
-    return undefined
-  }
-  return (value as MemoryTextFile).getData()
-}
-
 // suite
 
 /**
@@ -69,27 +54,11 @@ export function createBootTexSuite(): Suite {
     const isDebug = debug === 'true'
     log(`debug = ${isDebug}`)
 
-    const tangleJsStage = cache(stage('build tangle.js', [], async () => {
-      const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
-      const tangleWeb = await readTextFile('./resources/knuth/tangle/tangle.web')
-      const tangleV1 = runTanglePascal({
-        tangleContent: tanglePas,
-        webContent: tangleWeb,
-        debug: isDebug,
-      })
-      const tangleV2 = runTanglePascal({
-        tangleContent: tangleV1.pasFile,
-        webContent: tangleWeb,
-        debug: isDebug,
-      })
-      const tangleJs = transformTangle(tangleV2.pasFile, isDebug)
-      attachText('tangle.js', tangleJs)
-      return { tangleJs }
-    }))
+    const tangleJsStage = cache(createStageOfGetTangleJs(debug))
 
     const tripPasStage = cache(stage('tangle tex.web => tex.trip', [tangleJsStage], async ([{ tangleJs }]) => {
       const texWeb = await readTextFile('./resources/knuth/tex/tex.web')
-      const chFileContent = getTripChFile()
+      const chFileContent = await getTripChFile()
       const result = validRunTangleResult(runTangleJs(tangleJs, texWeb, chFileContent))
       attachText('tex.trip.web', result.pasFile)
       attach('tex.trip.pool', result.poolFile)
@@ -236,28 +205,28 @@ export function createBootTexSuite(): Suite {
       [pass2RunStage, tripSourcesStage],
       (
         [
-          { tripLog, tripDvi, triposTex, terminalTex, consoleOutput, status },
-          { tripLog: masterTripLog, tripDvi: masterTripDvi, triposTex: masterTriposTex, tripFot },
+          actual,
+          expect,
         ],
       ) => {
-        log(`[pass2 verify] assert status === 'terminated', actual = ${JSON.stringify(status)}`)
-        assertEquals(status, 'terminated')
+        log(`[pass2 verify] assert status === 'terminated', actual = ${JSON.stringify(actual.status)}`)
+        assertEquals(actual.status, 'terminated')
 
         // trip.dvi 字节级比较
-        log(`[pass2 verify] assert trip.dvi exists, tripDvi defined = ${tripDvi !== undefined}`)
-        assert(tripDvi !== undefined, 'trip.dvi not found')
+        log(`[pass2 verify] assert trip.dvi exists, tripDvi defined = ${actual.tripDvi !== undefined}`)
+        assert(actual.tripDvi !== undefined, 'trip.dvi not found')
         log(
-          `[pass2 verify] assert trip.dvi length match, actual = ${tripDvi.length}, expected = ${masterTripDvi.length}`,
+          `[pass2 verify] assert trip.dvi length match, actual = ${actual.tripDvi.length}, expected = ${expect.tripDvi.length}`,
         )
         assertEquals(
-          tripDvi.length,
-          masterTripDvi.length,
-          `trip.dvi length mismatch expect ${masterTripDvi.length} actual ${tripDvi.length}`,
+          actual.tripDvi.length,
+          expect.tripDvi.length,
+          `trip.dvi length mismatch expect ${expect.tripDvi.length} actual ${actual.tripDvi.length}`,
         )
         let divMismatchCount = 0
-        const maxLength = Math.max(tripDvi.length, masterTripDvi.length)
+        const maxLength = Math.max(actual.tripDvi.length, expect.tripDvi.length)
         for (let i = 0; i < maxLength; i++) {
-          if (tripDvi[i] !== masterTripDvi[i]) {
+          if (actual.tripDvi[i] !== expect.tripDvi[i]) {
             divMismatchCount++
           }
         }
@@ -267,31 +236,31 @@ export function createBootTexSuite(): Suite {
         // tripos.tex 直接比较
         log(
           `[pass2 verify] assert tripos.tex match, actual length = ${
-            triposTex?.length ?? 'undefined'
-          }, expected length = ${masterTriposTex.length}`,
+            actual.triposTex?.length ?? 'undefined'
+          }, expected length = ${expect.triposTex.length}`,
         )
-        assertEquals(triposTex, masterTriposTex, 'tripos.tex mismatch')
+        assertEquals(actual.triposTex, expect.triposTex, 'tripos.tex mismatch')
 
         // 8terminal.tex 应为空
-        log(`[pass2 verify] assert 8terminal.tex exists, terminalTex defined = ${terminalTex !== undefined}`)
-        assert(terminalTex !== undefined, '8terminal.tex not found')
-        log(`[pass2 verify] assert 8terminal.tex empty, actual length = ${terminalTex.length}`)
-        assertEquals(terminalTex.length, 0, '8terminal.tex should be empty')
+        log(`[pass2 verify] assert 8terminal.tex exists, terminalTex defined = ${actual.terminalTex !== undefined}`)
+        assert(actual.terminalTex !== undefined, '8terminal.tex not found')
+        log(`[pass2 verify] assert 8terminal.tex empty, actual length = ${actual.terminalTex.length}`)
+        assertEquals(actual.terminalTex.length, 0, '8terminal.tex should be empty')
 
         // trip.log 比较：tripman Step 5 允许若干例外（日期、glue set、accent kern、
         // 容量值、help messages、strings 总数/长度、内存统计）。
         // 第一版先做严格断言，暴露差异后再做归一化。
         log(
           `[pass2 verify] assert trip.log match, actual length = ${
-            tripLog?.length ?? 'undefined'
-          }, expected length = ${masterTripLog.length}`,
+            actual.tripLog?.length ?? 'undefined'
+          }, expected length = ${expect.tripLog.length}`,
         )
-        assertEquals(tripLog, masterTripLog, 'trip.log mismatch (may need normalization per tripman Step 5)')
+        assertEquals(actual.tripLog, expect.tripLog, 'trip.log mismatch (may need normalization per tripman Step 5)')
         // 终端输出 == trip.fot
         log(
-          `[pass2 verify] assert console output === trip.fot, actual length = ${consoleOutput.length}, expected length = ${tripFot.length}`,
+          `[pass2 verify] assert console output === trip.fot, actual length = ${actual.consoleOutput.length}, expected length = ${expect.tripFot.length}`,
         )
-        assertEquals(consoleOutput, tripFot, 'terminal output should equal trip.fot')
+        assertEquals(actual.consoleOutput, expect.tripFot, 'terminal output should equal trip.fot')
       },
     )
   })
