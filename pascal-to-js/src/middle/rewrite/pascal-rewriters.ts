@@ -465,9 +465,7 @@ function writeItem(
     }
   }
   const converted = sc(toConvertKey(vt, binary), convArgs)
-  return binary
-    ? sc(rtKeys.fileWriteBytes, [target, converted])
-    : sc(rtKeys.fileWriteText, [target, converted])
+  return binary ? sc(rtKeys.fileWriteBytes, [target, converted]) : sc(rtKeys.fileWriteText, [target, converted])
 }
 
 /** write / writeln：逐项写入，多项用闭包串成一条表达式 */
@@ -743,9 +741,7 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       }
       // 新变量的宿主表示 = 领域类型的默认表示（指针描述符带一层领域布局）
       const domain = pt.elem
-      const inner = isObjectRepr(domain)
-        ? defaultValueExpr(domain)
-        : sc(rtKeys.bytesAlloc, [litInt(sizeOf(domain))])
+      const inner = isObjectRepr(domain) ? defaultValueExpr(domain) : sc(rtKeys.bytesAlloc, [litInt(sizeOf(domain))])
       return writeBack(p, sc(rtKeys.cellNew, [inner]), debug)
     },
     'lowering.call.dispose': (sys) => {

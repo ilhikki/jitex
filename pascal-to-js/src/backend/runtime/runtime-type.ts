@@ -92,7 +92,7 @@ export interface BlockStore {
   hasMore(): boolean
 
   /** 全部块（调试 / 产物导出用） */
-  getBlocks(): Uint8Array[]
+  toBytes(): Uint8Array
 }
 
 export type PascalCell = {

@@ -40,13 +40,7 @@ import {
   WithBinding,
 } from './helpers.ts'
 import { typeDescLiteral } from './type.ts'
-import {
-  callKey,
-  loweringCallableArgument,
-  loweringCallActuals,
-  loweringExpr,
-  resolveSymbol,
-} from './expressions.ts'
+import { callKey, loweringCallableArgument, loweringCallActuals, loweringExpr, resolveSymbol } from './expressions.ts'
 
 // loweringStmt → Statement[]
 

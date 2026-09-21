@@ -7,12 +7,9 @@ import {
   rtKeys,
   runJs,
   SyscallHandler,
-  syscallKeys,
   SyscallRewriteTable,
   TextFile,
 } from '@jitex/pascal-to-js'
-import { runTanglePascal, transformTangle } from './tangle/build-tangle.ts'
-import { createStageOfGetTangleJs } from './tex/build-tex.ts'
 
 export function bytesToString(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes)
@@ -48,9 +45,11 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
   'extra.breakIn': (ctx) => {
     ctx.debugLog.push('extra.breakIn')
   },
-  'extra.erStat': (_ctx, file) => {
+  'extra.erStat': (ctx, file) => {
     const pascalFile = file as PascalFile
-    return pascalFile.value !== undefined ? 0 : 1
+    const result = pascalFile.value !== undefined ? 0 : 1
+    ctx.debugLog.push('extra.erStat = ' + result)
+    return result
   },
 }
 
@@ -85,9 +84,10 @@ const fileNameOf = (name: unknown): string => bytesToString((name as ByteHost).b
 /** openin / openout 的运行期实现：按名字在 ctx.files 中查找（或新建）并绑定到句柄 */
 export const runtimeFileSyscalls: Record<string, SyscallHandler> = {
   'extra.openIn': (ctx, file, name) => {
+    const key = fileNameOf(name)
+    ctx.debugLog.push('extra.openIn ' + key)
     const p = file as PascalFile
-    const store = ctx.files.get(fileNameOf(name))
-    // 输入文件不存在即打开失败：句柄保持未定义，由 erstat(f) 报告
+    const store = ctx.files.get(key)
     p.value = store
     if (store !== undefined) {
       store.seek(0)
@@ -98,6 +98,7 @@ export const runtimeFileSyscalls: Record<string, SyscallHandler> = {
   'extra.openOut': (ctx, file, name) => {
     const p = file as PascalFile
     const key = fileNameOf(name)
+    ctx.debugLog.push('extra.openOut ' + key)
     let store = ctx.files.get(key)
     if (store === undefined) {
       store = (p.fileKind === 'blocks' ? new ByteBlockFile() : new MemoryTextFile()) as PascalFileStore

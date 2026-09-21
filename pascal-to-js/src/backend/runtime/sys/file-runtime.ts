@@ -77,8 +77,17 @@ export class ByteBlockFile implements BlockStore {
   hasMore(): boolean {
     return this.pos < this.blocks.length
   }
-  getBlocks(): Uint8Array[] {
-    return this.blocks
+
+  toBytes(): Uint8Array {
+    const blocks = this.buffer ? [...this.blocks, this.buffer] : this.blocks
+    const total = blocks.reduce((n, b) => n + b.length, 0)
+    const out = new Uint8Array(total)
+    let offset = 0
+    for (const b of blocks) {
+      out.set(b, offset)
+      offset += b.length
+    }
+    return out
   }
 }
 

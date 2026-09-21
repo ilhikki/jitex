@@ -1,15 +1,7 @@
 import { assert, assertEquals, attach, attachText, cache, log, stage, type Suite, suite } from '@jitex/integration'
 import { BlockStore, MemoryTextFile, PascalFileStore, runJs } from '@jitex/pascal-to-js'
-import { runTangleJs, runTanglePascal, transformTangle, validRunTangleResult } from '../tangle/build-tangle.ts'
-import {
-  bytesToString,
-  ConsoleFile,
-  getTripChFile,
-  readBytesFromState,
-  readFile,
-  readTextFile,
-  readTextFromState,
-} from '../utils.ts'
+import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
+import { ConsoleFile, getTripChFile, readBytesFromState, readFile, readTextFile, readTextFromState } from '../utils.ts'
 import { createStageOfGetTangleJs, texExtraSyscalls, transformTex } from './build-tex.ts'
 
 interface RunTripTexArgs {
@@ -124,7 +116,7 @@ export function createBootTexSuite(): Suite {
 
         const tripFmt = state.files.get('trip.fmt') as BlockStore | undefined
         if (tripFmt !== undefined) {
-          attachText('trip.fmt.json', JSON.stringify(tripFmt.getBlocks(), undefined, 2))
+          attach('trip.fmt', tripFmt.toBytes())
         }
 
         const tripLog = readTextFromState(state, 'trip.log')

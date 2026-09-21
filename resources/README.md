@@ -2,4 +2,5 @@
 - ./knuth/web is downloaded from https://ctan.org/tex-archive/systems/knuth/dist (at 2026-08-23)
 - ./jitex/trip.ch is created by ./knuth/tex/tripman.tex
 - ./knuth/plain/base/ is downloaded and extracted from https://mirrors.ctan.org/macros/plain/base.zip (at 2026-09-20)
-- ./knuth/plain/fonts/tfm/ is downloaded and extracted from https://mirrors.ctan.org/fonts/cm/tfm.zip (at 2026-09-20)
+- ./knuth/plain/fonts/cm/ is downloaded and extracted from https://mirrors.ctan.org/fonts/cm/tfm.zip (at 2026-09-20)
+- ./knuth/plain/fonts/manfnt/manfnt.tfm is downloaded and extracted from https://tug.ctan.org/systems/apltex/amsfonts/tfm/manfnt.tfm (at 2026-09-21)
