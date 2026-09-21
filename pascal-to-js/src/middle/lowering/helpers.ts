@@ -20,6 +20,21 @@ export interface WithBinding {
   fields: Map<string, TypeInfo>
 }
 
+// 内部不变量断言
+
+/**
+ * 编译器内部不变量被违反（非 ISO 语义报错）。
+ *
+ * 与「面向用户的 ISO 报错」区分：这里的不变量由前序层保证——analysis 的检查先于
+ * lowering 执行，能到达这些位置说明编译器自身有缺陷，而不是被编译程序的问题。
+ */
+export class AssertionError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AssertionError'
+  }
+}
+
 // 辅助构造函数
 
 export function ref(varId: number): JsonCode.Ref {

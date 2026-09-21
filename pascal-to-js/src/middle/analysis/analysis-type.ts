@@ -27,6 +27,9 @@ export type TypeTag =
   | 'enum'
   | 'subrange'
   | 'pointer'
+  // nil-value（ISO 7185 6.4.4）：不含单一类型，可适配任意 pointer-type。
+  // 仅作为表达式的类型出现，不是变量/字段可声明的类型。
+  | 'nil'
   | 'unknown'
   // 内部标记（非 ISO 类型）：过程形参。过程标识符不能出现在表达式中（ISO 6.6.3.4），
   // 此 tag 仅用于分析阶段明确该符号的语义，rewrite 阶段不会见到它。
@@ -260,7 +263,8 @@ export const BUILTIN_FUNCTION_RETURN_TYPES: Record<string, BuiltinReturnTypeRule
 export const BUILTIN_IDENTIFIER_TYPES: Record<string, TypeInfo> = {
   eof: { tag: 'boolean' },
   eoln: { tag: 'boolean' },
-  nil: { tag: 'pointer' },
+  // nil 用专属标记而非 pointer：它不含单一类型，赋值兼容性由 6.4.4 NOTE 2 单独规定
+  nil: { tag: 'nil' },
 }
 
 // 简单类型表（ISO 7185 6.4.2.2 的 required simple-type 与 text）

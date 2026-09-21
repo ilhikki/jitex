@@ -19,6 +19,7 @@ import {
   UnaryExpressionNode,
 } from '@/frontend/node.ts'
 import {
+  AssertionError,
   callExpr,
   litBool,
   litBytes,
@@ -149,7 +150,7 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
     return syscall(syscallKeys.ioEoln, [])
   }
 
-  throw new Error(`loweringIdentifier: undefined identifier ${node.name}`)
+  throw new AssertionError(`loweringIdentifier: undefined identifier ${node.name}`)
 }
 
 function loweringBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
@@ -199,7 +200,7 @@ function loweringBinary(node: BinaryExpressionNode, a: Analysis, ws: WithBinding
     case '>=':
       return withTypes(syscallKeys.ge)
     default:
-      throw new Error(`loweringBinary: unknown operator ${op}`)
+      throw new AssertionError(`loweringBinary: unknown operator ${op}`)
   }
 }
 
@@ -221,7 +222,7 @@ function loweringUnary(node: UnaryExpressionNode, a: Analysis, ws: WithBinding[]
   if (op === '+') {
     return X
   }
-  throw new Error(`loweringUnary: unknown operator ${op}`)
+  throw new AssertionError(`loweringUnary: unknown operator ${op}`)
 }
 
 function loweringFunctionCall(
@@ -306,7 +307,7 @@ function loweringFunctionCall(
       }
       return syscall(syscallKeys.fileEoln, argExprs)
     default: {
-      throw new Error(`loweringFunctionCall: unknown function ${name}`)
+      throw new AssertionError(`loweringFunctionCall: unknown function ${name}`)
     }
   }
 }
@@ -430,7 +431,7 @@ export function loweringCallableArgument(
   ws: WithBinding[],
 ): JsonCode.Expr {
   if (arg.kind !== 'Identifier') {
-    throw new Error('loweringCallableArgument: actual callable parameter must be an identifier')
+    throw new AssertionError('loweringCallableArgument: actual callable parameter must be an identifier')
   }
   const sym = resolveSymbol(arg, a, ws)
   if (sym?.kind === 'func') {
@@ -440,5 +441,5 @@ export function loweringCallableArgument(
   if (sym?.kind === 'param' && sym.callable) {
     return ref(sym.varId)
   }
-  throw new Error(`loweringCallableArgument: '${arg.name}' is not a procedure/function identifier`)
+  throw new AssertionError(`loweringCallableArgument: '${arg.name}' is not a procedure/function identifier`)
 }

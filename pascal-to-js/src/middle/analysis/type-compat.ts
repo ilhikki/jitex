@@ -140,6 +140,10 @@ export function isAssignCompatible(target: TypeInfo, value: TypeInfo): boolean {
   if (target.tag === 'real' && value.tag === 'integer') {
     return true
   }
+  // ISO 6.4.4 NOTE 2：nil-value 不含单一类型，可适配任意 pointer-type
+  if (target.tag === 'pointer' && value.tag === 'nil') {
+    return true
+  }
   // c) 兼容的 ordinal-types
   if (isCompatibleOrdinal(target, value)) {
     return true

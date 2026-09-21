@@ -25,6 +25,7 @@ import {
   WithStatementNode,
 } from '@/frontend/node.ts'
 import {
+  AssertionError,
   assignStmt,
   callExpr,
   evalStmt,
@@ -78,7 +79,7 @@ export function loweringStmt(
     case 'EmptyStatement':
       return []
     default:
-      throw new Error(`loweringStmt: unknown kind ${(node as StatementNode).kind}`)
+      throw new AssertionError(`loweringStmt: unknown kind ${(node as StatementNode).kind}`)
   }
 }
 
@@ -400,7 +401,7 @@ function loweringCase(
 function loweringGoto(node: GotoStatementNode, a: Analysis, funcId: number): JsonCode.Statement[] {
   const info = a.labelInfo(funcId, node.label.value)
   if (!info) {
-    throw new Error(`loweringGoto: label ${node.label.value} not declared`)
+    throw new AssertionError(`loweringGoto: label ${node.label.value} not declared`)
   }
   // 决策 13：goto 跳转前插入 steps.check，防止 goto 死循环（steps.check 只在循环回边
   // 插入，goto 跳转不触发回边检查，需单独兜底）
@@ -429,7 +430,7 @@ function loweringLabeled(
 ): JsonCode.Statement[] {
   const info = a.labelInfo(funcId, node.label.value)
   if (!info) {
-    throw new Error(`loweringLabeled: label ${node.label.value} not declared`)
+    throw new AssertionError(`loweringLabeled: label ${node.label.value} not declared`)
   }
   return [labelStmt(info.labelId), ...loweringStmt(node.statement, a, funcId, ws)]
 }
@@ -645,7 +646,7 @@ function loweringProcedureCall(
       return [checkStmt, ...loweringAssignTarget(argNode, litNull(), a, funcId, ws)]
     }
     default: {
-      throw new Error(`loweringProcedureCall: unknown procedure ${name}`)
+      throw new AssertionError(`loweringProcedureCall: unknown procedure ${name}`)
     }
   }
 }

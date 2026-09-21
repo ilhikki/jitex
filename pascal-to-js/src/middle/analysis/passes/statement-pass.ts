@@ -676,13 +676,6 @@ class StatementPass {
     if (target.tag === 'unknown' || value.tag === 'unknown') {
       return
     }
-    // ISO 6.4.4 NOTE 2：nil 不含单一类型，可适配任意 pointer-type
-    if (
-      target.tag === 'pointer' && valueNode.kind === 'Identifier' &&
-      valueNode.name.toLowerCase() === 'nil'
-    ) {
-      return
-    }
     // 实现把枚举值常量建模为 integer（见 Pass 1 的 EnumerationType 分支），类型层面无法区分
     // 「枚举常量」与「整数字面量」：此处仅放行常量标识符（如 `c := red`），
     // 整数字面量（如 `c := 5`）仍按 6.4.6 判定为不兼容。
