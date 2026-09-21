@@ -115,14 +115,16 @@ export const syscallKeys = {
   setElem: 'lowering.set.elem', // [v, typeDesc]
   setLiteral: 'lowering.set.literal', // [...elems, typeDesc]
 
+  // 文件过程：首参为文件变量、次参为其类型描述，其余实参（方言形式的文件名 /
+  // 选项）原样过境 —— 实参数量与形态由 rewrite 解释，lowering 不做判定
   fileCreate: 'lowering.file.create', // [typeDesc]
-  fileReset: 'lowering.file.reset', // [f, typeDesc, ...src]
-  fileRewrite: 'lowering.file.rewrite', // [f, typeDesc, ...src]
-  fileGet: 'lowering.file.get', // [f, typeDesc]
-  filePut: 'lowering.file.put', // [f, typeDesc, value?]
+  fileReset: 'lowering.file.reset', // [f, typeDesc, ...rest]
+  fileRewrite: 'lowering.file.rewrite', // [f, typeDesc, ...rest]
+  fileGet: 'lowering.file.get', // [f, typeDesc, ...rest]
+  filePut: 'lowering.file.put', // [f, typeDesc, value?, ...rest]
   filePeek: 'lowering.file.peek', // [f, typeDesc]
-  fileEof: 'lowering.file.eof', // [f, typeDesc]
-  fileEoln: 'lowering.file.eoln', // [f]
+  fileEof: 'lowering.file.eof', // [f, typeDesc, ...rest]
+  fileEoln: 'lowering.file.eoln', // [f, ...rest]
   programFileUrl: 'lowering.program.fileUrl', // [f, name, typeDesc]
 
   ioWrite: 'lowering.io.write', // [target, targetType, value, valueType, width, prec]

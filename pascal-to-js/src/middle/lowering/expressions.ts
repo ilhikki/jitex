@@ -289,15 +289,20 @@ function loweringFunctionCall(
       return syscall(syscallKeys.succ, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
     case 'odd':
       return syscall(syscallKeys.odd, argExprs)
+    // eof / eoln 的实参形态不由本层判定（内置语义归 rewrite）：
+    // 无实参形式用 null 表示缺省目标，语义与无括号形式 lowering.io.eof / io.eoln 相同
     case 'eof':
-      // ISO 7185 6.6.6.5：eof 的形式为 eof（无括号）或 eof(f)，空实参表不是 ISO 形式
       if (args.length === 0) {
-        throw new Error('eof requires a file-variable actual parameter (ISO 7185 6.6.6.5)')
+        return syscall(syscallKeys.fileEof, [litNull()])
       }
-      return syscall(syscallKeys.fileEof, [...argExprs, typeDescLiteral(a.typeOf(args[0]))])
+      return syscall(syscallKeys.fileEof, [
+        argExprs[0],
+        typeDescLiteral(a.typeOf(args[0])),
+        ...argExprs.slice(1),
+      ])
     case 'eoln':
       if (args.length === 0) {
-        throw new Error('eoln requires a file-variable actual parameter (ISO 7185 6.6.6.5)')
+        return syscall(syscallKeys.fileEoln, [litNull()])
       }
       return syscall(syscallKeys.fileEoln, argExprs)
     default: {

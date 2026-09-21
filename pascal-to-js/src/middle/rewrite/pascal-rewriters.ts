@@ -345,6 +345,23 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
 // 表
 
 /**
+ * ISO 7185 6.6.5.2 形态检查：reset(f) / rewrite(f) 只有一个 file-variable 实参。
+ *
+ * 检查落在 rewrite —— 实参形态属于内置语义，lowering 只做结构翻译与类型描述过境，
+ * 不判定。实参多于 ISO 形态即为非标形式（带 file-name），此处报错；使用方若要
+ * 以 rewrite 扩展表达该方言，覆盖同名 lowering.* key 即可，本检查随之让位。
+ *
+ * 实参布局由 lowering 产出：args = [f, 类型描述, ...方言实参]。
+ */
+function requireIsoFileActuals(sys: JsonCode.Syscall, name: string): void {
+  if (sys.args.length !== 2) {
+    throw new Error(
+      `ISO 7185 6.6.5.2: ${name}(f) shall have exactly one actual-parameter, a file-variable; a file-name is not an ISO 7185 form`,
+    )
+  }
+}
+
+/**
  * 构建 Pascal → runtime 的 IR 重写表。
  *
  * `debug` 决定是否产出 `runtime.debug.*` 检查（边界 / 步数 / 除零 / 视图断言）。
@@ -451,10 +468,19 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       return elems.reduce((a, b) => sc(rtKeys.bitmapUnion, [a, b, size]))
     },
 
-    // 类型只用到「文件行为类别」，句柄不携带类型描述符
+    // 类型只用到「文件行为类别」，句柄不携带类型描述符。
+    // reset / rewrite 的实参形态是本层的职责（内置语义归 rewrite）：ISO 形式即
+    // 「file-variable + 类型描述」，其余形式在此报错；使用方以 syscallRewriters
+    // 覆盖同名 lowering.* key 即可接管方言形式（如 reset(f, name, opts)）。
     'lowering.file.create': (sys) => sc(rtKeys.fileCreate, [litStr(fileKind(parseType(sys.args[0])))]),
-    'lowering.file.reset': (sys) => sc(rtKeys.fileReset, [sys.args[0]]),
-    'lowering.file.rewrite': (sys) => sc(rtKeys.fileRewrite, [sys.args[0]]),
+    'lowering.file.reset': (sys) => {
+      requireIsoFileActuals(sys, 'reset')
+      return sc(rtKeys.fileReset, [sys.args[0]])
+    },
+    'lowering.file.rewrite': (sys) => {
+      requireIsoFileActuals(sys, 'rewrite')
+      return sc(rtKeys.fileRewrite, [sys.args[0]])
+    },
     'lowering.file.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
     // `f^ := x` / `put(f)` 的形态在编译期定死（值形态由 key 承载，运行期不再判断）：
     //   blocks + 值 → put.buffer.block      值缺失 → put（仅块存储需要落盘）

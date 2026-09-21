@@ -1,5 +1,5 @@
 import { ExtraCallable, PascalFile, SyscallHandler, TextFile, transform } from '@jitex/pascal-to-js'
-import { ConsoleFile, extraSyscalls, normalizeFileOpen, readTextFile, runtimeFileSyscalls } from '../utils.ts'
+import { ConsoleFile, extraSyscalls, fileOpenRewriters, readTextFile, runtimeFileSyscalls } from '../utils.ts'
 import { runTanglePascal, transformTangle } from '../tangle/build-tangle.ts'
 import { attachText, stage } from '@jitex/integration'
 
@@ -19,15 +19,6 @@ const texExtraCallables: Record<string, ExtraCallable> = {
   'ERSTAT': {
     sysCallName: 'extra.erStat',
     kind: 'function',
-  },
-  // 由 normalizeFileOpen 从 reset(f, name, opts) / rewrite(f, name, opts) 改写而来
-  'OPENIN': {
-    sysCallName: 'extra.openIn',
-    kind: 'procedure',
-  },
-  'OPENOUT': {
-    sysCallName: 'extra.openOut',
-    kind: 'procedure',
   },
 }
 
@@ -61,8 +52,9 @@ export const texExtraSyscalls: Record<string, SyscallHandler> = {
 }
 
 export function transformTex(texPascalContent: string, debug = true) {
-  const jsCode = transform(normalizeFileOpen(texPascalContent), {
+  const jsCode = transform(texPascalContent, {
     extraCallables: texExtraCallables,
+    syscallRewriters: fileOpenRewriters,
     debug,
   })
   return jsCode

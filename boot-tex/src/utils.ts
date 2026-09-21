@@ -4,7 +4,11 @@ import {
   MemoryTextFile,
   PascalFile,
   PascalFileStore,
+  rtKeys,
+  runJs,
   SyscallHandler,
+  syscallKeys,
+  SyscallRewriteTable,
   TextFile,
 } from '@jitex/pascal-to-js'
 import { runTanglePascal, transformTangle } from './tangle/build-tangle.ts'
@@ -52,130 +56,26 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
 
 // 具名文件打开（TeX 方言的 reset(f, name, opts) / rewrite(f, name, opts)）
 //
-// ISO 7185 6.6.5.2 的 reset / rewrite 只接受文件变量、不带 file-name，因此这类调用
-// 在送入编译器前由 normalizeFileOpen 改写成下面两个注入过程，名字绑定在宿主侧完成。
+// ISO 7185 6.6.5.2 的 reset / rewrite 只接受一个 file-variable 实参，不带 file-name。
+// 带 file-name 的形式以 rewrite 扩展接管（覆盖同名 lowering.* key）：
+//   - ISO 形式（file-variable + 类型描述）交回内部终态 key；
+//   - 方言形式改写成宿主侧注入的 openin / openout（选项实参丢弃）。
+// 编译器内部表对非 ISO 形式默认报错，这里的覆盖使方言形式合法化。
 
-const isLetter = (c: string): boolean => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-const isDigit = (c: string): boolean => c >= '0' && c <= '9'
-const isAlphaNum = (c: string): boolean => isLetter(c) || isDigit(c) || c === '_'
-const isSpace = (c: string): boolean => c === ' ' || c === '\t' || c === '\n' || c === '\r'
-
-/** 跳过 { } 或 (* *) 注释，返回其后位置 */
-function skipComment(src: string, from: number): number {
-  const parenForm = src[from] === '('
-  let i = parenForm ? from + 2 : from + 1
-  while (i < src.length && src[i] !== '}' && !(src[i] === '*' && src[i + 1] === ')')) {
-    i++
-  }
-  if (i >= src.length) {
-    return src.length
-  }
-  return src[i] === '}' ? i + 1 : i + 2
-}
-
-/** 跳过 '...' 字符串字面量（内部 '' 为转义），返回其后位置 */
-function skipString(src: string, from: number): number {
-  let i = from + 1
-  while (i < src.length) {
-    if (src[i] === "'") {
-      if (src[i + 1] === "'") {
-        i += 2
-        continue
-      }
-      return i + 1
+/** TeX 方言的文件打开：以 rewrite 扩展覆盖 lowering.* key */
+export const fileOpenRewriters: SyscallRewriteTable = {
+  [syscallKeys.fileReset]: (sys) => {
+    if (sys.args.length === 2) {
+      return { kind: 'syscall', key: rtKeys.fileReset, args: [sys.args[0]] }
     }
-    i++
-  }
-  return src.length
-}
-
-/** 从 '(' 起拆分顶层实参，返回 [右括号之后的位置, 实参文本表] */
-function splitActuals(src: string, openParen: number): [number, string[]] {
-  const args: string[] = []
-  let depth = 0
-  let start = openParen + 1
-  let i = openParen + 1
-  while (i < src.length) {
-    const c = src[i]
-    if (c === '{' || (c === '(' && src[i + 1] === '*')) {
-      i = skipComment(src, i)
-      continue
+    return { kind: 'syscall', key: 'extra.openIn', args: [sys.args[0], sys.args[2]] }
+  },
+  [syscallKeys.fileRewrite]: (sys) => {
+    if (sys.args.length === 2) {
+      return { kind: 'syscall', key: rtKeys.fileRewrite, args: [sys.args[0]] }
     }
-    if (c === "'") {
-      i = skipString(src, i)
-      continue
-    }
-    if (c === '(' || c === '[') {
-      depth++
-    } else if (c === ']') {
-      depth--
-    } else if (c === ')') {
-      if (depth === 0) {
-        args.push(src.slice(start, i).trim())
-        return [i + 1, args.filter((a) => a.length > 0)]
-      }
-      depth--
-    } else if (c === ',' && depth === 0) {
-      args.push(src.slice(start, i).trim())
-      start = i + 1
-    }
-    i++
-  }
-  return [src.length, args]
-}
-
-/**
- * 把 TeX 方言的 `reset(f, name, opts)` / `rewrite(f, name, opts)` 改写为
- * 注入的 `openin(f, name)` / `openout(f, name)`（多余的选项实参丢弃），
- * 使 pascal-to-js 只需处理 ISO 形式的单实参 reset / rewrite。
- */
-export function normalizeFileOpen(source: string): string {
-  let out = ''
-  let i = 0
-  while (i < source.length) {
-    const c = source[i]
-    if (c === '{' || (c === '(' && source[i + 1] === '*')) {
-      const next = skipComment(source, i)
-      out += source.slice(i, next)
-      i = next
-      continue
-    }
-    if (c === "'") {
-      const next = skipString(source, i)
-      out += source.slice(i, next)
-      i = next
-      continue
-    }
-    if (isLetter(c)) {
-      let j = i
-      while (j < source.length && isAlphaNum(source[j])) {
-        j++
-      }
-      const word = source.slice(i, j)
-      const lower = word.toLowerCase()
-      if (lower === 'reset' || lower === 'rewrite') {
-        let k = j
-        while (k < source.length && isSpace(source[k])) {
-          k++
-        }
-        if (source[k] === '(') {
-          const [after, args] = splitActuals(source, k)
-          if (args.length >= 2) {
-            const target = lower === 'reset' ? 'openin' : 'openout'
-            out += `${target}${source.slice(j, k)}(${args[0]}, ${args[1]})`
-            i = after
-            continue
-          }
-        }
-      }
-      out += word
-      i = j
-      continue
-    }
-    out += c
-    i++
-  }
-  return out
+    return { kind: 'syscall', key: 'extra.openOut', args: [sys.args[0], sys.args[2]] }
+  },
 }
 
 const fileNameOf = (name: unknown): string => bytesToString((name as ByteHost).bytes).trim()
@@ -320,4 +220,3 @@ export function readBytesFromState(
   }
   return (value as MemoryTextFile).getData()
 }
-

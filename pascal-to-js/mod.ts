@@ -73,3 +73,7 @@ export { executeCompiled, run, runJs, transform } from '@/run.ts'
 export type { RunOptions, TransformOptions } from '@/run.ts'
 export type { RunError, RunState } from '@/backend/runtime/run-state.ts'
 export type { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
+
+export { syscallKeys } from '@/middle/lowering/helpers.ts'
+export { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
+export type { SyscallRewriter, SyscallRewriteTable } from '@/middle/rewrite/rewrite.ts'

@@ -4,7 +4,6 @@ import { runTangleJs, runTanglePascal, transformTangle, validRunTangleResult } f
 import {
   bytesToString,
   ConsoleFile,
-  getTangleJs,
   getTripChFile,
   readBytesFromState,
   readFile,
@@ -54,7 +53,7 @@ export function createBootTexSuite(): Suite {
     const isDebug = debug === 'true'
     log(`debug = ${isDebug}`)
 
-    const tangleJsStage = cache(createStageOfGetTangleJs(debug))
+    const tangleJsStage = cache(createStageOfGetTangleJs(isDebug))
 
     const tripPasStage = cache(stage('tangle tex.web => tex.trip', [tangleJsStage], async ([{ tangleJs }]) => {
       const texWeb = await readTextFile('./resources/knuth/tex/tex.web')

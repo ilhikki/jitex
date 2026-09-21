@@ -204,6 +204,65 @@ export const BUILTIN_FUNCTIONS = new Set([
 /** 内置无参标识符（parser 将无参调用解析为 Identifier） */
 export const BUILTIN_IDENTIFIERS = new Set(['maxint', 'nil', 'eof', 'eoln'])
 
+// 内置函数/标识符的类型（analysis 对内置语义的唯一依赖点）
+
+/**
+ * 内置函数的返回类型规则，只有两种形式。
+ *
+ * 规则里刻意不含实参个数、实参形态与合法调用形式——那些属于内置语义，
+ * 归 rewrite 解释（见下表的说明）。
+ */
+export type BuiltinReturnTypeRule =
+  | { kind: 'fixed'; type: TypeInfo }
+  /** 结果类型同第一实参（ISO 7185 6.6.6.2 / 6.6.6.3 / 6.6.6.4 / 6.6.6.6） */
+  | { kind: 'sameAsFirstArg' }
+
+/**
+ * 内置函数 → 返回类型。
+ *
+ * analysis 不拥有内置函数的语义：一个内置函数接受几个实参、实参是什么形态、
+ * 合法调用长什么样，这些问题 analysis 一概不问（它也无从判断该名字是不是
+ * 使用方方言里的形式），它们全部归 rewrite。
+ *
+ * 但表达式类型推断必须知道「调用后得到什么类型」，故在此开设唯一的依赖点，
+ * 并把它收窄到「只声明返回类型」这一种形式：
+ *   - 新增内置函数时只在此追加一行，不得在 analysis 里写名字分支；
+ *   - 不在此声明任何形态信息（个数 / file 实参 / variable-access …）。
+ */
+export const BUILTIN_FUNCTION_RETURN_TYPES: Record<string, BuiltinReturnTypeRule> = {
+  abs: { kind: 'sameAsFirstArg' },
+  sqr: { kind: 'sameAsFirstArg' },
+  pred: { kind: 'sameAsFirstArg' },
+  succ: { kind: 'sameAsFirstArg' },
+  sqrt: { kind: 'fixed', type: { tag: 'real' } },
+  sin: { kind: 'fixed', type: { tag: 'real' } },
+  cos: { kind: 'fixed', type: { tag: 'real' } },
+  exp: { kind: 'fixed', type: { tag: 'real' } },
+  ln: { kind: 'fixed', type: { tag: 'real' } },
+  arctan: { kind: 'fixed', type: { tag: 'real' } },
+  trunc: { kind: 'fixed', type: { tag: 'integer' } },
+  round: { kind: 'fixed', type: { tag: 'integer' } },
+  ord: { kind: 'fixed', type: { tag: 'integer' } },
+  chr: { kind: 'fixed', type: { tag: 'char' } },
+  odd: { kind: 'fixed', type: { tag: 'boolean' } },
+  eof: { kind: 'fixed', type: { tag: 'boolean' } },
+  eoln: { kind: 'fixed', type: { tag: 'boolean' } },
+  // 实现扩展（非 ISO 7185）：不在 BUILTIN_FUNCTIONS 内，仅类型推断沿用
+  length: { kind: 'fixed', type: { tag: 'integer' } },
+}
+
+/**
+ * 内置无参标识符的类型（parser 把无参调用解析为 Identifier）。
+ *
+ * 与 BUILTIN_FUNCTION_RETURN_TYPES 同理：只声明「这个标识符是什么类型」，
+ * 不涉及调用形态或行为。maxint 未收录——它沿用缺省（unknown）类型。
+ */
+export const BUILTIN_IDENTIFIER_TYPES: Record<string, TypeInfo> = {
+  eof: { tag: 'boolean' },
+  eoln: { tag: 'boolean' },
+  nil: { tag: 'pointer' },
+}
+
 // 简单类型表（ISO 7185 6.4.2.2 的 required simple-type 与 text）
 export const SIMPLE_TYPES: Record<string, TypeInfo> = {
   integer: { tag: 'integer' },

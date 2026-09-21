@@ -20,7 +20,9 @@ import {
 } from '@/frontend/node.ts'
 import {
   AnalysisSymbol,
+  BUILTIN_FUNCTION_RETURN_TYPES,
   BUILTIN_FUNCTIONS,
+  BUILTIN_IDENTIFIER_TYPES,
   BUILTIN_IDENTIFIERS,
   BUILTIN_PROCEDURES,
   CallableParamSig,
@@ -411,14 +413,10 @@ class StatementPass {
         } else if (sym?.kind === 'func') {
           info = sym.retTypeInfo ?? this.unknown(node, `func '${node.name}' 无返回类型`)
         } else {
-          const lower = node.name.toLowerCase()
-          if (lower === 'eof' || lower === 'eoln') {
-            info = { tag: 'boolean' }
-          } else if (lower === 'nil') {
-            info = { tag: 'pointer' }
-          } else {
-            info = this.unknown(node, `identifier '${node.name}' 未解析到符号`)
-          }
+          // 内置无参标识符的类型来自声明表 —— analysis 不写内置名字分支
+          // （内置语义归 rewrite，这里只查「它是什么类型」）
+          info = BUILTIN_IDENTIFIER_TYPES[node.name.toLowerCase()] ??
+            this.unknown(node, `identifier '${node.name}' 未解析到符号`)
         }
         break
       }
@@ -647,27 +645,23 @@ class StatementPass {
     return remaining === 0 ? t : { tag: 'unknown' }
   }
 
+  /**
+   * 内置函数的返回类型。
+   *
+   * 这是唯一允许 analysis 依赖的内置语义，且只依赖「返回类型」：规则取自
+   * BUILTIN_FUNCTION_RETURN_TYPES，本函数不含任何内置函数名分支。实参个数、
+   * 实参形态、合法调用形式一律不问——那些归 rewrite 解释。
+   */
   private builtinFuncReturnType(name: string, args: ExpressionNode[]): TypeInfo {
-    const n = name.toLowerCase()
-    if (['abs', 'sqr', 'pred', 'succ'].includes(n)) {
-      if (args.length > 0) {
-        return this.analyzeExpr(args[0])
-      }
-      return { tag: 'integer' }
+    const rule = BUILTIN_FUNCTION_RETURN_TYPES[name.toLowerCase()]
+    if (rule === undefined) {
+      return { tag: 'unknown' }
     }
-    if (['sqrt', 'sin', 'cos', 'exp', 'ln', 'arctan'].includes(n)) {
-      return { tag: 'real' }
+    if (rule.kind === 'sameAsFirstArg') {
+      // 无实参时沿用既有缺省（integer）
+      return args.length > 0 ? this.analyzeExpr(args[0]) : { tag: 'integer' }
     }
-    if (['trunc', 'round', 'ord', 'length'].includes(n)) {
-      return { tag: 'integer' }
-    }
-    if (['chr'].includes(n)) {
-      return { tag: 'char' }
-    }
-    if (['odd', 'eof', 'eoln'].includes(n)) {
-      return { tag: 'boolean' }
-    }
-    return { tag: 'unknown' }
+    return rule.type
   }
 
   // ISO 7185 检查：6.4.6 赋值兼容、6.8.3.4 条件类型、6.8.3.5 case 常量互异、

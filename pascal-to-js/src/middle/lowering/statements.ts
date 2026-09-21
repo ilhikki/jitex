@@ -464,6 +464,31 @@ function loweringWith(
 
 // ProcedureCall 编译
 
+/**
+ * 文件过程的实参过境：首参（文件变量）+ 其类型描述，其余实参照传。
+ *
+ * 实参形态不由本层判定：内置过程接受何种实参（ISO 的单实参形式，还是方言形式
+ * 如 `reset(f, name, opts)`）属于内置语义，归 rewrite 解释。lowering 只保证
+ * 「结构 + 类型描述」完整过境 —— 多余实参原样带给 rewriter，由 rewriter 按形态
+ * 决定翻译（使用方可覆盖对应的 lowering.* key 接管方言形态）。
+ */
+function loweringFileActuals(
+  args: ExpressionNode[],
+  a: Analysis,
+  ws: WithBinding[],
+): JsonCode.Expr[] {
+  // 无实参：目标缺省，其含义交 rewrite / runtime 解释（本层不判定合法性）
+  if (args.length === 0) {
+    return [litNull()]
+  }
+  const head = args[0]
+  return [
+    loweringExpr(head, a, ws),
+    typeDescLiteral(a.typeOf(head)),
+    ...args.slice(1).map((x) => loweringExpr(x, a, ws)),
+  ]
+}
+
 function loweringProcedureCall(
   node: ProcedureCallNode,
   a: Analysis,
@@ -536,56 +561,24 @@ function loweringProcedureCall(
       return loweringReadln(node.arguments, a, ws, false)
     case 'read':
       return loweringReadln(node.arguments, a, ws, true)
-    case 'reset': {
-      // ISO 6.6.5.2 reset(f)：只接受一个 file-variable 实参，句柄自带类型
-      if (node.arguments.length !== 1) {
-        throw new Error('reset takes exactly one file-variable actual parameter (ISO 7185 6.6.5.2)')
-      }
-      const f = loweringExpr(node.arguments[0], a, ws)
+    // 文件过程的实参形态（ISO 单实参 / 方言带文件名）不由本层判定：
+    // 完整实参与类型描述过境，翻译由 rewrite 决定（见 loweringFileActuals）
+    case 'reset':
       return [
-        evalStmt(
-          syscall(syscallKeys.fileReset, [
-            f,
-            typeDescLiteral(a.typeOf(node.arguments[0])),
-          ]),
-        ),
+        evalStmt(syscall(syscallKeys.fileReset, loweringFileActuals(node.arguments, a, ws))),
       ]
-    }
-    case 'rewrite': {
-      if (node.arguments.length !== 1) {
-        throw new Error('rewrite takes exactly one file-variable actual parameter (ISO 7185 6.6.5.2)')
-      }
-      const f = loweringExpr(node.arguments[0], a, ws)
+    case 'rewrite':
       return [
-        evalStmt(
-          syscall(syscallKeys.fileRewrite, [
-            f,
-            typeDescLiteral(a.typeOf(node.arguments[0])),
-          ]),
-        ),
+        evalStmt(syscall(syscallKeys.fileRewrite, loweringFileActuals(node.arguments, a, ws))),
       ]
-    }
-    case 'get': {
-      const f = loweringExpr(node.arguments[0], a, ws)
+    case 'get':
       return [
-        evalStmt(
-          syscall(syscallKeys.fileGet, [f, typeDescLiteral(a.typeOf(node.arguments[0]))]),
-        ),
+        evalStmt(syscall(syscallKeys.fileGet, loweringFileActuals(node.arguments, a, ws))),
       ]
-    }
-    case 'put': {
-      const f = loweringExpr(node.arguments[0], a, ws)
-      const extra = node.arguments.slice(1).map((x) => loweringExpr(x, a, ws))
+    case 'put':
       return [
-        evalStmt(
-          syscall(syscallKeys.filePut, [
-            f,
-            typeDescLiteral(a.typeOf(node.arguments[0])),
-            ...extra,
-          ]),
-        ),
+        evalStmt(syscall(syscallKeys.filePut, loweringFileActuals(node.arguments, a, ws))),
       ]
-    }
     case 'page': {
       if (node.arguments.length === 0) {
         return [evalStmt(syscall(syscallKeys.ioPage, [litNull(), litNull()]))]
