@@ -7,7 +7,7 @@ import { analyzeProgram } from '@/middle/analysis/analysis.ts'
 import { loweringProgram } from '@/middle/lowering/lowering.ts'
 import type { SyscallRewriter, SyscallRewriteTable } from '@/middle/rewrite/rewrite.ts'
 import { composeMapping, mergeRewriteTables, rewrite } from '@/middle/rewrite/rewrite.ts'
-import { buildPascalRewriteTable } from '@/middle/rewrite/pascal-rewriters.ts'
+import { buildExtraCallableRewriters, buildPascalRewriteTable } from '@/middle/rewrite/pascal-rewriters.ts'
 import { toJs } from '@/backend/codegen/json-code-compiler.ts'
 import type { RunError, RunState } from '@/backend/runtime/run-state.ts'
 
@@ -68,13 +68,19 @@ function parseSource(source: string): ProgramNode {
 export function transform(source: string, options: TransformOptions = { debug: false }): string {
   const ast = parseSource(source)
 
-  const analysis = analyzeProgram(ast, options.extraCallables)
+  // debug 构建开关：lowering（决定是否生成独立检查语句）与 rewrite（决定检查的
+  // 具体形态）都需要它，故在两层之前先算出
+  const debug = options.debug ?? true
+  const analysis = analyzeProgram(ast, options.extraCallables, debug)
 
   const jsonCode = loweringProgram(ast, analysis)
 
-  // IR 重写：合并内部 pascal 表与用户表，合成单一映射后执行后序 DFS 替换
-  const debug = options.debug ?? true
-  const table = mergeRewriteTables(buildPascalRewriteTable(debug), options.syscallRewriters)
+  // IR 重写：合并内部 pascal 表、注入 callable 的自动表与用户表（后者覆盖前者），
+  // 合成单一映射后执行后序 DFS 替换
+  const table = mergeRewriteTables(
+    mergeRewriteTables(buildPascalRewriteTable(debug), buildExtraCallableRewriters(options.extraCallables)),
+    options.syscallRewriters,
+  )
   const ir = rewrite(jsonCode, composeMapping(table, options.defaultRewriter))
 
   const semantic = new PascalSemanticCompiler()

@@ -78,39 +78,53 @@ export interface VariantBranchDescriptor {
   nested?: VariantPartDescriptor
 }
 
-export function serializeTypeInfo(ti: TypeInfo): TypeDescriptor {
+export function serializeTypeInfo(ti: TypeInfo, expandPointer = true): TypeDescriptor {
   // subrange 展平：tag 即基类型，low/high 表范围
   if (ti.tag === 'subrange') {
     return { tag: ti.baseTag ?? 'integer', low: ti.low, high: ti.high }
   }
   // set：基类型放进 elem（唯一泛型参数）
   if (ti.tag === 'set') {
-    return { tag: 'set', elem: ti.setBase ? serializeTypeInfo(ti.setBase) : undefined }
+    return { tag: 'set', elem: ti.setBase ? serializeTypeInfo(ti.setBase, expandPointer) : undefined }
+  }
+  // pointer：展开一层领域类型（new(p) 需要其布局）。内层不再展开 pointer ——
+  // 否则递归类型（record 里的 pointer 指回自身）会形成无限递归。
+  if (ti.tag === 'pointer') {
+    return {
+      tag: 'pointer',
+      elem: expandPointer && ti.domainType ? serializeTypeInfo(ti.domainType, false) : undefined,
+    }
   }
   return {
     tag: ti.tag,
     low: ti.low,
     high: ti.high,
     dims: ti.dims,
-    elem: ti.elem ? serializeTypeInfo(ti.elem) : undefined,
+    elem: ti.elem ? serializeTypeInfo(ti.elem, expandPointer) : undefined,
     fields: ti.fields
-      ? Array.from(ti.fields.entries()).map(([k, v]) => ({ name: k, type: serializeTypeInfo(v) }))
+      ? Array.from(ti.fields.entries()).map(([k, v]) => ({
+        name: k,
+        type: serializeTypeInfo(v, expandPointer),
+      }))
       : undefined,
-    variant: ti.variant ? serializeVariantPart(ti.variant) : undefined,
+    variant: ti.variant ? serializeVariantPart(ti.variant, expandPointer) : undefined,
     enumCount: ti.enumCount,
   }
 }
 
-export function serializeVariantPart(vp: VariantPartInfo): VariantPartDescriptor {
+export function serializeVariantPart(
+  vp: VariantPartInfo,
+  expandPointer = true,
+): VariantPartDescriptor {
   return {
     tagName: vp.tagName,
     branches: vp.branches.map((b) => ({
       labels: b.labels,
       fields: Array.from(b.fields.entries()).map(([k, v]) => ({
         name: k,
-        type: serializeTypeInfo(v),
+        type: serializeTypeInfo(v, expandPointer),
       })),
-      nested: b.nested ? serializeVariantPart(b.nested) : undefined,
+      nested: b.nested ? serializeVariantPart(b.nested, expandPointer) : undefined,
     })),
   }
 }

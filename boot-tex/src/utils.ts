@@ -62,15 +62,17 @@ export const extraSyscalls: Record<string, SyscallHandler> = {
 //   - 方言形式改写成宿主侧注入的 openin / openout（选项实参丢弃）。
 // 编译器内部表对非 ISO 形式默认报错，这里的覆盖使方言形式合法化。
 
-/** TeX 方言的文件打开：以 rewrite 扩展覆盖 lowering.* key */
+/** TeX 方言的文件打开：以 rewrite 扩展覆盖 lowering 侧的无本体调用 key */
 export const fileOpenRewriters: SyscallRewriteTable = {
-  [syscallKeys.fileReset]: (sys) => {
+  // key 为 lowering 统一产出的 `lowering.call.<小写名>`；实参布局 = (值, 类型描述) 平铺，
+  // 故 ISO 单实参形式长度为 2，方言形式（带 file-name）长度 > 2
+  ['lowering.call.reset']: (sys) => {
     if (sys.args.length === 2) {
       return { kind: 'syscall', key: rtKeys.fileReset, args: [sys.args[0]] }
     }
     return { kind: 'syscall', key: 'extra.openIn', args: [sys.args[0], sys.args[2]] }
   },
-  [syscallKeys.fileRewrite]: (sys) => {
+  ['lowering.call.rewrite']: (sys) => {
     if (sys.args.length === 2) {
       return { kind: 'syscall', key: rtKeys.fileRewrite, args: [sys.args[0]] }
     }

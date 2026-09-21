@@ -132,6 +132,12 @@ export const syscallKeys = {
   // 槽赋值：把值写入一个变量槽（rewrite 译成 runtime.assign，codegen 内联为 (x = v)）
   assign: 'lowering.assign', // [target, value]
 
+  // 无本体调用：key 形如 `lowering.call.<小写名>`，实参平铺为 (值, 类型描述)…，
+  // 翻译（含实参形态检查）全部归 rewrite
+  callPrefix: 'lowering.call.',
+  // 字段规格（write 的 `x:w` / `x:w:p`，`:` 二元）：[值, 类型描述, 宽/或省略?, …]
+  widthSpec: 'lowering.widthspec',
+
   memDefault: 'lowering.mem.default', // [typeDesc]
   memCopy: 'lowering.mem.copy', // [dst, dstOffset, src, typeDesc]
 

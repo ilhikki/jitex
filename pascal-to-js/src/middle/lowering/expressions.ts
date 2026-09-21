@@ -142,12 +142,10 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
   if (name === 'nil') {
     return litNull()
   }
-  // 内置无参函数（parser 将无括号调用解析为 Identifier）
-  if (name === 'eof') {
-    return syscall(syscallKeys.ioEof, [])
-  }
-  if (name === 'eoln') {
-    return syscall(syscallKeys.ioEoln, [])
+  // 内置无参函数（parser 将无括号调用解析为 Identifier）：与带括号形式同一条
+  // 机械翻译路径 —— 名字即 key，交给 rewrite
+  if (name === 'eof' || name === 'eoln') {
+    return syscall(callKey(name), [])
   }
 
   throw new AssertionError(`loweringIdentifier: undefined identifier ${node.name}`)
@@ -225,6 +223,62 @@ function loweringUnary(node: UnaryExpressionNode, a: Analysis, ws: WithBinding[]
   throw new AssertionError(`loweringUnary: unknown operator ${op}`)
 }
 
+// 无本体调用的机械翻译
+
+/** 无本体调用的 key：`lowering.call.<小写名>`（名字只是拼进 key，不做任何判定） */
+export function callKey(name: string): SyscallKey {
+  return `${syscallKeys.callPrefix}${name.toLowerCase()}` as SyscallKey
+}
+
+/**
+ * 拆分字段规格语法 `x:w` / `x:w:p`。
+ *
+ * parser 把它解析为 `:` 二元表达式（`x:w:p` 形如 `(x:w):p`），这里只按 AST 形状
+ * 拆成 [值, 宽度, 精度?] —— 纯结构翻译，不含任何语义判断。
+ */
+function splitWidthSpec(arg: ExpressionNode): ExpressionNode[] | undefined {
+  if (arg.kind !== 'BinaryExpression' || (arg as BinaryExpressionNode).operator !== ':') {
+    return undefined
+  }
+  const outer = arg as BinaryExpressionNode
+  if (
+    outer.left.kind === 'BinaryExpression' &&
+    (outer.left as BinaryExpressionNode).operator === ':'
+  ) {
+    const inner = outer.left as BinaryExpressionNode
+    return [inner.left, inner.right, outer.right]
+  }
+  return [outer.left, outer.right]
+}
+
+/**
+ * 无本体调用（内置 + 注入）的实参翻译 —— 机械、无判定。
+ *
+ * 每个实参平铺成 (值, 类型描述)；字段规格 `x:w[:p]` 这类**仅由语法形状**决定的
+ * 特殊写法，用一个专用 syscall（lowering.widthspec）表达，整体仍是一个实参。
+ *
+ * 实参个数、形态与合法性一概不问：全部原样交给 rewrite。
+ */
+export function loweringCallActuals(
+  args: ExpressionNode[],
+  a: Analysis,
+  ws: WithBinding[],
+): JsonCode.Expr[] {
+  const out: JsonCode.Expr[] = []
+  for (const arg of args) {
+    const spec = splitWidthSpec(arg)
+    if (spec) {
+      out.push(
+        syscall(syscallKeys.widthSpec, spec.flatMap((x) => [loweringExpr(x, a, ws), typeDescLiteral(a.typeOf(x))])),
+        typeDescLiteral(a.typeOf(arg)),
+      )
+      continue
+    }
+    out.push(loweringExpr(arg, a, ws), typeDescLiteral(a.typeOf(arg)))
+  }
+  return out
+}
+
 function loweringFunctionCall(
   node: FunctionCallNode,
   a: Analysis,
@@ -247,69 +301,10 @@ function loweringFunctionCall(
     return callExpr(sym.funcId, args)
   }
 
-  // 内置函数
-  const name = node.name.name.toLowerCase()
-  const args = node.arguments
-  const argExprs = args.map((x) => loweringExpr(x, a, ws))
-
-  // 额外 callable 注入的函数（AGENTS.md 原则 A.7：注入优先；原生被允许覆盖时也在此命中）
-  const extraFunc = a.extraCallables()?.get(name)
-  if (extraFunc?.kind === 'function') {
-    return syscall(extraFunc.sysCallName as SyscallKey, argExprs)
-  }
-
-  switch (name) {
-    // 内置函数统一产泛型 key（带类型的传 type 参数），类型分派下沉到 rewrite
-    case 'abs':
-      return syscall(syscallKeys.abs, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
-    case 'sqr':
-      return syscall(syscallKeys.sqr, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
-    case 'sqrt':
-      return syscall(syscallKeys.sqrt, argExprs)
-    case 'sin':
-      return syscall(syscallKeys.sin, argExprs)
-    case 'cos':
-      return syscall(syscallKeys.cos, argExprs)
-    case 'exp':
-      return syscall(syscallKeys.exp, argExprs)
-    case 'ln':
-      return syscall(syscallKeys.ln, argExprs)
-    case 'arctan':
-      return syscall(syscallKeys.arctan, argExprs)
-    case 'trunc':
-      return syscall(syscallKeys.trunc, argExprs)
-    case 'round':
-      return syscall(syscallKeys.round, argExprs)
-    case 'ord':
-      return syscall(syscallKeys.ord, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
-    case 'chr':
-      return syscall(syscallKeys.chr, argExprs)
-    case 'pred':
-      return syscall(syscallKeys.pred, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
-    case 'succ':
-      return syscall(syscallKeys.succ, [argExprs[0], typeDescLiteral(a.typeOf(args[0]))])
-    case 'odd':
-      return syscall(syscallKeys.odd, argExprs)
-    // eof / eoln 的实参形态不由本层判定（内置语义归 rewrite）：
-    // 无实参形式用 null 表示缺省目标，语义与无括号形式 lowering.io.eof / io.eoln 相同
-    case 'eof':
-      if (args.length === 0) {
-        return syscall(syscallKeys.fileEof, [litNull()])
-      }
-      return syscall(syscallKeys.fileEof, [
-        argExprs[0],
-        typeDescLiteral(a.typeOf(args[0])),
-        ...argExprs.slice(1),
-      ])
-    case 'eoln':
-      if (args.length === 0) {
-        return syscall(syscallKeys.fileEoln, [litNull()])
-      }
-      return syscall(syscallKeys.fileEoln, argExprs)
-    default: {
-      throw new AssertionError(`loweringFunctionCall: unknown function ${name}`)
-    }
-  }
+  // 内置函数与注入函数：机械翻译 —— 名字拼进 key，实参与类型描述平铺传递。
+  // 名 → 翻译的映射（含实参形态是否合法）全部在 rewrite；注入的 callable 由其
+  // sysCallName 在 transform 里自动注册为同 key 的 rewriter，故此处无需区分两者。
+  return syscall(callKey(node.name.name), loweringCallActuals(node.arguments, a, ws))
 }
 
 function loweringArrayAccess(node: ArrayAccessNode, a: Analysis, ws: WithBinding[]): JsonCode.Expr {
@@ -320,7 +315,7 @@ function loweringArrayAccess(node: ArrayAccessNode, a: Analysis, ws: WithBinding
     // 否则 JS 中 arr['A'] 访问属性而非 arr[65]
     const ti = a.typeOf(i)
     if (ti.tag === 'char') {
-      return syscall(syscallKeys.ord, [expr, typeDescLiteral(ti)])
+      return syscall(callKey('ord'), [expr, typeDescLiteral(ti)])
     }
     return expr
   })

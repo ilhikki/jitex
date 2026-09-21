@@ -34,16 +34,19 @@ import {
   labelStmt,
   litField,
   litInt,
-  litNull,
   ref,
   syscall,
-  SyscallKey,
   syscallKeys,
   WithBinding,
 } from './helpers.ts'
-import { defaultExpr, typeDescLiteral } from './type.ts'
-import { loweringCallableArgument, loweringExpr, resolveSymbol } from './expressions.ts'
-import { loweringReadln, loweringWriteln } from './io.ts'
+import { typeDescLiteral } from './type.ts'
+import {
+  callKey,
+  loweringCallableArgument,
+  loweringCallActuals,
+  loweringExpr,
+  resolveSymbol,
+} from './expressions.ts'
 
 // loweringStmt → Statement[]
 
@@ -145,7 +148,7 @@ function loweringAssignTarget(
     if (sym && (sym.kind === 'var' || sym.kind === 'param')) {
       const ti = sym.typeInfo
       // subrange 运行时边界检查
-      const rangeCheck = ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
+      const rangeCheck = a.debug() && ti.tag === 'subrange' && ti.low !== undefined && ti.high !== undefined
         ? evalStmt(
           syscall(syscallKeys.rangeCheck, [ref(sym.varId), litInt(ti.low), litInt(ti.high)]),
         )
@@ -185,7 +188,7 @@ function loweringAssignTarget(
       const expr = loweringExpr(i, a, ws)
       const ti = a.typeOf(i)
       if (ti.tag === 'char') {
-        return syscall(syscallKeys.ord, [expr, typeDescLiteral(ti)])
+        return syscall(callKey('ord'), [expr, typeDescLiteral(ti)])
       }
       return expr
     })
@@ -254,6 +257,16 @@ function loweringIf(
   return out
 }
 
+/**
+ * 循环回边 / goto 前的步数检查。
+ *
+ * **非 debug 构建不生成这条语句** —— 它该不该存在取决于插入位置，而位置知识在本层
+ * （rewrite 看不到位置，所以不能由它来删）。
+ */
+function stepsCheckStmts(a: Analysis): JsonCode.Statement[] {
+  return a.debug() ? [evalStmt(syscall(syscallKeys.stepsCheck, []))] : []
+}
+
 function loweringWhile(
   node: WhileStatementNode,
   a: Analysis,
@@ -266,7 +279,7 @@ function loweringWhile(
   const cond = loweringExpr(node.condition, a, ws)
   return [
     labelStmt(L_top),
-    evalStmt(syscall(syscallKeys.stepsCheck, [])),
+    ...stepsCheckStmts(a),
     jumpIfStmt(cond, L_body, L_end),
     labelStmt(L_body),
     ...loweringStmt(node.body, a, funcId, ws),
@@ -290,7 +303,7 @@ function loweringRepeat(
   }
   return [
     labelStmt(L_top),
-    evalStmt(syscall(syscallKeys.stepsCheck, [])),
+    ...stepsCheckStmts(a),
     ...bodyStmts,
     jumpIfStmt(cond, L_end, L_top),
     labelStmt(L_end),
@@ -328,7 +341,7 @@ function loweringFor(
     assignStmt(ref(vid), initE),
     assignStmt(ref(limitVar), finalE),
     labelStmt(L_top),
-    evalStmt(syscall(syscallKeys.stepsCheck, [])),
+    ...stepsCheckStmts(a),
     jumpIfStmt(syscall(cmpKey, [varRef, i32Td, ref(limitVar), i32Td]), L_body, L_end),
     labelStmt(L_body),
     ...loweringStmt(node.body, a, funcId, ws),
@@ -404,16 +417,14 @@ function loweringGoto(node: GotoStatementNode, a: Analysis, funcId: number): Jso
     throw new AssertionError(`loweringGoto: label ${node.label.value} not declared`)
   }
   // 决策 13：goto 跳转前插入 steps.check，防止 goto 死循环（steps.check 只在循环回边
-  // 插入，goto 跳转不触发回边检查，需单独兜底）
-  const check = evalStmt(syscall(syscallKeys.stepsCheck, []))
-  // label 使用位置的 funcId：label 可能在祖先函数声明，但在后代函数使用。
-  // longJump 需跳到使用位置（有 labelStmt 的函数），而非声明位置。
+  // 插入，goto 跳转不触发回边检查，需单独兜底）。非 debug 构建不生成。
+  const checks = stepsCheckStmts(a)
   const useFuncId = a.labelUseFuncOf(info.labelId) ?? info.funcId
   if (useFuncId === funcId) {
-    return [check, jumpStmt(info.labelId)]
+    return [...checks, jumpStmt(info.labelId)]
   }
   return [
-    check,
+    ...checks,
     {
       kind: 'longJump',
       labelId: info.labelId,
@@ -464,31 +475,6 @@ function loweringWith(
 }
 
 // ProcedureCall 编译
-
-/**
- * 文件过程的实参过境：首参（文件变量）+ 其类型描述，其余实参照传。
- *
- * 实参形态不由本层判定：内置过程接受何种实参（ISO 的单实参形式，还是方言形式
- * 如 `reset(f, name, opts)`）属于内置语义，归 rewrite 解释。lowering 只保证
- * 「结构 + 类型描述」完整过境 —— 多余实参原样带给 rewriter，由 rewriter 按形态
- * 决定翻译（使用方可覆盖对应的 lowering.* key 接管方言形态）。
- */
-function loweringFileActuals(
-  args: ExpressionNode[],
-  a: Analysis,
-  ws: WithBinding[],
-): JsonCode.Expr[] {
-  // 无实参：目标缺省，其含义交 rewrite / runtime 解释（本层不判定合法性）
-  if (args.length === 0) {
-    return [litNull()]
-  }
-  const head = args[0]
-  return [
-    loweringExpr(head, a, ws),
-    typeDescLiteral(a.typeOf(head)),
-    ...args.slice(1).map((x) => loweringExpr(x, a, ws)),
-  ]
-}
 
 function loweringProcedureCall(
   node: ProcedureCallNode,
@@ -545,110 +531,10 @@ function loweringProcedureCall(
     return loweringUserCallStmt(sym.funcId, node.arguments, a, funcId, ws)
   }
 
-  // 额外 callable 注入的过程（AGENTS.md 原则 A.7：注入优先；原生被允许覆盖时也在此命中）
-  const extraProc = a.extraCallables()?.get(name)
-  if (extraProc?.kind === 'procedure') {
-    const args = node.arguments.map((x) => loweringExpr(x, a, ws))
-    return [evalStmt(syscall(extraProc.sysCallName as SyscallKey, args))]
-  }
-
-  // 内置过程
-  switch (name) {
-    case 'writeln':
-      return loweringWriteln(node.arguments, a, ws, false)
-    case 'write':
-      return loweringWriteln(node.arguments, a, ws, true)
-    case 'readln':
-      return loweringReadln(node.arguments, a, ws, false)
-    case 'read':
-      return loweringReadln(node.arguments, a, ws, true)
-    // 文件过程的实参形态（ISO 单实参 / 方言带文件名）不由本层判定：
-    // 完整实参与类型描述过境，翻译由 rewrite 决定（见 loweringFileActuals）
-    case 'reset':
-      return [
-        evalStmt(syscall(syscallKeys.fileReset, loweringFileActuals(node.arguments, a, ws))),
-      ]
-    case 'rewrite':
-      return [
-        evalStmt(syscall(syscallKeys.fileRewrite, loweringFileActuals(node.arguments, a, ws))),
-      ]
-    case 'get':
-      return [
-        evalStmt(syscall(syscallKeys.fileGet, loweringFileActuals(node.arguments, a, ws))),
-      ]
-    case 'put':
-      return [
-        evalStmt(syscall(syscallKeys.filePut, loweringFileActuals(node.arguments, a, ws))),
-      ]
-    case 'page': {
-      if (node.arguments.length === 0) {
-        return [evalStmt(syscall(syscallKeys.ioPage, [litNull(), litNull()]))]
-      }
-      const f = loweringExpr(node.arguments[0], a, ws)
-      return [
-        evalStmt(
-          syscall(syscallKeys.ioPage, [f, typeDescLiteral(a.typeOf(node.arguments[0]))]),
-        ),
-      ]
-    }
-    case 'pack': {
-      // ISO 7185 6.6.5.4: pack(a, i, z) 等价于 z[j] := a[k]（k 自 i 起随 j 递增）
-      const [aArg, iArg, zArg] = node.arguments
-      return [
-        evalStmt(
-          syscall(syscallKeys.pack, [
-            loweringExpr(aArg, a, ws),
-            loweringExpr(iArg, a, ws),
-            loweringExpr(zArg, a, ws),
-            typeDescLiteral(a.typeOf(aArg)),
-            typeDescLiteral(a.typeOf(zArg)),
-          ]),
-        ),
-      ]
-    }
-    case 'unpack': {
-      // ISO 7185 6.6.5.4: unpack(z, a, i) 等价于 a[k] := z[j]（k 自 i 起随 j 递增）
-      const [zArg, aArg, iArg] = node.arguments
-      return [
-        evalStmt(
-          syscall(syscallKeys.unpack, [
-            loweringExpr(zArg, a, ws),
-            loweringExpr(aArg, a, ws),
-            loweringExpr(iArg, a, ws),
-            typeDescLiteral(a.typeOf(zArg)),
-            typeDescLiteral(a.typeOf(aArg)),
-          ]),
-        ),
-      ]
-    }
-    case 'new': {
-      // ISO 7185 6.6.5.3: new(p) 创建新变量，p 指向它
-      // p 可以是指针变量、记录的 pointer 字段、数组元素的 pointer 字段等
-      const argNode = node.arguments[0]
-      const ptrType = a.typeOf(argNode)
-      if (ptrType.tag !== 'pointer' || !ptrType.domainType) {
-        throw new Error('new: argument must be a pointer-type variable')
-      }
-      const defaultVal = defaultExpr(ptrType.domainType)
-      const cell = syscall(syscallKeys.cellCreate, [defaultVal])
-      return loweringAssignTarget(argNode, cell, a, funcId, ws)
-    }
-    case 'dispose': {
-      // ISO 7185 6.6.5.3: dispose(p) 释放标识值，p 置 nil
-      const argNode = node.arguments[0]
-      const ptrType = a.typeOf(argNode)
-      if (ptrType.tag !== 'pointer') {
-        throw new Error('dispose: argument must be a pointer-type variable')
-      }
-      // 先检查 p 不是 nil，然后置 nil
-      const ptrExpr = loweringExpr(argNode, a, ws)
-      const checkStmt = evalStmt(syscall(syscallKeys.ptrDisposeCheck, [ptrExpr]))
-      return [checkStmt, ...loweringAssignTarget(argNode, litNull(), a, funcId, ws)]
-    }
-    default: {
-      throw new AssertionError(`loweringProcedureCall: unknown procedure ${name}`)
-    }
-  }
+  // 无本体调用（内置过程 + 注入过程）：机械翻译 —— 名字拼进 key，实参与类型描述
+  // 平铺传递。名 → 翻译的映射、实参形态是否合法，全部在 rewrite；注入的 callable
+  // 由其 sysCallName 在 transform 里自动注册为同 key 的 rewriter。
+  return [evalStmt(syscall(callKey(name), loweringCallActuals(node.arguments, a, ws)))]
 }
 
 function loweringUserCallStmt(

@@ -396,6 +396,8 @@ export interface Analysis {
   globalSymbolOf(name: string): AnalysisSymbol | undefined
   /** id → 可读名字映射（调试用，仅 json-code-compiler 读取） */
   debugNames(): Map<number, string>
+  /** debug 构建开关：lowering 据此决定是否生成独立检查语句（步数 / 边界 / 进入钩子） */
+  debug(): boolean
   /** 额外 callable 注入表（小写名为 key；编译期用于查 syscall 名） */
   extraCallables(): Map<string, ExtraCallable> | undefined
 }

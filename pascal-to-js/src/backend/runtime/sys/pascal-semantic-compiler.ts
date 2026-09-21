@@ -99,6 +99,15 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // 值而非引用，无法写回（见 runtime-keys.ts 的 assign 说明）。
   [rtKeys.assign]: (a) => `((${a[0]}) = ${a[1]})`,
 
+  // 求值序列（闭包）：用一个立即执行函数把多个表达式按顺序求值（见 runtime-keys.ts）。
+  // 参数必须 >= 2 —— 只有一项时规则应直接返回该项，包一层闭包没有意义。
+  [rtKeys.closureNoValue]: (a) => {
+    if (a.length < 2) {
+      throw new Error(`runtime.closure.noValue 至少需要 2 个参数，实际 ${a.length} 个`)
+    }
+    return `(() => { ${a.map((e) => `${e};`).join(' ')} })()`
+  },
+
   [rtKeys.cellNew]: (a) => `({ kind: 'cell', value: ${a[0]} })`,
   [rtKeys.cellGet]: (a) => `(${a[0]}.value)`,
   // cell.set 的 handler 返回 undefined，用 void 保持返回值语义

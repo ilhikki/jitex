@@ -229,6 +229,16 @@ export const rtKeys = {
    */
   assign: 'runtime.assign',
 
+  /**
+   * 求值序列（闭包）：`noValue(e1, …, en)` 顺序求值，交出 `undefined`。
+   *
+   * 给 rewrite 提供"在一个表达式里做多件事"的能力（如 write 的多项、readln 的多次
+   * 写回）——这些语义在源语言里是过程（语句），出现在表达式位置时需要一个出口。
+   *
+   * **必须内联**为立即执行函数；参数 >= 2（只有一项时规则应直接返回该项，不必包裹）。
+   */
+  closureNoValue: 'runtime.closure.noValue',
+
   cellNew: 'runtime.cell.new',
   cellGet: 'runtime.cell.get',
   cellSet: 'runtime.cell.set',

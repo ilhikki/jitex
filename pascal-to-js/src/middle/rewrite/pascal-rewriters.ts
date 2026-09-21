@@ -10,6 +10,8 @@
 
 import type * as JsonCode from '@/middle/ir/json-code.ts'
 import type { TypeDescriptor } from '@/middle/lowering/type.ts'
+import type { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
+import { syscallKeys } from '@/middle/lowering/helpers.ts'
 import {
   arrayCount,
   arraySlot,
@@ -41,10 +43,6 @@ function litStr(s: string): JsonCode.Literal {
 
 function litReal(v: string): JsonCode.Literal {
   return { kind: 'literal', key: 'number', arg: v }
-}
-
-function isNullLit(e: JsonCode.Expr | undefined): boolean {
-  return e !== undefined && e.kind === 'literal' && e.key === 'null'
 }
 
 /** 解析 type 描述字面量参数 */
@@ -362,6 +360,222 @@ function requireIsoFileActuals(sys: JsonCode.Syscall, name: string): void {
 }
 
 /**
+ * `put(f)` 与 `f^ := x` 的翻译。
+ *
+ * 实参布局 = [f, 文件类型描述, 值?, 值类型描述?]；值缺失即无值形式的 put(f)。
+ * 值的宿主形态在编译期定死：
+ *   blocks + 值 → put.buffer.block      值缺失 → put（仅块存储需要落盘）
+ *   bytes  + 值 → put.buffer.byte
+ *   text   + 值 → put.buffer.character（elem 为 char）/ put.buffer.text（其余元素）
+ */
+function filePutRewrite(sys: JsonCode.Syscall): JsonCode.Expr {
+  const [f, fileType, unit] = sys.args
+  if (unit === undefined) {
+    return sc(rtKeys.filePut, [f])
+  }
+  const tt = parseType(fileType)
+  const kind = fileKind(tt)
+  if (kind === 'blocks') {
+    return sc(rtKeys.filePutBufferBlock, [f, unit])
+  }
+  if (kind === 'bytes') {
+    return sc(rtKeys.filePutBufferByte, [f, unit])
+  }
+  if (tt?.elem?.tag === 'char') {
+    return sc(rtKeys.filePutBufferCharacter, [f, unit])
+  }
+  // 其余文本单位：按元素类型的文本表示写出（与 write(f, x) 同规则）
+  return sc(rtKeys.filePutBufferText, [f, sc(toConvertKey(tt?.elem, false), [unit])])
+}
+
+// 无本体调用：实参按 (值, 类型描述) 平铺，形态解释都在本层
+
+interface ActualPair {
+  value: JsonCode.Expr
+  td: JsonCode.Expr
+}
+
+/** 把平铺实参切成 (值, 类型描述) 对 */
+function actualPairs(args: JsonCode.Expr[]): ActualPair[] {
+  const out: ActualPair[] = []
+  for (let i = 0; i + 1 < args.length; i += 2) {
+    out.push({ value: args[i], td: args[i + 1] })
+  }
+  return out
+}
+
+/** 首实参是文件变量时把它当写出/读入目标，其余为项；否则目标缺省（标准输入输出） */
+function splitFileTarget(pairs: ActualPair[]): {
+  target: JsonCode.Expr
+  fileType: TypeDescriptor | undefined
+  rest: ActualPair[]
+} {
+  const first = pairs[0]
+  const firstType = first ? parseType(first.td) : undefined
+  if (first && firstType?.tag === 'file') {
+    return { target: first.value, fileType: firstType, rest: pairs.slice(1) }
+  }
+  return { target: litNullLiteral(), fileType: undefined, rest: pairs }
+}
+
+/** 解开 `x:w:p` 的专用翻译（lowering.widthspec）：值 / 类型 / 宽度 / 精度 */
+function unpackWidthSpec(e: JsonCode.Expr): {
+  value: JsonCode.Expr
+  valueType: JsonCode.Expr | undefined
+  width: JsonCode.Expr | undefined
+  prec: JsonCode.Expr | undefined
+} {
+  if (e.kind === 'syscall' && e.key === syscallKeys.widthSpec) {
+    const a = e.args
+    return { value: a[0], valueType: a[1], width: a[2], prec: a[4] }
+  }
+  return { value: e, valueType: undefined, width: undefined, prec: undefined }
+}
+
+/** 单个写出项 → 一条写入表达式（值的宿主表示在编译期定死，见原 write 注释） */
+function writeItem(
+  target: JsonCode.Expr,
+  fileType: TypeDescriptor | undefined,
+  pair: ActualPair,
+): JsonCode.Expr {
+  const spec = unpackWidthSpec(pair.value)
+  const value = spec.value
+  const vt = parseType(spec.valueType ?? pair.td)
+  const width = spec.width
+  const prec = spec.prec
+  if (fileKind(fileType) === 'blocks') {
+    return sc(rtKeys.fileWriteBlock, [target, value])
+  }
+  if (isByteFile(fileType)) {
+    return sc(rtKeys.fileWriteByte, [target, value])
+  }
+  if (isCharArray(vt)) {
+    // ISO 6.9.3.6：string 值带字段宽度时须左补空格或截断
+    if (width === undefined) {
+      return sc(rtKeys.fileWriteBytes, [target, value])
+    }
+    return sc(rtKeys.fileWriteText, [target, sc(rtKeys.convertBytesToTextField, [value, width])])
+  }
+  const binary = isBinaryFile(fileType)
+  const convArgs: JsonCode.Expr[] = [value]
+  if (width !== undefined) {
+    convArgs.push(width)
+    if (prec !== undefined) {
+      convArgs.push(prec)
+    }
+  }
+  const converted = sc(toConvertKey(vt, binary), convArgs)
+  return binary
+    ? sc(rtKeys.fileWriteBytes, [target, converted])
+    : sc(rtKeys.fileWriteText, [target, converted])
+}
+
+/** write / writeln：逐项写入，多项用闭包串成一条表达式 */
+function writeCall(sys: JsonCode.Syscall, newline: boolean): JsonCode.Expr {
+  const { target, fileType, rest } = splitFileTarget(actualPairs(sys.args))
+  const writes = rest.map((p) => writeItem(target, fileType, p))
+  if (newline) {
+    writes.push(sc(rtKeys.fileWriteln, [target]))
+  }
+  if (writes.length === 1) {
+    return writes[0]
+  }
+  if (writes.length === 0) {
+    return sc(rtKeys.fileWriteln, [target])
+  }
+  return sc(rtKeys.closureNoValue, writes)
+}
+
+/** 单个读入项 → 读到的值 */
+function readOne(
+  target: JsonCode.Expr,
+  fileType: TypeDescriptor | undefined,
+  valueType: JsonCode.Expr,
+): JsonCode.Expr {
+  const vt = parseType(valueType)
+  if (isByteFile(fileType)) {
+    return sc(rtKeys.fileReadCharacter, [target])
+  }
+  const binary = isBinaryFile(fileType)
+  const readKey = binary || vt?.tag === 'char' ? rtKeys.fileReadCharacter : rtKeys.fileReadToken
+  const raw = sc(readKey, [target])
+  if (isCharArray(vt)) {
+    return raw
+  }
+  return sc(fromConvertKey(vt, binary), [raw])
+}
+
+/**
+ * 写回一个位置。
+ *
+ * 位置只可能是 variable-access 的翻译结果：变量槽（ref）或数组元素
+ * （lowering.array.access）。
+ */
+function writeBack(loc: JsonCode.Expr, value: JsonCode.Expr, _debug: boolean): JsonCode.Expr {
+  // 变量槽
+  if (loc.kind === 'ref') {
+    return sc(rtKeys.assign, [loc, value])
+  }
+  if (loc.kind === 'syscall') {
+    // 位置的表达式在 post-order 中已被本层重写为「读」的 runtime key。
+    // 写回即换成成对的「写」key，并把值追加为最后一个实参（读写布局一致）。
+    switch (loc.key) {
+      case rtKeys.cellGet:
+        return sc(rtKeys.cellSet, [loc.args[0], value])
+      case rtKeys.pointerDereference:
+        return sc(rtKeys.pointerAssign, [loc.args[0], value])
+      case rtKeys.objectGet:
+        return sc(rtKeys.objectSet, [...loc.args, value])
+      case rtKeys.objectArrayGet:
+        return sc(rtKeys.objectArraySet, [...loc.args, value])
+      default:
+        break
+    }
+  }
+  throw new Error(
+    `rewrite: 写回目标必须是变量 / 变量参数 / 数组元素 / 记录字段 / 解引用（实际：${loc.kind}${
+      loc.kind === 'syscall' ? ':' + loc.key : ''
+    }）`,
+  )
+}
+
+/** read / readln：逐项读入并写回，多项用闭包串成一条表达式 */
+function readCall(sys: JsonCode.Syscall, skipLine: boolean, debug: boolean): JsonCode.Expr {
+  const { target, fileType, rest } = splitFileTarget(actualPairs(sys.args))
+  const ops = rest.map((p) => writeBack(p.value, readOne(target, fileType, p.td), debug))
+  if (skipLine) {
+    ops.push(sc(rtKeys.fileReadln, [target]))
+  }
+  if (ops.length === 1) {
+    return ops[0]
+  }
+  if (ops.length === 0) {
+    return sc(rtKeys.fileReadln, [target])
+  }
+  return sc(rtKeys.closureNoValue, ops)
+}
+
+/**
+ * 为注入的 callable 生成重写项：`lowering.call.<名>` → 使用方指定的 syscall 名。
+ *
+ * 注入只是"声明这个名字存在并给出实现"，实参布局由 lowering 统一为平铺的
+ * (值, 类型描述)——还原成纯值后交给使用方的 syscall（其 handler 只面对值）。
+ */
+export function buildExtraCallableRewriters(
+  extraCallables?: Record<string, ExtraCallable>,
+): SyscallRewriteTable {
+  const table: SyscallRewriteTable = {}
+  if (!extraCallables) {
+    return table
+  }
+  for (const [name, spec] of Object.entries(extraCallables)) {
+    table[`lowering.call.${name.toLowerCase()}`] = (sys) =>
+      sc(spec.sysCallName, actualPairs(sys.args).map((p) => p.value))
+  }
+  return table
+}
+
+/**
  * 构建 Pascal → runtime 的 IR 重写表。
  *
  * `debug` 决定是否产出 `runtime.debug.*` 检查（边界 / 步数 / 除零 / 视图断言）。
@@ -390,27 +604,27 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
 
     'lowering.neg': unaryFloatOrI32(rtKeys.float32Negate, rtKeys.int32Negate),
     'lowering.not': unaryI32OrOther(rtKeys.int32Not, rtKeys.booleanNot),
-    'lowering.abs': unaryFloatOrI32(rtKeys.float32Absolute, rtKeys.int32Absolute),
-
-    'lowering.sqr': (sys) => {
+    // 内置函数调用：lowering 只把名字拼进 key（lowering.call.<名>），
+    // 翻译与类型分派都在本层；实参布局 = (值, 类型描述)
+    'lowering.call.abs': unaryFloatOrI32(rtKeys.float32Absolute, rtKeys.int32Absolute),
+    'lowering.call.sqr': (sys) => {
       const t = parseType(sys.args[1])
       const x = sys.args[0]
       return sc(isFloat(t) ? rtKeys.float32Multiply : rtKeys.int32Multiply, [x, x])
     },
-    'lowering.sqrt': unary(rtKeys.float32SquareRoot),
-    'lowering.sin': unary(rtKeys.float32Sine),
-    'lowering.cos': unary(rtKeys.float32Cosine),
-    'lowering.exp': unary(rtKeys.float32Exponential),
-    'lowering.ln': unary(rtKeys.float32Logarithm),
-    'lowering.arctan': unary(rtKeys.float32Arctangent),
-    'lowering.odd': unary(rtKeys.int32Odd),
-
-    'lowering.trunc': unary(rtKeys.castFloat32ToInt32),
-    'lowering.round': unary(rtKeys.castFloat32ToInt32Round),
-    'lowering.ord': ordRewrite,
-    'lowering.chr': ordRewrite,
-    'lowering.pred': predSucc(false, debug),
-    'lowering.succ': predSucc(true, debug),
+    'lowering.call.sqrt': unary(rtKeys.float32SquareRoot),
+    'lowering.call.sin': unary(rtKeys.float32Sine),
+    'lowering.call.cos': unary(rtKeys.float32Cosine),
+    'lowering.call.exp': unary(rtKeys.float32Exponential),
+    'lowering.call.ln': unary(rtKeys.float32Logarithm),
+    'lowering.call.arctan': unary(rtKeys.float32Arctangent),
+    'lowering.call.odd': unary(rtKeys.int32Odd),
+    'lowering.call.trunc': unary(rtKeys.castFloat32ToInt32),
+    'lowering.call.round': unary(rtKeys.castFloat32ToInt32Round),
+    'lowering.call.ord': ordRewrite,
+    'lowering.call.chr': ordRewrite,
+    'lowering.call.pred': predSucc(false, debug),
+    'lowering.call.succ': predSucc(true, debug),
 
     'lowering.eq': compare(rtKeys.bitmapEqual, rtKeys.compareEqual),
     'lowering.ne': compare(rtKeys.bitmapNotEqual, rtKeys.compareNotEqual),
@@ -472,43 +686,21 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
     },
 
     // 类型只用到「文件行为类别」，句柄不携带类型描述符。
-    // reset / rewrite 的实参形态是本层的职责（内置语义归 rewrite）：ISO 形式即
-    // 「file-variable + 类型描述」，其余形式在此报错；使用方以 syscallRewriters
-    // 覆盖同名 lowering.* key 即可接管方言形式（如 reset(f, name, opts)）。
+    // reset / rewrite 的实参形态是本层的职责：ISO 形式即「file-variable + 类型描述」，
+    // 其余形式在此报错；使用方覆盖同名 key 即可接管方言形式（如 reset(f, name, opts)）。
     'lowering.file.create': (sys) => sc(rtKeys.fileCreate, [litStr(fileKind(parseType(sys.args[0])))]),
-    'lowering.file.reset': (sys) => {
+    'lowering.call.reset': (sys) => {
       requireIsoFileActuals(sys, 'reset')
       return sc(rtKeys.fileReset, [sys.args[0]])
     },
-    'lowering.file.rewrite': (sys) => {
+    'lowering.call.rewrite': (sys) => {
       requireIsoFileActuals(sys, 'rewrite')
       return sc(rtKeys.fileRewrite, [sys.args[0]])
     },
-    'lowering.file.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
-    // `f^ := x` / `put(f)` 的形态在编译期定死（值形态由 key 承载，运行期不再判断）：
-    //   blocks + 值 → put.buffer.block      值缺失 → put（仅块存储需要落盘）
-    //   bytes  + 值 → put.buffer.byte
-    //   text   + 值 → put.buffer.character（elem 为 char）/ put.buffer.text（其余元素）
-    'lowering.file.put': (sys) => {
-      const [f, fileType, unit] = sys.args
-      // put(f)：无值参数
-      if (unit === undefined) {
-        return sc(rtKeys.filePut, [f])
-      }
-      const tt = parseType(fileType)
-      const kind = fileKind(tt)
-      if (kind === 'blocks') {
-        return sc(rtKeys.filePutBufferBlock, [f, unit])
-      }
-      if (kind === 'bytes') {
-        return sc(rtKeys.filePutBufferByte, [f, unit])
-      }
-      if (tt?.elem?.tag === 'char') {
-        return sc(rtKeys.filePutBufferCharacter, [f, unit])
-      }
-      // 其余文本单位：按元素类型的文本表示写出（与 write(f, x) 同规则）
-      return sc(rtKeys.filePutBufferText, [f, sc(toConvertKey(tt?.elem, false), [unit])])
-    },
+    'lowering.call.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
+    // put 有两条来源：调用 `put(f)` / `put(f, x)`，以及赋值 `f^ := x`
+    'lowering.call.put': filePutRewrite,
+    'lowering.file.put': filePutRewrite,
     'lowering.file.peek': (sys) => {
       const td = parseType(sys.args[1])
       // record 文件：传元素字节大小，供首次分配缓冲区
@@ -521,88 +713,76 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
     'lowering.file.eoln': (sys) => sc(rtKeys.fileEoln, [sys.args[0]]),
     'lowering.program.fileUrl': (sys) => sc(rtKeys.fileProgramUrl, [sys.args[0], sys.args[1]]),
 
-    'lowering.io.write': (sys) => {
-      const [target, targetType, value, valueType, width, prec] = sys.args
-      const vt = parseType(valueType)
-      const tt = parseType(targetType)
-      // 值的宿主表示在编译期定死，写 key 随之选定（运行期 handler 不再判类型）：
-      //   blocks 目标 → write.block（记录字节视图）
-      //   file of byte → write.byte（值即字节）
-      //   char 数组 → write.bytes（已是字节视图）
-      //   其余值类型 → 先按目标是否为二进制 convert，再按结果形态选 write.bytes / write.text
-      if (fileKind(tt) === 'blocks') {
-        return sc(rtKeys.fileWriteBlock, [target, value])
-      }
-      if (isByteFile(tt)) {
-        return sc(rtKeys.fileWriteByte, [target, value])
-      }
-      if (isCharArray(vt)) {
-        // ISO 6.9.3.6：string 值带字段宽度时须左补空格或截断（与 integer 等类型不同，
-        // 后者的字段宽度只保证最小宽度、不截断）
-        if (isNullLit(width)) {
-          return sc(rtKeys.fileWriteBytes, [target, value])
-        }
-        // 补/截后是文本，按文本单位写
-        return sc(rtKeys.fileWriteText, [target, sc(rtKeys.convertBytesToTextField, [value, width])])
-      }
-      const binary = isBinaryFile(tt)
-      const key = toConvertKey(vt, binary)
-      const convArgs: JsonCode.Expr[] = [value]
-      if (!isNullLit(width)) {
-        convArgs.push(width)
-        if (!isNullLit(prec)) {
-          convArgs.push(prec)
-        }
-      }
-      // convert.* 的结果形态由 binary 决定：二进制 → Uint8Array，文本 → string
-      const converted = sc(key, convArgs)
-      return binary ? sc(rtKeys.fileWriteBytes, [target, converted]) : sc(rtKeys.fileWriteText, [target, converted])
+    // 无本体调用：io 系列。实参由 lowering 平铺为 (值, 类型描述)；谁是目标、项是什么
+    // 形态，都由本层按类型/结构解释。
+    'lowering.call.write': (sys) => writeCall(sys, false),
+    'lowering.call.writeln': (sys) => writeCall(sys, true),
+    'lowering.call.read': (sys) => readCall(sys, false, debug),
+    'lowering.call.readln': (sys) => readCall(sys, true, debug),
+    'lowering.call.page': (sys) => {
+      const pairs = actualPairs(sys.args)
+      return sc(rtKeys.filePage, [pairs.length > 0 ? pairs[0].value : litNullLiteral()])
     },
-    'lowering.io.writeln': (sys) => sc(rtKeys.fileWriteln, [sys.args[0]]),
-    'lowering.io.read': (sys) => {
-      const [target, targetType, valueType] = sys.args
-      const vt = parseType(valueType)
-      const tt = parseType(targetType)
-      // 字节文件：读到的就是字节值，零转换
-      if (isByteFile(tt)) {
-        return sc(rtKeys.fileReadCharacter, [target])
-      }
-      const binary = isBinaryFile(tt)
-      const readKey = binary || vt?.tag === 'char' ? rtKeys.fileReadCharacter : rtKeys.fileReadToken
-      const raw = sc(readKey, [target])
-      if (isCharArray(vt)) {
-        return raw
-      }
-      return sc(fromConvertKey(vt, binary), [raw])
+    'lowering.call.eof': (sys) => {
+      const pairs = actualPairs(sys.args)
+      return sc(rtKeys.fileEof, [pairs.length > 0 ? pairs[0].value : litNullLiteral()])
     },
-    'lowering.io.readln.skip': (sys) => sc(rtKeys.fileReadln, [sys.args[0]]),
-    'lowering.io.page': (sys) => sc(rtKeys.filePage, [sys.args[0]]),
-    'lowering.io.eof': () => sc(rtKeys.fileEof, [litNullLiteral()]),
-    'lowering.io.eoln': () => sc(rtKeys.fileEoln, [litNullLiteral()]),
+    'lowering.call.eoln': (sys) => {
+      const pairs = actualPairs(sys.args)
+      return sc(rtKeys.fileEoln, [pairs.length > 0 ? pairs[0].value : litNullLiteral()])
+    },
 
-    // ISO 6.6.5.4：pack(a, i, z) / unpack(z, a, i) 按元素字节连续搬移
-    'lowering.pack': (sys) => {
-      const [src, start, dst, srcType, dstType] = sys.args
-      const srcArr = arraySlot(parseType(srcType)!)
+    // new(p) / dispose(p)：ISO 7185 6.6.5.3。p 是一个位置（变量槽 / 数组元素 / 变量
+    // 参数 / 记录字段），由本层写回；new 出来的变量其值未定义（ISO 不要求初始值），
+    // dispose 要先检查 p 不是 nil。
+    'lowering.call.new': (sys) => {
+      const [p, ptd] = sys.args
+      const pt = parseType(ptd)
+      if (pt?.tag !== 'pointer' || !pt.elem) {
+        throw new Error('ISO 7185 6.6.5.3: new(p) 的实参须为 pointer 类型的变量')
+      }
+      // 新变量的宿主表示 = 领域类型的默认表示（指针描述符带一层领域布局）
+      const domain = pt.elem
+      const inner = isObjectRepr(domain)
+        ? defaultValueExpr(domain)
+        : sc(rtKeys.bytesAlloc, [litInt(sizeOf(domain))])
+      return writeBack(p, sc(rtKeys.cellNew, [inner]), debug)
+    },
+    'lowering.call.dispose': (sys) => {
+      const [p, ptd] = sys.args
+      if (parseType(ptd)?.tag !== 'pointer') {
+        throw new Error('ISO 7185 6.6.5.3: dispose(p) 的实参须为 pointer 类型的变量')
+      }
+      return sc(rtKeys.closureNoValue, [
+        sc(rtKeys.pointerDisposeCheck, [p]),
+        writeBack(p, litNullLiteral(), debug),
+      ])
+    },
+
+    // ISO 6.6.5.4：pack(a, i, z) / unpack(z, a, i) 按元素字节连续搬移。
+    // 实参布局为平铺的 (值, 类型描述)。
+    'lowering.call.pack': (sys) => {
+      const [src, srcTd, start, , dst, dstTd] = sys.args
+      const srcArr = arraySlot(parseType(srcTd)!)
       return sc(rtKeys.bytesPack, [
         src,
         litInt(srcArr.lows[0] ?? 0),
         litInt(srcArr.elemSize),
         start,
         dst,
-        litInt(arrayCount(parseType(dstType)!)),
+        litInt(arrayCount(parseType(dstTd)!)),
       ])
     },
-    'lowering.unpack': (sys) => {
-      const [src, dst, start, srcType, dstType] = sys.args
-      const dstArr = arraySlot(parseType(dstType)!)
+    'lowering.call.unpack': (sys) => {
+      const [src, srcTd, dst, dstTd, start] = sys.args
+      const dstArr = arraySlot(parseType(dstTd)!)
       return sc(rtKeys.bytesUnpack, [
         src,
         dst,
         litInt(dstArr.lows[0] ?? 0),
         litInt(dstArr.elemSize),
         start,
-        litInt(arrayCount(parseType(srcType)!)),
+        litInt(arrayCount(parseType(srcTd)!)),
       ])
     },
     'lowering.array.access': (sys) => {
@@ -646,9 +826,11 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
     'lowering.cell.set': (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),
     // 可调用形参的间接调用：callee 为函数值，是个原子操作，无需类型分派
     'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
-    'lowering.range.check': (sys) => debug ? sc(rtKeys.debugRangeCheck, sys.args) : sys.args[0],
-    'lowering.steps.check': () => debug ? sc(rtKeys.debugStepsCheck, []) : litInt(0),
-    'lowering.hook.function.enter': () => debug ? sc(rtKeys.hookFunctionEnter, []) : undefined,
+    // 这三条只在 debug 构建由 lowering 生成（"是否生成"已由 lowering 决定），
+    // 因此此处无条件翻译 —— rewrite 不再需要"删除语句"的能力
+    'lowering.range.check': (sys) => sc(rtKeys.debugRangeCheck, sys.args),
+    'lowering.steps.check': () => sc(rtKeys.debugStepsCheck, []),
+    'lowering.hook.function.enter': () => sc(rtKeys.hookFunctionEnter, []),
   }
 }
 

@@ -115,8 +115,12 @@ function loweringBlock(
 
   // 函数体 = 进入钩子 → 变量默认初始化 → 语句 → 末尾 return
   const body: JsonCode.Statement[] = []
-  const debugName = analysis.debugNames().get(info.funcId) ?? ''
-  body.push(evalStmt(syscall(syscallKeys.hookFunctionEnter, [litField(info.funcId.toString()), litField(debugName)])))
+  // 进入钩子只在 debug 构建生成：它该不该存在取决于插入位置（函数入口），
+  // 而位置知识在本层 —— 所以由本层决定，而不是生成后交给 rewrite 抹掉
+  if (analysis.debug()) {
+    const debugName = analysis.debugNames().get(info.funcId) ?? ''
+    body.push(evalStmt(syscall(syscallKeys.hookFunctionEnter, [litField(info.funcId.toString()), litField(debugName)])))
+  }
   for (const local of info.locals) {
     body.push(assignStmt(ref(local.varId), defaultExpr(local.typeInfo)))
   }
