@@ -107,8 +107,12 @@ export function executeCompiled(
   // 移除 export 语句，添加 return
   const execCode = code.replace(/export.*$/, `return ${mainName};`)
   const factory = new Function(execCode)
-  const mainFn = factory()
-  mainFn(syscalls)
+  const createRun = factory() as (syscalls: Record<string, Syscall>) => () => void
+
+  // 产物顶层是工厂：注入 __sys 后返回执行体，调用它才真正开始执行。
+  // 契约：工厂调用后 __sys 字典须保持稳定（解包只发生在工厂里）。
+  const run = createRun(syscalls)
+  run()
 }
 
 export interface RunOptions extends TransformOptions, RuntimeOptions {}
