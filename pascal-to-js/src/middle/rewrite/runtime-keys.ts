@@ -221,6 +221,14 @@ export const rtKeys = {
   objectArrayNew: 'runtime.objectarray.new',
   objectArrayClone: 'runtime.objectarray.clone',
 
+  /**
+   * 槽赋值：把值写入一个变量槽。
+   *
+   * **必须内联**（见 pascal-semantic-compiler.ts）：走 dispatcher 时实参只能拿到槽的
+   * 值而非引用，无法赋值。内联为 `(x = v)`，与直接的 JS 赋值等价。
+   */
+  assign: 'runtime.assign',
+
   cellNew: 'runtime.cell.new',
   cellGet: 'runtime.cell.get',
   cellSet: 'runtime.cell.set',

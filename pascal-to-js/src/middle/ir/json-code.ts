@@ -91,10 +91,10 @@ export interface Function {
  * 语句联合。
  *
  * 控制流类：Label / Jmp / JumpIf / LongJump
- * 数据类  ：Assign / Eval
+ * 数据类  ：Eval（一切计算，含赋值，都是 syscall 表达式）
  * 退出类  ：Return
  */
-export type Statement = Label | Jmp | JumpIf | LongJump | Assign | Return | Eval
+export type Statement = Label | Jmp | JumpIf | LongJump | Return | Eval
 
 /**
  * 标签声明：作为跳转的着陆点。
@@ -156,19 +156,6 @@ export interface LongJump {
 }
 
 /**
- * 赋值：把 value 写入 target 标识的变量。
- *
- * target 仅接受 Ref（简单变量引用）。任何"更复杂的写入目标"
- * （数组元素、记录字段、复合整体复制 …）必须通过 Syscall + Eval
- * 表达，不走 Assign。
- */
-export interface Assign {
-  kind: 'assign'
-  target: Ref
-  value: Expr
-}
-
-/**
  * 从当前函数返回。
  *
  * - 有 value：作为返回值交给调用者。
@@ -210,7 +197,8 @@ export type Expr = Ref | Literal | Call | Syscall
  * 变量引用：读取一个变量的值。
  *
  * varId 必须能在当前作用域链（见 §2）中解析到。
- * 作为 Assign.target 使用时表示写入该变量。
+ * 作为赋值 syscall 的目标实参（`lowering.assign` → `runtime.assign`）时，
+ * 表示写入该变量。
  */
 export interface Ref {
   kind: 'ref'

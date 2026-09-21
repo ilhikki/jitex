@@ -427,6 +427,9 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
     'lowering.ptr.assign': (sys) => sc(rtKeys.pointerAssign, sys.args),
     'lowering.ptr.dispose.check': (sys) => sc(rtKeys.pointerDisposeCheck, sys.args),
 
+    // 槽赋值：目标槽与值的宿主表示都在编译期定死，codegen 内联为 (x = v)
+    'lowering.assign': (sys) => sc(rtKeys.assign, sys.args),
+
     'lowering.mem.default': (sys) => {
       const td = parseType(sys.args[0])
       if (!td) {

@@ -126,7 +126,6 @@ const EXIT_TERM: Terminator = { kind: 'exit' }
  */
 function lowerStatement(stmt: JsonCode.Statement, ctx: StructurizeContext): Lowered {
   switch (stmt.kind) {
-    case 'assign':
     case 'eval':
       return { line: ctx.compileStatement(stmt), term: undefined }
     case 'return':

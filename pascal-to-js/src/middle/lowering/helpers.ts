@@ -103,8 +103,15 @@ export function jumpIfStmt(cond: JsonCode.Expr, then: number, els: number): Json
   return { kind: 'jumpIf', condition: cond, then, else: els }
 }
 
-export function assignStmt(target: JsonCode.Ref, value: JsonCode.Expr): JsonCode.Assign {
-  return { kind: 'assign', target, value }
+/**
+ * 槽赋值：产出一条 `lowering.assign` syscall 语句。
+ *
+ * 赋值没有独立的 IL 语句形态 —— 它与其它写入一样是 syscall 表达式，由 rewrite
+ * 译成 `runtime.assign`（codegen 内联为 `(x = v)`）。这样"写回某个位置"可以由
+ * rewrite 生成，lowering 不必为此生成语句。
+ */
+export function assignStmt(target: JsonCode.Ref, value: JsonCode.Expr): JsonCode.Eval {
+  return evalStmt(syscall(syscallKeys.assign, [target, value]))
 }
 
 export function evalStmt(expr: JsonCode.Expr): JsonCode.Eval {
@@ -121,6 +128,9 @@ export const syscallKeys = {
   hookFunctionEnter: 'lowering.hook.function.enter', // [id, name]
   stepsCheck: 'lowering.steps.check', // []
   rangeCheck: 'lowering.range.check', // [v, lo, hi]
+
+  // 槽赋值：把值写入一个变量槽（rewrite 译成 runtime.assign，codegen 内联为 (x = v)）
+  assign: 'lowering.assign', // [target, value]
 
   memDefault: 'lowering.mem.default', // [typeDesc]
   memCopy: 'lowering.mem.copy', // [dst, dstOffset, src, typeDesc]

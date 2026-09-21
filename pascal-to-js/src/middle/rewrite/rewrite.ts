@@ -17,12 +17,10 @@
  *
  * 覆盖范围：
  *   - Function.children 递归处理（内层函数体里的 syscall 也会被重写）
- *   - Statement 中的所有 Expr：JumpIf.condition / Assign.value /
- *     Return.value / Eval.expr
+ *   - Statement 中的所有 Expr：JumpIf.condition / Return.value / Eval.expr
  *   - Expr.syscall.args / Expr.call.args 递归
  *   - Expr.ref / Expr.literal 原样返回
  *
- * Assign.target 是 Ref，不含 Syscall，无需处理。
  * Label / Jmp / LongJump 不含 Expr，跳过。
  */
 
@@ -99,9 +97,6 @@ function rewriteStatement(
       return stmt
     case 'jumpIf':
       return { ...stmt, condition: requireNotUndefined(rewriteExpr(stmt.condition, mapping)) }
-    case 'assign':
-      // target 是 Ref，不含 Syscall；只重写 value
-      return { ...stmt, value: requireNotUndefined(rewriteExpr(stmt.value, mapping)) }
     case 'eval': {
       const expr = rewriteExpr(stmt.expr, mapping)
       if (expr === undefined) {

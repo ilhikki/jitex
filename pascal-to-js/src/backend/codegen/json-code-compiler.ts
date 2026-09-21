@@ -166,9 +166,6 @@ class JsCompilerImpl implements JsCompiler {
           `throw 0;`,
         ].join('\n')
 
-      case 'assign':
-        return `${this.compileExpr(stmt.target)} = ${this.compileExpr(stmt.value)};`
-
       case 'eval':
         return `${this.compileExpr(stmt.expr)};`
 

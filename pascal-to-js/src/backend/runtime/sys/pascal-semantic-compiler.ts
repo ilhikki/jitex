@@ -95,6 +95,10 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // 都不内联——宿主是 { bytes, dv } 对象，构造与标量读写统一由 mem.ts 的 handler 承担
   // （dv 随宿主走，不再需要按 ArrayBuffer 缓存）。
 
+  // 槽赋值：内联为 JS 赋值表达式。**必须内联** —— dispatcher 的实参只能拿到槽的
+  // 值而非引用，无法写回（见 runtime-keys.ts 的 assign 说明）。
+  [rtKeys.assign]: (a) => `((${a[0]}) = ${a[1]})`,
+
   [rtKeys.cellNew]: (a) => `({ kind: 'cell', value: ${a[0]} })`,
   [rtKeys.cellGet]: (a) => `(${a[0]}.value)`,
   // cell.set 的 handler 返回 undefined，用 void 保持返回值语义
