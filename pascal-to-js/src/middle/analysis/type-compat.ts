@@ -7,8 +7,7 @@
  *   因此按对象身份判定同一性。
  * - 简单类型（integer / real / boolean / char）按 tag 判定。
  * - subrange-type 按区间与 host-type 判定。
- * - string-type 按分量数判定（6.1.7、6.4.5 d）；非标扩展 string 以 dims.high === 0 表示
- *   任意长度，参与比较时通配。
+ * - string-type 按分量数判定（6.1.7、6.4.5 d）。
  */
 
 import { TypeInfo } from './analysis-type.ts'
@@ -27,10 +26,7 @@ export function isOrdinalType(t: TypeInfo): boolean {
   }
 }
 
-/**
- * ISO 6.4.3.2：packed array[1..n] of char（n > 1）为 string-type。
- * 非标扩展 string 以 high === 0 表示任意长度，一并按 string-type 处理。
- */
+/** ISO 6.4.3.2：packed array[1..n] of char（n > 1）为 string-type */
 export function isStringType(t: TypeInfo): boolean {
   if (t.tag !== 'array' || t.elem?.tag !== 'char') {
     return false
@@ -39,10 +35,10 @@ export function isStringType(t: TypeInfo): boolean {
   if (!dims || dims.length !== 1) {
     return false
   }
-  return dims[0].low === 1 && (dims[0].high > 1 || dims[0].high === 0)
+  return dims[0].low === 1 && dims[0].high > 1
 }
 
-/** string-type 的分量数；0 表示非标 string 扩展（任意长度），参与比较时通配 */
+/** string-type 的分量数 */
 function stringLength(t: TypeInfo): number {
   return t.dims?.[0].high ?? 0
 }
@@ -68,9 +64,7 @@ function intervalOf(t: TypeInfo): { low: number; high: number } | undefined {
 /** ISO 6.4.5 a)：T1 与 T2 是同一类型 */
 export function isSameType(a: TypeInfo, b: TypeInfo): boolean {
   if (isStringType(a) && isStringType(b)) {
-    const la = stringLength(a)
-    const lb = stringLength(b)
-    return la === 0 || lb === 0 || la === lb
+    return stringLength(a) === stringLength(b)
   }
   if (a.tag !== b.tag) {
     return false

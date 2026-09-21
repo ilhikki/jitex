@@ -250,8 +250,6 @@ export const BUILTIN_FUNCTION_RETURN_TYPES: Record<string, BuiltinReturnTypeRule
   odd: { kind: 'fixed', type: { tag: 'boolean' } },
   eof: { kind: 'fixed', type: { tag: 'boolean' } },
   eoln: { kind: 'fixed', type: { tag: 'boolean' } },
-  // 实现扩展（非 ISO 7185）：不在 BUILTIN_FUNCTIONS 内，仅类型推断沿用
-  length: { kind: 'fixed', type: { tag: 'integer' } },
 }
 
 /**
@@ -326,7 +324,9 @@ export function evalConstInt(
     }
     case 'Identifier': {
       const sym = lookup(node.name)
-      if (sym?.kind === 'const' && sym.typeInfo.tag === 'integer') {
+      // 序数常量（integer / char / boolean / enum / subrange）在常量表里都以 'number' 编码；
+      // real 常量同用该编码，须排除 —— 它不能作 subrange 边界、数组下标或 case 常量
+      if (sym?.kind === 'const' && sym.literal.key === 'number' && sym.typeInfo.tag !== 'real') {
         return parseInt(sym.literal.arg, 10)
       }
       return undefined
@@ -357,11 +357,15 @@ export function evalLiteral(
     case 'RealLiteral':
       return { key: 'number', arg: node.raw, typeInfo: { tag: 'real' } }
     case 'StringLiteral':
-      // ISO 7185 6.1.7：string-literal 的类型是 packed array[1..n] of char
+      // ISO 7185 6.1.7：string-literal 的类型是 packed array[1..n] of char（n = 字符数）
       return {
         key: 'string',
         arg: node.value,
-        typeInfo: { tag: 'array', dims: [{ low: 1, high: 0 }], elem: { tag: 'char' } },
+        typeInfo: {
+          tag: 'array',
+          dims: [{ low: 1, high: node.value.length }],
+          elem: { tag: 'char' },
+        },
       }
     case 'CharLiteral':
       return { key: 'string', arg: node.value, typeInfo: { tag: 'char' } }

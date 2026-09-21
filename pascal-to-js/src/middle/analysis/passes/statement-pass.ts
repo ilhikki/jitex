@@ -174,7 +174,7 @@ class StatementPass {
       case 'Assignment': {
         const lt = this.analyzeExpr(node.left)
         const rt = this.analyzeExpr(node.right)
-        this.checkAssignmentCompatibility(lt, rt, node.right)
+        this.checkAssignmentCompatibility(lt, rt)
         if (lt.tag === 'subrange' && lt.low !== undefined && lt.high !== undefined) {
           const constVal = evalConstInt(node.right, (n) => this.lookup(n))
           if (constVal !== undefined && (constVal < lt.low || constVal > lt.high)) {
@@ -671,18 +671,9 @@ class StatementPass {
   private checkAssignmentCompatibility(
     target: TypeInfo,
     value: TypeInfo,
-    valueNode: ExpressionNode,
   ): void {
     if (target.tag === 'unknown' || value.tag === 'unknown') {
       return
-    }
-    // 实现把枚举值常量建模为 integer（见 Pass 1 的 EnumerationType 分支），类型层面无法区分
-    // 「枚举常量」与「整数字面量」：此处仅放行常量标识符（如 `c := red`），
-    // 整数字面量（如 `c := 5`）仍按 6.4.6 判定为不兼容。
-    if (target.tag === 'enum' && value.tag === 'integer' && valueNode.kind === 'Identifier') {
-      if (this.lookup(valueNode.name)?.kind === 'const') {
-        return
-      }
     }
     if (isAssignCompatible(target, value)) {
       return

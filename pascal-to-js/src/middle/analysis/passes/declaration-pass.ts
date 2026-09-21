@@ -232,6 +232,7 @@ class DeclarationPass {
       const info = this.resolveTypeInfo(t.typeDef)
       const placeholder = typePlaceholders.get(lower)!
       Object.assign(placeholder, info)
+      this.bindEnumConstants(t.typeDef, placeholder)
     }
     for (const t of block.typeDeclarations) {
       if (t.typeDef.kind === 'PointerType') {
@@ -310,6 +311,27 @@ class DeclarationPass {
   }
 
   // 类型解析
+
+  /**
+   * 命名枚举类型：把枚举常量重新绑定到该 type-definition 的 placeholder。
+   *
+   * new-type 的同一性按对象身份判定（见 type-compat.ts），而类型声明的最终对象是
+   * placeholder（解析结果经 Object.assign 拷入），故枚举常量必须与它共享同一对象，
+   * `c := red` 才能在 6.4.6 下直接成立。匿名枚举没有 placeholder，
+   * 其常量已在 resolveTypeInfo 内绑定到那次解析的类型对象。
+   */
+  private bindEnumConstants(typeDef: TypeNode, enumType: TypeInfo): void {
+    if (typeDef.kind !== 'EnumerationType') {
+      return
+    }
+    for (let i = 0; i < typeDef.values.length; i++) {
+      this.bind(typeDef.values[i].name, {
+        kind: 'const',
+        literal: { key: 'number', arg: String(i), typeInfo: enumType },
+        typeInfo: enumType,
+      })
+    }
+  }
 
   private resolveTypeInfo(node: TypeNode): TypeInfo {
     const cached = this.typeNodeInfo.get(node)
@@ -421,14 +443,17 @@ class DeclarationPass {
         break
       }
       case 'EnumerationType': {
-        info = { tag: 'enum', enumCount: node.values.length }
+        // 枚举常量与其枚举类型共享同一 TypeInfo 对象：new-type 按对象身份判定同一性
+        // （见 type-compat.ts），故 `c := red` 无需任何特例即可满足 6.4.6 赋值兼容
+        const enumType: TypeInfo = { tag: 'enum', enumCount: node.values.length }
         for (let i = 0; i < node.values.length; i++) {
           this.bind(node.values[i].name, {
             kind: 'const',
-            literal: { key: 'number', arg: String(i), typeInfo: { tag: 'integer' } },
-            typeInfo: { tag: 'integer' },
+            literal: { key: 'number', arg: String(i), typeInfo: enumType },
+            typeInfo: enumType,
           })
         }
+        info = enumType
         break
       }
       case 'PointerType': {
