@@ -1,5 +1,4 @@
 import {
-  ByteBlockFile,
   type ByteHost,
   MemoryTextFile,
   PascalFile,
@@ -101,7 +100,7 @@ export const runtimeFileSyscalls: Record<string, SyscallHandler> = {
     ctx.debugLog.push('extra.openOut ' + key)
     let store = ctx.files.get(key)
     if (store === undefined) {
-      store = (p.fileKind === 'blocks' ? new ByteBlockFile() : new MemoryTextFile()) as PascalFileStore
+      store = new MemoryTextFile() as PascalFileStore
       ctx.files.set(key, store)
     }
     p.value = store
@@ -168,6 +167,18 @@ export class ConsoleFile implements TextFile {
       throw new Error('EOF')
     }
     return this.input.value[this.input.position]?.charCodeAt(0)
+  }
+
+  peekBytes(_size: number): Uint8Array | undefined {
+    throw new Error('peekBytes not supported on ConsoleFile')
+  }
+
+  advanceBy(_n: number): void {
+    throw new Error('advanceBy not supported on ConsoleFile')
+  }
+
+  getData(): Uint8Array {
+    return stringToBytes(this.getOutput())
   }
 
   seek(): void {

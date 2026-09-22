@@ -56,16 +56,8 @@ export { nodeToCode } from '@/frontend/printer/printer.ts'
 export type { Position, Token } from '@/frontend/token.ts'
 export type { ParseResult, ParserInput } from '@/frontend/types.ts'
 export { parseProgram } from '@/frontend/parser/declarations.ts'
-export type {
-  BlockStore,
-  ByteHost,
-  PascalFile,
-  PascalFileStore,
-  SyscallHandler,
-  TextFile,
-} from '@/backend/runtime/runtime-type.ts'
+export type { ByteHost, PascalFile, PascalFileStore, SyscallHandler, TextFile } from '@/backend/runtime/runtime-type.ts'
 export { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
-export { ByteBlockFile } from '@/backend/runtime/sys/file-runtime.ts'
 export { MemoryTextFile } from '@/backend/runtime/sys/memory-text-file.ts'
 export { parse } from '@/run.ts'
 

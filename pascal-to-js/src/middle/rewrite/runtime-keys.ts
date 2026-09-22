@@ -117,9 +117,9 @@ export const rtKeys = {
 
   // 文件
   //
-  // 多态边界：reset / rewrite / get / peek / eof 按「存储实现形态」（text / bytes /
-  // blocks）分派，这是**存储接口**的多态（TextFile vs BlockStore），不是 Pascal 类型
-  // 泄漏 —— fileKind 本身是 rewrite 算定的宿主表示常量。
+  // 多态边界：get / peek / read 按 fileKind（text / bytes / blocks）分派读写语义，
+  // 但存储实现统一为 TextFile（连续字节流）；blocks 的 record size 由 rewriter
+  // 内联到操作参数（sizeOf），不在文件对象上记录。f^ 写缓冲是 PascalFile 的属性。
   // 写入路径（write.* / put.buffer.*）不在此列：值的宿主表示已由 rewrite 选进 key，
   // handler 不再做任何类型判断。
   fileReset: 'runtime.file.reset',

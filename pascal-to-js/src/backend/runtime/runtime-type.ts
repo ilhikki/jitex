@@ -33,8 +33,10 @@ export type PascalFile = {
   value: PascalFileStore | undefined
   /** 编译期算定的存储形态：text / bytes / blocks（由 rewrite 传入，不含 Pascal 类型语义） */
   fileKind: string
+  /** f^ 写缓冲（ISO 6.5.5 buffer variable）：仅 blocks 写模式使用；读模式 f^ 直接从 store 取视图 */
+  buffer: ByteHost | undefined
 }
-export type PascalFileStore = TextFile | BlockStore
+export type PascalFileStore = TextFile
 
 export interface TextFile {
   // 位置
@@ -43,6 +45,11 @@ export interface TextFile {
   // 读取（原子原语）
   peekByte(): number | undefined // 查看当前字节
   advance(): void // 推进一个字节
+  /** 从 pos 取 size 字节视图（不推进）；不足 size 返回 undefined */
+  peekBytes(size: number): Uint8Array | undefined
+
+  // 推进
+  advanceBy(n: number): void
 
   // 写入
   writeByte(byte: number): void
@@ -60,39 +67,11 @@ export interface TextFile {
   // 查询
   hasMore(): boolean
 
+  /** 全部内容（产物导出用） */
+  getData(): Uint8Array
+
   /** 当前行是否已有内容且以非 end-of-line 字符结尾（ISO 6.9.5 page 的隐式 writeln 判定） */
   currentLineHasContent(): boolean
-}
-
-/**
- * 定长字节块存储：单位是一段定长字节（每个块大小由编译期算定）。
- */
-export interface BlockStore {
-  // 位置
-  seek(pos: number): void
-
-  // 读取（原子原语）
-  peekBlock(): Uint8Array | undefined // 查看当前块
-  advance(): void // 推进一块
-
-  // 写入
-  writeBlock(): void // 将 buffer 写入
-  setBuffer(block: Uint8Array): void // 设置 f^
-  getBuffer(): Uint8Array | undefined
-
-  // 内容
-  clear(): void
-
-  // 模式
-  setMode(mode: 'inspection' | 'generation'): void
-
-  getMode(): 'inspection' | 'generation'
-
-  // 查询
-  hasMore(): boolean
-
-  /** 全部块（调试 / 产物导出用） */
-  toBytes(): Uint8Array
 }
 
 export type PascalCell = {

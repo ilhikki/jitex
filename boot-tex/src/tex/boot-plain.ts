@@ -1,7 +1,7 @@
 import { createStageOfGetTangleJs, texExtraSyscalls, transformTex } from './build-tex.ts'
 import { ConsoleFile, readFile, readTextFile } from '../utils.ts'
 import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
-import { BlockStore, MemoryTextFile, PascalFileStore, runJs } from '@jitex/pascal-to-js'
+import { MemoryTextFile, PascalFileStore, runJs } from '@jitex/pascal-to-js'
 import { assert, attach, attachText, cache, stage, type Suite, suite } from '@jitex/integration'
 
 function createBootPlainSuite(): Suite {
@@ -50,16 +50,16 @@ function createBootPlainSuite(): Suite {
         attach('plain.log', (state.files.get('plain.log') as MemoryTextFile).getData())
         const plainFmtFile = files.get('plain.fmt')
         assert(plainFmtFile !== undefined, 'plain.fmt not found')
-        const plainFmtBytes = (plainFmtFile as BlockStore).toBytes()
+        const plainFmtBytes = (plainFmtFile as MemoryTextFile).getData()
         attach('plain.fmt', plainFmtBytes)
-        return { plainFmtFile }
+        return { plainFmtBytes }
       },
     )
 
     stage('valid plain fmt', [getTexStage, getPlainFmtStage], async ([texFiles, plainFmtFile]) => {
       const files = new Map<string, PascalFileStore>()
       files.set('TeXformats:TEX.POOL', new MemoryTextFile(texFiles.poolFile))
-      files.set('plain.fmt', plainFmtFile.plainFmtFile)
+      files.set('plain.fmt', new MemoryTextFile(plainFmtFile.plainFmtBytes))
       const tex = await readFile('./resources/knuth/plain/base/story.tex')
       files.set('story.tex', new MemoryTextFile(tex))
       const consoleFile = new ConsoleFile('&plain story \n\ \\bye \n')
@@ -74,6 +74,7 @@ function createBootPlainSuite(): Suite {
       const dviData = (state.files.get('story.dvi') as MemoryTextFile).getData()
       assert(dviData.length > 0, 'story.dvi is empty')
       attach('story.dvi', dviData)
+      attachText('story.dvi.txt', dviData.join(', '))
     })
   })
 }

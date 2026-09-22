@@ -7,17 +7,20 @@
  *   - **值的宿主表示由 key 承载，不由实参承载**：写入路径按值形态拆成
  *     write.text（string）/ write.byte（number）/ write.bytes、write.block（Uint8Array），
  *     以及 put.buffer.block / .byte / .character / .text。handler 内不做类型判断。
- *   - 仍在运行期分派的只剩**存储实现多态**（TextFile vs BlockStore，见 reset /
- *     rewrite / get / peek / eof）——那是宿主接口的形态差异，不是 Pascal 类型泄漏。
+ *   - **存储统一为连续字节流**（MemoryTextFile）；fileKind 区分读写语义
+ *     （行结束符处理 / 缓冲落盘），不区分存储实现。
+ *   - **record size 内联到操作参数**：fileGet / filePeek / fileReadCharacter
+ *     在 blocks 模式下由 rewriter 传 sizeOf，不在文件对象上记录。
+ *   - **f^ 写缓冲是 PascalFile 的属性**（ISO 6.5.5 buffer variable），
+ *     不是存储层的状态。仅 blocks 写模式使用；读模式 f^ 直接从 store 取视图。
  *   - key 与 Pascal 原生 io 过程一一对应：reset / rewrite / get / put / read / write /
  *     readln / writeln / eof / eoln / page / peek(f^)。
- *   - rewrite 只负责「值 → 文件单位」的转换（convert.*)；语义（如 read = 读+推进）
+ *   - rewrite 只负责「值 → 文件单位」的转换（convert.*）；语义（如 read = 读+推进）
  *     由本文件承担。
  */
 
 import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
 import type {
-  BlockStore,
   ByteHost,
   PascalFile,
   PascalFileStore,
@@ -28,68 +31,6 @@ import type {
 import { bytesToString, encodeUtf8 } from '../runtime-util.ts'
 import { makeByteHost } from './mem.ts'
 import { MemoryTextFile } from './memory-text-file.ts'
-
-/** 定长字节块文件：每块是一段字节 */
-export class ByteBlockFile implements BlockStore {
-  private blocks: Uint8Array[] = []
-  private pos = 0
-  private buffer: Uint8Array | undefined
-  private mode: 'inspection' | 'generation' = 'inspection'
-
-  constructor(initial?: Uint8Array[]) {
-    if (initial) {
-      this.blocks = initial.slice()
-    }
-  }
-
-  seek(p: number): void {
-    this.pos = p
-  }
-  peekBlock(): Uint8Array | undefined {
-    return this.blocks[this.pos]
-  }
-  advance(): void {
-    this.pos++
-  }
-  writeBlock(): void {
-    if (this.buffer !== undefined) {
-      this.blocks.push(this.buffer)
-      this.buffer = undefined
-    }
-  }
-  setBuffer(r: Uint8Array): void {
-    this.buffer = r
-  }
-  getBuffer(): Uint8Array | undefined {
-    return this.buffer
-  }
-  clear(): void {
-    this.blocks = []
-    this.pos = 0
-    this.buffer = undefined
-  }
-  setMode(m: 'inspection' | 'generation'): void {
-    this.mode = m
-  }
-  getMode(): 'inspection' | 'generation' {
-    return this.mode
-  }
-  hasMore(): boolean {
-    return this.pos < this.blocks.length
-  }
-
-  toBytes(): Uint8Array {
-    const blocks = this.buffer ? [...this.blocks, this.buffer] : this.blocks
-    const total = blocks.reduce((n, b) => n + b.length, 0)
-    const out = new Uint8Array(total)
-    let offset = 0
-    for (const b of blocks) {
-      out.set(b, offset)
-      offset += b.length
-    }
-    return out
-  }
-}
 
 // 辅助
 
@@ -113,10 +54,6 @@ function textStore(f: PascalFile): TextFile {
   return f.value as unknown as TextFile
 }
 
-function blockStore(f: PascalFile): BlockStore {
-  return f.value as unknown as BlockStore
-}
-
 /** 默认 input / output（f 为 null 时） */
 function defaultStore(ctx: RuntimeContext, isOutput: boolean): TextFile {
   const store = ctx.files.get(isOutput ? 'OUTPUT' : 'INPUT')
@@ -136,16 +73,15 @@ function writeStore(ctx: RuntimeContext, f: unknown): TextFile {
 }
 
 /**
- * 无 file-name 的 reset / rewrite：按元素类型建立初始存储。
+ * 无 file-name 的 reset / rewrite：建立初始存储。
  *
  * ISO 7185 6.6.5.2 把「文件未定义时使用」定为 error，而 reset / rewrite 的作用正是让
- * 文件进入定义状态；未初始化的文件变量在此建立存储（record → 字节记录，
- * 其余 → 文本式单位读写，见 isByteFile 的说明）。
+ * 文件进入定义状态；未初始化的文件变量在此建立存储。
  */
 function ensureStore(p: PascalFile): PascalFileStore {
   let store = p.value
   if (store === undefined) {
-    store = (isBlockFile(p) ? new ByteBlockFile() : new MemoryTextFile()) as unknown as PascalFileStore
+    store = new MemoryTextFile()
     p.value = store
   }
   return store
@@ -215,27 +151,25 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
     [rtKeys.fileRewrite]: (_ctx, f) => {
-      const store = ensureStore(f as PascalFile)
+      const p = f as PascalFile
+      const store = ensureStore(p)
       store.clear()
       store.seek(0)
       store.setMode('generation')
+      p.buffer = undefined
       return undefined
     },
 
-    [rtKeys.fileGet]: (_ctx, f) => {
+    [rtKeys.fileGet]: (_ctx, f, size) => {
       const p = f as PascalFile
-      if (isBlockFile(p)) {
-        const rs = blockStore(p)
-        if (!rs.hasMore()) {
-          throw new Error('get(f) at EOF: pre-assertion violated')
-        }
-        rs.advance()
-        return undefined
-      }
       const store = textStore(p)
       // ISO 6.6.5.2: get(f) 的 pre-assertion 是 not eof(f)
       if (!store.hasMore()) {
         throw new Error('get(f) at EOF: pre-assertion violated')
+      }
+      if (isBlockFile(p)) {
+        store.advanceBy(size as number)
+        return undefined
       }
       // 字节文件：单纯推进，不做行结束符处理
       if (isByteFile(p)) {
@@ -248,24 +182,22 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.filePeek]: (_ctx, f, size) => {
       const p = f as PascalFile
       if (isBlockFile(p)) {
-        const rs = blockStore(p)
-        // 写模式：f^ 恒为当前缓冲区（每次 put 后重建），保证多次 f^.field := x 互不干扰
-        if (rs.getMode() === 'generation') {
-          const buf = rs.getBuffer()
-          if (buf !== undefined) {
-            return makeByteHost(buf)
+        const store = textStore(p)
+        // 写模式：f^ 恒为 p.buffer（每次 put 后清空，保证多次 f^.field := x 互不干扰）
+        if (store.getMode() === 'generation') {
+          if (p.buffer !== undefined) {
+            return p.buffer
           }
           const nb = new Uint8Array((size as number) ?? 0)
-          rs.setBuffer(nb)
-          return makeByteHost(nb)
+          p.buffer = makeByteHost(nb)
+          return p.buffer
         }
         // 读模式：当前记录
-        const rec = rs.peekBlock()
+        const rec = store.peekBytes(size as number)
         if (rec !== undefined) {
           return makeByteHost(rec)
         }
         const buf = new Uint8Array((size as number) ?? 0)
-        rs.setBuffer(buf)
         return makeByteHost(buf)
       }
       const store = textStore(p)
@@ -277,29 +209,33 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return b
     },
 
-    // put(f)：把缓冲区落盘。仅定长块存储需要落盘，text / bytes 无缓冲语义
+    // put(f)：把缓冲区落盘。仅 blocks 需要落盘，text / bytes 无缓冲语义
     [rtKeys.filePut]: (_ctx, f) => {
       const p = f as PascalFile
       if (isBlockFile(p)) {
-        const rs = blockStore(p)
-        if (rs.getMode() !== 'generation') {
+        const store = textStore(p)
+        if (store.getMode() !== 'generation') {
           throw new Error('put(f) before rewrite: pre-assertion violated')
         }
-        rs.writeBlock()
+        if (p.buffer !== undefined) {
+          store.writeBytes(p.buffer.bytes)
+          p.buffer = undefined
+        }
       }
       return undefined
     },
 
     // `f^ := x`（blocks）：x 是记录字节宿主
     [rtKeys.filePutBufferBlock]: (_ctx, f, unit) => {
-      const rs = blockStore(f as PascalFile)
+      const p = f as PascalFile
+      const store = textStore(p)
       // ISO 6.6.5.2: 写缓冲区的前置条件是文件处于写状态
-      if (rs.getMode() !== 'generation') {
+      if (store.getMode() !== 'generation') {
         throw new Error('f^ := x before rewrite: pre-assertion violated')
       }
       // `f^ := x` 是赋值（值语义），x 可能是共享视图（如 mem[k]），
       // 必须深拷贝后落缓冲：否则改 x 会连带改掉已写入的缓冲内容。
-      rs.setBuffer((unit as ByteHost).bytes.slice())
+      p.buffer = makeByteHost((unit as ByteHost).bytes.slice())
       return undefined
     },
 
@@ -321,18 +257,20 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    [rtKeys.fileReadCharacter]: (ctx, f) => {
+    [rtKeys.fileReadCharacter]: (ctx, f, size) => {
       if (f === undefined) {
         return readCharUnit(defaultStore(ctx, false))
       }
       const p = f as PascalFile
-      if (isBlockFile(p)) {
-        const rs = blockStore(p)
-        const rec = rs.peekBlock()
-        rs.advance()
-        return makeByteHost(rec ?? new Uint8Array(0))
-      }
       const store = textStore(p)
+      if (isBlockFile(p)) {
+        const rec = store.peekBytes(size as number)
+        if (rec !== undefined) {
+          store.advanceBy(size as number)
+          return makeByteHost(rec)
+        }
+        return makeByteHost(new Uint8Array(0))
+      }
       // 字节文件：原样取一个字节
       if (isByteFile(p)) {
         const b = store.peekByte() ?? 0
@@ -366,9 +304,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
     // 写一个定长块：值是字节宿主（file of record）
     [rtKeys.fileWriteBlock]: (_ctx, f, unit) => {
-      const rs = blockStore(f as PascalFile)
-      rs.setBuffer((unit as ByteHost).bytes)
-      rs.writeBlock()
+      textStore(f as PascalFile).writeBytes((unit as ByteHost).bytes)
       return undefined
     },
 
@@ -396,11 +332,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       if (f === undefined) {
         return defaultStore(ctx, false).hasMore() ? 0 : 1
       }
-      const p = f as PascalFile
-      if (isBlockFile(p)) {
-        return blockStore(p).hasMore() ? 0 : 1
-      }
-      return textStore(p).hasMore() ? 0 : 1
+      return textStore(f as PascalFile).hasMore() ? 0 : 1
     },
     [rtKeys.fileEoln]: (ctx, f) => {
       const store = pick(ctx, f, false)
@@ -411,15 +343,17 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return b === 10 || b === 13 ? 1 : 0
     },
 
-    [rtKeys.fileCreate]: (_ctx, kind) => ({ kind: 'file', value: undefined, fileKind: kind } as PascalFile),
+    [rtKeys.fileCreate]: (
+      _ctx,
+      kind,
+    ) => ({ kind: 'file', value: undefined, fileKind: kind, buffer: undefined } as PascalFile),
     [rtKeys.fileProgramUrl]: (ctx, f, name) => {
       const p = f as PascalFile
       const key = name as string
       const url = ctx.programFileUrls[key] ?? key
       let fileStore = ctx.files.get(url)
       if (fileStore === undefined) {
-        // 定长块文件用字节版存储；其余用文本存储
-        fileStore = (isBlockFile(p) ? new ByteBlockFile() : new MemoryTextFile()) as unknown as PascalFileStore
+        fileStore = new MemoryTextFile()
       }
       p.value = fileStore
       ctx.files.set(key, fileStore)

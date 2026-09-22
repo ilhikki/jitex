@@ -496,7 +496,9 @@ function readOne(
   }
   const binary = isBinaryFile(fileType)
   const readKey = binary || vt?.tag === 'char' ? rtKeys.fileReadCharacter : rtKeys.fileReadToken
-  const raw = sc(readKey, [target])
+  // record 文件：传元素字节大小，供 read 按 stride 取记录
+  const readArgs = binary ? [target, litInt(sizeOf(fileType!.elem!))] : [target]
+  const raw = sc(readKey, readArgs)
   if (isCharArray(vt)) {
     return raw
   }
@@ -695,7 +697,14 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       requireIsoFileActuals(sys, 'rewrite')
       return sc(rtKeys.fileRewrite, [sys.args[0]])
     },
-    'lowering.call.get': (sys) => sc(rtKeys.fileGet, [sys.args[0]]),
+    'lowering.call.get': (sys) => {
+      const td = parseType(sys.args[1])
+      // record 文件：传元素字节大小，供 get 按 stride 推进
+      if (td?.elem?.tag === 'record') {
+        return sc(rtKeys.fileGet, [sys.args[0], litInt(sizeOf(td.elem))])
+      }
+      return sc(rtKeys.fileGet, [sys.args[0]])
+    },
     // put 有两条来源：调用 `put(f)` / `put(f, x)`，以及赋值 `f^ := x`
     'lowering.call.put': filePutRewrite,
     'lowering.file.put': filePutRewrite,

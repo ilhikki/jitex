@@ -60,11 +60,26 @@ export class MemoryTextFile implements TextFile {
     return this.buffer[this.pos]
   }
 
+  /** 从 pos 取 size 字节视图（不推进）；不足 size 返回 undefined */
+  peekBytes(size: number): Uint8Array | undefined {
+    if (this.pos + size > this.length) {
+      return undefined
+    }
+    return this.buffer.subarray(this.pos, this.pos + size)
+  }
+
   advance(): void {
     if (this.pos >= this.length) {
       throw new Error('advance beyond EOF')
     }
     this.pos++
+  }
+
+  advanceBy(n: number): void {
+    if (this.pos + n > this.length) {
+      throw new Error('advance beyond EOF')
+    }
+    this.pos += n
   }
 
   writeByte(byte: number): void {
