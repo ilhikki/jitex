@@ -64,19 +64,21 @@ export default suite('demo', () => {
 
 ### 1.2 运行
 
+（命令以**仓库根**为工作目录）
+
 ```bash
 # 首次全量跑，写缓存 + 落盘报告
-deno run -A src/cli.ts run my-pipeline.ts --purge
+deno run -A src/integration/cli.ts run my-pipeline.ts --purge
 
 # 后续 strict 模式：只走缓存（命中失败直接报错）
-deno run -A src/cli.ts run my-pipeline.ts --with-cache
+deno run -A src/integration/cli.ts run my-pipeline.ts --with-cache
 
 # 只跑末段 report：依赖 build/check 自动从缓存取
 # （前提是 build/check 都被 cache() 标记且已有缓存）
-deno run -A src/cli.ts run my-pipeline.ts --with-cache --filter "report"
+deno run -A src/integration/cli.ts run my-pipeline.ts --with-cache --filter "report"
 
 # 只跑不落盘报告（快速迭代）
-deno run -A src/cli.ts run my-pipeline.ts --no-report
+deno run -A src/integration/cli.ts run my-pipeline.ts --no-report
 ```
 
 退出码：所有 stage 成功 → `0`；任一 failed/skipped 或 hook 失败 → `1`。
@@ -154,7 +156,7 @@ deno run -A src/cli.ts run my-pipeline.ts --no-report
 ## 4. CLI 选项完整列表
 
 ```
-deno run -A src/cli.ts run <entry.ts> [options]
+deno run -A src/integration/cli.ts run <entry.ts> [options]
 ```
 
 | 选项                      | 默认值                    | 说明                                                                                                         |
@@ -178,7 +180,7 @@ deno run -A src/cli.ts run <entry.ts> [options]
 
 ```ts
 export default suite('my pipeline', ({ debug, mode }) => {
-  // deno run -A src/cli.ts run my-pipeline.ts -a debug=false -a mode=fast
+  // deno run -A src/integration/cli.ts run my-pipeline.ts -a debug=false -a mode=fast
   // → { debug: 'false', mode: 'fast' }
   const isDebug = debug !== 'false'
   ...
@@ -231,7 +233,7 @@ const report = await run(s, {
 console.log(report.success, report.stages.map((s) => s.status))
 ```
 
-`RunOptions` 完整字段见 `src/runner.ts` 的接口定义。
+`RunOptions` 完整字段见 `runner.ts` 的接口定义。
 
 ---
 
@@ -239,18 +241,19 @@ console.log(report.success, report.stages.map((s) => s.status))
 
 ### 7.1 目录结构
 
+包位于 `src/integration/`（workspace 成员，包根即源码根）：
+
 ```
-integration/
+src/integration/
 ├─ README.md          # 本文件（使用 + 维护文档）
-├─ deno.json          # workspace 成员配置，exports 指向 src/mod.ts
-├─ src/               # 全部源码
-│  ├─ mod.ts          # 对外导出面：DSL 原语 + hook + run() 类型
-│  ├─ dsl.ts          # stage/suite/cache/assert/attach/log 声明与实现
-│  ├─ context.ts      # RunContext / StageContext 上下文栈
-│  ├─ runner.ts       # 拓扑排序（Kahn）+ 调度 + 失败策略 + 写盘报告调度
-│  ├─ cache.ts        # 缓存目录结构、checksum、恢复判定、序列化
-│  ├─ reporter.ts     # overview.json / 三份 txt / stages 产物 / 两份 index.html
-│  └─ cli.ts          # CLI 参数解析 + 动态 import 入口
+├─ deno.json          # workspace 成员配置，exports 指向 ./mod.ts
+├─ mod.ts             # 对外导出面：DSL 原语 + hook + run() 类型
+├─ dsl.ts             # stage/suite/cache/assert/attach/log 声明与实现
+├─ context.ts         # RunContext / StageContext 上下文栈
+├─ runner.ts          # 拓扑排序（Kahn）+ 调度 + 失败策略 + 写盘报告调度
+├─ cache.ts           # 缓存目录结构、checksum、恢复判定、序列化
+├─ reporter.ts        # overview.json / 三份 txt / stages 产物 / 两份 index.html
+└─ cli.ts             # CLI 参数解析 + 动态 import 入口
 ```
 
 > 说明：模块当前**无自动化测试**。原有 report.test.ts 依赖文件系统写盘（临时目录）， 需 `--allow-write` 权限；顶层
@@ -260,30 +263,28 @@ integration/
 ### 7.2 常用命令
 
 ```bash
-cd integration
-
-# 类型检查
-deno check src/mod.ts src/cli.ts
+# 类型检查（以仓库根为工作目录）
+deno check src/integration/mod.ts src/integration/cli.ts
 
 # 代码风格
-deno lint src/
+deno lint src/integration
 ```
 
 ### 7.3 常见改动点 & 注意事项
 
 1. **新增 DSL 原语**：
    - 在 `dsl.ts` 声明，通过 `requireStageContext()` 拿当前上下文。
-   - `src/mod.ts` 导出。
+   - `mod.ts` 导出。
    - 模块无自动化测试；改完在顶层跑 `deno test` / `deno lint` 确认不回归。
 
 2. **改报告结构**：
-   - `RunReport`/`StageRecord` 接口在 `src/runner.ts`。
-   - 写盘逻辑在 `src/reporter.ts` 的 `writeReport()`。
-   - 约束：HTML 零 `<style>`/`style=`、纯语义标签；改动后可用 `deno run -A src/cli.ts run <entry.ts>`
+   - `RunReport`/`StageRecord` 接口在 `runner.ts`。
+   - 写盘逻辑在 `reporter.ts` 的 `writeReport()`。
+   - 约束：HTML 零 `<style>`/`style=`、纯语义标签；改动后可用 `deno run -A src/integration/cli.ts run <entry.ts>`
      手动跑一次流水线核对产物结构。
 
 3. **改缓存判定**：
-   - 恢复流程在 `src/cache.ts` 的 `tryRecoverCache()`。
+   - 恢复流程在 `cache.ts` 的 `tryRecoverCache()`。
    - 默认**不要**在无 `--with-cache` 时恢复缓存（参见 §3 的设计意图）。
    - `filter` 排除但被 active stage 依赖的 cacheable stages，通过 `runner.ts` 的 `preRecoverFilteredDeps()`
      **递归**预恢复。

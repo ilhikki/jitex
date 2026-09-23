@@ -31,7 +31,7 @@ export interface TransformOptions {
    * 用户自定义 syscall 重写表。
    * 与内部 buildPascalRewriteTable() 合并，同 key 覆盖内部表。
    * 某 key 设为 undefined 可禁用内部对该 key 的重写。
-   * 详见 src/middle/rewrite/rewrite.ts。
+   * 详见 middle/rewrite/rewrite.ts。
    */
   syscallRewriters?: SyscallRewriteTable
   /**

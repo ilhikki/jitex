@@ -29,7 +29,7 @@
  *
  * 本文件是 runtime 与 compiler 之间唯一的依赖契约：compiler 的 rewrite 层产出
  * 这里的 key，runtime 的 handler 按 key 分派。与本文件对应的 lowering 侧 key
- * （'lowering.' 前缀）定义在 compiler 的 src/middle/lowering/helpers.ts：lowering
+ * （'lowering.' 前缀）定义在 compiler 的 middle/lowering/helpers.ts：lowering
  * 产泛型 key + type 参数，rewrite 消费 type 后产出这里的终态 key。
  */
 

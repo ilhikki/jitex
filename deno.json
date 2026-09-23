@@ -1,18 +1,18 @@
 {
   "workspace": [
-    "./runtime",
-    "./pascal-to-js",
-    "./integration",
-    "./boot-tex"
+    "./src/runtime",
+    "./src/pascal-to-js",
+    "./src/integration"
   ],
-  "exclude": ["reports", "resources"],
+  "exclude": ["reports", "resources", "dist"],
   "compilerOptions": {
     "strict": true
   },
   "tasks": {
-    "boot-tangle": "deno run -RW ./integration/src/cli.ts run ./boot-tex/src/tangle/boot-tangle.ts",
-    "boot-trip": "deno run -RW ./integration/src/cli.ts run ./boot-tex/src/tex/boot-trip.ts",
-    "boot-plain": "deno run -RW ./integration/src/cli.ts run ./boot-tex/src/tex/boot-plain.ts"
+    "boot:tangle": "deno run -RW ./src/integration/cli.ts run ./src/boot-tex/tangle/boot-tangle.ts",
+    "boot:trip": "deno run -RW ./src/integration/cli.ts run ./src/boot-tex/tex/boot-trip.ts",
+    "boot:plain": "deno run -RW ./src/integration/cli.ts run ./src/boot-tex/tex/boot-plain.ts",
+    "runtime:build": "deno run -A ./src/runtime/build.ts"
   },
   "lint": {
     "rules": {

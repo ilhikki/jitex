@@ -1,0 +1,4 @@
+{
+  "name": "@jitex/integration",
+  "exports": "./mod.ts"
+}

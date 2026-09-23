@@ -14,9 +14,22 @@
   零依赖，可单独打包为浏览器 ESM。编译与执行分属两包：使用方「先 transform，再 runJs」。
 - `@jitex/integration`：E2E 流水线 DSL——多阶段、有依赖、可缓存、可产出结构化报告的流水线框架， 用于编排"编译 → 运行 →
   比对产物"类长任务（TANGLE 自举、TeX TRIP 等）；不含任何 TeX 代码。
-- `@jitex/boot-tex`：TeX82 编译流水线——TANGLE 自举 + TeX TRIP 测试，基于 `@jitex/integration` 编排。
+- `boot-tex`（`src/boot-tex/`，**非 workspace 包**，无 `deno.json`）：TeX82 编译流水线——TANGLE 自举 + TeX TRIP 测试，
+  基于 `@jitex/integration` 编排，由顶层 `boot:*` task 运行。
 
 **终极目标**：让 TEX82 在合理时间内跑完。
+
+### 目录布局
+
+Deno workspace monorepo：workspace 成员都在 `src/` 下，包根即源码根；顶层 `deno.json` 是唯一的 task / lint / fmt /
+compilerOptions 入口。
+
+- `src/pascal-to-js/`：编译器包（`@jitex/pascal-to-js`）。`@/` 别名定义在本包 `deno.json`，指向包根。
+- `src/runtime/`：执行层包（`@jitex/runtime`），含构建脚本 `build.ts`。
+- `src/integration/`：流水线框架包（`@jitex/integration`）。
+- `src/boot-tex/`：TeX 流水线目录（非包）。
+- `tests/<包名>/`：测试，按包分目录。
+- `resources/`：外部素材；`dist/`：构建产物（已 gitignore）。
 
 ---
 
