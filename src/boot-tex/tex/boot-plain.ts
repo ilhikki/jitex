@@ -75,7 +75,7 @@ function createBootPlainSuite(): Suite {
       attachText('console.log', consoleFile.getOutput())
       attachText('debug.log', state.debugLog.join('\n'))
       attachFile('story.log', state.files.get('story.log'))
-      const dviFileStore = state.files.get('story.bvi')
+      const dviFileStore = state.files.get('story.dvi')
       assert(dviFileStore !== undefined, 'dvi file store not found')
       const dviData = dviFileStore.getData()
       assert(dviData.length === 680, 'story.dvi length should be 680 bytes')
