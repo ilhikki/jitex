@@ -2,14 +2,14 @@
  * 算术 / 逻辑 / 比较 / 转换 / 指针的 runtime syscall handler。
  *
  * 这一组 key 绝大多数已由 codegen 内联为宿主表达式
- * （见 sys/pascal-semantic-compiler.ts 的 inlineSyscalls），不会经过 dispatcher。
+ * （见 @jitex/pascal-to-js 的 backend/codegen/semantic-compiler.ts 的 inlineSyscalls），不会经过 dispatcher。
  * 本文件只保留无法内联的 handler：
  *   - 带前置条件检查的：除零、mod 的正数要求、sqrt / ln 的定义域；
  *   - 内联会导致实参重复求值的：char → int32、round；
  *   - 带 error 语义的指针操作。
  */
 
-import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
+import { rtKeys } from '../keys.ts'
 import type { PascalCell, SyscallHandler } from '../runtime-type.ts'
 
 export function arithSyscalls(): Record<string, SyscallHandler> {

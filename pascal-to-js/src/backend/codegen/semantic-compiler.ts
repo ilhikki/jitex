@@ -1,52 +1,25 @@
 import type { JsCompiler, SemanticCompiler } from '@/backend/codegen/json-code-compiler.ts'
 import * as JsonCode from '@/middle/ir/json-code.ts'
-import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import type { SyscallHandler } from '../runtime-type.ts'
-
-/** 运行期基础设施：debug 检查 / 函数进入钩子 */
-export function basicSyscall(): Record<string, SyscallHandler> {
-  // subrange 边界检查（rewrite 只在 debug 构建产出 runtime.debug.range.check）。
-  // 必须回传被检查的值：rewrite 既把它当语句（赋值前的校验），也把它当表达式
-  // （pred / succ 的结果包裹，ISO 6.6.6.4）。
-  const debugRangeCheck: SyscallHandler = (_ctx, index, min, max) => {
-    if ((index as number) < (min as number) || (index as number) > (max as number)) {
-      throw new Error(`subrange value ${index} out of range ${min}..${max}`)
-    }
-    return index
-  }
-
-  // 循环步数限制（rewrite 只在 debug 构建产出 runtime.debug.steps.check）
-  const debugStepsCheck: SyscallHandler = (ctx, _args) => {
-    if (++ctx.steps > ctx.maxSteps) {
-      throw new Error('step limit exceeded')
-    }
-    return undefined
-  }
-
-  return {
-    [rtKeys.debugStepsCheck]: debugStepsCheck,
-    [rtKeys.hookFunctionEnter]: () => undefined,
-    [rtKeys.debugRangeCheck]: debugRangeCheck,
-  }
-}
+import { rtKeys } from '@jitex/runtime'
 
 /**
  * syscall 内联表：key → 「已编译的实参表达式 → 内联 JS 表达式」。
  *
- * 语义必须与 sys/arith.ts 等处的 handler 完全一致（返回值、异常、副作用）。
- * 表达式整体用括号包裹，保证嵌入父表达式时运算符优先级安全。
+ * 语义必须与 runtime 的 sys handler（@jitex/runtime 的 sys/arith.ts 等）完全一致
+ * （返回值、异常、副作用）。表达式整体用括号包裹，保证嵌入父表达式时运算符优先级安全。
  * 未在此表的 key 一律回退 dispatcher。
  */
+
 /** 内联表达式生成器：返回 undefined 表示放弃内联、回退 dispatcher */
 type InlineGen = (args: string[]) => string | undefined
 
 /**
  * Pascal 数字字面量 → 合法的 JS 数字字面量。
  *
- * Pascal 的 digit-sequence 是十进制，前导零只表示位数（0100000 = 100000，ISO 6.1.5）；
- * 而 JS 宽松模式（`new Function` 的函数体即宽松模式）把前导 0 的整数按八进制解析
- * （0100000 → 32768），前导 0 后接比例因子更是语法错误（010E2 无法 parse）。
- * 因此以 0 开头且紧跟数字的字面量一律按十进制重新求值再输出。
+ * Pascal 的 digit-sequence 是十进制，前导零只表示位数（0100000 = 100000，ISO 6.1.5）。
+ * 编译产物按 ES 模块执行（严格模式），而严格模式禁用前导 0 的八进制字面量——
+ * `0100000`、`010E2` 都会直接 parse 失败。因此以 0 开头且紧跟数字的字面量一律
+ * 按十进制重新求值再输出。
  */
 function jsNumberLiteral(raw: string): string {
   return /^0[0-9]/.test(raw) ? String(Number(raw)) : raw
@@ -96,10 +69,10 @@ const inlineSyscalls: Record<string, InlineGen> = {
   // （dv 随宿主走，不再需要按 ArrayBuffer 缓存）。
 
   // 槽赋值：内联为 JS 赋值表达式。**必须内联** —— dispatcher 的实参只能拿到槽的
-  // 值而非引用，无法写回（见 runtime-keys.ts 的 assign 说明）。
+  // 值而非引用，无法写回（见 @jitex/runtime 的 keys.ts 的 assign 说明）。
   [rtKeys.assign]: (a) => `((${a[0]}) = ${a[1]})`,
 
-  // 求值序列（闭包）：用一个立即执行函数把多个表达式按顺序求值（见 runtime-keys.ts）。
+  // 求值序列（闭包）：用一个立即执行函数把多个表达式按顺序求值（见 @jitex/runtime 的 keys.ts）。
   // 参数必须 >= 2 —— 只有一项时规则应直接返回该项，包一层闭包没有意义。
   [rtKeys.closureNoValue]: (a) => {
     if (a.length < 2) {

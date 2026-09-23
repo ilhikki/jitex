@@ -1,5 +1,5 @@
 /*
- * runtime syscall key 常量。
+ * runtime syscall key 常量（runtime ↔ compiler 的公开契约）。
  *
  * 由 rewrite 产出、runtime handler 消费。命名约定：
  *   - 一律 'runtime.' 前缀；
@@ -27,12 +27,11 @@
  *      见 object.new/object.clone、objectarray.new/objectarray.clone、
  *      bytes.alloc/bytes.clone。
  *
- * 与本文件对应的 lowering 侧 key（'lowering.' 前缀）定义在
- * src/middle/lowering/helpers.ts。lowering 产泛型 key + type 参数，
- * rewrite 消费 type 后产出这里的终态 key。
+ * 本文件是 runtime 与 compiler 之间唯一的依赖契约：compiler 的 rewrite 层产出
+ * 这里的 key，runtime 的 handler 按 key 分派。与本文件对应的 lowering 侧 key
+ * （'lowering.' 前缀）定义在 compiler 的 src/middle/lowering/helpers.ts：lowering
+ * 产泛型 key + type 参数，rewrite 消费 type 后产出这里的终态 key。
  */
-
-import type { ScalarKind } from './type-layout.ts'
 
 export const rtKeys = {
   // 整数运算
@@ -103,9 +102,9 @@ export const rtKeys = {
 
   // debug 构建专属的检查原语。
   //
-  // **只有 debug 构建才会产出这些 key**（见 TransformOptions.debug，默认 true）：
-  // 非 debug 构建里 rewrite 根本不生成它们，运行期零开销；debug 构建里它们
-  // 是独立 syscall，不追求性能。
+  // **只有 debug 构建才会产出这些 key**（见 compiler 的 TransformOptions.debug，
+  // 默认 true）：非 debug 构建里 rewrite 根本不生成它们，运行期零开销；debug
+  // 构建里它们是独立 syscall，不追求性能。
   //
   // 注意：非 debug 构建跳过这些检查时，ISO 7185 定为 error 的情形
   // （6.7.2.2 除数为 0 / 负数、6.4.2.4 子界越界）变为实现定义行为。
@@ -224,8 +223,8 @@ export const rtKeys = {
   /**
    * 槽赋值：把值写入一个变量槽。
    *
-   * **必须内联**（见 pascal-semantic-compiler.ts）：走 dispatcher 时实参只能拿到槽的
-   * 值而非引用，无法赋值。内联为 `(x = v)`，与直接的 JS 赋值等价。
+   * **必须内联**（见 compiler 的 codegen：semantic-compiler.ts）：走 dispatcher
+   * 时实参只能拿到槽的值而非引用，无法赋值。内联为 `(x = v)`，与直接的 JS 赋值等价。
    */
   assign: 'runtime.assign',
 
@@ -246,23 +245,3 @@ export const rtKeys = {
   // 间接调用：args = [callee, ...actualArgs]，callee 为函数值
   callIndirect: 'runtime.call.indirect',
 } as const
-
-/** 标量种类 → 字节视图读取 key */
-export const bytesGetKey: Record<ScalarKind, string> = {
-  int8: rtKeys.bytesGetInt8,
-  uint8: rtKeys.bytesGetUint8,
-  int16: rtKeys.bytesGetInt16,
-  uint16: rtKeys.bytesGetUint16,
-  int32: rtKeys.bytesGetInt32,
-  float32: rtKeys.bytesGetFloat32,
-}
-
-/** 标量种类 → 字节视图写入 key */
-export const bytesSetKey: Record<ScalarKind, string> = {
-  int8: rtKeys.bytesSetInt8,
-  uint8: rtKeys.bytesSetUint8,
-  int16: rtKeys.bytesSetInt16,
-  uint16: rtKeys.bytesSetUint16,
-  int32: rtKeys.bytesSetInt32,
-  float32: rtKeys.bytesSetFloat32,
-}

@@ -1,0 +1,8 @@
+{
+  "name": "@jitex/runtime",
+  "version": "1.0.0",
+  "exports": "./mod.ts",
+  "tasks": {
+    "build": "deno run -A ./build.ts"
+  }
+}

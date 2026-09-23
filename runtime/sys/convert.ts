@@ -8,7 +8,7 @@
  * 文本文件：单位是字符串；二进制文件：单位是 Uint8Array。
  */
 
-import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
+import { rtKeys } from '../keys.ts'
 import type { ByteHost, SyscallHandler } from '../runtime-type.ts'
 import { bytesToString, formatField, formatReal } from '../runtime-util.ts'
 import { makeByteHost } from './mem.ts'

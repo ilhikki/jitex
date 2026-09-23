@@ -17,7 +17,7 @@
 import type { RunError, RunState } from './run-state.ts'
 import { RuntimeContext, RuntimeOptions, Syscall, SyscallHandler } from './runtime-type.ts'
 import { arithSyscalls } from './sys/arith.ts'
-import { basicSyscall } from './sys/pascal-semantic-compiler.ts'
+import { basicSyscall } from './basic.ts'
 import { convertSyscalls } from './sys/convert.ts'
 import { memSyscalls, setSyscalls } from './sys/mem.ts'
 import { fileRuntimeSyscalls } from './sys/file-runtime.ts'

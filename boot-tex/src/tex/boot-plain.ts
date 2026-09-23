@@ -1,7 +1,8 @@
 import { createStageOfGetTangleJs, texExtraSyscalls, transformTex } from './build-tex.ts'
 import { ConsoleFile, readFile, readTextFile } from '../utils.ts'
 import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
-import { MemoryTextFile, PascalFileStore, runJs } from '@jitex/pascal-to-js'
+import { createMemoryFileStore, runJs } from '@jitex/runtime'
+import type { PascalFileStore } from '@jitex/runtime'
 import { assert, attach, attachText, cache, stage, type Suite, suite } from '@jitex/integration'
 
 function createBootPlainSuite(): Suite {
@@ -26,31 +27,34 @@ function createBootPlainSuite(): Suite {
     const getPlainFmtStage = stage(
       'get plain.fmt',
       [getTexStage, baseFileStage, tfmResourcesStage],
-      ([texFiles, baseFiles, tfmFiles]) => {
+      async ([texFiles, baseFiles, tfmFiles]) => {
         const files = new Map<string, PascalFileStore>()
         for (const [name, data] of Object.entries(baseFiles)) {
-          files.set(name, new MemoryTextFile(data))
+          files.set(name, createMemoryFileStore(data))
         }
-        files.set('plain.tex', new MemoryTextFile(baseFiles['plain.tex']))
-        files.set('hyphen.tex', new MemoryTextFile(baseFiles['hyphen.tex']))
+        files.set('plain.tex', createMemoryFileStore(baseFiles['plain.tex']))
+        files.set('hyphen.tex', createMemoryFileStore(baseFiles['hyphen.tex']))
         for (const [name, data] of Object.entries(tfmFiles)) {
-          files.set('TeXfonts:' + name, new MemoryTextFile(data))
+          files.set('TeXfonts:' + name, createMemoryFileStore(data))
         }
-        files.set('TeXformats:TEX.POOL', new MemoryTextFile(texFiles.poolFile))
+        files.set('TeXformats:TEX.POOL', createMemoryFileStore(texFiles.poolFile))
         const consoleFile = new ConsoleFile('\\input plain \\dump \n')
         files.set('TTY:', consoleFile)
 
         attach('hyphen.tex.txt', baseFiles['hyphen.tex'])
-        const state = runJs(texFiles.texJs, {
+        const state = await runJs(texFiles.texJs, {
           files,
           extraSyscalls: texExtraSyscalls,
         })
         attachText('console.log', consoleFile.getOutput())
         attachText('debug.log', state.debugLog.join('\n'))
-        attach('plain.log', (state.files.get('plain.log') as MemoryTextFile).getData())
+        const plainLogStore = state.files.get('plain.log')
+        if (plainLogStore !== undefined) {
+          attach('plain.log', plainLogStore.getData())
+        }
         const plainFmtFile = files.get('plain.fmt')
         assert(plainFmtFile !== undefined, 'plain.fmt not found')
-        const plainFmtBytes = (plainFmtFile as MemoryTextFile).getData()
+        const plainFmtBytes = plainFmtFile.getData()
         attach('plain.fmt', plainFmtBytes)
         return { plainFmtBytes }
       },
@@ -58,27 +62,33 @@ function createBootPlainSuite(): Suite {
 
     stage('valid plain fmt', [getTexStage, getPlainFmtStage], async ([texFiles, plainFmtFile]) => {
       const files = new Map<string, PascalFileStore>()
-      files.set('TeXformats:TEX.POOL', new MemoryTextFile(texFiles.poolFile))
-      files.set('plain.fmt', new MemoryTextFile(plainFmtFile.plainFmtBytes))
+      files.set('TeXformats:TEX.POOL', createMemoryFileStore(texFiles.poolFile))
+      files.set('plain.fmt', createMemoryFileStore(plainFmtFile.plainFmtBytes))
       const tex = await readFile('./resources/knuth/plain/base/story.tex')
-      files.set('story.tex', new MemoryTextFile(tex))
+      files.set('story.tex', createMemoryFileStore(tex))
       const consoleFile = new ConsoleFile('&plain story \n\ \\bye \n')
       files.set('TTY:', consoleFile)
-      const state = runJs(texFiles.texJs, {
+      const state = await runJs(texFiles.texJs, {
         files,
         extraSyscalls: texExtraSyscalls,
       })
       attachText('console.log', consoleFile.getOutput())
       attachText('debug.log', state.debugLog.join('\n'))
-      attach('story.log', (state.files.get('story.log') as MemoryTextFile).getData())
-      const dviData = (state.files.get('story.dvi') as MemoryTextFile).getData()
-      assert(dviData.length > 0, 'story.dvi is empty')
+      attachFile('story.log', state.files.get('story.log'))
+      const dviFileStore = state.files.get('story.bvi')
+      assert(dviFileStore !== undefined, 'dvi file store not found')
+      const dviData = dviFileStore.getData()
+      assert(dviData.length === 680, 'story.dvi length should be 680 bytes')
       attach('story.dvi', dviData)
       attachText('story.dvi.txt', dviData.join(', '))
     })
   })
 }
-
+function attachFile(name: string, store: PascalFileStore | undefined) {
+  if (store !== undefined) {
+    attach(name, store.getData())
+  }
+}
 const tfmNames = [
   'cmb10.tfm',
   'cmbsy10.tfm',
@@ -172,7 +182,7 @@ async function loadFiles(basePath: string, fileNames: string[]) {
 
 async function compileTexAsJs(tangleJs: string) {
   const texWeb = await readTextFile('./resources/knuth/tex/tex.web')
-  const result = validRunTangleResult(runTangleJs(tangleJs, texWeb, undefined))
+  const result = validRunTangleResult(await runTangleJs(tangleJs, texWeb, undefined))
   const pasFile = result.pasFile
   attachText('tex.pas', pasFile)
   const poolFile = result.poolFile

@@ -1,13 +1,8 @@
-import { extraSyscalls, fileOpenRewriters, runtimeFileSyscalls, stringToBytes } from '../utils.ts'
-import {
-  ExtraCallable,
-  MemoryTextFile,
-  PascalFileStore,
-  runJs,
-  RunState,
-  SyscallHandler,
-  transform,
-} from '@jitex/pascal-to-js'
+import { bytesToString, extraSyscalls, fileOpenRewriters, runtimeFileSyscalls, stringToBytes } from '../utils.ts'
+import { transform } from '@jitex/pascal-to-js'
+import type { ExtraCallable } from '@jitex/pascal-to-js'
+import { createMemoryFileStore, runJs } from '@jitex/runtime'
+import type { PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
 // noinspection SpellCheckingInspection
@@ -68,10 +63,10 @@ export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   return { pasFile, poolFile }
 }
 
-export function runTanglePascal(
+export async function runTanglePascal(
   tangleInput: TangleInput,
-): TangleOutput {
-  const runTangleOutput = runTangle(tangleInput)
+): Promise<TangleOutput> {
+  const runTangleOutput = await runTangle(tangleInput)
   return validRunTangleResult(runTangleOutput)
 }
 
@@ -80,42 +75,42 @@ export function createTangleStage<const T extends readonly Stage<unknown>[], R>(
   deps: T,
   fn: (results: UnwrapAll<T>) => TangleInput,
 ): Stage<TangleOutput> {
-  return stage(name, deps, (results) => {
+  return stage(name, deps, async (results) => {
     const tangleInput = fn(results)
-    return runTanglePascal(tangleInput)
+    return await runTanglePascal(tangleInput)
   })
 }
 
-export function runTangleJs(
+export async function runTangleJs(
   jsCode: string,
   webContent: string,
   changeContent: string | undefined = undefined,
-): RunTangleResult {
+): Promise<RunTangleResult> {
   const files = new Map<string, PascalFileStore>()
-  files.set(fileNames.webFile, new MemoryTextFile(stringToBytes(webContent)))
+  files.set(fileNames.webFile, createMemoryFileStore(stringToBytes(webContent)))
   if (changeContent) {
     const changeBytes = stringToBytes(changeContent)
-    files.set(fileNames.changeFile, new MemoryTextFile(changeBytes))
+    files.set(fileNames.changeFile, createMemoryFileStore(changeBytes))
   }
-  const pascalFile = new MemoryTextFile()
+  const pascalFile = createMemoryFileStore()
   pascalFile.setMode('generation')
-  const output = new MemoryTextFile()
+  const output = createMemoryFileStore()
   output.setMode('generation')
   files.set('TTY:', output)
   files.set(fileNames.pascalFile, pascalFile)
-  const poolFile = new MemoryTextFile()
+  const poolFile = createMemoryFileStore()
   poolFile.setMode('generation')
   files.set(fileNames.pool, poolFile)
 
-  const state = runJs(jsCode, {
+  const state = await runJs(jsCode, {
     files,
     maxSteps: 1e9,
     extraSyscalls: tangleExtraSyscalls,
   })
   const debugLog = state.debugLog
-  const pasFile = pascalFile.getContent()
+  const pasFile = bytesToString(pascalFile.getData())
   return {
-    output: output.getContent(),
+    output: bytesToString(output.getData()),
     state,
     pasFile,
     poolFile: poolFile.getData(),
@@ -132,8 +127,8 @@ export function transformTangle(tangleContent: string, debug = true) {
   return jsCode
 }
 
-export function runTangle(input: TangleInput) {
+export async function runTangle(input: TangleInput) {
   const { tangleContent, webContent, changeContent, debug } = input
   const jsCode = transformTangle(tangleContent, debug ?? true)
-  return runTangleJs(jsCode, webContent, changeContent)
+  return await runTangleJs(jsCode, webContent, changeContent)
 }

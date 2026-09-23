@@ -249,7 +249,7 @@ export interface Call {
  * 系统调用：运行时原语。
  *
  * 所有 JsonCode 自身不表达的语义都走 Syscall。典型类别（终态 key 见
- * middle/rewrite/runtime-keys.ts；段名写完整单词，不用缩写）：
+ * @jitex/runtime 的 keys.ts；段名写完整单词，不用缩写）：
  *
  *   整数与位      : int32.add / int32.subtract / int32.multiply / int32.modulo / int32.negate
  *   实数（单精度）: float32.add / float32.subtract / float32.squareRoot / float32.sine

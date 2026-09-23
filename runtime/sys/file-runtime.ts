@@ -19,18 +19,11 @@
  *     由本文件承担。
  */
 
-import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
-import type {
-  ByteHost,
-  PascalFile,
-  PascalFileStore,
-  RuntimeContext,
-  SyscallHandler,
-  TextFile,
-} from '../runtime-type.ts'
+import { rtKeys } from '../keys.ts'
+import type { ByteHost, PascalFile, PascalFileStore, RuntimeContext, SyscallHandler } from '../runtime-type.ts'
 import { bytesToString, encodeUtf8 } from '../runtime-util.ts'
 import { makeByteHost } from './mem.ts'
-import { MemoryTextFile } from './memory-text-file.ts'
+import { createMemoryFileStore } from './memory-text-file.ts'
 
 // 辅助
 
@@ -50,25 +43,25 @@ function isByteFile(f: PascalFile): boolean {
   return f.fileKind === 'bytes'
 }
 
-function textStore(f: PascalFile): TextFile {
-  return f.value as unknown as TextFile
+function textStore(f: PascalFile): PascalFileStore {
+  return f.value as unknown as PascalFileStore
 }
 
 /** 默认 input / output（f 为 null 时） */
-function defaultStore(ctx: RuntimeContext, isOutput: boolean): TextFile {
+function defaultStore(ctx: RuntimeContext, isOutput: boolean): PascalFileStore {
   const store = ctx.files.get(isOutput ? 'OUTPUT' : 'INPUT')
   if (store === undefined) {
     throw new Error(isOutput ? 'OUTPUT not defined' : 'INPUT not defined')
   }
-  return store as unknown as TextFile
+  return store as unknown as PascalFileStore
 }
 
-function pick(ctx: RuntimeContext, f: unknown, isOutput: boolean): TextFile {
+function pick(ctx: RuntimeContext, f: unknown, isOutput: boolean): PascalFileStore {
   return f === undefined ? defaultStore(ctx, isOutput) : textStore(f as PascalFile)
 }
 
 /** 写目标存储：f 缺省表示默认 output（ISO 的 write 不带文件参数的形式） */
-function writeStore(ctx: RuntimeContext, f: unknown): TextFile {
+function writeStore(ctx: RuntimeContext, f: unknown): PascalFileStore {
   return f === undefined ? defaultStore(ctx, true) : textStore(f as PascalFile)
 }
 
@@ -81,14 +74,14 @@ function writeStore(ctx: RuntimeContext, f: unknown): TextFile {
 function ensureStore(p: PascalFile): PascalFileStore {
   let store = p.value
   if (store === undefined) {
-    store = new MemoryTextFile()
+    store = createMemoryFileStore()
     p.value = store
   }
   return store
 }
 
 /** 读一个字符单位；行结束符消耗后返回空格（char 用 ord 值表示） */
-function readCharUnit(store: TextFile): number {
+function readCharUnit(store: PascalFileStore): number {
   if (!store.hasMore()) {
     return 32
   }
@@ -105,7 +98,7 @@ function readCharUnit(store: TextFile): number {
 }
 
 /** 读一个 token（跳过前导空白，读到下一空白） */
-function readTokenUnit(store: TextFile): string {
+function readTokenUnit(store: PascalFileStore): string {
   while (store.hasMore()) {
     const b = store.peekByte()!
     if (b === 32 || b === 9 || b === 10 || b === 13 || b === 0) {
@@ -129,7 +122,7 @@ function readTokenUnit(store: TextFile): string {
   return bytesToString(new Uint8Array(bytes))
 }
 
-function skipLine(store: TextFile): void {
+function skipLine(store: PascalFileStore): void {
   while (store.hasMore()) {
     const b = store.peekByte()!
     store.advance()
@@ -353,7 +346,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       const url = ctx.programFileUrls[key] ?? key
       let fileStore = ctx.files.get(url)
       if (fileStore === undefined) {
-        fileStore = new MemoryTextFile()
+        fileStore = createMemoryFileStore()
       }
       p.value = fileStore
       ctx.files.set(key, fileStore)
@@ -372,7 +365,7 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
  *
  * 多字符（数字格式化结果等）是 ASCII 文本，仍走 UTF-8 编码。
  */
-function writeTextUnit(store: TextFile, s: string): void {
+function writeTextUnit(store: PascalFileStore, s: string): void {
   if (s.length === 1) {
     store.writeByte(s.charCodeAt(0) & 0xff)
     return

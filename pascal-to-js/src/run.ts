@@ -9,11 +9,7 @@ import type { SyscallRewriter, SyscallRewriteTable } from '@/middle/rewrite/rewr
 import { composeMapping, mergeRewriteTables, rewrite } from '@/middle/rewrite/rewrite.ts'
 import { buildExtraCallableRewriters, buildPascalRewriteTable } from '@/middle/rewrite/pascal-rewriters.ts'
 import { toJs } from '@/backend/codegen/json-code-compiler.ts'
-import type { RunError, RunState } from '@/backend/runtime/run-state.ts'
-
-import { RuntimeContext, RuntimeOptions, Syscall } from '@/backend/runtime/runtime-type.ts'
-import { PascalSemanticCompiler } from '@/backend/runtime/sys/pascal-semantic-compiler.ts'
-import { createDispatcher, createRuntimeContext, toRunState } from '@/backend/runtime/runtime.ts'
+import { PascalSemanticCompiler } from '@/backend/codegen/semantic-compiler.ts'
 import { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
 
 /**
@@ -65,6 +61,12 @@ function parseSource(source: string): ProgramNode {
   return result.astNode as ProgramNode
 }
 
+/**
+ * 将 Pascal 源码编译为 ESM 源码字符串（编译产物）。
+ *
+ * 产物顶层是工厂：`export default function main(__sys) { ... return __run }`，
+ * 由 @jitex/runtime 加载并注入 dispatcher 后执行（见 runtime 的 runJs）。
+ */
 export function transform(source: string, options: TransformOptions = { debug: false }): string {
   const ast = parseSource(source)
 
@@ -91,83 +93,4 @@ export function transform(source: string, options: TransformOptions = { debug: f
   })
 
   return `${jsBody}\nexport default ${mainName};`
-}
-
-export function executeCompiled(
-  code: string,
-  syscalls: Record<string, Syscall>,
-): void {
-  // 提取导出的函数名
-  const exportMatch = code.match(/export\s+default\s+(\w+);/)
-  if (!exportMatch) {
-    throw new Error('executeCompiled: no export found in code')
-  }
-  const mainName = exportMatch[1]
-
-  // 移除 export 语句，添加 return
-  const execCode = code.replace(/export.*$/, `return ${mainName};`)
-  const factory = new Function(execCode)
-  const createRun = factory() as (syscalls: Record<string, Syscall>) => () => void
-
-  // 产物顶层是工厂：注入 __sys 后返回执行体，调用它才真正开始执行。
-  // 契约：工厂调用后 __sys 字典须保持稳定（解包只发生在工厂里）。
-  const run = createRun(syscalls)
-  run()
-}
-
-export interface RunOptions extends TransformOptions, RuntimeOptions {}
-
-function reportErrorAsState(e: unknown, ctx: RuntimeContext) {
-  const err = e as { message?: string; stack?: string } | undefined
-  // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
-  const stackLines: string[] = err?.stack ? String(err.stack).split('\n').slice(0, 40) : []
-  // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看
-  ctx.debugLog.push(`[run] error: ${err?.message || String(e)}`)
-  for (const line of stackLines) {
-    ctx.debugLog.push(`  ${line}`)
-  }
-  const error: RunError = {
-    message: err?.message || String(e),
-    stackTrace: stackLines,
-  }
-  return toRunState(ctx, 'error', error)
-}
-
-function getRunTimeContextFromOptions(options: RuntimeOptions) {
-  const ctx = createRuntimeContext({
-    files: options.files,
-    programFileUrls: options.programFileUrls,
-    maxSteps: options.maxSteps,
-  })
-  return ctx
-}
-
-export function runJs(source: string, options: RuntimeOptions): RunState {
-  const ctx = getRunTimeContextFromOptions(options)
-  try {
-    ctx.jsCode = source
-    // __sys dispatcher
-    const dispatcher = createDispatcher(ctx, options.extraSyscalls ?? {})
-
-    // 执行（ES module 代码）
-    executeCompiled(source, dispatcher)
-
-    return toRunState(ctx, 'terminated')
-  } catch (e: unknown) {
-    return reportErrorAsState(e, ctx)
-  }
-}
-
-export function run(source: string, options: RunOptions = { debug: false }): RunState {
-  let jsCode
-  try {
-    jsCode = transform(source, {
-      extraCallables: options.extraCallables,
-      debug: options.debug,
-    })
-  } catch (e: unknown) {
-    const ctx = getRunTimeContextFromOptions(options)
-    return reportErrorAsState(e, ctx)
-  }
-  return runJs(jsCode, options)
 }

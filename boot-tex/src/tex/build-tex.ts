@@ -1,4 +1,6 @@
-import { ExtraCallable, PascalFile, SyscallHandler, TextFile, transform } from '@jitex/pascal-to-js'
+import { transform } from '@jitex/pascal-to-js'
+import type { ExtraCallable } from '@jitex/pascal-to-js'
+import type { PascalFile, SyscallHandler } from '@jitex/runtime'
 import { ConsoleFile, extraSyscalls, fileOpenRewriters, readTextFile, runtimeFileSyscalls } from '../utils.ts'
 import { runTanglePascal, transformTangle } from '../tangle/build-tangle.ts'
 import { attachText, stage } from '@jitex/integration'
@@ -30,7 +32,7 @@ const texExtraCallables: Record<string, ExtraCallable> = {
  */
 const eolnSyscall: SyscallHandler = (ctx, file) => {
   const f = file as PascalFile | undefined
-  const store = (f === undefined ? ctx.files.get('INPUT') : f.value) as (TextFile | undefined)
+  const store = f === undefined ? ctx.files.get('INPUT') : f.value
   if (!store || !store.hasMore()) {
     return 1
   }
@@ -64,12 +66,12 @@ export function createStageOfGetTangleJs(isDebug: boolean) {
   return stage('build tangle.js', [], async () => {
     const tanglePas = await readTextFile('./resources/jitex/tangle.pas')
     const tangleWeb = await readTextFile('./resources/knuth/tangle/tangle.web')
-    const tangleV1 = runTanglePascal({
+    const tangleV1 = await runTanglePascal({
       tangleContent: tanglePas,
       webContent: tangleWeb,
       debug: isDebug,
     })
-    const tangleV2 = runTanglePascal({
+    const tangleV2 = await runTanglePascal({
       tangleContent: tangleV1.pasFile,
       webContent: tangleWeb,
       debug: isDebug,

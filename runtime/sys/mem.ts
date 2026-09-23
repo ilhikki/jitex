@@ -8,12 +8,13 @@
  *
  * 多字节标量一律大端。
  *
- * 已被 codegen 内联为宿主表达式（见 sys/pascal-semantic-compiler.ts 的 inlineSyscalls）
+ * 已被 codegen 内联为宿主表达式（见 @jitex/pascal-to-js 的 backend/codegen/semantic-compiler.ts
+ * 的 inlineSyscalls）
  * 的 key 不在此实现：bytes.alloc / bytes.clone / bytes.copy、cell.new / cell.get /
  * cell.set、objectarray.get / objectarray.set / objectarray.sublist。
  */
 
-import { rtKeys } from '@/middle/rewrite/runtime-keys.ts'
+import { rtKeys } from '../keys.ts'
 import type { ByteHost, SyscallHandler } from '../runtime-type.ts'
 
 /**

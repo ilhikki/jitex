@@ -1,9 +1,9 @@
-import { nodeToCode, parse, run } from '@jitex/pascal-to-js'
-import type { ExtraCallable, PascalFileStore, RunState, SyscallHandler } from '@jitex/pascal-to-js'
-import { MemoryTextFile } from '@jitex/pascal-to-js'
-import { encodeUtf8 } from '@/backend/runtime/runtime-util.ts'
+import { nodeToCode, parse, transform } from '@jitex/pascal-to-js'
+import type { ExtraCallable } from '@jitex/pascal-to-js'
+import { createMemoryFileStore, encodeUtf8, runJs, toErrorState } from '@jitex/runtime'
+import type { PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
 import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@^1.0.0'
-
+const textDecoder = new TextDecoder()
 /**
  * 单个 Pascal 测试用例。
  *
@@ -46,7 +46,6 @@ export interface PascalTest {
 
   /** 内存文件系统：文件名 → 文件内容 */
   textFiles?: Map<string, Uint8Array>
-  recordFiles?: Map<string, MemoryTextFile>
   /** 程序文件变量名 → files 中的键名 */
   programFileUrls?: Record<string, string>
 
@@ -57,31 +56,38 @@ export interface PascalTest {
   maxSteps?: number
 }
 
-function newTextFile(mode: 'inspection' | 'generation', text?: string): MemoryTextFile {
-  const store = new MemoryTextFile(text === undefined ? undefined : encodeUtf8(text))
+function newTextFile(mode: 'inspection' | 'generation', text?: string) {
+  const store = createMemoryFileStore(text === undefined ? undefined : encodeUtf8(text))
   store.setMode(mode)
   return store
 }
 
 /** 执行单个用例，返回运行状态 */
-export function runPascal(t: PascalTest): RunState {
+export async function runPascal(t: PascalTest): Promise<RunState> {
   const files = new Map<string, PascalFileStore>()
   files.set('INPUT', newTextFile('inspection', t.input))
   files.set('OUTPUT', newTextFile('generation'))
   for (const [key, value] of t.textFiles ?? []) {
-    files.set(key, new MemoryTextFile(value))
-  }
-  for (const [key, value] of t.recordFiles ?? []) {
-    files.set(key, value)
+    files.set(key, createMemoryFileStore(value))
   }
 
-  return run(t.code, {
+  // 编译（@jitex/pascal-to-js）与执行（@jitex/runtime）分属两个包：先 transform 再 runJs。
+  // 编译期报错在此转成 error 状态，与运行期报错统一。
+  let jsCode: string
+  try {
+    jsCode = transform(t.code, {
+      extraCallables: t.extraCallables,
+      debug: true,
+    })
+  } catch (e) {
+    return toErrorState(e)
+  }
+
+  return await runJs(jsCode, {
     files,
     programFileUrls: t.programFileUrls,
     maxSteps: t.maxSteps ?? 1e5,
-    extraCallables: t.extraCallables,
     extraSyscalls: t.extraSyscalls,
-    debug: true,
   })
 }
 
@@ -96,15 +102,21 @@ export function runPascalTests(group: string, tests: PascalTest[]): void {
     Deno.test(`${group} > ${t.name}`, () => runPascalTest(t))
   }
 }
-
+function decode(store: PascalFileStore | undefined): string | undefined {
+  if (store === undefined) {
+    return undefined
+  }
+  return textDecoder.decode(store.getData())
+}
 /** 执行并断言单个用例；失败时先输出编译产物，再抛出断言错误 */
-export function runPascalTest(t: PascalTest): void {
-  const state = runPascal(t)
-  const output = state.files.get('OUTPUT') as MemoryTextFile
+export async function runPascalTest(t: PascalTest): Promise<void> {
+  const state = await runPascal(t)
+  const output = state.files.get('OUTPUT')
   const ctx = `[${t.name}] ${t.purpose}`
 
   try {
-    assertCase(t, state, output.getContent(), ctx)
+    const outputContent = decode(output)
+    assertCase(t, state, outputContent ?? '', ctx)
     // 期望编译通过的用例：额外验证源码往返（parse → print → parse → print）的稳定性
     if (t.expectedError === undefined) {
       assertPrintRoundTripStable(t.code, ctx)
@@ -172,7 +184,11 @@ function assertCase(t: PascalTest, state: RunState, output: string, ctx: string)
 
   // 4. 文件断言
   for (const { url, contains } of t.expectedFileContains ?? []) {
-    const store = state.files.get(url) as MemoryTextFile | undefined
-    assertStringIncludes(store?.getContent() ?? '', contains, `${ctx}: 文件 ${url}`)
+    const store = state.files.get(url)
+    if (store?.getData() === undefined) {
+      assert(false, `file not found ${ctx}: 文件 ${url}`)
+    }
+
+    assertStringIncludes(textDecoder.decode(store.getData()), contains, `${ctx}: 文件 ${url}`)
   }
 }

@@ -24,7 +24,8 @@ import {
   setSize,
   sizeOf,
 } from './type-layout.ts'
-import { bytesGetKey, bytesSetKey, rtKeys } from './runtime-keys.ts'
+import { rtKeys } from '@jitex/runtime'
+import { bytesGetKey, bytesSetKey } from './scalar-keys.ts'
 import type { SyscallRewriteTable } from './rewrite.ts'
 
 // 工具

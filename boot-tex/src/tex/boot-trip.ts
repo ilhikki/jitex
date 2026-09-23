@@ -1,5 +1,6 @@
 import { assert, assertEquals, attach, attachText, cache, log, stage, type Suite, suite } from '@jitex/integration'
-import { MemoryTextFile, PascalFileStore, runJs } from '@jitex/pascal-to-js'
+import { createMemoryFileStore, runJs } from '@jitex/runtime'
+import type { PascalFileStore } from '@jitex/runtime'
 import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { ConsoleFile, getTripChFile, readBytesFromState, readFile, readTextFile, readTextFromState } from '../utils.ts'
 import { createStageOfGetTangleJs, texExtraSyscalls, transformTex } from './build-tex.ts'
@@ -13,11 +14,11 @@ interface RunTripTexArgs {
   extraFiles?: Map<string, PascalFileStore>
 }
 
-function runTripTex(args: RunTripTexArgs) {
+async function runTripTex(args: RunTripTexArgs) {
   const files = new Map<string, PascalFileStore>()
-  files.set('trip.tex', new MemoryTextFile(args.tripTex))
-  files.set('TeXformats:TEX.POOL', new MemoryTextFile(args.poolFile))
-  files.set('TeXfonts:trip.tfm', new MemoryTextFile(args.tripTfm))
+  files.set('trip.tex', createMemoryFileStore(args.tripTex))
+  files.set('TeXformats:TEX.POOL', createMemoryFileStore(args.poolFile))
+  files.set('TeXfonts:trip.tfm', createMemoryFileStore(args.tripTfm))
   if (args.extraFiles) {
     for (const [key, value] of args.extraFiles) {
       files.set(key, value)
@@ -25,7 +26,7 @@ function runTripTex(args: RunTripTexArgs) {
   }
   const consoleFile = new ConsoleFile(args.ttyInput)
   files.set('TTY:', consoleFile)
-  const state = runJs(args.tripJs, {
+  const state = await runJs(args.tripJs, {
     files,
     extraSyscalls: texExtraSyscalls,
   })
@@ -50,7 +51,7 @@ export function createBootTexSuite(): Suite {
     const tripPasStage = cache(stage('tangle tex.web => tex.trip', [tangleJsStage], async ([{ tangleJs }]) => {
       const texWeb = await readTextFile('./resources/knuth/tex/tex.web')
       const chFileContent = await getTripChFile()
-      const result = validRunTangleResult(runTangleJs(tangleJs, texWeb, chFileContent))
+      const result = validRunTangleResult(await runTangleJs(tangleJs, texWeb, chFileContent))
       attachText('tex.trip.web', result.pasFile)
       attach('tex.trip.pool', result.poolFile)
       return { pasFile: result.pasFile, poolFile: result.poolFile }
@@ -79,8 +80,8 @@ export function createBootTexSuite(): Suite {
     const pass1RunStage = stage(
       'trip pass 1: run initex',
       [tripTexJsStage, tripPasStage, tripSourcesStage],
-      ([{ texTripJs }, { poolFile }, { tripTex, tripTfm }]) => {
-        const { state, consoleFile } = runTripTex({
+      async ([{ texTripJs }, { poolFile }, { tripTex, tripTfm }]) => {
+        const { state, consoleFile } = await runTripTex({
           tripJs: texTripJs,
           poolFile,
           tripTex,
@@ -91,11 +92,7 @@ export function createBootTexSuite(): Suite {
         log(`state.steps = ${state.steps}`)
         log('all files = ' + [...state.files.keys()].join(', '))
 
-        // attach 调试产物（仅 MemoryTextFile 类型）
         for (const [key, value] of state.files) {
-          if (!(value instanceof MemoryTextFile)) {
-            continue
-          }
           const data = value.getData()
           log(`fileName = ${key} length = ${data.length}`)
           attach(key.replaceAll(':', '.').replaceAll(' ', ''), data)
@@ -114,7 +111,7 @@ export function createBootTexSuite(): Suite {
           }
         }
 
-        const tripFmt = state.files.get('trip.fmt') as MemoryTextFile | undefined
+        const tripFmt = state.files.get('trip.fmt')
         if (tripFmt !== undefined) {
           attach('trip.fmt', tripFmt.getData())
         }
@@ -143,14 +140,14 @@ export function createBootTexSuite(): Suite {
       tripPasStage,
       tripSourcesStage,
       pass1RunStage,
-    ], ([{ texTripJs }, { poolFile }, { tripTex, tripTfm }, { tripFmt }]) => {
+    ], async ([{ texTripJs }, { poolFile }, { tripTex, tripTfm }, { tripFmt }]) => {
       assert(tripFmt !== undefined, 'trip.fmt from pass 1 is required')
 
       const extraFiles = new Map<string, PascalFileStore>()
       extraFiles.set('trip.fmt', tripFmt)
       extraFiles.set('TeXformats:trip.fmt', tripFmt)
 
-      const { state, consoleFile } = runTripTex({
+      const { state, consoleFile } = await runTripTex({
         tripJs: texTripJs,
         poolFile,
         tripTex,
@@ -163,9 +160,6 @@ export function createBootTexSuite(): Suite {
       log('all files = ' + [...state.files.keys()].join(', '))
 
       for (const [key, value] of state.files) {
-        if (!(value instanceof MemoryTextFile)) {
-          continue
-        }
         const data = value.getData()
         log(`fileName = ${key} length = ${data.length}`)
         attach(key.replaceAll(':', '.').replaceAll(' ', ''), data)

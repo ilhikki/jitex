@@ -1,12 +1,14 @@
-import type { TextFile } from '../runtime-type.ts'
+import type { PascalFileStore } from '../runtime-type.ts'
 import { bytesToString } from '../runtime-util.ts'
-
+export function createMemoryFileStore(initialData: Uint8Array | undefined = undefined): PascalFileStore {
+  return new MemoryFileStore(initialData)
+}
 /**
  * 纯内存文本文件实现。
  * 内部使用动态扩容的 Uint8Array（双倍扩容策略），支持在任意位置读写。
  * 状态维护：容量、已用长度、当前位置、模式。
  */
-export class MemoryTextFile implements TextFile {
+class MemoryFileStore implements PascalFileStore {
   private buffer: Uint8Array
   private length: number
   private pos: number
@@ -15,7 +17,7 @@ export class MemoryTextFile implements TextFile {
   private static readonly INITIAL_CAPACITY = 16
 
   constructor(initialData: Uint8Array | undefined = undefined) {
-    const cap = Math.max(MemoryTextFile.INITIAL_CAPACITY, initialData?.length ?? 0)
+    const cap = Math.max(MemoryFileStore.INITIAL_CAPACITY, initialData?.length ?? 0)
     this.buffer = new Uint8Array(cap)
     this.mode = 'inspection'
     this.pos = 0

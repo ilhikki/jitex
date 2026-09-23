@@ -1,20 +1,15 @@
-import {
-  type ByteHost,
-  MemoryTextFile,
-  PascalFile,
-  PascalFileStore,
-  rtKeys,
-  runJs,
-  SyscallHandler,
-  SyscallRewriteTable,
-  TextFile,
-} from '@jitex/pascal-to-js'
+import { createMemoryFileStore, rtKeys } from '@jitex/runtime'
+import type { ByteHost, PascalFile, PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
+import type { SyscallRewriteTable } from '@jitex/pascal-to-js'
+
+const textDecoder = new TextDecoder()
+const textEncoder = new TextEncoder()
 
 export function bytesToString(bytes: Uint8Array): string {
-  return new TextDecoder().decode(bytes)
+  return textDecoder.decode(bytes)
 }
 export function stringToBytes(str: string): Uint8Array {
-  return new TextEncoder().encode(str)
+  return textEncoder.encode(str)
 }
 
 export function readTextFile(path: string): Promise<string> {
@@ -100,7 +95,7 @@ export const runtimeFileSyscalls: Record<string, SyscallHandler> = {
     ctx.debugLog.push('extra.openOut ' + key)
     let store = ctx.files.get(key)
     if (store === undefined) {
-      store = new MemoryTextFile() as PascalFileStore
+      store = createMemoryFileStore() as PascalFileStore
       ctx.files.set(key, store)
     }
     p.value = store
@@ -111,7 +106,7 @@ export const runtimeFileSyscalls: Record<string, SyscallHandler> = {
   },
 }
 
-export class ConsoleFile implements TextFile {
+export class ConsoleFile implements PascalFileStore {
   readonly input: { value: string; position: number }
   readonly output: string[] = []
   mode: 'inspection' | 'generation'
@@ -214,23 +209,23 @@ export async function getTripChFile() {
 }
 
 export function readTextFromState(
-  state: ReturnType<typeof runJs>,
+  state: RunState,
   key: string,
 ): string | undefined {
   const value = state.files.get(key)
   if (value === undefined) {
     return undefined
   }
-  return bytesToString((value as MemoryTextFile).getData())
+  return bytesToString(value.getData())
 }
 
 export function readBytesFromState(
-  state: ReturnType<typeof runJs>,
+  state: RunState,
   key: string,
 ): Uint8Array | undefined {
   const value = state.files.get(key)
   if (value === undefined) {
     return undefined
   }
-  return (value as MemoryTextFile).getData()
+  return value.getData()
 }

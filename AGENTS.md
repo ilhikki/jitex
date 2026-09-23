@@ -8,8 +8,10 @@
 
 核心能力：
 
-- `@jitex/pascal-to-js`：将 Pascal 源码编译为 JS 代码字符串，用 `new Function()` 同步执行。只实现 ISO 7185；
-  非标能力由使用方经扩展点声明提供——不改写源码。
+- `@jitex/pascal-to-js`：编译器——将 Pascal 源码编译为 ESM 源码字符串（`transform`）。只实现 ISO 7185；
+  非标能力由使用方经扩展点声明提供——不改写源码。对 `@jitex/runtime` 的唯一依赖是 key 契约（`rtKeys`）。
+- `@jitex/runtime`：执行层——加载并执行编译产物（`runJs`），提供宿主值、文件存储与 syscall handler；
+  零依赖，可单独打包为浏览器 ESM。编译与执行分属两包：使用方「先 transform，再 runJs」。
 - `@jitex/integration`：E2E 流水线 DSL——多阶段、有依赖、可缓存、可产出结构化报告的流水线框架， 用于编排"编译 → 运行 →
   比对产物"类长任务（TANGLE 自举、TeX TRIP 等）；不含任何 TeX 代码。
 - `@jitex/boot-tex`：TeX82 编译流水线——TANGLE 自举 + TeX TRIP 测试，基于 `@jitex/integration` 编排。

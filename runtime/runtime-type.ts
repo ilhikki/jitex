@@ -36,9 +36,8 @@ export type PascalFile = {
   /** f^ 写缓冲（ISO 6.5.5 buffer variable）：仅 blocks 写模式使用；读模式 f^ 直接从 store 取视图 */
   buffer: ByteHost | undefined
 }
-export type PascalFileStore = TextFile
 
-export interface TextFile {
+export interface PascalFileStore {
   // 位置
   seek(pos: number): void
 
