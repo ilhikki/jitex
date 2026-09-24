@@ -1,0 +1,4 @@
+{
+  "name": "@jitex/tex-runtime",
+  "exports": "./mod.ts"
+}

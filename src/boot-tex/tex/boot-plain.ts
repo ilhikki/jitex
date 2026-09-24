@@ -3,6 +3,7 @@ import { ConsoleFile, readFile, readTextFile } from '../utils.ts'
 import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { createMemoryFileStore, runJs } from '@jitex/runtime'
 import type { PascalFileStore } from '@jitex/runtime'
+import { createPlainDviConfig, dviToSvg } from '@jitex/tex-runtime'
 import { assert, attach, attachText, cache, stage, type Suite, suite } from '@jitex/integration'
 
 function createBootPlainSuite(): Suite {
@@ -60,27 +61,40 @@ function createBootPlainSuite(): Suite {
       },
     )
 
-    stage('valid plain fmt', [getTexStage, getPlainFmtStage], async ([texFiles, plainFmtFile]) => {
-      const files = new Map<string, PascalFileStore>()
-      files.set('TeXformats:TEX.POOL', createMemoryFileStore(texFiles.poolFile))
-      files.set('plain.fmt', createMemoryFileStore(plainFmtFile.plainFmtBytes))
-      const tex = await readFile('./resources/knuth/plain/base/story.tex')
-      files.set('story.tex', createMemoryFileStore(tex))
-      const consoleFile = new ConsoleFile('&plain story \n\ \\bye \n')
-      files.set('TTY:', consoleFile)
-      const state = await runJs(texFiles.texJs, {
-        files,
-        extraSyscalls: texExtraSyscalls,
-      })
-      attachText('console.log', consoleFile.getOutput())
-      attachText('debug.log', state.debugLog.join('\n'))
-      attachFile('story.log', state.files.get('story.log'))
-      const dviFileStore = state.files.get('story.dvi')
-      assert(dviFileStore !== undefined, 'dvi file store not found')
-      const dviData = dviFileStore.getData()
-      assert(dviData.length === 680, 'story.dvi length should be 680 bytes')
-      attach('story.dvi', dviData)
-      attachText('story.dvi.txt', dviData.join(', '))
+    const validPlainFmtStage = stage(
+      'valid plain fmt',
+      [getTexStage, getPlainFmtStage],
+      async ([texFiles, plainFmtFile]) => {
+        const files = new Map<string, PascalFileStore>()
+        files.set('TeXformats:TEX.POOL', createMemoryFileStore(texFiles.poolFile))
+        files.set('plain.fmt', createMemoryFileStore(plainFmtFile.plainFmtBytes))
+        const tex = await readFile('./resources/knuth/plain/base/story.tex')
+        files.set('story.tex', createMemoryFileStore(tex))
+        const consoleFile = new ConsoleFile('&plain story \n\ \\bye \n')
+        files.set('TTY:', consoleFile)
+        const state = await runJs(texFiles.texJs, {
+          files,
+          extraSyscalls: texExtraSyscalls,
+        })
+        attachText('console.log', consoleFile.getOutput())
+        attachText('debug.log', state.debugLog.join('\n'))
+        attachFile('story.log', state.files.get('story.log'))
+        const dviFileStore = state.files.get('story.dvi')
+        assert(dviFileStore !== undefined, 'dvi file store not found')
+        const dviData = dviFileStore.getData()
+        assert(dviData.length === 680, 'story.dvi length should be 680 bytes')
+        attach('story.dvi', dviData)
+        attachText('story.dvi.txt', dviData.join(', '))
+        return { dviData }
+      },
+    )
+
+    stage('dvi => svg', [validPlainFmtStage], ([{ dviData }]) => {
+      const svgs = dviToSvg(dviData, createPlainDviConfig())
+      for (const [index, svg] of svgs.entries()) {
+        attachText(`story.${index + 1}.svg`, svg)
+      }
+      return { svgs }
     })
   })
 }

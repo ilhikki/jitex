@@ -2,7 +2,8 @@
   "workspace": [
     "./src/runtime",
     "./src/pascal-to-js",
-    "./src/integration"
+    "./src/integration",
+    "./src/tex-runtime"
   ],
   "exclude": ["reports", "resources", "dist"],
   "compilerOptions": {
