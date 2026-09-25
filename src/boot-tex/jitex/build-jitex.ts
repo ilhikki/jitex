@@ -25,7 +25,7 @@ const REPO_ROOT = new URL('../../../', import.meta.url)
  *   6 bundle jitex.js    内联成单文件                    → dist/jitex.js + manifest
  *   7 smoke: tex ⇒ svg   用产物跑两个用例                → smoke-*.dvi / *.svg / *.log
  *   8 site tex ⇒ dvi+svg 官网正文那段 tex 的产物          → site.dvi / site.N.svg / site.log
- *   9 copy site          拷官网（4 个静态文件）          → dist/index.html · styles.css · app.js · initial-tex.js
+ *   9 copy site          拷官网（5 个静态文件）          → dist/index.html · styles.css · app.js · initial-tex.js · logo-tex.js
  *  10 copy fonts         拷 CM 字体 + 生成清单           → dist/fonts/*.woff2 · fonts.css
  *  11 smoke: site        用 DOM 桩把官网真跑一遍          → （断言）
  *  12 publish            发布检查（体积 / sha256）        → dist.manifest.txt
@@ -37,8 +37,8 @@ const JITEX_VERSION = '0.1.0'
 const BUILD_DIR = new URL('.build/jitex/', REPO_ROOT)
 const DIST_DIR = new URL('dist/', REPO_ROOT)
 
-/** 官网的静态文件（非包，原样拷进 dist；app.js 引用同目录的 jitex.js 与 initial-tex.js） */
-const SITE_FILES = ['index.html', 'styles.css', 'app.js', 'initial-tex.js']
+/** 官网的静态文件（非包，原样拷进 dist；app.js 引用同目录的 jitex.js、initial-tex.js 与 logo-tex.js） */
+const SITE_FILES = ['index.html', 'styles.css', 'app.js', 'initial-tex.js', 'logo-tex.js']
 
 /** 生成模块里的 bare specifier：bundle 需要显式给出（不依赖宿主的工作区配置） */
 const IMPORT_MAP: ImportMap = {
@@ -322,7 +322,7 @@ export function createBuildJitexSuite(): Suite {
     })
 
     const siteStage = stage('copy site', [jitexStage], async () => {
-      // 官网是三个静态文件，原样拷进 dist：index.html 引用 ./styles.css 与
+      // 官网是几个静态文件，原样拷进 dist：index.html 引用 ./styles.css 与
       // `<script type="module" src="./app.js">`，app.js 再 import 同目录的 jitex.js。
       //
       // 不内联、也不另打一份 jitex：页面用的就是发布的那个库文件，同批产出、版本一致。
@@ -395,12 +395,19 @@ export function createBuildJitexSuite(): Suite {
         }
       }
 
-      const status = dom.byId('status').textContent
+      const runInfo = dom.byId('run-info').textContent
       const consoleText = dom.byId('console').textContent
       const pageCount = dom.byId('pages').children.length
-      log(`[site] status=${status} pages=${pageCount}`)
-      assert(status.startsWith('terminated'), `site: status = ${status}`)
+      log(`[site] run: ${runInfo} · pages=${pageCount}`)
+      assert(
+        /^\d+ pages? · \d+ ms$/.test(runInfo),
+        `site: 控制台标题右侧应是"页数 · 耗时"，实际 = ${runInfo}`,
+      )
       assert(pageCount >= 1, 'site: 至少应渲染出一页')
+      assert(
+        dom.byId('logo').innerHTML.includes('<svg'),
+        'site: 左上角标志应由引擎排出来（#logo 里没有 SVG）',
+      )
       assert(
         dom.byId('pages').children[0].innerHTML.includes('<svg'),
         'site: 页面容器里应该是 SVG',

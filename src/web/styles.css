@@ -40,37 +40,24 @@ body {
 
 header {
   display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
+  align-items: center;
   padding: 0.6rem 0.9rem;
   border-bottom: 1px solid var(--line);
 }
 
-header h1 {
-  margin: 0;
-  font-size: 1rem;
-  letter-spacing: 0.02em;
+/* 左上角标志：一个空位，内容由引擎排出来（见 app.js）。
+   尺寸是 TeX 定的（cmr10 at 20pt），这里只管对齐与颜色——引擎输出的 <text>
+   自带黑色 fill，深色主题下要改回当前前景色。 */
+header .logo {
+  display: block;
 }
 
-header .sub {
-  color: var(--muted);
+header .logo svg {
+  display: block;
 }
 
-header .spacer {
-  flex: 1;
-}
-
-.status {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.status.busy {
-  color: var(--accent);
-}
-
-.status.error {
-  color: var(--error);
+header .logo svg text {
+  fill: var(--fg);
 }
 
 button {
@@ -104,6 +91,9 @@ main {
 }
 
 .pane h2 {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
   margin: 0;
   padding: 0.4rem 0.7rem;
   font-size: 0.8rem;
@@ -112,8 +102,21 @@ main {
   border-bottom: 1px solid var(--line);
 }
 
+.pane h2 .spacer {
+  flex: 1;
+}
+
+/* 输入栏标题行最右边那颗：它是这一栏的动作，不属于页头 */
+.pane h2 button {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+/* 控制台标题行最右边：这次运行的页数与耗时 */
 .pane h2 .info {
   font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 .pane-console {
@@ -122,16 +125,40 @@ main {
   border-bottom: none;
 }
 
+/* 输入栏：左边行号、右边源码；两侧共用同一套等宽字体与行高，行号才对得上。
+   源码不折行（wrap="off"），横向自己滚；行号只跟着纵向滚。 */
+.editor {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gutter {
+  flex: none;
+  margin: 0;
+  padding: 0.5rem 0.35rem 0.5rem 0.6rem;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 #source {
-  width: 100%;
-  height: 100%;
-  padding: 0.7rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
   border: none;
   outline: none;
   resize: none;
   background: transparent;
   color: inherit;
-  font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+  overflow: auto;
   tab-size: 2;
 }
 
@@ -140,9 +167,12 @@ main {
   padding: 0.7rem;
 }
 
+/* 每页就是一张纸：白边（padding）与底色是展示层的事——渲染端只画 DVI 说的那点内容，
+   用户想去掉白边、换纸色、改缩放，都在这里改，不必碰库。 */
 .pages .page {
   margin: 0 auto 0.9rem;
   max-width: 100%;
+  padding: 1.8rem 1.5rem;
   background: #fff;
   border: 1px solid var(--line);
 }
@@ -158,12 +188,14 @@ main {
 }
 
 #console {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  padding: 0.7rem;
+  padding: 0.5rem 0.7rem;
   overflow: auto;
   color: var(--fg);
-  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  white-space: pre-wrap;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
 }
 
 #console .err {

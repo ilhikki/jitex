@@ -1,26 +1,31 @@
+import { LOGO_TEX } from './logo-tex.js'
+
 /**
- * 页面正文 = build:jitex 的初始 TeX —— 同一段内容，两处共用（单一真源）。
+ * 页面正文 = build:jitex 的初始 TeX（单一真源）。
  *
- * 它同时是三样东西：
- *   1. 官网首页的正文：这段 TeX 由 jitex 自己排版，页面正文就是它的输出；
- *   2. 能力的展示：数学与物理按**历史**排列——从毕达哥拉斯到 univalence、
- *      从阿基米德到费曼；
- *   3. 字形探针：公式故意覆盖根号、可变大小括号、\hbar、\cal、\langle、
- *      大运算符、希腊字母等各类字形。**哪一行在页面上坏掉，就说明那个字形
- *      还没接上**；全部接上时，这一页也就全对了。
+ * 两页：
+ *   第一页——样例。数学与物理按**历史**排列（毕达哥拉斯到 univalence、
+ *          阿基米德到费曼），末尾一段展示各个字面。
+ *   第二页——能力。是什么、能排什么、我们是怎么做的、边界在哪。**不写接口用法**：
+ *          这一页的读者是要排版的人，接口的读者是要集成的人，两种读者不混在一页。
  *
- * 两个书写约束（否则这段源码自己会出问题）：
+ * 标志（名字那五个字母）的定义与渲染在 logo-tex.js；这里只内插那段定义——站头与
+ * 正文里的宏因此永远是同一行。
+ *
+ * 几个书写约束（否则这段源码自己会出问题）：
  *   - 不用反引号：TeX 的引号写成 \lq\lq ... \rq\rq；
- *   - 每个 $$ 后留一个空格：避免出现 ${ 触发模板插值。
+ *   - 每个 $$ 后留一个空格：避免出现 ${ 触发模板插值（LOGO_TEX 那处插值是有意的）；
+ *   - 提到 LaTeX 只能写纯文本：plain.tex 里没有 \LaTeX；
+ *   - 源码里的注释也是给读者看的，所以写英文。
  */
-export const INITIAL_TEX = String.raw`% 改这里，然后按 Ctrl/⌘ + Enter
-\noindent {\bf jitex} \quad \TeX82, in your browser.
+
+export const INITIAL_TEX = String.raw`% Plain TeX, not LaTeX --- edit this, then press Ctrl/⌘ + Enter.
+${LOGO_TEX}
+\noindent \JiTex \quad \TeX82, in your browser.
 
 \medskip
-\noindent This page is typeset by the program it describes: Knuth's \TeX82
-itself, TANGLEd from {\tt tex.web} and INITEXed with {\tt plain.tex}, running
-in your browser. Engine, format and fonts are inlined into a single file:
-no WebAssembly, no worker, no network.
+\noindent This page was set by \TeX82 itself. The next page says what it can
+set, and how it is done.
 
 \medskip
 \noindent{\bf Mathematics.} \quad a chronology
@@ -46,10 +51,82 @@ $$ (i \gamma^{\mu} \partial_{\mu} - m) \psi = 0 \qquad {\rm Dirac, 1928} $$
 $$ \langle x' | e^{-iHt/\hbar} | x \rangle = \int {\cal D} x\, e^{iS[x]/\hbar} \qquad {\rm Feynman, 1948} $$
 
 \medskip
-\noindent{\bf Type.} \quad Ten point roman, {\bf bold}, {\it italic},
-{\tt typewriter} and {\font\scc=cmcsc10 \scc Small Caps}; ligatures in a
-{\it flowing final};
-\lq\lq quotes\rq\rq\ like these, an em dash---like that; and a larger size:
-{\font\bigfont=cmr10 at 24pt \bigfont 24 pt}. Edit this text and press
-Ctrl/$\mathsurround=0pt$+ Enter: DVI first, then SVG, transcript below.
+\noindent{\bf The faces.} \quad Ten point roman, {\bf bold}, {\it italic},
+{\tt typewriter}, {\font\scc=cmcsc10 \scc Small Caps} and
+{\font\bigfont=cmr10 at 24pt \bigfont 24 pt}; ligatures in a
+{\it flowing final}; \lq\lq quotes\rq\rq\ like these, an em dash---like that.
+
+\medskip
+\noindent Edit this text and press Ctrl/$\mathsurround=0pt$+ Enter.
+
+\eject
+\noindent \JiTex \quad what it can set.
+
+\beginsection 1. The two pages
+
+The first page is a specimen: mathematics and physics in the order they were
+found. This page says what \TeX\ can set, and how it is done.
+
+\beginsection 2. What it is
+
+JiTex runs \TeX82 --- Knuth's own program --- in the browser. You give it a
+document, and it sets every page of it.
+
+\beginsection 3. What it sets
+
+\noindent Mathematics, in line or displayed: fractions, radicals, big operators,
+matrices, accents, arrows, the Greek alphabet. Alignments, by
+{\tt\char92 halign}, {\tt\char92 settabs} or {\tt\char92 matrix}. Boxes and
+rules, so that a page can be laid out and not merely flowed. Line breaking,
+page breaking, and the paragraph shapes that go with them. Faces --- roman,
+bold, italic, typewriter, small caps --- and any other design, or any size, that
+you name with {\tt\char92 font}. And {\tt\char92 def}, for notation of your own:
+the name above is one.
+
+\beginsection 4. How we do it
+
+\noindent \TeX\ is a program. So the work was not to write a typesetting
+program: it was to make \TeX's own program run here.
+
+\medskip
+\noindent{\bf A Pascal compiler.} \quad Knuth's \TeX\ is written in Pascal, and
+{\tt tex.web} is the source he published. We wrote a Pascal compiler, and it
+compiles that source as it stands. TANGLE, the tool that pulls the Pascal out of
+{\tt tex.web}, is compiled by the same compiler. Nothing of the program itself
+was rewritten for the browser.
+
+\medskip
+\noindent That is the whole method, and it is worth saying why it is the method.
+A re-implementation would be a new program, with faults of its own: it could
+look right and still decide differently. A compiler keeps the original the
+original. Between Knuth's source and the page in front of you there is exactly
+one thing of ours --- the compiler --- and it is allowed to be wrong; what it
+cannot do is quietly change what the program means.
+
+\medskip
+\noindent{\bf The same for the measurements.} \quad Line and page breaks are
+made out of character widths, so the widths matter as much as the program. Every
+face here takes its widths from the same {\tt .tfm} files that \TeX\ reads, and
+its outlines are the Computer Modern of the American Mathematical Society, not a
+redrawn approximation. The lines break where Knuth's would break.
+
+\beginsection 5. Limits
+
+\noindent{\bf Engine and format.} \quad \TeX82 is the engine. {\tt plain.tex} is
+one format written for it, and the one here. LaTeX is another format, far
+larger, on the same engine. What is absent here is that layer: document classes,
+packages, hyperlinks, microtype. None of it is absent from the engine; all of it
+is written above the engine.
+
+\medskip
+\noindent{\bf Of JiTex.} \quad A page comes out as a finished drawing, not as
+reflowable text. The line breaks were decided by \TeX\ and are baked into the
+result: a page cannot reflow like a web page, and its text is not selectable as
+prose. And a run is not interruptible from the outside.
+
+\beginsection 6. Where it comes from
+
+\TeX82 and {\tt plain.tex} are Donald Knuth's. The typefaces are the Computer
+Modern of the American Mathematical Society and Bluesky, under the SIL Open Font
+License.
 `

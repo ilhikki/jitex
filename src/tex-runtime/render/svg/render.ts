@@ -9,6 +9,9 @@ type Glyph = Extract<Drawable, { kind: 'glyph' }>
  * 只做一件事——把"紧接在一起"的字形合并进同一个 text 元素，字符间距交给字体度量；
  * 其余情况各起一个 text。合并是省体积的关键：一行文字通常只落成一个标签。
  *
+ * 这里只画 DVI 说的那点内容，**不替用户决定纸张**：白边多大、页面缩放到多宽、
+ * 底色如何，都是展示层的事（见 src/web/styles.css 的 .page）。
+ *
  * 代价是 rule / special 与文字的层叠顺序固定为"文字先画"。
  */
 export function renderPage(page: Page): string {

@@ -4,7 +4,7 @@
 
 ## 这是什么项目
 
-**JITEX**：Pascal82（ISO 7185）到 JS 的编译器 + TeX 自举套件，基于 Deno workspace 的 monorepo。
+**JiTex**：Pascal82（ISO 7185）到 JS 的编译器 + TeX 自举套件，基于 Deno workspace 的 monorepo。
 
 核心能力：
 

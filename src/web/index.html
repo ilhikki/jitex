@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>jitex — TeX82 in the browser</title>
+    <title>JiTex — TeX82 in the browser</title>
     <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="./fonts.css">
   </head>
@@ -16,27 +16,39 @@
       二、没有 Worker：TeX 是同步执行、没有协作式中断点，放哪个线程、怎么中断，是使用
           者适配层该决定的（库不含 Worker）。官网跑在主线程上，因此也可能被一段失控
           的文档卡住——真项目请把引擎放进 Worker。
+
+      左上角那个标志不是画出来的，是**排出来的**：app.js 把 logo-tex.js 里那段渲染
+      文档交给引擎跑一遍，把它输出的 SVG 放进 #logo。放大一倍也是 TeX 说的
+      （cmr10 at 20pt）。这里因此没有字形、没有字体名，只有一个空位。
     -->
     <header>
-      <h1>jitex</h1>
-      <span class="sub">TeX82 → DVI → SVG，全部在浏览器里跑</span>
-      <span class="spacer"></span>
-      <span id="status" class="status">就绪</span>
-      <button id="run" type="button">运行 (Ctrl/⌘ + Enter)</button>
+      <span id="logo" class="logo" role="img" aria-label="JiTex"></span>
     </header>
 
     <main>
       <section class="pane pane-input">
-        <h2>TeX 输入</h2>
-        <textarea id="source" spellcheck="false" autocomplete="off"></textarea>
+        <h2>
+          plain TeX input <span class="spacer"></span>
+          <button id="run" type="button">Run (Ctrl/⌘ + Enter)</button>
+        </h2>
+        <div class="editor">
+          <pre id="gutter" class="gutter" aria-hidden="true"></pre>
+          <textarea id="source" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+        </div>
       </section>
       <section class="pane pane-output">
-        <h2>SVG 输出 <span id="pages-info" class="info"></span></h2>
+        <h2>Pages</h2>
         <div id="pages" class="pages"></div>
       </section>
       <section class="pane pane-console">
-        <h2>TeX 控制台</h2>
-        <pre id="console"></pre>
+        <h2>
+          TeX console <span class="spacer"></span>
+          <span id="run-info" class="info"></span>
+        </h2>
+        <div class="editor">
+          <pre id="console-gutter" class="gutter" aria-hidden="true"></pre>
+          <pre id="console"></pre>
+        </div>
       </section>
     </main>
 

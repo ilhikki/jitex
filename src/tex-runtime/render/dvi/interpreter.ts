@@ -86,8 +86,9 @@ class Interpreter {
   private y = 0
   private z = 0
   private font = -1
-  /** 上一个字形结束时的 h（sp）；下一个字形的 h 等于它即为"紧接" */
+  /** 上一个字形结束时的 h、v（sp）；下一个字形的 h 与 v 都等于它们，才算"紧接" */
   private lastEndH: number | undefined
+  private lastEndV: number | undefined
 
   constructor(data: Uint8Array, config: DviConfig) {
     this.reader = new DviReader(data)
@@ -248,6 +249,7 @@ class Interpreter {
     this.z = 0
     this.font = -1
     this.lastEndH = undefined
+    this.lastEndV = undefined
     this.stack.length = 0
     this.colors = [BLACK]
     this.background = undefined
@@ -380,7 +382,8 @@ class Interpreter {
       kind: 'glyph',
       x: this.h / SP_PER_PT,
       y: this.v / SP_PER_PT,
-      continues: this.lastEndH === this.h,
+      // 竖直位置也算：\lower、\raise 的字 h 是接续的，但 y 不同，不能并进同一段
+      continues: this.lastEndH === this.h && this.lastEndV === this.v,
       text,
       family: font.family,
       size: font.size,
@@ -389,6 +392,7 @@ class Interpreter {
       style: font.style,
     })
     this.lastEndH = this.h + width
+    this.lastEndV = this.v
     if (advances) {
       this.h = this.lastEndH
     }
@@ -446,6 +450,7 @@ class Interpreter {
     this.z = entry.z
     // 出栈是本层盒的结束：不假设盒后第一个字形与盒内最后一个是同一条流
     this.lastEndH = undefined
+    this.lastEndV = undefined
   }
 
   // 字体
