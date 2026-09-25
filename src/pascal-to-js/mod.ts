@@ -1,64 +1,8 @@
-export { lex } from '@/frontend/lexer/lexer.ts'
-export type {
-  ArrayAccessNode,
-  ArrayTypeNode,
-  AssignmentNode,
-  AstNode,
-  BinaryExpressionNode,
-  BlockNode,
-  BooleanLiteralNode,
-  CaseBranchNode,
-  CaseStatementNode,
-  CharLiteralNode,
-  CompoundStatementNode,
-  ConstDeclarationNode,
-  EmptyStatementNode,
-  EnumerationTypeNode,
-  ExpressionNode,
-  FieldAccessNode,
-  FileTypeNode,
-  ForStatementNode,
-  FunctionCallNode,
-  FunctionDeclarationNode,
-  GotoStatementNode,
-  IdentifierNode,
-  IfStatementNode,
-  InExpressionNode,
-  IntegerLiteralNode,
-  LabelDeclarationNode,
-  LabeledStatementNode,
-  ParameterDeclarationNode,
-  ParenthesizedExpressionNode,
-  PointerTypeNode,
-  ProcedureCallNode,
-  ProcedureDeclarationNode,
-  ProgramNode,
-  RangeTypeNode,
-  RealLiteralNode,
-  RecordTypeNode,
-  RecordVariantNode,
-  RecordVariantPartNode,
-  RepeatStatementNode,
-  SetConstructorNode,
-  SetTypeNode,
-  SimpleTypeNode,
-  SourceLocation,
-  StatementNode,
-  StringLiteralNode,
-  TypeDeclarationNode,
-  TypeNode,
-  UnaryExpressionNode,
-  VariableDeclarationNode,
-  WhileStatementNode,
-  WithStatementNode,
-} from '@/frontend/node.ts'
-export { nodeToCode } from '@/frontend/printer/printer.ts'
-export type { Position, Token } from '@/frontend/token.ts'
-export type { ParseResult, ParserInput } from '@/frontend/types.ts'
-export { parseProgram } from '@/frontend/parser/declarations.ts'
-export { parse, transform } from '@/run.ts'
-export type { TransformOptions } from '@/run.ts'
-export type { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
+// 对外导出 = 跨包消费面：只有被其它项目（boot-tex / tests）实际引用的名字才在此导出。
+// 包内部件（lex / parseProgram / AST 节点类型 / syscallKeys / TransformOptions 等）留在
+// 各自模块里，包内文件经 `@/` 别名直接引用，不走本入口。
 
-export { syscallKeys } from '@/middle/lowering/helpers.ts'
-export type { SyscallRewriter, SyscallRewriteTable } from '@/middle/rewrite/rewrite.ts'
+export { parse, transform } from '@/run.ts'
+export { nodeToCode } from '@/frontend/printer/printer.ts'
+export type { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
+export type { SyscallRewriteTable } from '@/middle/rewrite/rewrite.ts'
