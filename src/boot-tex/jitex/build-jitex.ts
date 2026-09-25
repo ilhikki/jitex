@@ -21,7 +21,7 @@ const REPO_ROOT = new URL('../../../', import.meta.url)
  *   3 get plain.fmt      INITEX 建格式                  → plain.fmt / fonts.json
  *   4 bundle jitex.js    内联成单文件                    → dist/jitex.js + manifest
  *   5 smoke: tex ⇒ svg   用产物跑两个用例                → smoke-*.dvi / *.svg / *.log
- *   6 bundle demo        打演示站点（适配层范本）         → dist/index.html / app.js / worker.js
+ *   6 copy demo          拷演示页（3 个静态文件）      → dist/index.html · styles.css · app.js
  *   7 publish            发布检查（体积 / sha256）        → dist.manifest.txt
  *
  * 这是发布套件：产物即发布物，阶段可缓存，报告里每段都有 artifact 与日志。
@@ -31,8 +31,8 @@ const JITEX_VERSION = '0.1.0'
 const BUILD_DIR = new URL('.build/jitex/', REPO_ROOT)
 const DIST_DIR = new URL('dist/', REPO_ROOT)
 
-/** 演示页的静态文件（适配层范本，零构建，相对路径引用同目录的 jitex.js） */
-const DEMO_FILES = ['index.html', 'styles.css', 'app.js', 'worker.js']
+/** 演示页的静态文件（非包，原样拷进 dist；app.js 以相对路径引用同目录的 jitex.js） */
+const DEMO_FILES = ['index.html', 'styles.css', 'app.js']
 
 /** 生成模块里的 bare specifier：bundle 需要显式给出（不依赖宿主的工作区配置） */
 const IMPORT_MAP: ImportMap = {
@@ -116,6 +116,65 @@ export function createTexEngine(options = {}) {
   return entry
 }
 
+/** 最小 DOM 桩：只实现演示页用到的那几个接口，用来在无浏览器环境里跑一遍产物 */
+interface StubElement {
+  id: string
+  textContent: string
+  innerHTML: string
+  className: string
+  value: string
+  disabled: boolean
+  scrollTop: number
+  scrollHeight: number
+  children: StubElement[]
+  appendChild(child: StubElement): void
+  addEventListener(type: string, fn: (event: StubKeyboardEvent) => void): void
+}
+
+interface StubKeyboardEvent {
+  key?: string
+  ctrlKey?: boolean
+  metaKey?: boolean
+  preventDefault?: () => void
+}
+
+function createStubDom(): { document: unknown; byId: (id: string) => StubElement } {
+  const elements = new Map<string, StubElement>()
+
+  const make = (id: string): StubElement => ({
+    id,
+    textContent: '',
+    innerHTML: '',
+    className: '',
+    value: '',
+    disabled: false,
+    scrollTop: 0,
+    scrollHeight: 0,
+    children: [],
+    appendChild(child: StubElement) {
+      this.children.push(child)
+    },
+    addEventListener(_type: string, _fn: (event: StubKeyboardEvent) => void) {},
+  })
+
+  const byId = (id: string): StubElement => {
+    let element = elements.get(id)
+    if (element === undefined) {
+      element = make(id)
+      elements.set(id, element)
+    }
+    return element
+  }
+
+  return {
+    document: {
+      getElementById: (id: string) => byId(id),
+      createElement: (_tag: string) => make(''),
+    },
+    byId,
+  }
+}
+
 /** 用例 A：plain 的预加载字体，不需要读任何 tfm */
 const SMOKE_PLAIN = String.raw`Hello, \TeX!  $a^2 + b^2 = c^2$\par
 `
@@ -148,6 +207,12 @@ export function createBuildJitexSuite(): Suite {
         const entry = await writeBundleInputs(texFiles.texJs, plainFmt.plainFmtBytes, texFiles.poolFile, tfmFiles)
         const { code } = await bundle(entry, { importMap: IMPORT_MAP })
 
+        // 发布目录每次重建：改过名/删过的产物不许残留（Pages 上是直接对外的那份）
+        await Deno.remove(DIST_DIR, { recursive: true }).catch((error: unknown) => {
+          if (!(error instanceof Deno.errors.NotFound)) {
+            throw error
+          }
+        })
         await Deno.mkdir(DIST_DIR, { recursive: true })
         await Deno.writeTextFile(new URL('jitex.js', DIST_DIR), code)
         const codeBytes = new TextEncoder().encode(code)
@@ -224,30 +289,62 @@ export function createBuildJitexSuite(): Suite {
       return { plainPages: plain.svgs.length, fontPages: font.svgs.length }
     })
 
-    const demoStage = stage('bundle demo', [jitexStage], async () => {
-      // 演示页是**适配层范本**，本身零构建：四个静态文件直接拷进 dist，用相对路径
-      // 引用同目录的 jitex.js。所以这里不再打 jitex.js——打了就重复 1.5MB，还可能版本不一。
+    const demoStage = stage('copy demo', [jitexStage], async () => {
+      // 演示页是三个静态文件，原样拷进 dist：index.html 引用 ./styles.css 与
+      // `<script type="module" src="./app.js">`，app.js 再 import 同目录的 jitex.js。
+      //
+      // 不内联、也不另打一份 jitex：页面用的就是发布的那个库文件，同批产出、版本一致。
       const demoSource = new URL('src/web/', REPO_ROOT)
       for (const name of DEMO_FILES) {
         const bytes = await Deno.readFile(new URL(name, demoSource))
         await Deno.writeFile(new URL(name, DIST_DIR), bytes)
         attach(name, bytes)
-        if (name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.css')) {
-          const text = new TextDecoder().decode(bytes)
-          // GitHub Pages 挂在 /<repo>/ 下：绝对路径会白屏
-          assert(
-            !/(?:src|href)="\/|from '\//.test(text),
-            `${name}: 不能出现以 / 开头的资源路径（Pages 下会 404）`,
-          )
-        }
+        const text = new TextDecoder().decode(bytes)
+        // GitHub Pages 挂在 /<repo>/ 下：出现以 / 开头的资源路径就会白屏
+        assert(
+          !/\s(?:src|href)="\//.test(text) && !/from '\//.test(text),
+          `${name}: 不能出现以 / 开头的资源路径（Pages 下会 404）`,
+        )
       }
       const jitexFile = await Deno.stat(new URL('jitex.js', DIST_DIR))
-      assert(jitexFile.size > 0, 'dist/jitex.js must exist (demo 与库必须同批产出)')
-      log(`demo: ${DEMO_FILES.join(', ')} (引用同目录 jitex.js)`)
+      assert(jitexFile.size > 0, 'dist/jitex.js 必须与演示页同批产出')
+      log(`demo: ${DEMO_FILES.join(' + ')}（app.js 引用同目录 jitex.js）`)
       return { demoFiles: DEMO_FILES.length }
     })
 
-    stage('publish', [jitexStage, smokeStage, demoStage], async () => {
+    const demoSmokeStage = stage('smoke: demo', [demoStage], async () => {
+      // 演示页也是发布物，同样**用产物本身**验证：装一个最小 DOM 桩，把 dist/app.js
+      // （连同它 import 的 jitex.js）真跑一遍。没有浏览器也能挡住"字段名 / 元素 id
+      // 写错"这类只在页面里才暴露的错误。
+      const dom = createStubDom()
+      const hadDocument = 'document' in globalThis
+      ;(globalThis as { document?: unknown }).document = dom.document
+      try {
+        await import(new URL('app.js', DIST_DIR).href)
+        // 演示页在末尾自动跑一次；run() 里先让出一次事件循环再同步执行
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      } finally {
+        if (!hadDocument) {
+          delete (globalThis as { document?: unknown }).document
+        }
+      }
+
+      const status = dom.byId('status').textContent
+      const consoleText = dom.byId('console').textContent
+      const pageCount = dom.byId('pages').children.length
+      log(`[demo] status=${status} pages=${pageCount}`)
+      assert(status.startsWith('terminated'), `demo: status = ${status}`)
+      assert(pageCount >= 1, 'demo: 至少应渲染出一页')
+      assert(
+        dom.byId('pages').children[0].innerHTML.includes('<svg'),
+        'demo: 页面容器里应该是 SVG',
+      )
+      assert(consoleText.includes('Output written on'), 'demo: 控制台应有 TeX 的 transcript')
+
+      return { demoPages: pageCount }
+    })
+
+    stage('publish', [jitexStage, smokeStage, demoSmokeStage], async () => {
       const names = [...DEMO_FILES, 'jitex.js', 'jitex.manifest.json']
       const lines: string[] = []
       for (const name of names) {

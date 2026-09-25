@@ -1,7 +1,12 @@
-// 演示页的驱动：三面板 UI + Worker 生命周期。
+// 演示页逻辑：三面板 UI + 把 jitex 引擎跑在主线程上。
 //
-// 这里没有一行 TeX 逻辑——装载、执行、渲染都在 jitex.js 里，本文件只用它的
-// 结果（svgs / console / status）。Worker 与中断方式也由这里决定，属于适配层。
+// 与 jitex.js 同目录（build:jitex 会把两者一起放进 dist/）：index.html 里
+// `<script type="module" src="./app.js">`，这里再 import 同目录的 jitex.js。
+//
+// 为什么不用 Worker：演示页要能直接双击打开（file://），而浏览器不允许 file:// 页面
+// 构造 Worker（不透明源）。真项目应当把引擎放进 Worker——TeX 是同步执行、没有协作式
+// 中断点，只能靠 terminate 停下；放哪个线程、怎么中断，是使用者适配层该决定的事。
+import { createTexEngine } from './jitex.js'
 
 const DEFAULT_SOURCE = String.raw`% 改这里，然后按 Ctrl/⌘ + Enter
 \noindent Hello, \TeX!  This page is running the real \TeX82 in your browser.
@@ -22,11 +27,9 @@ const consoleEl = document.getElementById('console')
 const statusEl = document.getElementById('status')
 const runButton = document.getElementById('run')
 
-let worker = null
+// 装载一次：jitex.js 里的 TeX82 程序有 MB 级，装载有成本；render 才是一次运行
+const engine = createTexEngine()
 let busy = false
-let nextId = 1
-let pendingId = 0
-let startedAt = 0
 
 sourceEl.value = DEFAULT_SOURCE
 
@@ -40,54 +43,25 @@ function logLines(lines) {
   consoleEl.scrollTop = consoleEl.scrollHeight
 }
 
-function startWorker() {
-  // type: 'module' —— jitex.js 是标准 ESM，Worker 里直接 import 即可
-  worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
-  worker.onmessage = onWorkerMessage
-  worker.onerror = (event) => {
-    finish()
-    setStatus('Worker 出错', 'error')
-    logLines([`! ${event.message ?? 'unknown worker error'}`])
+function renderPages(svgs) {
+  pagesEl.textContent = ''
+  if (svgs.length === 0) {
+    const empty = document.createElement('div')
+    empty.className = 'empty'
+    empty.textContent = '没有页面输出（看下方控制台里的报错）'
+    pagesEl.appendChild(empty)
+    return
+  }
+  for (const svg of svgs) {
+    const page = document.createElement('div')
+    page.className = 'page'
+    // svg 由 jitex.js 的渲染器产出，文本已经过 XML 转义
+    page.innerHTML = svg
+    pagesEl.appendChild(page)
   }
 }
 
-function finish() {
-  busy = false
-  runButton.textContent = '运行 (Ctrl/⌘ + Enter)'
-}
-
-function run() {
-  if (busy) {
-    // 中断：TeX 同步执行停不下来，只能杀掉 Worker 再重建
-    worker.terminate()
-    startWorker()
-    finish()
-    setStatus('已停止', 'error')
-    return
-  }
-  busy = true
-  runButton.textContent = '停止'
-  setStatus('运行中…', 'busy')
-  startedAt = performance.now()
-  pendingId = nextId++
-  worker.postMessage({ id: pendingId, tex: sourceEl.value })
-}
-
-function onWorkerMessage(event) {
-  const message = event.data
-  if (message.id !== pendingId) {
-    return
-  }
-  finish()
-  const ms = Math.round(performance.now() - startedAt)
-
-  if (!message.ok) {
-    setStatus('装载失败', 'error')
-    logLines([`! ${message.error}`])
-    return
-  }
-
-  const result = message.result
+function show(result, ms) {
   renderPages(result.svgs)
 
   const lines = []
@@ -110,22 +84,27 @@ function onWorkerMessage(event) {
   pagesInfoEl.textContent = result.svgs.length > 0 ? `${result.svgs.length} 页 · ${ms} ms` : ''
 }
 
-function renderPages(svgs) {
-  pagesEl.textContent = ''
-  if (svgs.length === 0) {
-    const empty = document.createElement('div')
-    empty.className = 'empty'
-    empty.textContent = '没有页面输出（看下方控制台里的报错）'
-    pagesEl.appendChild(empty)
+function run() {
+  if (busy) {
     return
   }
-  for (const svg of svgs) {
-    const page = document.createElement('div')
-    page.className = 'page'
-    // svg 由 jitex.js 的渲染器产出，文本已经过 XML 转义
-    page.innerHTML = svg
-    pagesEl.appendChild(page)
-  }
+  busy = true
+  runButton.disabled = true
+  setStatus('运行中…', 'busy')
+  // 先让浏览器把"运行中"画出来，再进入同步执行（主线程会被 TeX 占住）
+  setTimeout(() => {
+    const startedAt = performance.now()
+    try {
+      show(engine.render(sourceEl.value, { jobName: 'job' }), Math.round(performance.now() - startedAt))
+    } catch (error) {
+      // 只有装载期失败才抛；运行期错误都在 result.status / result.error 里
+      setStatus('装载失败', 'error')
+      logLines([`! ${error instanceof Error ? error.message : String(error)}`])
+    } finally {
+      busy = false
+      runButton.disabled = false
+    }
+  }, 0)
 }
 
 runButton.addEventListener('click', run)
@@ -136,5 +115,4 @@ sourceEl.addEventListener('keydown', (event) => {
   }
 })
 
-startWorker()
 run()

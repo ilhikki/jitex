@@ -34,7 +34,8 @@ compilerOptions 入口。
 - `src/integration/`：流水线框架包（`@jitex/integration`）。
 - `src/tex-runtime/`：TeX 侧运行时包（`@jitex/tex-runtime`），内部按 `render/`（纯渲染）与 `tex/`（运行驱动）分层。
 - `src/boot-tex/`：TeX 流水线目录（非包）：`tex/`（公共阶段与 plain/trip 套件）、`tangle/`、`jitex/`（发布流水线）。
-- `src/web/`：演示站点目录（非包，零构建）：`jitex.js` 的适配层范本，由 `build:jitex` 的第 6 段拷进 `dist/`。
+- `src/web/`：演示页素材（非包）：`index.html` + `styles.css` + `app.js`（原生 ESM，import 同目录的 `jitex.js`）； 由
+  `build:jitex` 第 6 段原样拷进 `dist/`。页面里不出现以 `/` 开头的路径——Pages 挂在 `/<repo>/` 下。
 - `tests/<包名>/`：测试，按包分目录。
 - `resources/`：外部素材；`dist/`：构建产物（已 gitignore）。
 

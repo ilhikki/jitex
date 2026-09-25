@@ -8,9 +8,13 @@
   </head>
   <body>
     <!--
-      演示站点：jitex.js 的适配层范本。
-      站点里没有一行 TeX 逻辑——装载、执行、渲染都在 jitex.js 里；这里只有
-      三面板 UI，以及一个 Worker（线程模型是使用者的活，库不代劳）。
+      演示页：三个文件（index.html / styles.css / app.js），app.js 用原生 ESM import
+      同目录的 jitex.js。build:jitex 第 6 段把它们一起拷进 dist/。
+
+      一、页面里不出现以 / 开头的路径：Pages 挂在 /<repo>/ 下，绝对路径会白屏。
+      二、没有 Worker：TeX 是同步执行、没有协作式中断点，放哪个线程、怎么中断，是使用
+          者适配层该决定的（库不含 Worker）。演示页跑在主线程上，因此也可能被一段失控
+          的文档卡住——真项目请把引擎放进 Worker。
     -->
     <header>
       <h1>jitex</h1>
