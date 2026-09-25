@@ -15,7 +15,7 @@ import { assert, attach, attachText, stage, type Suite, suite } from '@jitex/int
 function createBootPlainSuite(): Suite {
   return suite('boot plain', ({ debug }) => {
     const isDebug = debug === 'true'
-    const { texJsStage, plainFmtStage } = createTexStages(isDebug)
+    const { texJsStage, plainFmtStage, tfmFilesStage } = createTexStages(isDebug)
 
     const validPlainFmtStage = stage(
       'valid plain fmt',
@@ -45,8 +45,9 @@ function createBootPlainSuite(): Suite {
       },
     )
 
-    stage('dvi => svg', [validPlainFmtStage], ([{ dviData }]) => {
-      const svgs = dviToSvg(dviData)
+    stage('dvi => svg', [validPlainFmtStage, tfmFilesStage], ([{ dviData }, tfmFiles]) => {
+      // 带上 tfm：渲染端据此按规范推进 h（否则位置只能交给渲染端的字体度量）
+      const svgs = dviToSvg(dviData, tfmFiles)
       for (const [index, svg] of svgs.entries()) {
         attachText(`story.${index + 1}.svg`, svg)
       }

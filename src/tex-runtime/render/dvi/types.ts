@@ -10,7 +10,7 @@ export type Color =
 
 /** 字体映射结果 */
 export interface FontInfo {
-  /** CSS font-family，默认实现用浏览器自带的字体族 */
+  /** CSS font-family 列表：可以是一条回退链，渲染端原样写进 SVG */
   family: string
   /** 字号乘数：最终字号 = fnt_def 的 scaled size（pt）× scale */
   scale: number
@@ -20,29 +20,32 @@ export interface FontInfo {
   style?: string
 }
 
-/** 只被 Interpreter 使用的两个映射函数 */
+/** 只被 Interpreter 使用的三个映射函数 */
 export interface DviConfig {
   resolveFont(dviFontName: string): FontInfo
   /** 字符码（0..255）→ Unicode；返回 number 视为码点 */
   resolveUnicode(dviFontName: string, charCode: number): string | number
+  /**
+   * 字符宽度（sp）；`size` 是该字体在本次作业里的实际尺寸（sp）。
+   *
+   * 返回 undefined 表示该字体没有度量来源：此时字形不推进 h，位置退化成
+   * "整段交给渲染端的字体度量"——同一行的字形会落成同一个 x，于是被合并进
+   * 同一个 text 元素。有度量时 h 按规范推进，(h,v) 即绝对位置。
+   */
+  resolveWidth?(dviFontName: string, charCode: number, size: number): number | undefined
 }
 
 export type Drawable =
   | {
     kind: 'glyph'
-    /**
-     * 位移累计坐标：DVI 里字符不携带宽度，字符间距交给输出字体的度量，
-     * 因此这里的 x 只累计显式位移（right/w/x），"连续的字符 x 相同"。
-     */
+    /** 参考点的绝对坐标（pt）：即 DVI 的 h / v（按规范推进后的值） */
     x: number
     y: number
     /**
-     * x/y 是否为精确的绝对位置。
-     * DVI 用位置栈 push/pop 复位坐标，复位处读者与 TeX 的位置一致，
-     * 因此这里的绝对坐标可信，渲染时可以在该字形处另起一个 text 元素；
-     * 其余位置只能靠前一个 run 的渲染宽度接续（见 Renderer）。
+     * 是否紧接上一个字形——其间没有任何位移。
+     * 渲染端可据此把相邻字符合并进同一个 text 元素，字符间距交给字体度量。
      */
-    anchor: boolean
+    continues: boolean
     text: string
     family: string
     size: number

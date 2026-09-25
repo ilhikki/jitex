@@ -2,14 +2,15 @@ import type { Color, Drawable, Page } from '../dvi/types.ts'
 
 type Glyph = Extract<Drawable, { kind: 'glyph' }>
 
-interface Run {
-  x: number
-  y: number
-  text: string
-  glyph: Glyph
-}
-
-/** 把一页渲染成 SVG 字符串。 */
+/**
+ * 把一页渲染成 SVG 字符串。
+ *
+ * 位置模型：每个字形都带**绝对**坐标（DVI 的 h/v 按规范推进后的值），所以这里
+ * 只做一件事——把"紧接在一起"的字形合并进同一个 text 元素，字符间距交给字体度量；
+ * 其余情况各起一个 text。合并是省体积的关键：一行文字通常只落成一个标签。
+ *
+ * 代价是 rule / special 与文字的层叠顺序固定为"文字先画"。
+ */
 export function renderPage(page: Page): string {
   const lines: string[] = []
   const { x, y, width, height } = page
@@ -24,10 +25,10 @@ export function renderPage(page: Page): string {
       }"/>`,
     )
   }
-  // 文字按 flow 分组：flow 内部的 run 只用 tspan 的 dx/dy，位置由 SVG 的字体度量接续；
-  // flow 的起点是盒边界（位置精确），用绝对坐标另起一个 <text>。
-  // 代价是 rule/special 与文字的层叠顺序不能交错（文字先画）。
-  lines.push(...renderTextFlows(page.drawables))
+  const text = renderText(page.drawables)
+  if (text !== '') {
+    lines.push(text)
+  }
   for (const item of page.drawables) {
     if (item.kind === 'rule') {
       lines.push(
@@ -44,73 +45,83 @@ export function renderPage(page: Page): string {
 }
 
 /**
- * 相邻的字符合并成一个 run（它们的 x/y 相同，字符间距交给 SVG 字体）。
- * 遇到带 anchor 的字形（盒边界，坐标精确）就另起一个 flow：flow 内部用 tspan 的
- * dx/dy 接续，flow 之间用绝对坐标，避免行与行之间把位移累加下去。
+ * 全部文字放进一个 text，每段一个 tspan。
+ *
+ * 位置全是绝对值（DVI 的 h/v 按规范推进后的值），所以每个 tspan 各自带 x/y、
+ * 彼此不接续。呈现属性只在 text 上写一份，与它不同的段才在 tspan 上覆盖——
+ * 这一份属性乘以段数，正是 SVG 体积的主要来源。
  */
-function renderTextFlows(drawables: Drawable[]): string[] {
-  const flows: Run[][] = []
-  let flow: Run[] | undefined
-  let prevGlyph: Glyph | undefined
-  for (const item of drawables) {
-    if (item.kind !== 'glyph') {
-      prevGlyph = undefined
-      continue
-    }
-    const run = flow?.[flow.length - 1]
-    if (
-      run !== undefined && prevGlyph !== undefined && sameStyle(prevGlyph, item) &&
-      prevGlyph.x === item.x && prevGlyph.y === item.y
-    ) {
-      run.text += item.text
-    } else {
-      if (flow === undefined || item.anchor) {
-        flow = []
-        flows.push(flow)
-      }
-      flow.push({ x: item.x, y: item.y, text: item.text, glyph: item })
-    }
-    prevGlyph = item
-  }
-  return flows.map(renderFlow)
-}
-
-function renderFlow(runs: Run[]): string {
-  const tspans: string[] = []
-  let first: Run | undefined
-  let prevRun: Run | undefined
-  for (const run of runs) {
-    const attrs: string[] = []
-    if (prevRun !== undefined) {
-      const dx = run.x - prevRun.x
-      const dy = run.y - prevRun.y
-      if (dx !== 0) {
-        attrs.push(`dx="${num(dx)}"`)
-      }
-      if (dy !== 0) {
-        attrs.push(`dy="${num(dy)}"`)
-      }
-    }
-    const glyph = run.glyph
-    attrs.push(
-      `fill="${toHex(glyph.color)}"`,
-      `font-family="${escapeXml(glyph.family)}"`,
-      `font-size="${num(glyph.size)}"`,
-    )
-    if (glyph.weight !== undefined) {
-      attrs.push(`font-weight="${escapeXml(glyph.weight)}"`)
-    }
-    if (glyph.style !== undefined) {
-      attrs.push(`font-style="${escapeXml(glyph.style)}"`)
-    }
-    tspans.push(`<tspan ${attrs.join(' ')}>${escapeXml(run.text)}</tspan>`)
-    first ??= run
-    prevRun = run
-  }
+function renderText(drawables: Drawable[]): string {
+  const runs = toRuns(drawables)
+  const first = runs[0]
   if (first === undefined) {
     return ''
   }
-  return `<text x="${num(first.x)}" y="${num(first.y)}" xml:space="preserve">${tspans.join('')}</text>`
+  const base = first.glyph
+  const attrs = [
+    `fill="${toHex(base.color)}"`,
+    `font-family="${escapeXml(base.family)}"`,
+    `font-size="${num(base.size)}"`,
+  ]
+  if (base.weight !== undefined) {
+    attrs.push(`font-weight="${escapeXml(base.weight)}"`)
+  }
+  if (base.style !== undefined) {
+    attrs.push(`font-style="${escapeXml(base.style)}"`)
+  }
+  attrs.push('xml:space="preserve"')
+  const children = runs.map((run) => {
+    const own = [`x="${num(run.x)}"`, `y="${num(run.y)}"`, ...overrides(base, run.glyph)]
+    return `<tspan ${own.join(' ')}>${escapeXml(run.text)}</tspan>`
+  })
+  return `<text ${attrs.join(' ')}>${children.join('')}</text>`
+}
+
+/** 一段紧接在一起的字形 */
+interface Run {
+  x: number
+  y: number
+  text: string
+  glyph: Glyph
+}
+
+function toRuns(drawables: Drawable[]): Run[] {
+  const runs: Run[] = []
+  let current: Run | undefined
+  for (const item of drawables) {
+    if (item.kind !== 'glyph') {
+      current = undefined
+      continue
+    }
+    if (current !== undefined && item.continues && sameStyle(current.glyph, item)) {
+      current.text += item.text
+      continue
+    }
+    current = { x: item.x, y: item.y, text: item.text, glyph: item }
+    runs.push(current)
+  }
+  return runs
+}
+
+/** 相对 text 上那份属性的差异——只补不同的项 */
+function overrides(base: Glyph, glyph: Glyph): string[] {
+  const attrs: string[] = []
+  if (!sameColor(base.color, glyph.color)) {
+    attrs.push(`fill="${toHex(glyph.color)}"`)
+  }
+  if (base.family !== glyph.family) {
+    attrs.push(`font-family="${escapeXml(glyph.family)}"`)
+  }
+  if (base.size !== glyph.size) {
+    attrs.push(`font-size="${num(glyph.size)}"`)
+  }
+  if (base.weight !== glyph.weight) {
+    attrs.push(`font-weight="${escapeXml(glyph.weight ?? 'normal')}"`)
+  }
+  if (base.style !== glyph.style) {
+    attrs.push(`font-style="${escapeXml(glyph.style ?? 'normal')}"`)
+  }
+  return attrs
 }
 
 function sameStyle(a: Glyph, b: Glyph): boolean {

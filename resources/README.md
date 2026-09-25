@@ -4,3 +4,4 @@
 - ./knuth/plain/base/ is downloaded and extracted from https://mirrors.ctan.org/macros/plain/base.zip (at 2026-09-20)
 - ./knuth/plain/fonts/cm/ is downloaded and extracted from https://mirrors.ctan.org/fonts/cm/tfm.zip (at 2026-09-20)
 - ./knuth/plain/fonts/manfnt/manfnt.tfm is downloaded and extracted from https://tug.ctan.org/systems/apltex/amsfonts/tfm/manfnt.tfm (at 2026-09-21)
+- ./fonts/*.otf and ./*.woff2 are converted from the AMS/Bluesky Computer Modern Type 1 fonts downloaded from https://mirrors.ctan.org/fonts/amsfonts/pfb/ ; the encoding comes from the matching *.afm (each font carries its own — TeX is not OT1 throughout), and glyphs with no Unicode identity get a private-use slot from U+E000 (at 2026-09-25)

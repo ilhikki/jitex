@@ -92,7 +92,8 @@ export function createTexEngine(assets: TexEngineAssets): TexEngine {
 
       // TeX 中途 errorstop 时可能根本没写出 DVI：此时不解析，直接给空结果
       const dvi = job.files.get(job.dviKey)?.getData() ?? new Uint8Array(0)
-      const rendered = dvi.length === 0 ? { svgs: [], missingFonts: [] } : renderDvi(dvi)
+      // 字体度量就是喂给 TeX 的那批 tfm：渲染端据此把 h 按规范推进
+      const rendered = dvi.length === 0 ? { svgs: [], missingFonts: [] } : renderDvi(dvi, fonts)
       const logStore: PascalFileStore | undefined = job.files.get(job.logKey)
       return {
         svgs: rendered.svgs,

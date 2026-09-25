@@ -14,10 +14,13 @@ const BLACK: Color = { model: 'gray', v: 0 }
 const textDecoder = new TextDecoder()
 
 interface FontEntry {
-  /** DVI 里的字体名，用于查字符映射 */
+  /** DVI 里的字体名，用于查字符映射与度量 */
   dviName: string
   family: string
+  /** 字号（pt），用于 SVG 的 font-size */
   size: number
+  /** fnt_def 的 scaled size（sp，已含 scale）——字符宽度的基准 */
+  sizeSp: number
   weight?: string
   style?: string
 }
@@ -29,7 +32,6 @@ interface StackEntry {
   x: number
   y: number
   z: number
-  exact: boolean
 }
 
 interface Box {
@@ -37,6 +39,16 @@ interface Box {
   y0: number
   x1: number
   y1: number
+}
+
+/** eop 暂存的一页：页面尺寸要等文件末尾的 post 才有权威值 */
+interface PendingPage {
+  /** bop 里的 c1 / c2+c3（sp），TeX82 通常写 0 */
+  declaredWidth: number
+  declaredHeight: number
+  box: Box | undefined
+  background: Color | undefined
+  drawables: Drawable[]
 }
 
 /** 解析完整 DVI 字节流，逐页产出 Page。 */
@@ -47,7 +59,7 @@ export function parseDvi(data: Uint8Array, config: DviConfig): Page[] {
 class Interpreter {
   private readonly reader: DviReader
   private readonly config: DviConfig
-  private readonly pages: Page[] = []
+  private readonly pending: PendingPage[] = []
   private readonly fonts = new Map<number, FontEntry>()
   private readonly stack: StackEntry[] = []
 
@@ -63,6 +75,10 @@ class Interpreter {
   private pageWidth = 0
   private pageHeight = 0
 
+  /** post 声明的页面尺寸（sp）：最高页面的高、最宽页面的宽。TeX82 一定写 */
+  private postWidth = 0
+  private postHeight = 0
+
   private h = 0
   private v = 0
   private w = 0
@@ -70,8 +86,8 @@ class Interpreter {
   private y = 0
   private z = 0
   private font = -1
-  /** 当前位置是否精确等于 TeX 的真实位置（未被跳过的字符宽度拉开） */
-  private exact = true
+  /** 上一个字形结束时的 h（sp）；下一个字形的 h 等于它即为"紧接" */
+  private lastEndH: number | undefined
 
   constructor(data: Uint8Array, config: DviConfig) {
     this.reader = new DviReader(data)
@@ -88,7 +104,7 @@ class Interpreter {
     if (!this.preSeen) {
       throw new Error('dvi: missing preamble (pre)')
     }
-    return this.pages
+    return this.finalize()
   }
 
   private command(code: number): void {
@@ -231,7 +247,7 @@ class Interpreter {
     this.y = 0
     this.z = 0
     this.font = -1
-    this.exact = true
+    this.lastEndH = undefined
     this.stack.length = 0
     this.colors = [BLACK]
     this.background = undefined
@@ -244,29 +260,68 @@ class Interpreter {
       throw new Error('dvi: eop without bop')
     }
     this.open = false
-    const width = this.pageWidth / SP_PER_PT
-    const height = this.pageHeight / SP_PER_PT
-    if (width > 0 && height > 0) {
-      this.pages.push({ x: 0, y: 0, width, height, background: this.background, drawables: this.drawables })
-      return
-    }
-    // bop 没给出尺寸时由内容包围盒推导
-    const box = this.contentBox()
-    if (box === undefined) {
-      this.pages.push({ x: 0, y: 0, width, height, background: this.background, drawables: this.drawables })
-      return
-    }
-    this.pages.push({
-      x: box.x0,
-      y: box.y0,
-      width: box.x1 - box.x0,
-      height: box.y1 - box.y0,
+    // 页面尺寸的权威值在文件末尾的 post 里，此处只暂存
+    this.pending.push({
+      declaredWidth: this.pageWidth,
+      declaredHeight: this.pageHeight,
+      box: this.contentBox(),
       background: this.background,
       drawables: this.drawables,
     })
   }
 
-  /** 内容包围盒（pt）；字形升/降部与 run 的行进宽度只能估算 */
+  /**
+   * 定稿每页的尺寸。
+   *
+   * 优先用 bop 的 c1..c3（TeX82 通常写 0，即不声明）；否则用 post 的 u/l —— 那是 TeX
+   * 自己记下的"最宽页面的宽、最高页面的高"，含字符推进，**不需要读 TFM 就是正确值**。
+   * 两者都没有（文件被截断）才退化为内容包围盒的估算。
+   *
+   * 最后与包围盒取并集：估算的墨迹范围可能超出 TeX 声明的页面，viewBox 之下被裁掉。
+   */
+  private finalize(): Page[] {
+    const declaredWidth = this.postWidth / SP_PER_PT
+    const declaredHeight = this.postHeight / SP_PER_PT
+    return this.pending.map((page) => {
+      const width = page.declaredWidth > 0 ? page.declaredWidth / SP_PER_PT : declaredWidth
+      const height = page.declaredHeight > 0 ? page.declaredHeight / SP_PER_PT : declaredHeight
+      const box = page.box
+      if (width <= 0 || height <= 0) {
+        // 没有任何尺寸声明（bop 为 0 且没有 post）：只能由内容包围盒推导
+        if (box === undefined) {
+          return { x: 0, y: 0, width, height, background: page.background, drawables: page.drawables }
+        }
+        return {
+          x: box.x0,
+          y: box.y0,
+          width: box.x1 - box.x0,
+          height: box.y1 - box.y0,
+          background: page.background,
+          drawables: page.drawables,
+        }
+      }
+      if (box === undefined) {
+        return { x: 0, y: 0, width, height, background: page.background, drawables: page.drawables }
+      }
+      const x = Math.min(0, box.x0)
+      const y = Math.min(0, box.y0)
+      return {
+        x,
+        y,
+        width: Math.max(width, box.x1) - x,
+        height: Math.max(height, box.y1) - y,
+        background: page.background,
+        drawables: page.drawables,
+      }
+    })
+  }
+
+  /**
+   * 内容包围盒（pt）。
+   *
+   * 只在 bop 与 post 都没给页面尺寸时兜底。h 已按规范推进，故 x 是准的，
+   * 估的只是"还要往右多宽、往上多高"（字形的升/降部与墨迹宽度）。
+   */
   private contentBox(): Box | undefined {
     let box: Box | undefined
     const extend = (x0: number, y0: number, x1: number, y1: number) => {
@@ -279,19 +334,17 @@ class Interpreter {
       box.x1 = Math.max(box.x1, x1)
       box.y1 = Math.max(box.y1, y1)
     }
-    let previous: Drawable | undefined
-    let runEnd = 0
     for (const item of this.drawables) {
       if (item.kind === 'glyph') {
-        // 同一 run 内的字形 x 相同，宽度按字符数累加，否则从该字形的 x 起算
-        const continues = previous !== undefined && previous.kind === 'glyph' && previous.x === item.x &&
-          previous.y === item.y && previous.size === item.size
-        runEnd = (continues ? runEnd : item.x) + item.text.length * item.size * AVG_WIDTH
-        extend(item.x, item.y - item.size * ASCENT, runEnd, item.y + item.size * DESCENT)
+        extend(
+          item.x,
+          item.y - item.size * ASCENT,
+          item.x + item.text.length * item.size * AVG_WIDTH,
+          item.y + item.size * DESCENT,
+        )
       } else if (item.kind === 'rule') {
         extend(item.x, item.y, item.x + item.w, item.y + item.h)
       }
-      previous = item
     }
     return box
   }
@@ -300,14 +353,20 @@ class Interpreter {
 
   private setChar(code: number): void {
     this.glyph(code, true)
-    // 字符宽度由输出字体承担，h 不推进；此处起 h 与 TeX 的真实位置不再相等
   }
 
   private putChar(code: number): void {
-    // put 在两个模型里都不移动 h，位置依旧精确
+    // put 不推进 h：下一个字形仍落在同一位置，两者都不与它"紧接"
     this.glyph(code, false)
   }
 
+  /**
+   * 放一个字形。
+   *
+   * `set_char` 的语义是"放在 (h,v)，然后 h 加上字符宽度"；宽度来自字体度量。
+   * 没有度量（宽度 0）时 h 停在原地——同一行的字形于是共用一个 x，渲染端会把
+   * 它们并进同一个 text，字符间距交给字体度量承担。
+   */
   private glyph(code: number, advances: boolean): void {
     this.requirePage('character')
     const font = this.fonts.get(this.font)
@@ -316,11 +375,12 @@ class Interpreter {
     }
     const unicode = this.config.resolveUnicode(font.dviName, code)
     const text = typeof unicode === 'number' ? String.fromCodePoint(unicode) : unicode
+    const width = this.config.resolveWidth?.(font.dviName, code, font.sizeSp) ?? 0
     this.drawables.push({
       kind: 'glyph',
       x: this.h / SP_PER_PT,
       y: this.v / SP_PER_PT,
-      anchor: this.exact,
+      continues: this.lastEndH === this.h,
       text,
       family: font.family,
       size: font.size,
@@ -328,8 +388,9 @@ class Interpreter {
       weight: font.weight,
       style: font.style,
     })
+    this.lastEndH = this.h + width
     if (advances) {
-      this.exact = false
+      this.h = this.lastEndH
     }
   }
 
@@ -369,7 +430,6 @@ class Interpreter {
       x: this.x,
       y: this.y,
       z: this.z,
-      exact: this.exact,
     })
   }
 
@@ -384,7 +444,8 @@ class Interpreter {
     this.x = entry.x
     this.y = entry.y
     this.z = entry.z
-    this.exact = entry.exact
+    // 出栈是本层盒的结束：不假设盒后第一个字形与盒内最后一个是同一条流
+    this.lastEndH = undefined
   }
 
   // 字体
@@ -402,10 +463,12 @@ class Interpreter {
       return
     }
     const info = this.config.resolveFont(dviName)
+    const sizeSp = scaledSize * info.scale
     this.fonts.set(number, {
       dviName,
       family: info.family,
-      size: (scaledSize / SP_PER_PT) * info.scale,
+      size: sizeSp / SP_PER_PT,
+      sizeSp,
       weight: info.weight,
       style: info.style,
     })
@@ -436,8 +499,8 @@ class Interpreter {
     this.reader.readUnsigned(4) // num
     this.reader.readUnsigned(4) // den
     this.reader.readUnsigned(4) // mag
-    this.reader.readUnsigned(4) // 最大高度
-    this.reader.readUnsigned(4) // 最大宽度
+    this.postHeight = this.reader.readUnsigned(4) // l：最高页面的高 + 深
+    this.postWidth = this.reader.readUnsigned(4) // u：最宽页面的宽
     this.reader.readUnsigned(2) // 最大栈深
     this.reader.readUnsigned(2) // 总页数
   }

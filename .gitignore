@@ -17,3 +17,4 @@ coverage-temp/
 !/resources/**/*.log
 /coverage
 *.cpuprofile
+__pycache__/
