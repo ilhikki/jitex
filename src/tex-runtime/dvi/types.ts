@@ -36,6 +36,13 @@ export type Drawable =
      */
     x: number
     y: number
+    /**
+     * x/y 是否为精确的绝对位置。
+     * DVI 用位置栈 push/pop 复位坐标，复位处读者与 TeX 的位置一致，
+     * 因此这里的绝对坐标可信，渲染时可以在该字形处另起一个 text 元素；
+     * 其余位置只能靠前一个 run 的渲染宽度接续（见 Renderer）。
+     */
+    anchor: boolean
     text: string
     family: string
     size: number

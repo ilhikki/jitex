@@ -24,12 +24,10 @@ export function renderPage(page: Page): string {
       }"/>`,
     )
   }
-  // 整页的文字放进同一个 <text>：run 之间只用 tspan 的 dx/dy，位置由 SVG 的字体度量接续。
+  // 文字按 flow 分组：flow 内部的 run 只用 tspan 的 dx/dy，位置由 SVG 的字体度量接续；
+  // flow 的起点是盒边界（位置精确），用绝对坐标另起一个 <text>。
   // 代价是 rule/special 与文字的层叠顺序不能交错（文字先画）。
-  const text = renderText(page.drawables)
-  if (text !== '') {
-    lines.push(text)
-  }
+  lines.push(...renderTextFlows(page.drawables))
   for (const item of page.drawables) {
     if (item.kind === 'rule') {
       lines.push(
@@ -46,29 +44,38 @@ export function renderPage(page: Page): string {
 }
 
 /**
- * 相邻的字符合并成一个 run（它们的 x/y 相同，字符间距交给 SVG 字体）；
- * run 之间的显式位移用 tspan 的 dx/dy 表达。
+ * 相邻的字符合并成一个 run（它们的 x/y 相同，字符间距交给 SVG 字体）。
+ * 遇到带 anchor 的字形（盒边界，坐标精确）就另起一个 flow：flow 内部用 tspan 的
+ * dx/dy 接续，flow 之间用绝对坐标，避免行与行之间把位移累加下去。
  */
-function renderText(drawables: Drawable[]): string {
-  const runs: Run[] = []
+function renderTextFlows(drawables: Drawable[]): string[] {
+  const flows: Run[][] = []
+  let flow: Run[] | undefined
   let prevGlyph: Glyph | undefined
   for (const item of drawables) {
     if (item.kind !== 'glyph') {
       prevGlyph = undefined
       continue
     }
-    const run = runs[runs.length - 1]
+    const run = flow?.[flow.length - 1]
     if (
       run !== undefined && prevGlyph !== undefined && sameStyle(prevGlyph, item) &&
       prevGlyph.x === item.x && prevGlyph.y === item.y
     ) {
       run.text += item.text
     } else {
-      runs.push({ x: item.x, y: item.y, text: item.text, glyph: item })
+      if (flow === undefined || item.anchor) {
+        flow = []
+        flows.push(flow)
+      }
+      flow.push({ x: item.x, y: item.y, text: item.text, glyph: item })
     }
     prevGlyph = item
   }
+  return flows.map(renderFlow)
+}
 
+function renderFlow(runs: Run[]): string {
   const tspans: string[] = []
   let first: Run | undefined
   let prevRun: Run | undefined

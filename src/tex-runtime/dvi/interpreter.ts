@@ -29,6 +29,7 @@ interface StackEntry {
   x: number
   y: number
   z: number
+  exact: boolean
 }
 
 interface Box {
@@ -69,6 +70,8 @@ class Interpreter {
   private y = 0
   private z = 0
   private font = -1
+  /** 当前位置是否精确等于 TeX 的真实位置（未被跳过的字符宽度拉开） */
+  private exact = true
 
   constructor(data: Uint8Array, config: DviConfig) {
     this.reader = new DviReader(data)
@@ -138,8 +141,9 @@ class Interpreter {
       this.h += this.reader.readSigned(code - 142)
       return
     }
+    // 寄存器类位移：w0/x0/y0/z0 是「按寄存器当前值移动」（不清零），
+    // w1..4/x1..4/y1..4/z1..4 是「按参数移动并更新寄存器」
     if (code === 147) {
-      this.w = 0
       this.h += this.w
       return
     }
@@ -149,7 +153,6 @@ class Interpreter {
       return
     }
     if (code === 152) {
-      this.x = 0
       this.h += this.x
       return
     }
@@ -163,7 +166,6 @@ class Interpreter {
       return
     }
     if (code === 161) {
-      this.y = 0
       this.v += this.y
       return
     }
@@ -173,7 +175,6 @@ class Interpreter {
       return
     }
     if (code === 166) {
-      this.z = 0
       this.v += this.z
       return
     }
@@ -230,6 +231,7 @@ class Interpreter {
     this.y = 0
     this.z = 0
     this.font = -1
+    this.exact = true
     this.stack.length = 0
     this.colors = [BLACK]
     this.background = undefined
@@ -264,7 +266,7 @@ class Interpreter {
     })
   }
 
-  /** 内容包围盒（pt）；字形升/降部与行宽只能估算 */
+  /** 内容包围盒（pt）；字形升/降部与 run 的行进宽度只能估算 */
   private contentBox(): Box | undefined {
     let box: Box | undefined
     const extend = (x0: number, y0: number, x1: number, y1: number) => {
@@ -277,13 +279,19 @@ class Interpreter {
       box.x1 = Math.max(box.x1, x1)
       box.y1 = Math.max(box.y1, y1)
     }
+    let previous: Drawable | undefined
+    let runEnd = 0
     for (const item of this.drawables) {
       if (item.kind === 'glyph') {
-        const width = item.text.length * item.size * AVG_WIDTH
-        extend(item.x, item.y - item.size * ASCENT, item.x + width, item.y + item.size * DESCENT)
+        // 同一 run 内的字形 x 相同，宽度按字符数累加，否则从该字形的 x 起算
+        const continues = previous !== undefined && previous.kind === 'glyph' && previous.x === item.x &&
+          previous.y === item.y && previous.size === item.size
+        runEnd = (continues ? runEnd : item.x) + item.text.length * item.size * AVG_WIDTH
+        extend(item.x, item.y - item.size * ASCENT, runEnd, item.y + item.size * DESCENT)
       } else if (item.kind === 'rule') {
         extend(item.x, item.y, item.x + item.w, item.y + item.h)
       }
+      previous = item
     }
     return box
   }
@@ -291,15 +299,16 @@ class Interpreter {
   // 图元
 
   private setChar(code: number): void {
-    this.glyph(code)
-    // 字符宽度由输出字体承担，h 不推进
+    this.glyph(code, true)
+    // 字符宽度由输出字体承担，h 不推进；此处起 h 与 TeX 的真实位置不再相等
   }
 
   private putChar(code: number): void {
-    this.glyph(code)
+    // put 在两个模型里都不移动 h，位置依旧精确
+    this.glyph(code, false)
   }
 
-  private glyph(code: number): void {
+  private glyph(code: number, advances: boolean): void {
     this.requirePage('character')
     const font = this.fonts.get(this.font)
     if (font === undefined) {
@@ -311,6 +320,7 @@ class Interpreter {
       kind: 'glyph',
       x: this.h / SP_PER_PT,
       y: this.v / SP_PER_PT,
+      anchor: this.exact,
       text,
       family: font.family,
       size: font.size,
@@ -318,6 +328,9 @@ class Interpreter {
       weight: font.weight,
       style: font.style,
     })
+    if (advances) {
+      this.exact = false
+    }
   }
 
   private setRule(a: number, b: number): void {
@@ -349,7 +362,15 @@ class Interpreter {
   // 栈与寄存器
 
   private push(): void {
-    this.stack.push({ h: this.h, v: this.v, w: this.w, x: this.x, y: this.y, z: this.z })
+    this.stack.push({
+      h: this.h,
+      v: this.v,
+      w: this.w,
+      x: this.x,
+      y: this.y,
+      z: this.z,
+      exact: this.exact,
+    })
   }
 
   private pop(): void {
@@ -363,6 +384,7 @@ class Interpreter {
     this.x = entry.x
     this.y = entry.y
     this.z = entry.z
+    this.exact = entry.exact
   }
 
   // 字体
