@@ -64,8 +64,9 @@ function parseSource(source: string): ProgramNode {
 /**
  * 将 Pascal 源码编译为 ESM 源码字符串（编译产物）。
  *
- * 产物顶层是工厂：`export default function main(__sys) { ... return __run }`，
- * 由 @jitex/runtime 加载并注入 dispatcher 后执行（见 runtime 的 runJs）。
+ * 产物顶层是柯里化的工厂：
+ * `export default function main(__sys) { ... return function __run(__ctx) { ... } }`，
+ * 由 @jitex/runtime 装载、注入 syscall 表与 ctx 后执行（见 runtime 的 exec.ts）。
  */
 export function transform(source: string, options: TransformOptions = { debug: false }): string {
   const ast = parseSource(source)

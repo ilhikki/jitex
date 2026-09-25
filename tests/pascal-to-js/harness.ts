@@ -62,8 +62,14 @@ function newTextFile(mode: 'inspection' | 'generation', text?: string) {
   return store
 }
 
-/** 执行单个用例，返回运行状态 */
-export async function runPascal(t: PascalTest): Promise<RunState> {
+/** 单个用例的执行结果：运行状态 + 编译产物（产物由调用方持有，runtime 不回传） */
+export interface PascalRunResult {
+  state: RunState
+  jsCode: string | undefined
+}
+
+/** 执行单个用例，返回运行状态与编译产物 */
+export async function runPascal(t: PascalTest): Promise<PascalRunResult> {
   const files = new Map<string, PascalFileStore>()
   files.set('INPUT', newTextFile('inspection', t.input))
   files.set('OUTPUT', newTextFile('generation'))
@@ -80,15 +86,16 @@ export async function runPascal(t: PascalTest): Promise<RunState> {
       debug: true,
     })
   } catch (e) {
-    return toErrorState(e)
+    return { state: toErrorState(e), jsCode: undefined }
   }
 
-  return await runJs(jsCode, {
+  const state = await runJs(jsCode, {
     files,
     programFileUrls: t.programFileUrls,
     maxSteps: t.maxSteps ?? 1e5,
     extraSyscalls: t.extraSyscalls,
   })
+  return { state, jsCode }
 }
 
 /**
@@ -110,7 +117,7 @@ function decode(store: PascalFileStore | undefined): string | undefined {
 }
 /** 执行并断言单个用例；失败时先输出编译产物，再抛出断言错误 */
 export async function runPascalTest(t: PascalTest): Promise<void> {
-  const state = await runPascal(t)
+  const { state, jsCode } = await runPascal(t)
   const output = state.files.get('OUTPUT')
   const ctx = `[${t.name}] ${t.purpose}`
 
@@ -122,8 +129,8 @@ export async function runPascalTest(t: PascalTest): Promise<void> {
       assertPrintRoundTripStable(t.code, ctx)
     }
   } catch (err) {
-    if (state.jsCode) {
-      console.error(state.jsCode)
+    if (jsCode) {
+      console.error(jsCode)
     }
     if (state.error) {
       console.error(state.error)

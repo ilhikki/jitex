@@ -181,9 +181,14 @@ class JsCompilerImpl implements JsCompiler {
   }
 
   /**
-   * 顶层函数是工厂：注入 __sys、把用到的 syscall 解包成局部常量，返回一个可多次
-   * 调用的函数。状态（locals / 子函数 / 状态机标志）全部留在内层作用域，故每次
-   * 调用都从干净状态开始，互不污染。
+   * 顶层函数是工厂，产物柯里化为两个参数：
+   *
+   *   main(__sys)(__ctx) — 注入 syscall 表后返回一个「注入 ctx 才运行」的函数。
+   *
+   * __sys 解包写在最外层：解包结果与 ctx 无关（handler 不绑定 ctx），故可在
+   * 「注入 sys」这一层一次性完成，跨多次运行复用（见 @jitex/runtime 的 exec.ts）。
+   * 状态（locals / 子函数 / 状态机标志）全部留在内层作用域，故每次调用都从干净
+   * 状态开始，互不污染。
    */
   private compileMainFunction(fn: JsonCode.Function, indent: string): string {
     // 内层函数体的缩进
@@ -206,7 +211,7 @@ class JsCompilerImpl implements JsCompiler {
       lines.push(`${indent}  const ${name} = __sys[${JSON.stringify(key)}];`)
     }
 
-    lines.push(`${indent}  return function __run() {`)
+    lines.push(`${indent}  return function __run(__ctx) {`)
     if (this.longJumpTargets.size > 0) {
       lines.push(`${indent}    let __is_long_jump_mode = false;`)
       lines.push(`${indent}    let __long_jump_label_id = 0;`)
@@ -226,7 +231,7 @@ class JsCompilerImpl implements JsCompiler {
     return lines.join('\n')
   }
 
-  /** 内层函数（子函数）：靠闭包访问外层的 locals 与解包变量，不需要 __sys 参数 */
+  /** 内层函数（子函数）：靠闭包访问外层的 locals、解包变量与 __ctx，无额外形参 */
   private compileNestedFunction(fn: JsonCode.Function, indent: string): string {
     const lines: string[] = []
 
@@ -248,7 +253,8 @@ class JsCompilerImpl implements JsCompiler {
 
   private functionHeader(fn: JsonCode.Function, top: boolean): string {
     const params = fn.params.map((x) => this.compileId(x))
-    // 顶层函数添加 __sys 参数（ES module 导出后由外部注入 dispatcher）
+    // 顶层函数添加 __sys 参数（ES module 导出后由外部注入 syscall 表；
+    // ctx 由返回的内层函数接收，见 compileMainFunction）
     if (top) {
       params.unshift('__sys')
     }
@@ -350,8 +356,10 @@ class JsCompilerImpl implements JsCompiler {
         if (js !== undefined) {
           return js
         }
-        const args = expr.args.map((arg) => this.compileExpr(arg)).join(', ')
-        return `${this.syscallVar(expr.key)}(${args})`
+        // 走 __sys 的实参形态固定为 (ctx, ...args)：ctx 由本层闭包提供
+        // （__ctx 是 __run 的形参），见 compileMainFunction。
+        const args = expr.args.map((arg) => this.compileExpr(arg))
+        return `${this.syscallVar(expr.key)}(${['__ctx', ...args].join(', ')})`
       }
     }
   }

@@ -37,6 +37,8 @@ export type TangleOutput = {
 }
 export type RunTangleResult = {
   state: RunState
+  /** 编译产物（调用方持有；runtime 不再回传源码） */
+  jsCode: string
   pasFile: string
   poolFile: Uint8Array
   debugLog: string[]
@@ -44,13 +46,13 @@ export type RunTangleResult = {
 }
 
 export function validRunTangleResult(result: RunTangleResult): TangleOutput {
-  const { state, pasFile, poolFile, debugLog, output } = result
+  const { state, jsCode, pasFile, poolFile, debugLog, output } = result
   log(`state.status = ${state.status}`)
   log(`state.steps = ${state.steps}`)
   attachText('debugLog.log', debugLog.join('\n'))
   attachText('output.txt', output)
-  if (state.jsCode) {
-    attachText('tangle.js', state.jsCode)
+  if (jsCode) {
+    attachText('tangle.js', jsCode)
   } else {
     assert(false, 'miss tangle.js')
   }
@@ -112,6 +114,7 @@ export async function runTangleJs(
   return {
     output: bytesToString(output.getData()),
     state,
+    jsCode,
     pasFile,
     poolFile: poolFile.getData(),
     debugLog,

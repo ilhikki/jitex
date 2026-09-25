@@ -5,15 +5,20 @@
  * （偏移 / 宽度 / key / 存储形态），这里只描述运行期值的形状。
  */
 
+/**
+ * 一次运行的上下文：只承载「运行期状态」与「本次运行的环境」。
+ *
+ * 不含编译产物——产物由调用方持有。ctx 必须能脱离 code 独立构造，
+ * 否则「装载 / 注入 sys / 执行」三段无法各自独立（见 exec.ts）。
+ */
 export interface RuntimeContext {
   files: Map<string, PascalFileStore>
   steps: number
   maxSteps: number
   programFileUrls: Record<string, string>
   /** 调试日志（e2e 报告消费，不写入临时文件）。
-   * file.ts 不再使用；transform.ts 在编译/运行出错时追加诊断信息。 */
+   * file.ts 不再使用；exec.ts 在装载/运行出错时追加诊断信息。 */
   debugLog: string[]
-  jsCode: string | undefined
 }
 
 export interface RuntimeOptions {
@@ -26,7 +31,14 @@ export interface RuntimeOptions {
 
 /** 单个 syscall 处理器：接收 ctx 与参数列表，返回结果 */
 export type SyscallHandler = (ctx: RuntimeContext, ...args: unknown[]) => unknown
-export type Syscall = (...args: unknown[]) => unknown
+
+/**
+ * syscall 表（key → handler），即生成代码里的 `__sys`。
+ *
+ * 表内 handler 的形参里就带 ctx，**不得**在构造期把 ctx 绑进表：表要与
+ * 「某一次运行」解耦，才能跨运行复用（ctx 由生成代码在调用点透传）。
+ */
+export type SyscallTable = Record<string, SyscallHandler>
 
 export type PascalFile = {
   kind: 'file'
