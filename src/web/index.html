@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>jitex — TeX82 in the browser</title>
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./fonts.css">
   </head>
   <body>
     <!--
-      演示页：三个文件（index.html / styles.css / app.js），app.js 用原生 ESM import
-      同目录的 jitex.js。build:jitex 第 6 段把它们一起拷进 dist/。
+      官网：三个文件（index.html / styles.css / app.js），app.js 用原生 ESM import
+      同目录的 jitex.js。build:jitex 第 9 段把它们一起拷进 dist/。
 
       一、页面里不出现以 / 开头的路径：Pages 挂在 /<repo>/ 下，绝对路径会白屏。
       二、没有 Worker：TeX 是同步执行、没有协作式中断点，放哪个线程、怎么中断，是使用
-          者适配层该决定的（库不含 Worker）。演示页跑在主线程上，因此也可能被一段失控
+          者适配层该决定的（库不含 Worker）。官网跑在主线程上，因此也可能被一段失控
           的文档卡住——真项目请把引擎放进 Worker。
     -->
     <header>

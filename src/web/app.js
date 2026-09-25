@@ -1,24 +1,13 @@
-// 演示页逻辑：三面板 UI + 把 jitex 引擎跑在主线程上。
+// 官网逻辑：三面板 UI + 把 jitex 引擎跑在主线程上。
 //
 // 与 jitex.js 同目录（build:jitex 会把两者一起放进 dist/）：index.html 里
 // `<script type="module" src="./app.js">`，这里再 import 同目录的 jitex.js。
 //
-// 为什么不用 Worker：演示页要能直接双击打开（file://），而浏览器不允许 file:// 页面
+// 为什么不用 Worker：官网要能直接双击打开（file://），而浏览器不允许 file:// 页面
 // 构造 Worker（不透明源）。真项目应当把引擎放进 Worker——TeX 是同步执行、没有协作式
 // 中断点，只能靠 terminate 停下；放哪个线程、怎么中断，是使用者适配层该决定的事。
 import { createTexEngine } from './jitex.js'
-
-const DEFAULT_SOURCE = String.raw`% 改这里，然后按 Ctrl/⌘ + Enter
-\noindent Hello, \TeX!  This page is running the real \TeX82 in your browser.
-
-\medskip
-\noindent Math: $\int_0^1 x^2 \, dx = {1 \over 3}$, and
-$$\sum_{n=1}^{\infty} {1 \over n^2} = {\pi^2 \over 6}.$$
-
-\medskip
-\noindent {\bf Bold}, {\it italic}, {\tt typewriter}, and a big one:
-{\font\bigfont=cmr10 at 24pt \bigfont 24pt}
-`
+import { INITIAL_TEX } from './initial-tex.js'
 
 const sourceEl = document.getElementById('source')
 const pagesEl = document.getElementById('pages')
@@ -31,7 +20,7 @@ const runButton = document.getElementById('run')
 const engine = createTexEngine()
 let busy = false
 
-sourceEl.value = DEFAULT_SOURCE
+sourceEl.value = INITIAL_TEX
 
 function setStatus(text, kind = '') {
   statusEl.textContent = text

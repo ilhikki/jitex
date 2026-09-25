@@ -17,6 +17,8 @@
   比对产物"类长任务（TANGLE 自举、TeX TRIP 等）；不含任何 TeX 代码。
 - `@jitex/tex-runtime`：TeX 侧运行时，两层各自成面——`render/` 纯渲染（DVI → SVG + plain 的字体/字符编码映射，
   零依赖）；`tex/` TeX 运行驱动（TTY 终端、文件区约定、引擎装配 `createTexEngine`，依赖 `@jitex/runtime`）。
+  字符映射按**每个字体自己的编码**取表（CM 有 10 种，见 `render/plain/encodings.ts`），不假设全局 OT1； 在 Unicode
+  里没有身份的字形（cmex 的尺寸档等）走私用区保留位，理由见 `resources/fonts/tools/README.md`。
 - `boot-tex`（`src/boot-tex/`，**非 workspace 包**，无 `deno.json`）：TeX82 编译流水线——TANGLE 自举 + TeX TRIP 测试，
   以及 `build:jitex` 发布流水线；基于 `@jitex/integration` 编排，由顶层 `boot:*` / `build:jitex` task 运行。
 - `jitex.js`（发布物）：自包含单文件 ESM——TeX82 编译产物 + plain.fmt + tfm 全部内联，无 fetch / 无动态装载， 浏览器 /
@@ -34,10 +36,13 @@ compilerOptions 入口。
 - `src/integration/`：流水线框架包（`@jitex/integration`）。
 - `src/tex-runtime/`：TeX 侧运行时包（`@jitex/tex-runtime`），内部按 `render/`（纯渲染）与 `tex/`（运行驱动）分层。
 - `src/boot-tex/`：TeX 流水线目录（非包）：`tex/`（公共阶段与 plain/trip 套件）、`tangle/`、`jitex/`（发布流水线）。
-- `src/web/`：演示页素材（非包）：`index.html` + `styles.css` + `app.js`（原生 ESM，import 同目录的 `jitex.js`）； 由
-  `build:jitex` 第 6 段原样拷进 `dist/`。页面里不出现以 `/` 开头的路径——Pages 挂在 `/<repo>/` 下。
+- `src/web/`：**官网**素材（非包）：`index.html` + `styles.css` + `app.js`（原生 ESM，import 同目录的 `jitex.js`）
+  - `initial-tex.js`（页面正文的单一真源：官网首页正文与发布流水线的初始 tex 是同一段）； 由 `build:jitex` 第 9
+    段原样拷进 `dist/`。页面里不出现以 `/` 开头的路径——Pages 挂在 `/<repo>/` 下。
 - `tests/<包名>/`：测试，按包分目录。
-- `resources/`：外部素材；`dist/`：构建产物（已 gitignore）。
+- `resources/`：外部素材与**入库的字体产物**。`fonts/` 是 75 个 CM 字体（`*.otf` + `*.woff2`）， 由 `fonts/tools/`
+  的一次性脚本从 CTAN 的 AMS Type 1 + AFM 生成——做法、理由与复现步骤见
+  `resources/fonts/tools/README.md`。`dist/`：构建产物（已 gitignore）。
 
 ---
 

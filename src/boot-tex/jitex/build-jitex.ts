@@ -1,8 +1,9 @@
-import { assert, attach, log, stage, suite } from '@jitex/integration'
+import { assert, attach, attachText, log, stage, suite } from '@jitex/integration'
 import type { Suite } from '@jitex/integration'
 import { bundle } from 'jsr:@deno/emit@^0.46.0'
 import type { ImportMap } from 'jsr:@deno/emit@^0.46.0'
 import { createTexStages } from '../tex/stages.ts'
+import { INITIAL_TEX } from '../../web/initial-tex.js'
 
 /*
  * build:jitex —— 发布流水线：把 TeX82 的编译产物 + 预建格式 + 字符串池 + 字体打成
@@ -15,14 +16,19 @@ import { createTexStages } from '../tex/stages.ts'
 const REPO_ROOT = new URL('../../../', import.meta.url)
 
 /*
- * 七段：
+ * 十二段：
  *   1 build tangle.js    自举 TANGLE                    → tangle.js
  *   2 get initex         编译 tex.web                   → tex.pas / tex.pool / tex.js
- *   3 get plain.fmt      INITEX 建格式                  → plain.fmt / fonts.json
- *   4 bundle jitex.js    内联成单文件                    → dist/jitex.js + manifest
- *   5 smoke: tex ⇒ svg   用产物跑两个用例                → smoke-*.dvi / *.svg / *.log
- *   6 copy demo          拷演示页（3 个静态文件）      → dist/index.html · styles.css · app.js
- *   7 publish            发布检查（体积 / sha256）        → dist.manifest.txt
+ *   3 load base files    读 plain 的素材                → 内存
+ *   4 load plain tfm     读 plain 用的 TFM              → 内存
+ *   5 get plain.fmt      INITEX 建格式                  → plain.fmt / fonts.json
+ *   6 bundle jitex.js    内联成单文件                    → dist/jitex.js + manifest
+ *   7 smoke: tex ⇒ svg   用产物跑两个用例                → smoke-*.dvi / *.svg / *.log
+ *   8 site tex ⇒ dvi+svg 官网正文那段 tex 的产物          → site.dvi / site.N.svg / site.log
+ *   9 copy site          拷官网（4 个静态文件）          → dist/index.html · styles.css · app.js · initial-tex.js
+ *  10 copy fonts         拷 CM 字体 + 生成清单           → dist/fonts/*.woff2 · fonts.css
+ *  11 smoke: site        用 DOM 桩把官网真跑一遍          → （断言）
+ *  12 publish            发布检查（体积 / sha256）        → dist.manifest.txt
  *
  * 这是发布套件：产物即发布物，阶段可缓存，报告里每段都有 artifact 与日志。
  */
@@ -31,8 +37,8 @@ const JITEX_VERSION = '0.1.0'
 const BUILD_DIR = new URL('.build/jitex/', REPO_ROOT)
 const DIST_DIR = new URL('dist/', REPO_ROOT)
 
-/** 演示页的静态文件（非包，原样拷进 dist；app.js 以相对路径引用同目录的 jitex.js） */
-const DEMO_FILES = ['index.html', 'styles.css', 'app.js']
+/** 官网的静态文件（非包，原样拷进 dist；app.js 引用同目录的 jitex.js 与 initial-tex.js） */
+const SITE_FILES = ['index.html', 'styles.css', 'app.js', 'initial-tex.js']
 
 /** 生成模块里的 bare specifier：bundle 需要显式给出（不依赖宿主的工作区配置） */
 const IMPORT_MAP: ImportMap = {
@@ -116,7 +122,7 @@ export function createTexEngine(options = {}) {
   return entry
 }
 
-/** 最小 DOM 桩：只实现演示页用到的那几个接口，用来在无浏览器环境里跑一遍产物 */
+/** 最小 DOM 桩：只实现官网用到的那几个接口，用来在无浏览器环境里跑一遍产物 */
 interface StubElement {
   id: string
   textContent: string
@@ -185,6 +191,10 @@ const SMOKE_PLAIN = String.raw`Hello, \TeX!  $a^2 + b^2 = c^2$\par
 const SMOKE_FONT = String.raw`\font\big=cmr10 at 12pt \big Big text at 12pt\par
 `
 
+/**
+ * 官网正文那段 tex 的产物：dvi + 每页 svg + log，全部进报告，点开就能与网页对照。
+ * 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
+ */
 interface SmokeRunResult {
   svgs: string[]
   dvi: Uint8Array
@@ -192,6 +202,13 @@ interface SmokeRunResult {
   steps: number
   error: { message: string } | undefined
   missingFonts: string[]
+}
+
+/** 产物 jitex.js 的公共面（只声明本套件用到的那部分） */
+interface JitexModule {
+  createTexEngine: (o?: Record<string, unknown>) => {
+    render: (tex: string, o?: Record<string, unknown>) => SmokeRunResult & { log: string | undefined }
+  }
 }
 
 export function createBuildJitexSuite(): Suite {
@@ -252,11 +269,7 @@ export function createBuildJitexSuite(): Suite {
 
     const smokeStage = stage('smoke: tex ⇒ svg', [jitexStage], async () => {
       // 只 import 产物本身：被测的必须是发布物
-      const jitex = await import(new URL('jitex.js', DIST_DIR).href) as {
-        createTexEngine: (o?: Record<string, unknown>) => {
-          render: (tex: string, o?: Record<string, unknown>) => SmokeRunResult & { log: string | undefined }
-        }
-      }
+      const jitex = await import(new URL('jitex.js', DIST_DIR).href) as JitexModule
       assert(typeof jitex.createTexEngine === 'function', 'createTexEngine should be exported')
       const engine = jitex.createTexEngine()
 
@@ -289,14 +302,33 @@ export function createBuildJitexSuite(): Suite {
       return { plainPages: plain.svgs.length, fontPages: font.svgs.length }
     })
 
-    const demoStage = stage('copy demo', [jitexStage], async () => {
-      // 演示页是三个静态文件，原样拷进 dist：index.html 引用 ./styles.css 与
+    // 官网正文那段 tex 的产物：dvi + 每页 svg + log，全部进报告，点开就能与网页对照。
+    // 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
+    stage('site tex ⇒ dvi + svg', [jitexStage], async () => {
+      const jitex = await import(new URL('jitex.js', DIST_DIR).href) as JitexModule
+      const run = jitex.createTexEngine().render(INITIAL_TEX, { jobName: 'site' })
+
+      attach('site.dvi', run.dvi)
+      // 二进制 dvi 在报告里点不开，另给一份可读的字节文本
+      attachText('site.dvi.txt', run.dvi.join(', '))
+      attachText('site.log', run.log ?? '')
+      run.svgs.forEach((svg, i) => attach(`site.${i + 1}.svg`, new TextEncoder().encode(svg)))
+
+      log(`[site] status=${run.status} steps=${run.steps} pages=${run.svgs.length} dvi=${run.dvi.length}`)
+      if (run.error) {
+        log(`[site] error: ${run.error.message}`)
+      }
+      return { sitePages: run.svgs.length }
+    })
+
+    const siteStage = stage('copy site', [jitexStage], async () => {
+      // 官网是三个静态文件，原样拷进 dist：index.html 引用 ./styles.css 与
       // `<script type="module" src="./app.js">`，app.js 再 import 同目录的 jitex.js。
       //
       // 不内联、也不另打一份 jitex：页面用的就是发布的那个库文件，同批产出、版本一致。
-      const demoSource = new URL('src/web/', REPO_ROOT)
-      for (const name of DEMO_FILES) {
-        const bytes = await Deno.readFile(new URL(name, demoSource))
+      const siteSource = new URL('src/web/', REPO_ROOT)
+      for (const name of SITE_FILES) {
+        const bytes = await Deno.readFile(new URL(name, siteSource))
         await Deno.writeFile(new URL(name, DIST_DIR), bytes)
         attach(name, bytes)
         const text = new TextDecoder().decode(bytes)
@@ -307,13 +339,47 @@ export function createBuildJitexSuite(): Suite {
         )
       }
       const jitexFile = await Deno.stat(new URL('jitex.js', DIST_DIR))
-      assert(jitexFile.size > 0, 'dist/jitex.js 必须与演示页同批产出')
-      log(`demo: ${DEMO_FILES.join(' + ')}（app.js 引用同目录 jitex.js）`)
-      return { demoFiles: DEMO_FILES.length }
+      assert(jitexFile.size > 0, 'dist/jitex.js 必须与官网同批产出')
+      log(`site: ${SITE_FILES.join(' + ')}（app.js 引用同目录 jitex.js）`)
+      return { siteFiles: SITE_FILES.length }
     })
 
-    const demoSmokeStage = stage('smoke: demo', [demoStage], async () => {
-      // 演示页也是发布物，同样**用产物本身**验证：装一个最小 DOM 桩，把 dist/app.js
+    /*
+     * 字体：resources/fonts/ 的 woff2 原样拷进 dist/fonts/，并按文件名生成 @font-face 清单。
+     * 清单只**声明**、不下载——浏览器只为页面上真正用到的族取文件，这就是按需加载。
+     * 依赖 jitexStage 是因为它负责重建 dist（先清空），晚跑会把字体删掉。
+     */
+    const fontsStage = stage('copy fonts', [jitexStage], async () => {
+      const fontDir = new URL('resources/fonts/', REPO_ROOT)
+      const names: string[] = []
+      for await (const entry of Deno.readDir(fontDir)) {
+        if (entry.isFile && entry.name.endsWith('.woff2')) {
+          names.push(entry.name)
+        }
+      }
+      names.sort()
+
+      await Deno.mkdir(new URL('fonts/', DIST_DIR), { recursive: true })
+      const lines = ['/* 由 build:jitex 生成：CM 字体清单（源自 resources/fonts/）。勿手改。 */']
+      for (const name of names) {
+        const bytes = await Deno.readFile(new URL(name, fontDir))
+        await Deno.writeFile(new URL(`fonts/${name}`, DIST_DIR), bytes)
+        // 族名 = 文件名大写（CMR10…），与运行期 resolveFont 的输出一致
+        lines.push(
+          `@font-face {\n  font-family: '${name.replace(/\.woff2$/, '').toUpperCase()}';\n` +
+            `  src: url('./fonts/${name}') format('woff2');\n}`,
+        )
+      }
+      const css = lines.join('\n') + '\n'
+      assert(!/url\(\s*['"]?\//.test(css), 'fonts.css: 不能出现以 / 开头的资源路径（Pages 下会 404）')
+      await Deno.writeTextFile(new URL('fonts.css', DIST_DIR), css)
+      attach('fonts.css', new TextEncoder().encode(css))
+      log(`fonts: ${names.length} 个 woff2 + fonts.css`)
+      return { fontFiles: names.length }
+    })
+
+    const siteSmokeStage = stage('smoke: site', [siteStage], async () => {
+      // 官网也是发布物，同样**用产物本身**验证：装一个最小 DOM 桩，把 dist/app.js
       // （连同它 import 的 jitex.js）真跑一遍。没有浏览器也能挡住"字段名 / 元素 id
       // 写错"这类只在页面里才暴露的错误。
       const dom = createStubDom()
@@ -321,7 +387,7 @@ export function createBuildJitexSuite(): Suite {
       ;(globalThis as { document?: unknown }).document = dom.document
       try {
         await import(new URL('app.js', DIST_DIR).href)
-        // 演示页在末尾自动跑一次；run() 里先让出一次事件循环再同步执行
+        // 官网在末尾自动跑一次；run() 里先让出一次事件循环再同步执行
         await new Promise((resolve) => setTimeout(resolve, 2000))
       } finally {
         if (!hadDocument) {
@@ -332,20 +398,20 @@ export function createBuildJitexSuite(): Suite {
       const status = dom.byId('status').textContent
       const consoleText = dom.byId('console').textContent
       const pageCount = dom.byId('pages').children.length
-      log(`[demo] status=${status} pages=${pageCount}`)
-      assert(status.startsWith('terminated'), `demo: status = ${status}`)
-      assert(pageCount >= 1, 'demo: 至少应渲染出一页')
+      log(`[site] status=${status} pages=${pageCount}`)
+      assert(status.startsWith('terminated'), `site: status = ${status}`)
+      assert(pageCount >= 1, 'site: 至少应渲染出一页')
       assert(
         dom.byId('pages').children[0].innerHTML.includes('<svg'),
-        'demo: 页面容器里应该是 SVG',
+        'site: 页面容器里应该是 SVG',
       )
-      assert(consoleText.includes('Output written on'), 'demo: 控制台应有 TeX 的 transcript')
+      assert(consoleText.includes('Output written on'), 'site: 控制台应有 TeX 的 transcript')
 
-      return { demoPages: pageCount }
+      return { sitePages: pageCount }
     })
 
-    stage('publish', [jitexStage, smokeStage, demoSmokeStage], async () => {
-      const names = [...DEMO_FILES, 'jitex.js', 'jitex.manifest.json']
+    stage('publish', [jitexStage, smokeStage, siteSmokeStage, fontsStage], async () => {
+      const names = [...SITE_FILES, 'fonts.css', 'jitex.js', 'jitex.manifest.json']
       const lines: string[] = []
       for (const name of names) {
         const bytes = await Deno.readFile(new URL(name, DIST_DIR))
