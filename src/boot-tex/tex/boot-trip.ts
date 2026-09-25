@@ -1,9 +1,11 @@
 import { assert, assertEquals, attach, attachText, cache, log, stage, type Suite, suite } from '@jitex/integration'
 import { createMemoryFileStore, runJs } from '@jitex/runtime'
 import type { PascalFileStore } from '@jitex/runtime'
+import { ConsoleFile, texFontKey, texFormatKey, texRuntimeSyscalls } from '@jitex/tex-runtime'
 import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
-import { ConsoleFile, getTripChFile, readBytesFromState, readFile, readTextFile, readTextFromState } from '../utils.ts'
-import { createStageOfGetTangleJs, texExtraSyscalls, transformTex } from './build-tex.ts'
+import { getTripChFile, readBytesFromState, readFile, readTextFile, readTextFromState } from '../utils.ts'
+import { createTexStages } from './stages.ts'
+import { transformTex } from './build-tex.ts'
 
 interface RunTripTexArgs {
   tripJs: string
@@ -17,8 +19,8 @@ interface RunTripTexArgs {
 async function runTripTex(args: RunTripTexArgs) {
   const files = new Map<string, PascalFileStore>()
   files.set('trip.tex', createMemoryFileStore(args.tripTex))
-  files.set('TeXformats:TEX.POOL', createMemoryFileStore(args.poolFile))
-  files.set('TeXfonts:trip.tfm', createMemoryFileStore(args.tripTfm))
+  files.set(texFormatKey('TEX.POOL'), createMemoryFileStore(args.poolFile))
+  files.set(texFontKey('trip.tfm'), createMemoryFileStore(args.tripTfm))
   if (args.extraFiles) {
     for (const [key, value] of args.extraFiles) {
       files.set(key, value)
@@ -28,7 +30,7 @@ async function runTripTex(args: RunTripTexArgs) {
   files.set('TTY:', consoleFile)
   const state = await runJs(args.tripJs, {
     files,
-    extraSyscalls: texExtraSyscalls,
+    extraSyscalls: texRuntimeSyscalls(),
   })
   return { state, consoleFile }
 }
@@ -46,7 +48,7 @@ export function createBootTexSuite(): Suite {
     const isDebug = debug === 'true'
     log(`debug = ${isDebug}`)
 
-    const tangleJsStage = cache(createStageOfGetTangleJs(isDebug))
+    const { tangleJsStage } = createTexStages(isDebug)
 
     const tripPasStage = cache(stage('tangle tex.web => tex.trip', [tangleJsStage], async ([{ tangleJs }]) => {
       const texWeb = await readTextFile('./resources/knuth/tex/tex.web')

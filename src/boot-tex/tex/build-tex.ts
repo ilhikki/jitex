@@ -1,9 +1,15 @@
 import { transform } from '@jitex/pascal-to-js'
 import type { ExtraCallable } from '@jitex/pascal-to-js'
-import type { PascalFile, SyscallHandler } from '@jitex/runtime'
-import { ConsoleFile, extraSyscalls, fileOpenRewriters, readTextFile, runtimeFileSyscalls } from '../utils.ts'
+import { fileOpenRewriters, readTextFile } from '../utils.ts'
 import { runTanglePascal, transformTangle } from '../tangle/build-tangle.ts'
 import { attachText, stage } from '@jitex/integration'
+
+/*
+ * TeX82 的编译期声明：extra callable 名 + 重写表 + transform 包装。
+ *
+ * 运行期部分（TTY 终端、extra / open syscall 实现）在 @jitex/tex-runtime 的
+ * tex/ 层；本文件只做"把 TeX 编译成 JS"这件事。
+ */
 
 const texExtraCallables: Record<string, ExtraCallable> = {
   'BREAK': {
@@ -22,35 +28,6 @@ const texExtraCallables: Record<string, ExtraCallable> = {
     sysCallName: 'extra.erStat',
     kind: 'function',
   },
-}
-
-/**
- * eoln(f)：ConsoleFile 需要模拟终端对回车键的回显。
- *
- * input_ln 读到行结束符就停下、不消费它；真实终端会把那个换行回显出来，
- * 这里用 advance() 消费并回显。
- */
-const eolnSyscall: SyscallHandler = (ctx, file) => {
-  const f = file as PascalFile | undefined
-  const store = f === undefined ? ctx.files.get('INPUT') : f.value
-  if (!store || !store.hasMore()) {
-    return 1
-  }
-  const byte = store.peekByte()
-  const isEoln = byte === 10 || byte === 13
-  if (isEoln && store instanceof ConsoleFile) {
-    store.advance()
-  }
-  return isEoln ? 1 : 0
-}
-
-export const texExtraSyscalls: Record<string, SyscallHandler> = {
-  'extra.close': extraSyscalls['extra.close'],
-  'extra.breakIn': extraSyscalls['extra.breakIn'],
-  'extra.erStat': extraSyscalls['extra.erStat'],
-  'extra.break': extraSyscalls['extra.break'],
-  'runtime.file.eoln': eolnSyscall,
-  ...runtimeFileSyscalls,
 }
 
 export function transformTex(texPascalContent: string, debug = true) {

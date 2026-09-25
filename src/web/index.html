@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>jitex — TeX82 in the browser</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <!--
+      演示站点：jitex.js 的适配层范本。
+      站点里没有一行 TeX 逻辑——装载、执行、渲染都在 jitex.js 里；这里只有
+      三面板 UI，以及一个 Worker（线程模型是使用者的活，库不代劳）。
+    -->
+    <header>
+      <h1>jitex</h1>
+      <span class="sub">TeX82 → DVI → SVG，全部在浏览器里跑</span>
+      <span class="spacer"></span>
+      <span id="status" class="status">就绪</span>
+      <button id="run" type="button">运行 (Ctrl/⌘ + Enter)</button>
+    </header>
+
+    <main>
+      <section class="pane pane-input">
+        <h2>TeX 输入</h2>
+        <textarea id="source" spellcheck="false" autocomplete="off"></textarea>
+      </section>
+      <section class="pane pane-output">
+        <h2>SVG 输出 <span id="pages-info" class="info"></span></h2>
+        <div id="pages" class="pages"></div>
+      </section>
+      <section class="pane pane-console">
+        <h2>TeX 控制台</h2>
+        <pre id="console"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

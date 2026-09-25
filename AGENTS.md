@@ -10,13 +10,17 @@
 
 - `@jitex/pascal-to-js`：编译器——将 Pascal 源码编译为 ESM 源码字符串（`transform`）。只实现 ISO 7185；
   非标能力由使用方经扩展点声明提供——不改写源码。对 `@jitex/runtime` 的唯一依赖是 key 契约（`rtKeys`）。
-- `@jitex/runtime`：执行层——加载并执行编译产物（`runJs`），提供宿主值、文件存储与 syscall handler；
-  零依赖，可单独打包为浏览器 ESM。编译与执行分属两包：使用方「先 transform，再 runJs」。
+- `@jitex/runtime`：执行层——加载并执行编译产物（`runJs`；产物已是 ESM 模块时用 `createRunnerFromFactory`），
+  提供宿主值、文件存储与 syscall handler；零依赖。编译与执行分属两包：使用方「先 transform，再 runJs」。
+  不再单独产出浏览器 bundle，由 `build:jitex` 内联进 `jitex.js`。
 - `@jitex/integration`：E2E 流水线 DSL——多阶段、有依赖、可缓存、可产出结构化报告的流水线框架， 用于编排"编译 → 运行 →
   比对产物"类长任务（TANGLE 自举、TeX TRIP 等）；不含任何 TeX 代码。
-- `@jitex/tex-runtime`：TeX 侧运行时——目前含 DVI 解析与 SVG 渲染（`dviToSvg`），以及 plain.tex 的字体/字符编码默认实现。
+- `@jitex/tex-runtime`：TeX 侧运行时，两层各自成面——`render/` 纯渲染（DVI → SVG + plain 的字体/字符编码映射，
+  零依赖）；`tex/` TeX 运行驱动（TTY 终端、文件区约定、引擎装配 `createTexEngine`，依赖 `@jitex/runtime`）。
 - `boot-tex`（`src/boot-tex/`，**非 workspace 包**，无 `deno.json`）：TeX82 编译流水线——TANGLE 自举 + TeX TRIP 测试，
-  基于 `@jitex/integration` 编排，由顶层 `boot:*` task 运行。
+  以及 `build:jitex` 发布流水线；基于 `@jitex/integration` 编排，由顶层 `boot:*` / `build:jitex` task 运行。
+- `jitex.js`（发布物）：自包含单文件 ESM——TeX82 编译产物 + plain.fmt + tfm 全部内联，无 fetch / 无动态装载， 浏览器 /
+  Worker / Deno / Node 同一份代码；入口 `createTexEngine` / `dviToSvg`。由 `deno task build:jitex` 产出到 `dist/`。
 
 **终极目标**：让 TEX82 在合理时间内跑完。
 
@@ -26,10 +30,11 @@ Deno workspace monorepo：workspace 成员都在 `src/` 下，包根即源码根
 compilerOptions 入口。
 
 - `src/pascal-to-js/`：编译器包（`@jitex/pascal-to-js`）。`@/` 别名定义在本包 `deno.json`，指向包根。
-- `src/runtime/`：执行层包（`@jitex/runtime`），含构建脚本 `build.ts`。
+- `src/runtime/`：执行层包（`@jitex/runtime`）。
 - `src/integration/`：流水线框架包（`@jitex/integration`）。
-- `src/tex-runtime/`：TeX 侧运行时包（`@jitex/tex-runtime`）。
-- `src/boot-tex/`：TeX 流水线目录（非包）。
+- `src/tex-runtime/`：TeX 侧运行时包（`@jitex/tex-runtime`），内部按 `render/`（纯渲染）与 `tex/`（运行驱动）分层。
+- `src/boot-tex/`：TeX 流水线目录（非包）：`tex/`（公共阶段与 plain/trip 套件）、`tangle/`、`jitex/`（发布流水线）。
+- `src/web/`：演示站点目录（非包，零构建）：`jitex.js` 的适配层范本，由 `build:jitex` 的第 6 段拷进 `dist/`。
 - `tests/<包名>/`：测试，按包分目录。
 - `resources/`：外部素材；`dist/`：构建产物（已 gitignore）。
 

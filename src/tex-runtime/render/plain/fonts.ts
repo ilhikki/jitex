@@ -7,6 +7,16 @@ const SERIF = 'serif'
 const SANS = 'sans-serif'
 const MONO = 'monospace'
 
+/**
+ * 是否有该字体的字符映射。
+ *
+ * CM 家族走本目录的 OT1 / 数学表；其余字体名（manfnt、使用者自带的 tfm…）只能退化渲染，
+ * 需由调用方显式回报——见 createPlainDviConfig 的 onUnmappedFont。
+ */
+export function isMappedFont(dviFontName: string): boolean {
+  return /^cm/.test(dviFontName.toLowerCase())
+}
+
 /** DVI 字体名 → 输出字体（字号由 fnt_def 的 scaled size 决定，scale 恒为 1） */
 export function resolveFont(dviFontName: string): FontInfo {
   const name = dviFontName.toLowerCase()

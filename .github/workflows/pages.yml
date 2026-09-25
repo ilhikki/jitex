@@ -1,0 +1,52 @@
+name: pages
+
+# 发布：构建 jitex.js + 演示站点，部署到 GitHub Pages。
+#
+# 一次性人工设置：仓库 Settings → Pages → Source = "GitHub Actions"。
+# 站点地址形如 https://<owner>.github.io/<repo>/，所以演示页里一律用相对路径
+# （build:jitex 的第 6 段会断言这一点）。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # 不做缓存：整条流水线冷跑约 20 秒（自举 TANGLE + 编译 tex.web + INITEX），
+      # 而 integration 的阶段缓存默认不恢复（--with-cache 才恢复，且缺条目即报错）。
+      - name: Build jitex.js + demo
+        run: deno task build:jitex
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

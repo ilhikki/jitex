@@ -91,6 +91,20 @@ export function executeProgram(program: CompiledProgram, ctx: RuntimeContext): R
 }
 
 /**
+ * 阶段 2 + 3：由一个**已就绪的工厂**构造可复用执行器。
+ *
+ * 用于产物已被当作普通 ESM 模块装载的场合（构建期就拿到 factory，无需把源码
+ * 当字符串再 import 一次）——浏览器/Worker 走这条，避开 data: URL 与 Blob URL。
+ */
+export function createRunnerFromFactory(
+  factory: CompiledFactory,
+  extraSyscalls: Record<string, SyscallHandler> = {},
+): ProgramRunner {
+  const program = injectSyscalls(factory, extraSyscalls)
+  return (ctx: RuntimeContext) => executeProgram(program, ctx)
+}
+
+/**
  * 装载 + 注入：得到一个「(ctx) => RunState」的执行器，可对同一份产物反复运行。
  *
  * 只吃 code 与 extraSyscalls——files / maxSteps / programFileUrls 属于单次运行，
@@ -101,9 +115,7 @@ export async function createRunner(
   code: string,
   extraSyscalls: Record<string, SyscallHandler> = {},
 ): Promise<ProgramRunner> {
-  const factory = await loadFactory(code)
-  const program = injectSyscalls(factory, extraSyscalls)
-  return (ctx: RuntimeContext) => executeProgram(program, ctx)
+  return createRunnerFromFactory(await loadFactory(code), extraSyscalls)
 }
 
 /**

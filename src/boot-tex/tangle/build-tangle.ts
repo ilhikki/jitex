@@ -1,8 +1,9 @@
-import { bytesToString, extraSyscalls, fileOpenRewriters, runtimeFileSyscalls, stringToBytes } from '../utils.ts'
+import { fileOpenRewriters } from '../utils.ts'
 import { transform } from '@jitex/pascal-to-js'
 import type { ExtraCallable } from '@jitex/pascal-to-js'
-import { createMemoryFileStore, runJs } from '@jitex/runtime'
+import { bytesToString, createMemoryFileStore, encodeUtf8, runJs } from '@jitex/runtime'
 import type { PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
+import { texRuntimeSyscalls } from '@jitex/tex-runtime'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
 // noinspection SpellCheckingInspection
@@ -19,10 +20,8 @@ const tangleExtraCallables: Record<string, ExtraCallable> = {
   },
 }
 
-const tangleExtraSyscalls: Record<string, SyscallHandler> = {
-  'extra.break': extraSyscalls['extra.break'],
-  ...runtimeFileSyscalls,
-}
+// TANGLE 的 TTY 接在普通内存文件上（不是交互式终端），故关掉终端的 eoln 覆盖
+const tangleExtraSyscalls: Record<string, SyscallHandler> = texRuntimeSyscalls({ terminal: false })
 
 export type TangleInput = {
   tangleContent: string
@@ -89,9 +88,9 @@ export async function runTangleJs(
   changeContent: string | undefined = undefined,
 ): Promise<RunTangleResult> {
   const files = new Map<string, PascalFileStore>()
-  files.set(fileNames.webFile, createMemoryFileStore(stringToBytes(webContent)))
+  files.set(fileNames.webFile, createMemoryFileStore(encodeUtf8(webContent)))
   if (changeContent) {
-    const changeBytes = stringToBytes(changeContent)
+    const changeBytes = encodeUtf8(changeContent)
     files.set(fileNames.changeFile, createMemoryFileStore(changeBytes))
   }
   const pascalFile = createMemoryFileStore()
