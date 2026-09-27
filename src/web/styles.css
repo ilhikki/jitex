@@ -1,8 +1,4 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
   --toolbar: 0;
@@ -11,20 +7,20 @@
   --page-max: 864px;
 }
 
-html,
-body {
-  height: 100%;
-}
+html, body { height: 100%; }
 
 body {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 header {
   flex: none;
   display: flex;
+  justify-content: space-between;
   align-items: center;
 }
 
@@ -32,8 +28,6 @@ main {
   flex: 1;
   min-height: 0;
   display: flex;
-  justify-content: center;
-  overflow: hidden;
 }
 
 .pane {
@@ -43,17 +37,16 @@ main {
   min-height: 0;
 }
 
+.title {
+  flex: none;
+  cursor: pointer;
+  user-select: none;
+}
+
 #source-area {
   flex: 1 1 var(--col-min);
   min-width: var(--col-min);
   max-width: var(--col-max);
-}
-
-#source-area > :not(.title) {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  width: 100%;
 }
 
 .right {
@@ -65,46 +58,51 @@ main {
   min-height: 0;
 }
 
+.code {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  font-family: monospace;
+}
+
+.gutter {
+  flex: none;
+  user-select: none;
+  text-align: right;
+  overflow: hidden;
+}
+
+#source, #console {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+#source { resize: none; }
+
 .tab-bar {
   flex: none;
   display: flex;
 }
 
-#pages-area,
-#console-area {
+#pages-area, #console-area {
   flex: 1;
   min-height: 0;
   overflow: auto;
   display: none;
 }
 
-.right[data-active="pages"] #pages-area {
-  display: block;
-}
-.right[data-active="console"] #console-area {
-  display: block;
-}
+.right[data-active="pages"] #pages-area { display: block; }
+.right[data-active="console"] #console-area { display: flex; flex-direction: column; }
 
-#source {
-  resize: none;
-}
-
-.pages svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
+.pages svg { display: block; width: 100%; height: auto; }
 
 @media (min-width: 1248px) {
-  main {
-    flex-direction: row;
-  }
+  main { flex-direction: row; }
 }
 
 @media (max-width: 1247px) {
-  main {
-    flex-direction: column;
-  }
+  main { flex-direction: column; }
 
   #source-area {
     flex: none;

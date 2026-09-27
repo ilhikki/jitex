@@ -1,38 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>JiTex</title>
-    <link rel="stylesheet" href="./styles.css">
-    <link rel="stylesheet" href="./fonts.css">
-  </head>
-  <body>
-    <header>
-      <span id="logo"></span>
-      <button id="run" type="button">Run</button>
-    </header>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JiTex</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./fonts.css">
+</head>
+<body>
 
-    <main id="main">
-      <section id="source-area" class="pane">
-        <h2 class="title">Plain TeX</h2>
-        <textarea id="source" spellcheck="false" autocomplete="off" wrap="off"></textarea>
-      </section>
+<header>
+  <span id="logo"></span>
+  <button id="run" type="button">Run</button>
+</header>
 
-      <div class="right" data-active="pages">
-        <nav class="tab-bar">
-          <button type="button" data-tab="pages">Pages</button>
-          <button type="button" data-tab="console">Console</button>
-        </nav>
-        <section id="pages-area">
-          <div class="pages"></div>
-        </section>
-        <section id="console-area">
-          <pre id="console"></pre>
-        </section>
+<main id="main">
+  <section id="source-area" class="pane">
+    <div class="title">Plain TeX</div>
+    <div class="code">
+      <pre class="gutter" aria-hidden="true"></pre>
+      <textarea id="source" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+    </div>
+  </section>
+
+  <div class="right" data-active="pages">
+    <nav class="tab-bar">
+      <div class="title" data-tab="pages">Pages</div>
+      <div class="title" data-tab="console">Console</div>
+    </nav>
+    <section id="pages-area">
+      <div class="pages"></div>
+    </section>
+    <section id="console-area">
+      <div class="code">
+        <pre class="gutter" aria-hidden="true"></pre>
+        <pre id="console"></pre>
       </div>
-    </main>
+    </section>
+  </div>
+</main>
 
-    <script type="module" src="./app.js"></script>
-  </body>
+<script type="module" src="./app.js"></script>
+</body>
 </html>
