@@ -1,6 +1,6 @@
 import type { DviConfig } from '../dvi/types.ts'
 import { createTfmLookup } from '../tfm.ts'
-import { isMappedFont, resolveFont, resolveUnicode } from './fonts.ts'
+import { hasGlyph, resolveFont, resolveUnicode } from './fonts.ts'
 
 /**
  * 渲染器的回报口。
@@ -8,8 +8,8 @@ import { isMappedFont, resolveFont, resolveUnicode } from './fonts.ts'
  * 包内使用：不对公共面暴露对象图（公共面只有纯数据，见 tex-runtime/mod.ts）。
  */
 export interface PlainDviHooks {
-  /** 遇到没有字符映射的字体名（会退化渲染）；同一字体可能被回报多次 */
-  onUnmappedFont?: (dviFontName: string) => void
+  /** 报告一个没有字符映射的字形（字体名 + 码位）；同一字形可能被回报多次 */
+  onUnmappedGlyph?: (dviFontName: string, charCode: number) => void
 }
 
 /**
@@ -24,13 +24,13 @@ export function createPlainDviConfig(
 ): DviConfig {
   const metrics = createTfmLookup(fonts)
   return {
-    resolveFont: (name) => {
-      if (!isMappedFont(name)) {
-        hooks.onUnmappedFont?.(name)
+    resolveFont,
+    resolveUnicode: (name, code) => {
+      if (!hasGlyph(name, code)) {
+        hooks.onUnmappedGlyph?.(name, code)
       }
-      return resolveFont(name)
+      return resolveUnicode(name, code)
     },
-    resolveUnicode,
     resolveWidth: (name, code, size) => metrics(name)?.charWidth(code, size),
   }
 }

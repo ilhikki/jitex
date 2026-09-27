@@ -5,7 +5,7 @@
     "./src/integration",
     "./src/tex-runtime"
   ],
-  "exclude": ["reports", "resources", "dist"],
+  "exclude": ["reports", "resources", "dist", "src/web"],
   "compilerOptions": {
     "strict": true
   },

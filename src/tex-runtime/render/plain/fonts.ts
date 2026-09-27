@@ -52,3 +52,9 @@ export function resolveUnicode(dviFontName: string, charCode: number): string | 
   const table = TABLES[FONT_TABLE[dviFontName.toLowerCase()] ?? '']
   return table?.[charCode] ?? charCode
 }
+
+/** 该字体在该码位上有没有字形（没有表、或表项为 null → 没有） */
+export function hasGlyph(dviFontName: string, charCode: number): boolean {
+  const glyph = TABLES[FONT_TABLE[dviFontName.toLowerCase()] ?? '']?.[charCode]
+  return glyph !== null && glyph !== undefined
+}

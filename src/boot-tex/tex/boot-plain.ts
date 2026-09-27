@@ -2,7 +2,8 @@ import { createTexStages } from './stages.ts'
 import { readFile } from '../utils.ts'
 import { createMemoryFileStore, runJs } from '@jitex/runtime'
 import type { PascalFileStore } from '@jitex/runtime'
-import { ConsoleFile, dviToSvg, texFormatKey, texRuntimeSyscalls } from '@jitex/tex-runtime'
+import { ConsoleFile, texFormatKey, texRuntimeSyscalls } from '@jitex/tex-runtime'
+import { dviToSvg } from '../../tex-runtime/render/mod.ts'
 import { assert, attach, attachText, stage, type Suite, suite } from '@jitex/integration'
 
 /*

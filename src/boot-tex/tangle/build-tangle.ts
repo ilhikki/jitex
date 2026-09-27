@@ -120,7 +120,7 @@ export async function runTangleJs(
   }
 }
 
-export function transformTangle(tangleContent: string, debug = true) {
+export function transformTangle(tangleContent: string, debug: boolean) {
   const jsCode = transform(tangleContent, {
     extraCallables: tangleExtraCallables,
     syscallRewriters: fileOpenRewriters,

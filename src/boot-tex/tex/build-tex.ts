@@ -30,7 +30,7 @@ const texExtraCallables: Record<string, ExtraCallable> = {
   },
 }
 
-export function transformTex(texPascalContent: string, debug = true) {
+export function transformTex(texPascalContent: string, debug: boolean) {
   const jsCode = transform(texPascalContent, {
     extraCallables: texExtraCallables,
     syscallRewriters: fileOpenRewriters,

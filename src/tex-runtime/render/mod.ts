@@ -3,30 +3,51 @@ import { createPlainDviConfig } from './plain/mod.ts'
 import { renderPage } from './svg/render.ts'
 
 /**
- * 装配点：DVI 字节流 → 每页一个 SVG 字符串（plain 默认字体/编码映射）。
+ * 缺字符映射：DVI 用到了渲染器没有编码表的字体。
  *
- * `fonts` 是随发布提供的字体度量（键为 `cmr10.tfm` 这类文件名，值为 TFM 字节）。
- * 给了它，字形位置就按 DVI 规范推进（set_char 之后 h 加上字符宽度）；不给也能跑，
- * 只是位置退化成由渲染端的字体度量承担（见 dvi/types.ts 的 resolveWidth）。
- *
- * 两个参数都是纯数据：公共面不出现可被当成契约的对象图（见 ../mod.ts）。
+ * 这类字形画不出来（位置也无从按规范推进），所以不做退化渲染，直接失败——
+ * `fonts` 里带齐所有出问题的字体名与码位，便于一次看清全部缺口。
  */
+export class UnmappedFontError extends Error {
+  readonly fonts: { name: string; charCodes: number[] }[]
+
+  constructor(fonts: { name: string; charCodes: number[] }[]) {
+    super(
+      `unmapped font(s): ${fonts.map((f) => `${f.name} [${f.charCodes.join(',')}]`).join('; ')}`,
+    )
+    this.name = 'UnmappedFontError'
+    this.fonts = fonts
+  }
+}
+
+/** 装配点：DVI 字节流 → 每页一个 SVG 字符串（plain 默认字体/编码映射） */
 export function dviToSvg(dvi: Uint8Array, fonts: Record<string, Uint8Array> = {}): string[] {
-  return renderDvi(dvi, fonts).svgs
+  return renderDvi(dvi, fonts)
 }
 
 /**
- * 包内用：渲染并回报没有字符映射的字体名。
+ * 渲染一个 DVI；缺字符映射就抛 `UnmappedFontError`。
  *
- * 错误在一侧产生就该在一侧报告：渲染层认不得某个字体名时，此处的 missingFonts
- * 把"退化渲染"这件事显式交出去，而不是让调用方看到空白/错字去猜。
+ * 收集发生在解释阶段、抛在解释之后——这样一次能报出所有缺口的字体与码位，
+ * 而不是撞见第一个就中断。`fonts` 是随发布提供的度量源（键为 `cmr10.tfm` 这类文件名）。
  */
-export function renderDvi(
-  dvi: Uint8Array,
-  fonts: Record<string, Uint8Array> = {},
-): { svgs: string[]; missingFonts: string[] } {
-  const missing = new Set<string>()
-  const config = createPlainDviConfig(fonts, { onUnmappedFont: (name) => missing.add(name) })
-  const svgs = parseDvi(dvi, config).map(renderPage)
-  return { svgs, missingFonts: [...missing].sort() }
+export function renderDvi(dvi: Uint8Array, fonts: Record<string, Uint8Array> = {}): string[] {
+  const missing = new Map<string, Set<number>>()
+  const config = createPlainDviConfig(fonts, {
+    onUnmappedGlyph: (name, code) => {
+      const codes = missing.get(name)
+      if (codes === undefined) {
+        missing.set(name, new Set([code]))
+      } else {
+        codes.add(code)
+      }
+    },
+  })
+  const pages = parseDvi(dvi, config)
+  if (missing.size > 0) {
+    throw new UnmappedFontError(
+      [...missing].map(([name, codes]) => ({ name, charCodes: [...codes].sort((a, b) => a - b) })),
+    )
+  }
+  return pages.map(renderPage)
 }

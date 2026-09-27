@@ -1,24 +1,20 @@
 import { bytesToString, createRunnerFromFactory, createRuntimeContext } from '@jitex/runtime'
-import type { CompiledFactory, PascalFileStore, RunState, RuntimeContext } from '@jitex/runtime'
+import type { CompiledFactory, RunState, RuntimeContext } from '@jitex/runtime'
 import { renderDvi } from '../render/mod.ts'
+import type { TexJobFiles } from './files.ts'
 import { createTexJobFiles } from './files.ts'
 import { texRuntimeSyscalls } from './syscalls.ts'
 
 /*
  * TeX 引擎：把「预建格式 + TeX82 程序 + 字体」装成可反复运行的 render。
  *
- * 与 runtime 的三段式对应：本函数做阶段 1（拿到工厂，由调用方传入）与阶段 2
- * （注入 syscall 表），每次 render 只做阶段 3（新建 ctx 跑一次）。
- *
  * 边界（改这里之前先读）：
  *   - 引擎只持有**不可变资产**（工厂、字节）+ 无状态 handler 表；任何 per-job
  *     的状态都在 render 内新建，故同一引擎可重复调用、结果互不污染。
  *   - 程序与格式是**不可分单元**：fmt 是 TeX82 程序的内存镜像，两者不同源会以
  *     极难排查的方式崩掉。因此没有"单独替换 fmt"的入口。
- *   - 不引入任何宿主输入（时钟 / 随机 / 环境变量）：TeX 的日期被钉成常量，
- *     同一输入必须逐字节可复现。
- *   - 装载期失败抛（调用方给错了资产）；运行期（TeX 的 errorstop、缺字、步数
- *     超限）一律走返回值的 status/error，不抛。
+ *   - 不引入任何宿主输入（时钟 / 随机 / 环境变量）：同一输入必须逐字节可复现。
+ *   - render 不抛：装载期（createTexEngine）失败才抛。
  */
 
 export interface TexEngineAssets {
@@ -32,40 +28,53 @@ export interface TexEngineAssets {
   formatName?: string
   /** 随发布提供的字体：键为字体名或 tfm 文件名 */
   fonts?: Record<string, Uint8Array>
-  /** 步数上限（防跑飞），默认 1e9 */
-  maxSteps?: number
 }
 
 export interface TexRenderOptions {
-  jobName?: string
-  maxSteps?: number
-  /** 额外的运行期文件（按 TeX 文件键） */
+  /** 额外的运行期文件（按 TeX 文件键，如 `foo.tex`） */
   files?: Record<string, string | Uint8Array>
-  /** 覆盖 TTY 引导串 */
-  inputLines?: string
 }
 
-export interface TexRenderResult {
-  /** 每页一个 SVG 字符串 */
-  svgs: string[]
-  /** DVI 字节（TeX 未产出时为空数组） */
-  dvi: Uint8Array
-  /** 终端上看到的一切（**含输入回显**；与 log 不是一回事） */
-  console: string
-  /** TeX 的 transcript（`<jobName>.log`）；未产出时为 undefined */
-  log: string | undefined
-  status: RunState['status']
-  steps: number
-  error: RunState['error']
-  /** 没有字符映射、已退化渲染的字体名 */
-  missingFonts: string[]
+/**
+ * TeX 启动成功、但文档里有 TeX 级错误（未定义控制序列、缺字体文件…）。
+ *
+ * TeX 自己不会抛异常：它把报错写进终端与 transcript 然后继续。所以这一类错误
+ * 由引擎从 transcript 里读出来，就是一个 Error——`instanceof TexError` 即
+ * "TeX 起来了，问题在文档"。
+ */
+export class TexError extends Error {
+  readonly line?: number
+
+  constructor(message: string, line?: number) {
+    super(message)
+    this.name = 'TexError'
+    this.line = line
+  }
 }
+
+export type TexRenderResult =
+  | { ok: true; svgs: string[]; console: string }
+  | { ok: false; error: Error; console?: string }
 
 export interface TexEngine {
   render(tex: string, options?: TexRenderOptions): TexRenderResult
 }
 
-const DEFAULT_MAX_STEPS = 1e9
+/** TeX 的报错行：`! <info>`，下一行（可能隔着上下文行）是 `l.<行号>` */
+const ERROR_LINE = /^!\s*(.+)$/m
+const ERROR_LINE_NO = /^l\.(\d+)/m
+
+/** 从 transcript 里取第一条 TeX 报错；没有则返回 undefined */
+function findTexError(job: TexJobFiles): TexError | undefined {
+  const store = job.files.get(job.logKey)
+  const text = store === undefined ? '' : bytesToString(store.getData())
+  const match = ERROR_LINE.exec(text)
+  if (match === null) {
+    return undefined
+  }
+  const lineMatch = ERROR_LINE_NO.exec(text.slice(match.index + match[0].length))
+  return new TexError(match[1].trim(), lineMatch === null ? undefined : Number(lineMatch[1]))
+}
 
 export function createTexEngine(assets: TexEngineAssets): TexEngine {
   const run = createRunnerFromFactory(assets.program, texRuntimeSyscalls())
@@ -80,30 +89,35 @@ export function createTexEngine(assets: TexEngineAssets): TexEngine {
         pool: assets.pool,
         formatName,
         fonts,
-        jobName: options.jobName,
-        inputLines: options.inputLines,
         extraFiles: options.files,
       })
-      const ctx: RuntimeContext = createRuntimeContext({
-        files: job.files,
-        maxSteps: options.maxSteps ?? assets.maxSteps ?? DEFAULT_MAX_STEPS,
-      })
+      const ctx: RuntimeContext = createRuntimeContext({ files: job.files })
       const state: RunState = run(ctx)
+      const consoleText = job.console.getOutput()
+      const fail = (error: Error): TexRenderResult =>
+        consoleText === '' ? { ok: false, error } : { ok: false, error, console: consoleText }
 
-      // TeX 中途 errorstop 时可能根本没写出 DVI：此时不解析，直接给空结果
+      // 引擎没跑起来：异常原样交出
+      if (state.status === 'error' && state.error !== undefined) {
+        return fail(state.error)
+      }
+
+      // TeX 自己报的错：不中断运行，只在 transcript 里留一条记录
+      const texError = findTexError(job)
+      if (texError !== undefined) {
+        return fail(texError)
+      }
+
+      // TeX 正常结束但没写 DVI（例如文档没有产出）：不算失败，只是没有页
       const dvi = job.files.get(job.dviKey)?.getData() ?? new Uint8Array(0)
-      // 字体度量就是喂给 TeX 的那批 tfm：渲染端据此把 h 按规范推进
-      const rendered = dvi.length === 0 ? { svgs: [], missingFonts: [] } : renderDvi(dvi, fonts)
-      const logStore: PascalFileStore | undefined = job.files.get(job.logKey)
-      return {
-        svgs: rendered.svgs,
-        dvi,
-        console: job.console.getOutput(),
-        log: logStore === undefined ? undefined : bytesToString(logStore.getData()),
-        status: state.status,
-        steps: state.steps,
-        error: state.error,
-        missingFonts: rendered.missingFonts,
+      if (dvi.length === 0) {
+        return { ok: true, svgs: [], console: consoleText }
+      }
+
+      try {
+        return { ok: true, svgs: renderDvi(dvi, fonts), console: consoleText }
+      } catch (e) {
+        return fail(e instanceof Error ? e : new Error(String(e)))
       }
     },
   }

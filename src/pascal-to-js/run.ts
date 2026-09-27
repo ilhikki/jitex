@@ -25,7 +25,7 @@ export function parse(source: string): ParseResult<ProgramNode> {
 }
 
 export interface TransformOptions {
-  /** 额外 callable 注入（编译期声明非标过程/函数，AGENTS.md 原则 A.7：注入优先） */
+  /** 额外 callable 注入（编译期声明非标过程/函数） */
   extraCallables?: Record<string, ExtraCallable>
   /**
    * 用户自定义 syscall 重写表。
@@ -40,15 +40,12 @@ export interface TransformOptions {
    */
   defaultRewriter?: SyscallRewriter
   /**
-   * debug 构建（默认 true）。
+   * 是否生成 debug 检查（默认 false）。
    *
-   * true 时 rewrite 产出 `runtime.debug.*` 系列检查：子界边界、循环步数、
-   * 除零、字节视图断言。false 时这些 key 根本不生成，运行期零开销。
-   *
-   * 注意：非 debug 构建下，ISO 7185 定为 error 的情形（6.7.2.2 除数为 0 /
-   * 负数、6.4.2.4 子界越界）不再被捕获，行为由宿主实现决定。
+   * 开启后才会产出 `runtime.debug.*` 系列检查（子界边界、循环步数、除零、
+   * 字节视图断言），代价是产物更大、更慢。仅供测试使用。
    */
-  debug: boolean
+  debug?: boolean
 }
 
 function parseSource(source: string): ProgramNode {
@@ -68,12 +65,12 @@ function parseSource(source: string): ProgramNode {
  * `export default function main(__sys) { ... return function __run(__ctx) { ... } }`，
  * 由 @jitex/runtime 装载、注入 syscall 表与 ctx 后执行（见 runtime 的 exec.ts）。
  */
-export function transform(source: string, options: TransformOptions = { debug: false }): string {
+export function transform(source: string, options: TransformOptions = {}): string {
   const ast = parseSource(source)
 
   // debug 构建开关：lowering（决定是否生成独立检查语句）与 rewrite（决定检查的
   // 具体形态）都需要它，故在两层之前先算出
-  const debug = options.debug ?? true
+  const debug = options.debug ?? false
   const analysis = analyzeProgram(ast, options.extraCallables, debug)
 
   const jsonCode = loweringProgram(ast, analysis)
@@ -90,7 +87,7 @@ export function transform(source: string, options: TransformOptions = { debug: f
   const { code: jsBody, mainName } = toJs(ir, {
     semantic,
     debugNames: analysis.debugNames(),
-    debug: options.debug === true,
+    debug,
   })
 
   return `${jsBody}\nexport default ${mainName};`

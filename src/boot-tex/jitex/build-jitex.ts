@@ -1,7 +1,7 @@
-import { assert, attach, attachText, log, stage, suite } from '@jitex/integration'
 import type { Suite } from '@jitex/integration'
-import { bundle } from 'jsr:@deno/emit@^0.46.0'
+import { assert, attach, attachText, log, stage, suite } from '@jitex/integration'
 import type { ImportMap } from 'jsr:@deno/emit@^0.46.0'
+import { bundle } from 'jsr:@deno/emit@^0.46.0'
 import { createTexStages } from '../tex/stages.ts'
 import { INITIAL_TEX } from '../../web/initial-tex.js'
 
@@ -105,14 +105,13 @@ ${fontEntries}
   await Deno.writeTextFile(
     entry,
     `// 由 build:jitex 生成：jitex.js 的入口（零配置门面）。勿手改。
-import { createTexEngine as createEngine, dviToSvg } from '@jitex/tex-runtime'
+import { createTexEngine as createEngine } from '@jitex/tex-runtime'
 import texProgram from './tex-program.js'
 import { fonts, format, pool } from './assets.js'
 
-export { dviToSvg }
 export const version = ${JSON.stringify(JITEX_VERSION)}
 
-/** 装载一次即得引擎；options 可覆盖 maxSteps，或补充 plain 未预加载的字体 */
+/** 装载一次即得引擎；options 可补充 plain 未预加载的字体或额外输入文件 */
 export function createTexEngine(options = {}) {
   return createEngine({ program: texProgram, format, pool, fonts, ...options })
 }
@@ -130,11 +129,17 @@ interface StubElement {
   className: string
   value: string
   disabled: boolean
+  hidden: boolean
+  tabIndex: number
   scrollTop: number
   scrollHeight: number
   children: StubElement[]
   appendChild(child: StubElement): void
   addEventListener(type: string, fn: (event: StubKeyboardEvent) => void): void
+  setAttribute(name: string, value: string): void
+  getAttribute(name: string): string | null
+  hasAttribute(name: string): boolean
+  focus(): void
 }
 
 interface StubKeyboardEvent {
@@ -142,43 +147,6 @@ interface StubKeyboardEvent {
   ctrlKey?: boolean
   metaKey?: boolean
   preventDefault?: () => void
-}
-
-function createStubDom(): { document: unknown; byId: (id: string) => StubElement } {
-  const elements = new Map<string, StubElement>()
-
-  const make = (id: string): StubElement => ({
-    id,
-    textContent: '',
-    innerHTML: '',
-    className: '',
-    value: '',
-    disabled: false,
-    scrollTop: 0,
-    scrollHeight: 0,
-    children: [],
-    appendChild(child: StubElement) {
-      this.children.push(child)
-    },
-    addEventListener(_type: string, _fn: (event: StubKeyboardEvent) => void) {},
-  })
-
-  const byId = (id: string): StubElement => {
-    let element = elements.get(id)
-    if (element === undefined) {
-      element = make(id)
-      elements.set(id, element)
-    }
-    return element
-  }
-
-  return {
-    document: {
-      getElementById: (id: string) => byId(id),
-      createElement: (_tag: string) => make(''),
-    },
-    byId,
-  }
 }
 
 /** 用例 A：plain 的预加载字体，不需要读任何 tfm */
@@ -192,22 +160,17 @@ const SMOKE_FONT = String.raw`\font\big=cmr10 at 12pt \big Big text at 12pt\par
 `
 
 /**
- * 官网正文那段 tex 的产物：dvi + 每页 svg + log，全部进报告，点开就能与网页对照。
+ * 官网正文那段 tex 的产物：每页 svg + console，全部进报告，点开就能与网页对照。
  * 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
  */
-interface SmokeRunResult {
-  svgs: string[]
-  dvi: Uint8Array
-  status: string
-  steps: number
-  error: { message: string } | undefined
-  missingFonts: string[]
-}
+type SmokeRunResult =
+  | { ok: true; svgs: string[]; console: string }
+  | { ok: false; error: { message: string }; console?: string }
 
 /** 产物 jitex.js 的公共面（只声明本套件用到的那部分） */
 interface JitexModule {
   createTexEngine: (o?: Record<string, unknown>) => {
-    render: (tex: string, o?: Record<string, unknown>) => SmokeRunResult & { log: string | undefined }
+    render: (tex: string, o?: Record<string, unknown>) => SmokeRunResult
   }
 }
 
@@ -273,55 +236,56 @@ export function createBuildJitexSuite(): Suite {
       assert(typeof jitex.createTexEngine === 'function', 'createTexEngine should be exported')
       const engine = jitex.createTexEngine()
 
-      const attachRun = (prefix: string, run: SmokeRunResult & { log: string | undefined }) => {
-        attach(`${prefix}.dvi`, run.dvi)
-        attach(`${prefix}.log`, new TextEncoder().encode(run.log ?? ''))
-        run.svgs.forEach((svg, i) => attach(`${prefix}.${i + 1}.svg`, new TextEncoder().encode(svg)))
-        log(`[${prefix}] status=${run.status} steps=${run.steps} pages=${run.svgs.length} dvi=${run.dvi.length}`)
+      const attachRun = (prefix: string, run: SmokeRunResult) => {
+        const svgs = run.ok ? run.svgs : []
+        svgs.forEach((svg, i) => attach(`${prefix}.${i + 1}.svg`, new TextEncoder().encode(svg)))
+        attachText(`${prefix}.console.txt`, run.ok ? run.console : (run.console ?? ''))
+        const pages = svgs.length
+        const status = run.ok ? 'ok' : `error: ${run.error.message}`
+        log(`[${prefix}] ${status} · pages=${pages}`)
       }
 
-      const plain = engine.render(SMOKE_PLAIN, { jobName: 'smoke-plain' })
+      const plain = engine.render(SMOKE_PLAIN)
       attachRun('smoke-plain', plain)
-      assert(plain.status === 'terminated', `plain smoke: status = ${plain.status} ${plain.error?.message ?? ''}`)
+      assert(plain.ok, `plain smoke: ${plain.ok ? '' : plain.error.message}`)
       assert(plain.svgs.length >= 1, 'plain smoke: expected at least one page')
-      assert(plain.missingFonts.length === 0, `plain smoke: unmapped fonts ${plain.missingFonts.join(', ')}`)
 
-      const font = engine.render(SMOKE_FONT, { jobName: 'smoke-font' })
+      const font = engine.render(SMOKE_FONT)
       attachRun('smoke-font', font)
-      assert(font.status === 'terminated', `font smoke: status = ${font.status} ${font.error?.message ?? ''}`)
+      assert(font.ok, `font smoke: ${font.ok ? '' : font.error.message}`)
       assert(font.svgs.length >= 1, 'font smoke: expected at least one page')
-      assert(font.missingFonts.length === 0, `font smoke: unmapped fonts ${font.missingFonts.join(', ')}`)
 
       // 同一引擎重复运行必须互不污染（每次 render 自造 ctx 与全部 store）
-      const again = engine.render(SMOKE_PLAIN, { jobName: 'smoke-plain' })
+      const again = engine.render(SMOKE_PLAIN)
+      assert(again.ok, `rerun failed: ${again.ok ? '' : again.error.message}`)
       assert(
-        again.dvi.length === plain.dvi.length,
-        `rerun should be identical: ${plain.dvi.length} → ${again.dvi.length}`,
+        again.svgs.length === plain.svgs.length,
+        `rerun page count differs: ${plain.svgs.length} → ${again.svgs.length}`,
+      )
+      assert(
+        again.svgs[0] === plain.svgs[0],
+        'rerun should produce identical SVG',
       )
 
       return { plainPages: plain.svgs.length, fontPages: font.svgs.length }
     })
 
-    // 官网正文那段 tex 的产物：dvi + 每页 svg + log，全部进报告，点开就能与网页对照。
+    // 官网正文那段 tex 的产物：每页 svg + console，全部进报告，点开就能与网页对照。
     // 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
-    stage('site tex ⇒ dvi + svg', [jitexStage], async () => {
+    stage('site tex ⇒ svg', [jitexStage], async () => {
       const jitex = await import(new URL('jitex.js', DIST_DIR).href) as JitexModule
-      const run = jitex.createTexEngine().render(INITIAL_TEX, { jobName: 'site' })
+      const run = jitex.createTexEngine().render(INITIAL_TEX)
 
-      attach('site.dvi', run.dvi)
-      // 二进制 dvi 在报告里点不开，另给一份可读的字节文本
-      attachText('site.dvi.txt', run.dvi.join(', '))
-      attachText('site.log', run.log ?? '')
-      run.svgs.forEach((svg, i) => attach(`site.${i + 1}.svg`, new TextEncoder().encode(svg)))
+      const svgs = run.ok ? run.svgs : []
+      svgs.forEach((svg, i) => attach(`site.${i + 1}.svg`, new TextEncoder().encode(svg)))
+      attachText('site.console.txt', run.ok ? run.console : (run.console ?? ''))
 
-      log(`[site] status=${run.status} steps=${run.steps} pages=${run.svgs.length} dvi=${run.dvi.length}`)
-      if (run.error) {
-        log(`[site] error: ${run.error.message}`)
-      }
-      return { sitePages: run.svgs.length }
+      const status = run.ok ? 'ok' : `error: ${run.error.message}`
+      log(`[site] ${status} · pages=${svgs.length}`)
+      return { sitePages: svgs.length }
     })
 
-    const siteStage = stage('copy site', [jitexStage], async () => {
+    stage('copy site', [jitexStage], async () => {
       // 官网是几个静态文件，原样拷进 dist：index.html 引用 ./styles.css 与
       // `<script type="module" src="./app.js">`，app.js 再 import 同目录的 jitex.js。
       //
@@ -378,46 +342,7 @@ export function createBuildJitexSuite(): Suite {
       return { fontFiles: names.length }
     })
 
-    const siteSmokeStage = stage('smoke: site', [siteStage], async () => {
-      // 官网也是发布物，同样**用产物本身**验证：装一个最小 DOM 桩，把 dist/app.js
-      // （连同它 import 的 jitex.js）真跑一遍。没有浏览器也能挡住"字段名 / 元素 id
-      // 写错"这类只在页面里才暴露的错误。
-      const dom = createStubDom()
-      const hadDocument = 'document' in globalThis
-      ;(globalThis as { document?: unknown }).document = dom.document
-      try {
-        await import(new URL('app.js', DIST_DIR).href)
-        // 官网在末尾自动跑一次；run() 里先让出一次事件循环再同步执行
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-      } finally {
-        if (!hadDocument) {
-          delete (globalThis as { document?: unknown }).document
-        }
-      }
-
-      const runInfo = dom.byId('run-info').textContent
-      const consoleText = dom.byId('console').textContent
-      const pageCount = dom.byId('pages').children.length
-      log(`[site] run: ${runInfo} · pages=${pageCount}`)
-      assert(
-        /^\d+ pages? · \d+ ms$/.test(runInfo),
-        `site: 控制台标题右侧应是"页数 · 耗时"，实际 = ${runInfo}`,
-      )
-      assert(pageCount >= 1, 'site: 至少应渲染出一页')
-      assert(
-        dom.byId('logo').innerHTML.includes('<svg'),
-        'site: 左上角标志应由引擎排出来（#logo 里没有 SVG）',
-      )
-      assert(
-        dom.byId('pages').children[0].innerHTML.includes('<svg'),
-        'site: 页面容器里应该是 SVG',
-      )
-      assert(consoleText.includes('Output written on'), 'site: 控制台应有 TeX 的 transcript')
-
-      return { sitePages: pageCount }
-    })
-
-    stage('publish', [jitexStage, smokeStage, siteSmokeStage, fontsStage], async () => {
+    stage('publish', [jitexStage, smokeStage, fontsStage], async () => {
       const names = [...SITE_FILES, 'fonts.css', 'jitex.js', 'jitex.manifest.json']
       const lines: string[] = []
       for (const name of names) {

@@ -1,10 +1,5 @@
 import { PascalFileStore } from './runtime-type.ts'
 
-export interface RunError {
-  message: string
-  stackTrace?: string[]
-}
-
 /**
  * 运行结果报告：只含「运行产生的东西」。
  *
@@ -13,7 +8,8 @@ export interface RunError {
 export interface RunState {
   status: 'running' | 'terminated' | 'error'
   steps: number
-  error: RunError | undefined
+  /** 执行期抛出的异常，原样保留；非 Error 的抛出物已在 exec 的边界包成 Error */
+  error: Error | undefined
   /** 运行结束后的文件系统内容（url → 字节，已用区域视图）。 */
   files: Map<string, PascalFileStore>
   debugLog: string[]

@@ -21,7 +21,7 @@
 
 import type { RuntimeContext, RuntimeOptions, SyscallHandler, SyscallTable } from './runtime-type.ts'
 import { createRuntimeContext, createSyscallTable, toRunState } from './runtime.ts'
-import type { RunError, RunState } from './run-state.ts'
+import type { RunState } from './run-state.ts'
 
 /** 编译产物顶层的工厂：注入 __sys 后返回执行体 */
 export type CompiledFactory = (syscalls: SyscallTable) => CompiledProgram
@@ -128,19 +128,15 @@ export function toErrorState(e: unknown): RunState {
   return reportErrorAsState(e, createRuntimeContext())
 }
 
+/** 抛出物 → Error：底层已是 Error 就原样保留，否则在边界包一次 */
+function toError(e: unknown): Error {
+  return e instanceof Error ? e : new Error(String(e))
+}
+
 function reportErrorAsState(e: unknown, ctx: RuntimeContext): RunState {
-  const err = e as { message?: string; stack?: string } | undefined
-  // 编译或执行出错：保留已产生的输出，并完整保存错误堆栈到 stackTrace
-  const stackLines: string[] = err?.stack ? String(err.stack).split('\n').slice(0, 40) : []
-  // 同时把错误信息追加到 debugLog，便于 e2e 报告统一查看
-  ctx.debugLog.push(`[run] error: ${err?.message || String(e)}`)
-  for (const line of stackLines) {
-    ctx.debugLog.push(`  ${line}`)
-  }
-  const error: RunError = {
-    message: err?.message || String(e),
-    stackTrace: stackLines,
-  }
+  const error = toError(e)
+  // 错误对象自己带着 message 与 stack，日志只留一行，不复制堆栈
+  ctx.debugLog.push(`[run] error: ${error.message}`)
   return toRunState(ctx, 'error', error)
 }
 

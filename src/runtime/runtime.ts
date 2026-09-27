@@ -18,7 +18,7 @@
  * 哪些走 `__sys`（IO/file/cell/mem/set）。本文件实现所有走 `__sys` 的 key。
  */
 
-import type { RunError, RunState } from './run-state.ts'
+import type { RunState } from './run-state.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler, SyscallTable } from './runtime-type.ts'
 import { arithSyscalls } from './sys/arith.ts'
 import { basicSyscall } from './basic.ts'
@@ -39,7 +39,7 @@ export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeConte
 export function toRunState(
   ctx: RuntimeContext,
   status: 'running' | 'terminated' | 'error' = 'terminated',
-  error?: RunError | undefined,
+  error?: Error | undefined,
 ): RunState {
   return {
     status,

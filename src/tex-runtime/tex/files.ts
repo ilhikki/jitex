@@ -21,6 +21,15 @@ export function texFormatKey(name: string): string {
   return TEX_FORMAT_AREA + name
 }
 
+/**
+ * TeX 的 job name。
+ *
+ * TeX 拿它去找 `<jobName>.tex` 当输入、并写出 `<jobName>.dvi` / `<jobName>.log`，
+ * 所以内部必须有这个名字；但它不该成为使用方的参数（每次 render 都是全新的内存
+ * 文件系统），故固定成一个常量。代价：文档里写 `\jobname` 会展开成这个值。
+ */
+const JOB_NAME = 'jitex'
+
 /** 一次 TeX job 的输入 */
 export interface TexJobInput {
   /** 待排版的源码，写入 `<jobName>.tex` */
@@ -38,16 +47,12 @@ export interface TexJobInput {
   formatName?: string
   /** 随发布一起提供的字体（键为字体名或 tfm 文件名） */
   fonts?: Record<string, Uint8Array>
-  jobName?: string
-  /** 覆盖 TTY 引导串；默认 `&<formatName> <jobName>` + 一行 `\bye` */
-  inputLines?: string
   /** 额外的运行期文件（按 TeX 文件键，如 `foo.tex`） */
   extraFiles?: Record<string, string | Uint8Array>
 }
 
 /** 一次 TeX job 的文件装配结果 */
 export interface TexJobFiles {
-  jobName: string
   files: Map<string, PascalFileStore>
   console: ConsoleFile
   /** 产物键：TeX 按 jobname 写出的 DVI / transcript */
@@ -63,9 +68,9 @@ export interface TexJobFiles {
  * 字节，故资产不会被某次运行污染）。
  */
 export function createTexJobFiles(input: TexJobInput): TexJobFiles {
-  const jobName = input.jobName ?? 'user'
+  const jobName = JOB_NAME
   const formatName = input.formatName ?? 'plain'
-  const console = new ConsoleFile(input.inputLines ?? `&${formatName} ${jobName} \n \\bye \n`)
+  const console = new ConsoleFile(`&${formatName} ${jobName} \n \\bye \n`)
 
   const files = new Map<string, PascalFileStore>()
   // 格式文件名（`&plain` → plain.fmt）不带区前缀，与 boot-tex 的既有装配一致
@@ -82,7 +87,6 @@ export function createTexJobFiles(input: TexJobInput): TexJobFiles {
   files.set('TTY:', console)
 
   return {
-    jobName,
     files,
     console,
     dviKey: `${jobName}.dvi`,

@@ -19,7 +19,7 @@ import { LOGO_TEX } from './logo-tex.js'
  *   - 源码里的注释也是给读者看的，所以写英文。
  */
 
-export const INITIAL_TEX = String.raw`% Plain TeX, not LaTeX --- edit this, then press Ctrl/⌘ + Enter.
+export const INITIAL_TEX = String.raw`% Plain TeX, not LaTeX --- edit this, then press Ctrl + Enter.
 ${LOGO_TEX}
 \noindent \JiTex \quad \TeX82, in your browser.
 
@@ -29,26 +29,74 @@ set, and how it is done.
 
 \medskip
 \noindent{\bf Mathematics.} \quad a chronology
-$$ a^{2} + b^{2} = c^{2} \qquad {\rm Pythagoras, \sim500\ BC} $$
-$$ x = {-b \pm \sqrt{b^{2} - 4ac} \over 2a} \qquad {\rm al-Khwarizmi, \sim820} $$
-$$ \int_{a}^{b} f'(x)\,dx = f(b) - f(a) \qquad {\rm Newton, \ Leibniz, 1675} $$
-$$ e^{i\pi} + 1 = 0 \qquad {\rm Euler, 1748} $$
-$$ \int_{-\infty}^{\infty} e^{-x^{2}} dx = \sqrt{\pi} \qquad {\rm Gauss, 1812} $$
-$$ \zeta(s) = \sum_{n=1}^{\infty} {1 \over n^{s}} = \prod_{p\ {\rm prime}} {1 \over 1 - p^{-s}} \qquad {\rm Riemann, 1859} $$
-$$ (A = B) \simeq (A \simeq B) \qquad {\rm univalence, 2013} $$
+$$
+  a^{2} + b^{2} = c^{2} \qquad {\rm Pythagoras, \sim500\ BC}
+$$
+$$
+  x = {-b \pm \sqrt{b^{2} - 4ac} \over 2a} \qquad {\rm al-Khwarizmi, \sim820}
+$$
+$$
+  \int_{a}^{b} f'(x)\,dx = f(b) - f(a) \qquad {\rm Newton, \ Leibniz, 1675}
+$$
+$$
+  e^{i\pi} + 1 = 0 \qquad {\rm Euler, 1748}
+$$
+$$
+  \int_{-\infty}^{\infty} e^{-x^{2}} dx = \sqrt{\pi} \qquad {\rm Gauss, 1812}
+$$
+$$
+  \zeta(s) = \sum_{n=1}^{\infty} {1 \over n^{s}}
+  = \prod_{p\ {\rm prime}} {1 \over 1 - p^{-s}}
+  \qquad {\rm Riemann, 1859}
+$$
+$$
+  (A = B) \simeq (A \simeq B) \qquad {\rm univalence, 2013}
+$$
 
 \medskip
 \noindent{\bf Physics.} \quad a chronology
-$$ F_{1} d_{1} = F_{2} d_{2} \qquad {\rm Archimedes, \sim250\ BC} $$
-$$ F = G {m_{1} m_{2} \over r^{2}} \qquad {\rm Newton, 1687} $$
-$$ {d \over dt} \left( {\partial L \over \partial \dot q} \right) - {\partial L \over \partial q} = 0 \qquad {\rm Lagrange, 1788} $$
-$$ \nabla \cdot {\bf E} = 4 \pi \rho, \qquad \nabla \cdot {\bf B} = 0 \qquad {\rm Maxwell, 1865} $$
-$$ \nabla \times {\bf E} = -{1 \over c} {\partial {\bf B} \over \partial t}, \qquad \nabla \times {\bf B} = {1 \over c} (4 \pi {\bf J} + {\partial {\bf E} \over \partial t}) $$
-$$ S = k \log W \qquad {\rm Boltzmann, 1877} $$
-$$ R_{\mu \nu} - {1 \over 2} R g_{\mu \nu} + \Lambda g_{\mu \nu} = {8 \pi G \over c^{4}} T_{\mu \nu} \qquad {\rm Einstein, 1915} $$
-$$ i \hbar {\partial \psi \over \partial t} = -{\hbar^{2} \over 2m} \nabla^{2} \psi + V \psi \qquad {\rm Schrodinger, 1926} $$
-$$ (i \gamma^{\mu} \partial_{\mu} - m) \psi = 0 \qquad {\rm Dirac, 1928} $$
-$$ \langle x' | e^{-iHt/\hbar} | x \rangle = \int {\cal D} x\, e^{iS[x]/\hbar} \qquad {\rm Feynman, 1948} $$
+$$
+  F_{1} d_{1} = F_{2} d_{2} \qquad {\rm Archimedes, \sim250\ BC}
+$$
+$$
+  F = G {m_{1} m_{2} \over r^{2}} \qquad {\rm Newton, 1687}
+$$
+$$
+  {d \over dt} \left( {\partial L \over \partial \dot q} \right)
+  - {\partial L \over \partial q} = 0
+  \qquad {\rm Lagrange, 1788}
+$$
+$$
+  \nabla \cdot {\bf E} = 4 \pi \rho, \qquad \nabla \cdot {\bf B} = 0
+  \qquad {\rm Maxwell, 1865}
+$$
+$$
+  \nabla \times {\bf E} = -{1 \over c} {\partial {\bf B} \over \partial t},
+  \qquad
+  \nabla \times {\bf B} = {1 \over c} (4 \pi {\bf J}
+  + {\partial {\bf E} \over \partial t})
+$$
+$$
+  S = k \log W \qquad {\rm Boltzmann, 1877}
+$$
+$$
+  R_{\mu \nu} - {1 \over 2} R g_{\mu \nu} + \Lambda g_{\mu \nu}
+  = {8 \pi G \over c^{4}} T_{\mu \nu}
+  \qquad {\rm Einstein, 1915}
+$$
+$$
+  i \hbar {\partial \psi \over \partial t}
+  = -{\hbar^{2} \over 2m} \nabla^{2} \psi + V \psi
+  \qquad {\rm Schrodinger, 1926}
+$$
+$$
+  (i \gamma^{\mu} \partial_{\mu} - m) \psi = 0 \qquad {\rm Dirac, 1928}
+$$
+$$
+  \langle x' | e^{-iHt/\hbar} | x \rangle
+  = \int {\cal D} x\, e^{iS[x]/\hbar}
+  \qquad {\rm Feynman, 1948}
+$$
 
 \medskip
 \noindent{\bf The faces.} \quad Ten point roman, {\bf bold}, {\it italic},
@@ -128,5 +176,4 @@ prose. And a run is not interruptible from the outside.
 
 \TeX82 and {\tt plain.tex} are Donald Knuth's. The typefaces are the Computer
 Modern of the American Mathematical Society and Bluesky, under the SIL Open Font
-License.
-`
+License.`

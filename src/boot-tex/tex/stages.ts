@@ -150,7 +150,7 @@ export function createTexStages(
     const result = validRunTangleResult(await runTangleJs(tangleJs, texWeb, undefined))
     attachText('tex.pas', result.pasFile)
     attach('tex.pool', result.poolFile)
-    const texJs = transformTex(result.pasFile)
+    const texJs = transformTex(result.pasFile, isDebug)
     attachText('tex.js', texJs)
     return { texJs, poolFile: result.poolFile }
   }))
