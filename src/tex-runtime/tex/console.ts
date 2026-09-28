@@ -15,6 +15,8 @@ export class ConsoleFile implements PascalFileStore {
   readonly input: { value: string; position: number }
   readonly output: string[] = []
   mode: 'inspection' | 'generation'
+  /** 运行期 console 回调：每次往终端写字节/块（含输入回显）时触发；不设则不触发 */
+  onOutput?: (chunk: string) => void
 
   constructor(input: string) {
     this.input = {
@@ -41,7 +43,9 @@ export class ConsoleFile implements PascalFileStore {
       throw new Error('EOF')
     }
     if (this.input.position >= 0) {
-      this.output.push(this.input.value[this.input.position])
+      const ch = this.input.value[this.input.position]
+      this.output.push(ch)
+      this.onOutput?.(ch)
     }
     this.input.position++
   }
@@ -88,11 +92,15 @@ export class ConsoleFile implements PascalFileStore {
   }
 
   writeByte(byte: number): void {
-    this.output.push(String.fromCharCode(byte))
+    const ch = String.fromCharCode(byte)
+    this.output.push(ch)
+    this.onOutput?.(ch)
   }
 
   writeBytes(data: Uint8Array): void {
-    this.output.push(bytesToString(data))
+    const chunk = bytesToString(data)
+    this.output.push(chunk)
+    this.onOutput?.(chunk)
   }
 
   /** 当前行是否已有内容且以非 end-of-line 字符结尾（ISO 6.9.5 page 的隐式 writeln 判定） */

@@ -1,7 +1,6 @@
-import { bytesToString, createRunnerFromFactory, createRuntimeContext } from '@jitex/runtime'
+import { createRunnerFromFactory, createRuntimeContext } from '@jitex/runtime'
 import type { CompiledFactory, RunState, RuntimeContext } from '@jitex/runtime'
 import { renderDvi } from '../render/mod.ts'
-import type { TexJobFiles } from './files.ts'
 import { createTexJobFiles } from './files.ts'
 import { texRuntimeSyscalls } from './syscalls.ts'
 
@@ -33,47 +32,25 @@ export interface TexEngineAssets {
 export interface TexRenderOptions {
   /** 额外的运行期文件（按 TeX 文件键，如 `foo.tex`） */
   files?: Record<string, string | Uint8Array>
+  /** 运行期 console 输出回调：每次往终端写字节/块时触发，宿主可实时收进度 */
+  onConsole?: (chunk: string) => void
 }
 
 /**
- * TeX 启动成功、但文档里有 TeX 级错误（未定义控制序列、缺字体文件…）。
+ * render 的结果。
  *
- * TeX 自己不会抛异常：它把报错写进终端与 transcript 然后继续。所以这一类错误
- * 由引擎从 transcript 里读出来，就是一个 Error——`instanceof TexError` 即
- * "TeX 起来了，问题在文档"。
+ *   - completed：引擎跑完了（不一定成功——TeX 自己的报错留在 console 里由回调流出，
+ *     不在这里判；DVI 为空就 svgs: []）。
+ *   - interrupted：运行中断（引擎没跑起来，或 DVI→SVG 渲染抛了异常），error 给原因。
+ *
+ * console 输出不再进结果：运行期经 options.onConsole 回调流出，见 TexRenderOptions。
  */
-export class TexError extends Error {
-  readonly line?: number
-
-  constructor(message: string, line?: number) {
-    super(message)
-    this.name = 'TexError'
-    this.line = line
-  }
-}
-
 export type TexRenderResult =
-  | { ok: true; svgs: string[]; console: string }
-  | { ok: false; error: Error; console?: string }
+  | { status: 'completed'; svgs: string[] }
+  | { status: 'interrupted'; error: Error }
 
 export interface TexEngine {
   render(tex: string, options?: TexRenderOptions): TexRenderResult
-}
-
-/** TeX 的报错行：`! <info>`，下一行（可能隔着上下文行）是 `l.<行号>` */
-const ERROR_LINE = /^!\s*(.+)$/m
-const ERROR_LINE_NO = /^l\.(\d+)/m
-
-/** 从 transcript 里取第一条 TeX 报错；没有则返回 undefined */
-function findTexError(job: TexJobFiles): TexError | undefined {
-  const store = job.files.get(job.logKey)
-  const text = store === undefined ? '' : bytesToString(store.getData())
-  const match = ERROR_LINE.exec(text)
-  if (match === null) {
-    return undefined
-  }
-  const lineMatch = ERROR_LINE_NO.exec(text.slice(match.index + match[0].length))
-  return new TexError(match[1].trim(), lineMatch === null ? undefined : Number(lineMatch[1]))
 }
 
 export function createTexEngine(assets: TexEngineAssets): TexEngine {
@@ -91,33 +68,28 @@ export function createTexEngine(assets: TexEngineAssets): TexEngine {
         fonts,
         extraFiles: options.files,
       })
+      // 运行期 console 流式回调：必须在 run 之前接上，TeX 一读/写就触发
+      if (options.onConsole) {
+        job.console.onOutput = options.onConsole
+      }
       const ctx: RuntimeContext = createRuntimeContext({ files: job.files })
       const state: RunState = run(ctx)
-      const consoleText = job.console.getOutput()
-      const fail = (error: Error): TexRenderResult =>
-        consoleText === '' ? { ok: false, error } : { ok: false, error, console: consoleText }
 
-      // 引擎没跑起来：异常原样交出
+      // 引擎没跑起来：运行中断
       if (state.status === 'error' && state.error !== undefined) {
-        return fail(state.error)
+        return { status: 'interrupted', error: state.error }
       }
 
-      // TeX 自己报的错：不中断运行，只在 transcript 里留一条记录
-      const texError = findTexError(job)
-      if (texError !== undefined) {
-        return fail(texError)
-      }
-
-      // TeX 正常结束但没写 DVI（例如文档没有产出）：不算失败，只是没有页
+      // 跑完了，不一定成功；TeX 自己的报错留在 console 里由回调流出，不在这里判
       const dvi = job.files.get(job.dviKey)?.getData() ?? new Uint8Array(0)
       if (dvi.length === 0) {
-        return { ok: true, svgs: [], console: consoleText }
+        return { status: 'completed', svgs: [] }
       }
 
       try {
-        return { ok: true, svgs: renderDvi(dvi, fonts), console: consoleText }
+        return { status: 'completed', svgs: renderDvi(dvi, fonts) }
       } catch (e) {
-        return fail(e instanceof Error ? e : new Error(String(e)))
+        return { status: 'interrupted', error: e instanceof Error ? e : new Error(String(e)) }
       }
     },
   }

@@ -15,30 +15,12 @@ import { INITIAL_TEX } from '../../web/initial-tex.js'
  */
 const REPO_ROOT = new URL('../../../', import.meta.url)
 
-/*
- * 十二段：
- *   1 build tangle.js    自举 TANGLE                    → tangle.js
- *   2 get initex         编译 tex.web                   → tex.pas / tex.pool / tex.js
- *   3 load base files    读 plain 的素材                → 内存
- *   4 load plain tfm     读 plain 用的 TFM              → 内存
- *   5 get plain.fmt      INITEX 建格式                  → plain.fmt / fonts.json
- *   6 bundle jitex.js    内联成单文件                    → dist/jitex.js + manifest
- *   7 smoke: tex ⇒ svg   用产物跑两个用例                → smoke-*.dvi / *.svg / *.log
- *   8 site tex ⇒ dvi+svg 官网正文那段 tex 的产物          → site.dvi / site.N.svg / site.log
- *   9 copy site          拷官网（5 个静态文件）          → dist/index.html · styles.css · app.js · initial-tex.js · logo-tex.js
- *  10 copy fonts         拷 CM 字体 + 生成清单           → dist/fonts/*.woff2 · fonts.css
- *  11 smoke: site        用 DOM 桩把官网真跑一遍          → （断言）
- *  12 publish            发布检查（体积 / sha256）        → dist.manifest.txt
- *
- * 这是发布套件：产物即发布物，阶段可缓存，报告里每段都有 artifact 与日志。
- */
-
 const JITEX_VERSION = '0.1.0'
 const BUILD_DIR = new URL('.build/jitex/', REPO_ROOT)
 const DIST_DIR = new URL('dist/', REPO_ROOT)
 
-/** 官网的静态文件（非包，原样拷进 dist；app.js 引用同目录的 jitex.js、initial-tex.js 与 logo-tex.js） */
-const SITE_FILES = ['index.html', 'styles.css', 'app.js', 'initial-tex.js', 'logo-tex.js']
+/** 官网的静态文件（非包，原样拷进 dist；app.js 引用同目录的 jitex.js、worker.js、initial-tex.js 与 logo-tex.js） */
+const SITE_FILES = ['index.html', 'styles.css', 'app.js', 'worker.js', 'initial-tex.js', 'logo-tex.js']
 
 /** 生成模块里的 bare specifier：bundle 需要显式给出（不依赖宿主的工作区配置） */
 const IMPORT_MAP: ImportMap = {
@@ -121,34 +103,6 @@ export function createTexEngine(options = {}) {
   return entry
 }
 
-/** 最小 DOM 桩：只实现官网用到的那几个接口，用来在无浏览器环境里跑一遍产物 */
-interface StubElement {
-  id: string
-  textContent: string
-  innerHTML: string
-  className: string
-  value: string
-  disabled: boolean
-  hidden: boolean
-  tabIndex: number
-  scrollTop: number
-  scrollHeight: number
-  children: StubElement[]
-  appendChild(child: StubElement): void
-  addEventListener(type: string, fn: (event: StubKeyboardEvent) => void): void
-  setAttribute(name: string, value: string): void
-  getAttribute(name: string): string | null
-  hasAttribute(name: string): boolean
-  focus(): void
-}
-
-interface StubKeyboardEvent {
-  key?: string
-  ctrlKey?: boolean
-  metaKey?: boolean
-  preventDefault?: () => void
-}
-
 /** 用例 A：plain 的预加载字体，不需要读任何 tfm */
 const SMOKE_PLAIN = String.raw`Hello, \TeX!  $a^2 + b^2 = c^2$\par
 `
@@ -164,8 +118,8 @@ const SMOKE_FONT = String.raw`\font\big=cmr10 at 12pt \big Big text at 12pt\par
  * 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
  */
 type SmokeRunResult =
-  | { ok: true; svgs: string[]; console: string }
-  | { ok: false; error: { message: string }; console?: string }
+  | { status: 'completed'; svgs: string[] }
+  | { status: 'interrupted'; error: { message: string } }
 
 /** 产物 jitex.js 的公共面（只声明本套件用到的那部分） */
 interface JitexModule {
@@ -236,28 +190,39 @@ export function createBuildJitexSuite(): Suite {
       assert(typeof jitex.createTexEngine === 'function', 'createTexEngine should be exported')
       const engine = jitex.createTexEngine()
 
-      const attachRun = (prefix: string, run: SmokeRunResult) => {
-        const svgs = run.ok ? run.svgs : []
+      const attachRun = (prefix: string, run: SmokeRunResult, consoleText: string) => {
+        const svgs = run.status === 'completed' ? run.svgs : []
         svgs.forEach((svg, i) => attach(`${prefix}.${i + 1}.svg`, new TextEncoder().encode(svg)))
-        attachText(`${prefix}.console.txt`, run.ok ? run.console : (run.console ?? ''))
+        attachText(`${prefix}.console.txt`, consoleText)
         const pages = svgs.length
-        const status = run.ok ? 'ok' : `error: ${run.error.message}`
+        const status = run.status === 'completed' ? 'ok' : `error: ${run.error.message}`
         log(`[${prefix}] ${status} · pages=${pages}`)
       }
 
-      const plain = engine.render(SMOKE_PLAIN)
-      attachRun('smoke-plain', plain)
-      assert(plain.ok, `plain smoke: ${plain.ok ? '' : plain.error.message}`)
+      // 返回元组：让解构出的 run 直接是联合类型本尊，窄化能跨函数调用保留
+      const runWith = (tex: string): [SmokeRunResult, string] => {
+        let consoleText = ''
+        const result = engine.render(tex, {
+          onConsole: (chunk: string) => {
+            consoleText += chunk
+          },
+        })
+        return [result, consoleText]
+      }
+
+      const [plain, plainConsole] = runWith(SMOKE_PLAIN)
+      attachRun('smoke-plain', plain, plainConsole)
+      assert(plain.status === 'completed', `plain smoke: ${plain.status === 'completed' ? '' : plain.error.message}`)
       assert(plain.svgs.length >= 1, 'plain smoke: expected at least one page')
 
-      const font = engine.render(SMOKE_FONT)
-      attachRun('smoke-font', font)
-      assert(font.ok, `font smoke: ${font.ok ? '' : font.error.message}`)
+      const [font, fontConsole] = runWith(SMOKE_FONT)
+      attachRun('smoke-font', font, fontConsole)
+      assert(font.status === 'completed', `font smoke: ${font.status === 'completed' ? '' : font.error.message}`)
       assert(font.svgs.length >= 1, 'font smoke: expected at least one page')
 
       // 同一引擎重复运行必须互不污染（每次 render 自造 ctx 与全部 store）
-      const again = engine.render(SMOKE_PLAIN)
-      assert(again.ok, `rerun failed: ${again.ok ? '' : again.error.message}`)
+      const [again] = runWith(SMOKE_PLAIN)
+      assert(again.status === 'completed', `rerun failed: ${again.status === 'completed' ? '' : again.error.message}`)
       assert(
         again.svgs.length === plain.svgs.length,
         `rerun page count differs: ${plain.svgs.length} → ${again.svgs.length}`,
@@ -274,13 +239,18 @@ export function createBuildJitexSuite(): Suite {
     // 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
     stage('site tex ⇒ svg', [jitexStage], async () => {
       const jitex = await import(new URL('jitex.js', DIST_DIR).href) as JitexModule
-      const run = jitex.createTexEngine().render(INITIAL_TEX)
+      let consoleText = ''
+      const run = jitex.createTexEngine().render(INITIAL_TEX, {
+        onConsole: (chunk: string) => {
+          consoleText += chunk
+        },
+      })
 
-      const svgs = run.ok ? run.svgs : []
+      const svgs = run.status === 'completed' ? run.svgs : []
       svgs.forEach((svg, i) => attach(`site.${i + 1}.svg`, new TextEncoder().encode(svg)))
-      attachText('site.console.txt', run.ok ? run.console : (run.console ?? ''))
+      attachText('site.console.txt', consoleText)
 
-      const status = run.ok ? 'ok' : `error: ${run.error.message}`
+      const status = run.status === 'completed' ? 'ok' : `error: ${run.error.message}`
       log(`[site] ${status} · pages=${svgs.length}`)
       return { sitePages: svgs.length }
     })

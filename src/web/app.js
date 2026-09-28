@@ -1,4 +1,3 @@
-import { createTexEngine } from './jitex.js'
 import { INITIAL_TEX } from './initial-tex.js'
 import { LOGO_DOC } from './logo-tex.js'
 
@@ -18,6 +17,7 @@ const dom = {
   consoleGutter: document.querySelector('#console-area .gutter'),
   tabTitle: document.getElementById('tab-title'),
   tabButton: document.getElementById('tab-button'),
+  timeCost: document.getElementById('time-cost'),
 }
 
 /* 一行号栏的同步器：把「滚动容器 + 行号栏」封成一个闭包，
@@ -31,11 +31,27 @@ function createGutterSync(scroller, gutter) {
   }
 }
 
-function createApp(dom, engine) {
+function createApp(dom) {
   const syncSourceGutter = createGutterSync(dom.source, dom.sourceGutter)
   const syncConsoleGutter = createGutterSync(dom.consoleOutput, dom.consoleGutter)
 
-  let busy = false
+  // 两态：idle（按钮 Run，可点启动）/ running（按钮 Stop，可点 terminate）
+  let state = 'idle'
+  // runToken：每次 run 自增，stop 也自增；让被 stop 的旧 async 在 await 醒来后能识别自己已失效
+  let runToken = 0
+  let worker = null
+  let readyPromise = null
+  let readyResolve = null
+  let readyReject = null
+  let msgId = 0
+  const pending = new Map() // id -> { resolve, reject }
+  let rafHandle = null
+  let startTime = 0
+
+  const setButton = () => {
+    dom.runButton.textContent = state === 'running' ? 'Stop' : 'Run'
+  }
+  setButton()
 
   const getActive = () => dom.right.dataset.active
 
@@ -67,40 +83,119 @@ function createApp(dom, engine) {
     dom.pages.appendChild(fragment)
   }
 
-  const show = result => {
-    renderPages(result.ok ? result.svgs : [])
+  // 装载 Worker（若已存在直接返回 readyPromise）；resolve 后引擎已就绪
+  const ensureWorker = () => {
+    if (worker) return readyPromise
+    worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
+    readyPromise = new Promise((resolve, reject) => {
+      readyResolve = resolve
+      readyReject = reject
+    })
+    worker.onmessage = (e) => {
+      const data = e.data
+      if (data.type === 'ready') {
+        readyResolve?.()
+      } else if (data.type === 'console') {
+        dom.consoleOutput.textContent += data.chunk
+        syncOutputGutter()
+      } else if (data.type === 'done') {
+        const handler = pending.get(data.id)
+        if (handler) {
+          pending.delete(data.id)
+          handler.resolve(data.result)
+        }
+      }
+    }
+    return readyPromise
+  }
 
-    const lines = []
-    if (!result.ok) {
-      lines.push(`! ${result.error.message}`)
+  const renderInWorker = (tex) => {
+    const id = ++msgId
+    const promise = new Promise((resolve, reject) => pending.set(id, { resolve, reject }))
+    worker.postMessage({ type: 'render', tex, id })
+    return promise
+  }
+
+  const stopRaf = () => {
+    if (rafHandle !== null) {
+      cancelAnimationFrame(rafHandle)
+      rafHandle = null
     }
-    if (result.console) {
-      lines.push(result.console.replace(/\n+$/, ''))
+  }
+
+  // time-cost 动画：每帧写 (now-start)/1000，保留 2 位小数 + 's'
+  const startTimer = () => {
+    startTime = performance.now()
+    const tick = () => {
+      dom.timeCost.textContent = ((performance.now() - startTime) / 1000).toFixed(2) + 's'
+      rafHandle = requestAnimationFrame(tick)
     }
-    dom.consoleOutput.textContent = lines.length > 0 ? lines.join('\n') : '(no output)'
+    tick()
+  }
+
+  // 硬停止：terminate worker + reject 所有 pending；下次 run 重建
+  const stop = () => {
+    if (state !== 'running') return
+    runToken++
+    if (worker) {
+      worker.terminate()
+      worker = null
+      readyReject?.(new Error('stopped'))
+      readyResolve = null
+      readyReject = null
+      readyPromise = null
+      for (const { reject } of pending.values()) {
+        reject(new Error('stopped'))
+      }
+      pending.clear()
+    }
+    stopRaf()
+    dom.consoleOutput.textContent += '! stopped'
     syncOutputGutter()
+    state = 'idle'
+    setButton()
   }
 
   const run = () => {
-    if (busy) return
-    busy = true
-    dom.runButton.disabled = true
+    if (state !== 'idle') return
+    state = 'running'
+    setButton()
+    const token = ++runToken
 
     const previous = getActive()
     setActive('console')
+    dom.consoleOutput.textContent = ''
+    dom.pages.textContent = ''
+    syncOutputGutter()
+    dom.timeCost.textContent = '0.00s'
+    startTimer()
 
-    setTimeout(() => {
+    ;(async () => {
       try {
-        show(engine.render(dom.source.value))
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        dom.consoleOutput.textContent = `! ${message}`
-      } finally {
+        await ensureWorker()
+        if (token !== runToken) return
+        const result = await renderInWorker(dom.source.value)
+        if (token !== runToken) return
+        stopRaf()
+        renderPages(result.status === 'completed' ? result.svgs : [])
+        if (result.status === 'interrupted') {
+          dom.consoleOutput.textContent += `! ${result.error.message}`
+          syncOutputGutter()
+        }
         setActive(previous)
-        busy = false
-        dom.runButton.disabled = false
+      } catch (error) {
+        if (token !== runToken) return
+        stopRaf()
+        const message = error instanceof Error ? error.message : String(error)
+        dom.consoleOutput.textContent += `! ${message}`
+        syncOutputGutter()
+      } finally {
+        if (token === runToken) {
+          state = 'idle'
+          setButton()
+        }
       }
-    }, 0)
+    })()
   }
 
   const bindEvents = () => {
@@ -115,12 +210,16 @@ function createApp(dom, engine) {
       }
     })
 
-    dom.runButton.addEventListener('click', run)
+    dom.runButton.addEventListener('click', () => {
+      if (state === 'running') stop()
+      else run()
+    })
   }
 
-  const start = () => {
-    const logoResult = engine.render(LOGO_DOC)
-    dom.logo.innerHTML = logoResult.ok ? logoResult.svgs[0] || '' : ''
+  const start = async () => {
+    await ensureWorker()
+    const logoResult = await renderInWorker(LOGO_DOC)
+    dom.logo.innerHTML = logoResult.status === 'completed' ? logoResult.svgs[0] || '' : ''
 
     dom.source.value = INITIAL_TEX
 
@@ -133,5 +232,5 @@ function createApp(dom, engine) {
   return { run, start }
 }
 
-const app = createApp(dom, createTexEngine())
+const app = createApp(dom)
 app.start()

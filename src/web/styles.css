@@ -73,6 +73,11 @@ body {
     height: 32.4px;
 }
 
+.text-subtle {
+    color: #999;
+    font-size: 12px;
+}
+
 .main {
     flex: 1;
     min-height: 0;
