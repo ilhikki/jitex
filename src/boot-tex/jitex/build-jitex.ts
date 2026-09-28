@@ -1,5 +1,5 @@
 import type { Suite } from '@jitex/integration'
-import { assert, attach, attachText, log, stage, suite } from '@jitex/integration'
+import { assert, attach, attachText, cache, log, stage, suite } from '@jitex/integration'
 import type { ImportMap } from 'jsr:@deno/emit@^0.46.0'
 import { bundle } from 'jsr:@deno/emit@^0.46.0'
 import { createTexStages } from '../tex/stages.ts'
@@ -134,7 +134,7 @@ export function createBuildJitexSuite(): Suite {
     log(`debug = ${isDebug}`)
     const tex = createTexStages(isDebug, { cachePlainFmt: true })
 
-    const jitexStage = stage(
+    const jitexStage = cache(stage(
       'bundle jitex.js',
       [tex.texJsStage, tex.plainFmtStage, tex.tfmFilesStage],
       async ([texFiles, plainFmt, tfmFiles]) => {
@@ -182,9 +182,9 @@ export function createBuildJitexSuite(): Suite {
         log(`jitex.js = ${codeBytes.length} bytes (${manifest.sha256.slice(0, 12)}…)`)
         return { jitexBytes: codeBytes.length, jitexSha256: manifest.sha256 }
       },
-    )
+    ))
 
-    const smokeStage = stage('smoke: tex ⇒ svg', [jitexStage], async () => {
+    const smokeStage = cache(stage('smoke: tex ⇒ svg', [jitexStage], async () => {
       // 只 import 产物本身：被测的必须是发布物
       const jitex = await import(new URL('jitex.js', DIST_DIR).href) as JitexModule
       assert(typeof jitex.createTexEngine === 'function', 'createTexEngine should be exported')
@@ -233,7 +233,7 @@ export function createBuildJitexSuite(): Suite {
       )
 
       return { plainPages: plain.svgs.length, fontPages: font.svgs.length }
-    })
+    }))
 
     // 官网正文那段 tex 的产物：每页 svg + console，全部进报告，点开就能与网页对照。
     // 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
@@ -283,7 +283,7 @@ export function createBuildJitexSuite(): Suite {
      * 清单只**声明**、不下载——浏览器只为页面上真正用到的族取文件，这就是按需加载。
      * 依赖 jitexStage 是因为它负责重建 dist（先清空），晚跑会把字体删掉。
      */
-    const fontsStage = stage('copy fonts', [jitexStage], async () => {
+    const fontsStage = cache(stage('copy fonts', [jitexStage], async () => {
       const fontDir = new URL('resources/fonts/', REPO_ROOT)
       const names: string[] = []
       for await (const entry of Deno.readDir(fontDir)) {
@@ -310,7 +310,7 @@ export function createBuildJitexSuite(): Suite {
       attach('fonts.css', new TextEncoder().encode(css))
       log(`fonts: ${names.length} 个 woff2 + fonts.css`)
       return { fontFiles: names.length }
-    })
+    }))
 
     stage('publish', [jitexStage, smokeStage, fontsStage], async () => {
       const names = [...SITE_FILES, 'fonts.css', 'jitex.js', 'jitex.manifest.json']

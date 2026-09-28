@@ -125,6 +125,7 @@ function createApp(dom) {
 
   // time-cost 动画：每帧写 (now-start)/1000，保留 2 位小数 + 's'
   const startTimer = () => {
+    stopRaf() // 清掉上一轮残留的 rAF，避免两个 tick 循环并行
     startTime = performance.now()
     const tick = () => {
       dom.timeCost.textContent = ((performance.now() - startTime) / 1000).toFixed(2) + 's'
@@ -162,7 +163,6 @@ function createApp(dom) {
     setButton()
     const token = ++runToken
 
-    const previous = getActive()
     setActive('console')
     dom.consoleOutput.textContent = ''
     dom.pages.textContent = ''
@@ -177,12 +177,14 @@ function createApp(dom) {
         const result = await renderInWorker(dom.source.value)
         if (token !== runToken) return
         stopRaf()
-        renderPages(result.status === 'completed' ? result.svgs : [])
+        const svgs = result.status === 'completed' ? result.svgs : []
+        renderPages(svgs)
         if (result.status === 'interrupted') {
           dom.consoleOutput.textContent += `! ${result.error.message}`
           syncOutputGutter()
         }
-        setActive(previous)
+        // 有 svg 切回 pages 看，没有（含 interrupted）留在 console
+        setActive(svgs.length > 0 ? 'pages' : 'console')
       } catch (error) {
         if (token !== runToken) return
         stopRaf()
