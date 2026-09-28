@@ -5,11 +5,7 @@
 }
 
 :root {
-    --toolbar: 0;
     --col-min: 624px;
-    --col-max: 780px;
-    --page-max: 864px;
-    --right-width: 800px;
     --base-background-color: #DDDDDD;
     scrollbar-width: thin;
     scrollbar-color: #888 var(--base-background-color);
@@ -22,18 +18,21 @@ html, body {
 body {
     display: flex;
     flex-direction: column;
-    align-items: center;
     padding: 8px;
     background: #DDDDDD;
+    overflow-x: auto;
 }
 
+/* ---------- 通用 UI 组件 ---------- */
 .stack {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .row {
     display: flex;
+    min-width: 0;
 }
 
 .scroll {
@@ -42,9 +41,7 @@ body {
     min-height: 0;
 }
 
-.mono {
-    font-family: monospace;
-}
+.mono { font-family: monospace; }
 
 .clickable {
     cursor: pointer;
@@ -54,11 +51,17 @@ body {
     font: inherit;
 }
 
+.text-subtle { color: #999; font-size: 12px; }
+.logo { width: 71px; height: 32.4px; }
 
+/* ---------- 应用骨架 ---------- */
 .app {
     flex: 1;
     min-height: 0;
+    width: 100%;
     max-width: 100%;
+    min-width: var(--col-min);
+    margin: 0 auto;
     gap: 8px;
 }
 
@@ -66,16 +69,6 @@ body {
     flex: none;
     justify-content: space-between;
     align-items: center;
-}
-
-.logo {
-    width: 71px;
-    height: 32.4px;
-}
-
-.text-subtle {
-    color: #999;
-    font-size: 12px;
 }
 
 .main {
@@ -86,26 +79,11 @@ body {
 
 .panel {
     gap: 8px;
-    min-width: 0;
     min-height: 200px;
     overflow: hidden;
 }
 
-.source-panel {
-    flex: 1 1 var(--col-min);
-    min-width: var(--col-min);
-    max-width: var(--col-max);
-}
-
-.pages-panel {
-    flex: none;
-    width: var(--page-max);
-    min-width: var(--col-min);
-}
-
-.panel-title {
-    flex: none;
-}
+.panel-title { flex: none; }
 
 .panel-content {
     flex: 1;
@@ -122,7 +100,6 @@ body {
 .gutter {
     flex: none;
     min-width: 5ch;
-
     user-select: none;
     text-align: right;
     overflow: hidden;
@@ -155,24 +132,17 @@ body {
     display: none;
 }
 
-.pages-panel[data-active="pages"] .tab-content[data-tab="pages"] {
-    display: block;
-}
-
+.pages-panel[data-active="pages"] .tab-content[data-tab="pages"] { display: block; }
 .pages-panel[data-active="console"] .tab-content[data-tab="console"] {
     display: flex;
     flex-direction: column;
 }
 
-#right {
-    width: var(--right-width);
-}
-
-.pages {
-    gap: 16px;
-}
+.pages { gap: 16px; }
 
 .page {
+    min-width: 0;
+    max-width: 100%;
     background-color: #FFF;
     padding: 3em 3em 3em 4em;
 }
@@ -181,34 +151,69 @@ body {
     display: block;
     width: 100%;
     height: auto;
-
 }
 
-@media (min-width: 1401px) {
-    .main {
-        flex-direction: row;
-    }
-
-    .app {
-        width: 100%;
-        max-width: calc(var(--col-max) + var(--right-width) + 8px);
-    }
-}
-
+/* ---------- 窄版：整页滚动 ---------- */
 @media (max-width: 1400px) {
+    html, body { height: auto; }
+    body { min-height: 100%; }
+
+    .app,
+    .main {
+        flex: none;
+        min-height: 0;
+    }
+
     .main {
         flex-direction: column;
+        width: 98%;
     }
 
     .source-panel {
         flex: none;
-        height: 40vh;
+        width: 100%;
+        height: 60vh;
         max-width: none;
     }
 
     .pages-panel {
-        flex: 1;
-        width: auto;
+        flex: none;
+        width: 100%;
         max-width: none;
+        overflow: visible;
+    }
+
+    .pages-panel .panel-content,
+    .pages-panel .tab-content.scroll {
+        flex: none;
+        overflow: visible;
+    }
+}
+
+/* ---------- 宽版：左右分栏 ---------- */
+@media (min-width: 1401px) {
+    :root {
+        --col-max: 780px;
+        --page-max: 864px;
+        --right-width: 800px;
+    }
+
+    .main { flex-direction: row; }
+
+    .source-panel {
+        flex: 1 1 var(--col-min);
+        min-width: var(--col-min);
+        max-width: var(--col-max);
+    }
+
+    .pages-panel {
+        flex: none;
+        width: var(--right-width);
+        min-width: var(--col-min);
+        max-width: none;
+    }
+
+    .app {
+        max-width: calc(var(--col-max) + var(--right-width) + 8px);
     }
 }
