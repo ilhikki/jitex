@@ -2,108 +2,136 @@ import { createTexEngine } from './jitex.js'
 import { INITIAL_TEX } from './initial-tex.js'
 import { LOGO_DOC } from './logo-tex.js'
 
-const sourceEl       = document.getElementById('source')
-const logoEl         = document.getElementById('logo')
-const runButton      = document.getElementById('run')
-const pagesEl        = document.querySelector('#pages-area .pages')
-const consoleEl      = document.getElementById('console')
-const rightEl        = document.querySelector('.right')
-const sourceGutter   = document.querySelector('#source-area .gutter')
-const consoleGutter  = document.querySelector('#console-area .gutter')
-
-const engine = createTexEngine()
-
-const logoResult = engine.render(LOGO_DOC)
-logoEl.innerHTML = logoResult.ok ? (logoResult.svgs[0] ?? '') : ''
-
-sourceEl.value = INITIAL_TEX
-
-function setActive(tab) {
-  rightEl.dataset.active = tab
+const TABS = {
+  pages: { title: 'Pages', label: 'Console', next: 'console' },
+  console: { title: 'Console', label: 'Pages', next: 'pages' },
 }
 
-function getActive() {
-  return rightEl.dataset.active
+const dom = {
+  logo: document.querySelector('.logo'),
+  source: document.getElementById('source'),
+  runButton: document.querySelector('.run-btn'),
+  pages: document.querySelector('.pages'),
+  consoleOutput: document.getElementById('console'),
+  right: document.getElementById('right'),
+  sourceGutter: document.querySelector('.source-panel .gutter'),
+  consoleGutter: document.querySelector('#console-area .gutter'),
+  tabTitle: document.getElementById('tab-title'),
+  tabButton: document.getElementById('tab-button'),
 }
 
-document.querySelectorAll('.tab-bar .title').forEach(el => {
-  el.addEventListener('click', () => setActive(el.dataset.tab))
-})
-
-function syncGutter(scroller, gutter, read) {
-  const count = read().split('\n').length
-  let text = ''
-  for (let i = 1; i <= count; i++) text += i + '\n'
-  gutter.textContent = text
-  gutter.scrollTop = scroller.scrollTop
-}
-
-function syncSourceGutter() {
-  syncGutter(sourceEl, sourceGutter, () => sourceEl.value)
-}
-
-sourceEl.addEventListener('input', syncSourceGutter)
-sourceEl.addEventListener('scroll', syncSourceGutter)
-
-function renderPages(svgs) {
-  pagesEl.textContent = ''
-  for (const svg of svgs) {
-    const page = document.createElement('div')
-    page.className = 'page'
-    page.innerHTML = svg
-    pagesEl.appendChild(page)
+/* 一行号栏的同步器：把「滚动容器 + 行号栏」封成一个闭包，
+   之后再喂给它任意一个「读取文本」的函数即可。 */
+function createGutterSync(scroller, gutter) {
+  return function sync(readText) {
+    const lineCount = readText().split('\n').length
+    const numbers = Array.from({ length: lineCount }, (_, index) => index + 1)
+    gutter.textContent = numbers.join('\n') + '\n'
+    gutter.scrollTop = scroller.scrollTop
   }
 }
 
-function show(result) {
-  if (result.ok) {
-    renderPages(result.svgs)
-  } else {
-    pagesEl.textContent = ''
+function createApp(dom, engine) {
+  const syncSourceGutter = createGutterSync(dom.source, dom.sourceGutter)
+  const syncConsoleGutter = createGutterSync(dom.consoleOutput, dom.consoleGutter)
+
+  let busy = false
+
+  const getActive = () => dom.right.dataset.active
+
+  const updateTabs = () => {
+    const { title, label, next } = TABS[getActive()]
+    dom.tabTitle.textContent = title
+    dom.tabButton.textContent = label
+    dom.tabButton.dataset.tab = next
   }
 
-  const lines = []
-  if (!result.ok) {
-    lines.push(`! ${result.error.message}`)
+  const setActive = tab => {
+    dom.right.dataset.active = tab
+    updateTabs()
   }
-  if (result.console) {
-    lines.push(result.console.replace(/\n+$/, ''))
-  }
-  consoleEl.textContent = lines.length > 0 ? lines.join('\n') : '(no output)'
-  syncGutter(consoleEl, consoleGutter, () => consoleEl.textContent)
-}
 
-let busy = false
+  const syncEditorGutter = () => syncSourceGutter(() => dom.source.value)
 
-function run() {
-  if (busy) return
-  busy = true
-  runButton.disabled = true
+  const syncOutputGutter = () => syncConsoleGutter(() => dom.consoleOutput.textContent)
 
-  const previous = getActive()
-  setActive('console')
-
-  setTimeout(() => {
-    try {
-      show(engine.render(sourceEl.value))
-    } catch (error) {
-      consoleEl.textContent = `! ${error instanceof Error ? error.message : String(error)}`
-    } finally {
-      setActive(previous)
-      busy = false
-      runButton.disabled = false
+  const renderPages = svgs => {
+    const fragment = document.createDocumentFragment()
+    for (const svg of svgs) {
+      const page = document.createElement('div')
+      page.className = 'page'
+      page.innerHTML = svg
+      fragment.appendChild(page)
     }
-  }, 0)
-}
+    dom.pages.textContent = ''
+    dom.pages.appendChild(fragment)
+  }
 
-runButton.addEventListener('click', run)
+  const show = result => {
+    renderPages(result.ok ? result.svgs : [])
 
-sourceEl.addEventListener('keydown', e => {
-  if ((e.ctrlKey || event.metaKey) && e.key === 'Enter') {
-    e.preventDefault()
+    const lines = []
+    if (!result.ok) {
+      lines.push(`! ${result.error.message}`)
+    }
+    if (result.console) {
+      lines.push(result.console.replace(/\n+$/, ''))
+    }
+    dom.consoleOutput.textContent = lines.length > 0 ? lines.join('\n') : '(no output)'
+    syncOutputGutter()
+  }
+
+  const run = () => {
+    if (busy) return
+    busy = true
+    dom.runButton.disabled = true
+
+    const previous = getActive()
+    setActive('console')
+
+    setTimeout(() => {
+      try {
+        show(engine.render(dom.source.value))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        dom.consoleOutput.textContent = `! ${message}`
+      } finally {
+        setActive(previous)
+        busy = false
+        dom.runButton.disabled = false
+      }
+    }, 0)
+  }
+
+  const bindEvents = () => {
+    dom.tabButton.addEventListener('click', () => setActive(dom.tabButton.dataset.tab))
+
+    dom.source.addEventListener('input', syncEditorGutter)
+    dom.source.addEventListener('scroll', syncEditorGutter)
+    dom.source.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault()
+        run()
+      }
+    })
+
+    dom.runButton.addEventListener('click', run)
+  }
+
+  const start = () => {
+    const logoResult = engine.render(LOGO_DOC)
+    dom.logo.innerHTML = logoResult.ok ? logoResult.svgs[0] || '' : ''
+
+    dom.source.value = INITIAL_TEX
+
+    bindEvents()
+    updateTabs()
+    syncEditorGutter()
     run()
   }
-})
 
-syncSourceGutter()
-run()
+  return { run, start }
+}
+
+const app = createApp(dom, createTexEngine())
+app.start()

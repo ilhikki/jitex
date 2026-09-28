@@ -9,36 +9,44 @@
 </head>
 <body>
 
-<header>
-  <span id="logo"></span>
-  <button id="run" type="button">Run</button>
-</header>
+<div class="app stack">
+  <header class="topbar row">
+    <span class="logo"></span>
+  </header>
 
-<main id="main">
-  <section id="source-area" class="pane">
-    <div class="title">Plain TeX</div>
-    <div class="code">
-      <pre class="gutter" aria-hidden="true"></pre>
-      <textarea id="source" spellcheck="false" autocomplete="off" wrap="off"></textarea>
-    </div>
-  </section>
-
-  <div class="right" data-active="pages">
-    <nav class="tab-bar">
-      <div class="title" data-tab="pages">Pages</div>
-      <div class="title" data-tab="console">Console</div>
-    </nav>
-    <section id="pages-area">
-      <div class="pages"></div>
-    </section>
-    <section id="console-area">
-      <div class="code">
-        <pre class="gutter" aria-hidden="true"></pre>
-        <pre id="console"></pre>
+  <main class="main row">
+    <section class="source-panel panel stack">
+      <div class="tab-bar row">
+        <div class="panel-title">Plain TeX</div>
+        <button class="run-btn clickable" type="button">Run</button>
+      </div>
+      <div class="panel-content stack">
+        <div class="code row mono">
+          <pre class="gutter" aria-hidden="true"></pre>
+          <textarea class="code-body scroll" id="source" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+        </div>
       </div>
     </section>
-  </div>
-</main>
+
+    <div class="pages-panel panel stack" id="right" data-active="pages">
+      <nav class="tab-bar row">
+        <div class="panel-title" id="tab-title"></div>
+        <button class="tab-button clickable" id="tab-button" type="button"></button>
+      </nav>
+      <div class="panel-content stack">
+        <section class="tab-content scroll" id="pages-area" data-tab="pages">
+          <div class="pages stack"></div>
+        </section>
+        <section class="tab-content scroll" id="console-area" data-tab="console">
+          <div class="code row mono">
+            <pre class="gutter" aria-hidden="true"></pre>
+            <pre class="code-body scroll" id="console"></pre>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
 
 <script type="module" src="./app.js"></script>
 </body>
