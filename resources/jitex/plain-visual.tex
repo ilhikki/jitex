@@ -1,0 +1,213 @@
+\magnification=1000
+\hsize=6.5truein
+\vsize=8.9truein
+\normalbaselines
+\nonfrenchspacing
+\parindent=0pt
+\raggedbottom
+\tolerance=9999
+\hbadness=9999
+\vbadness=9999
+\overfullrule=0pt
+
+\headline={\hfil\tenrm Plain TeX Visual Reference\hfil}
+\footline={\hss\tenrm\folio\hss}
+\pageno=1
+
+\newcount\fcde
+\newcount\fctmp
+
+\def\Title#1{\centerline{\bf #1}\vskip .5em}
+\def\Section#1{\vskip 1em\hrule\vskip .5em\noindent{\bf #1}\par\vskip .5em}
+\def\Label#1{\noindent{\tt #1}\par\vskip .3em}
+
+\def\fontchart#1#2#3{%
+  \Label{#1}
+  \noindent Font: {\tt #3}\par
+  \vskip .3em
+  \begingroup
+  \fcde=32
+  \loop\ifnum\fcde<127
+    \hbox to 4.5em{\tt\the\fcde: #2\char\fcde\hss}%
+    \advance\fcde by 1
+    \fctmp=\fcde
+    \divide\fctmp by 8
+    \multiply\fctmp by 8
+    \ifnum\fctmp=\fcde \hfil\break\fi
+  \repeat
+  \endgroup
+  \vskip 1em
+}
+
+\Title{Plain TeX Visual Reference}
+\centerline{\tenrm Fonts, characters, math, boxes, and rules}
+\vskip .5em
+\hrule
+
+\Section{1. Environment}
+
+\Label{UNIT-ENV}
+\noindent hsize = \the\hsize\par
+\noindent vsize = \the\vsize\par
+\noindent mag = \the\mag\par
+\noindent parindent = \the\parindent\par
+\noindent baselineskip = \the\baselineskip\par
+\noindent topskip = \the\topskip\par
+\noindent format = \fmtname\ \fmtversion\par
+
+\eject
+
+\Section{2. Fonts}
+
+\fontchart{UNIT-FONT-CMR10}{\tenrm}{cmr10}
+\eject
+
+\fontchart{UNIT-FONT-CMBX10}{\tenbf}{cmbx10}
+\eject
+
+\fontchart{UNIT-FONT-CMTT10}{\tentt}{cmtt10}
+\eject
+
+\fontchart{UNIT-FONT-CMTI10}{\tenit}{cmti10}
+\eject
+
+\fontchart{UNIT-FONT-CMSL10}{\tensl}{cmsl10}
+\eject
+
+\font\tenss=cmss10
+\fontchart{UNIT-FONT-CMSS10}{\tenss}{cmss10}
+\eject
+
+\fontchart{UNIT-FONT-CMMI10}{\teni}{cmmi10}
+\eject
+
+\fontchart{UNIT-FONT-CMSY10}{\tensy}{cmsy10}
+\eject
+
+\fontchart{UNIT-FONT-CMEX10}{\tenex}{cmex10}
+\eject
+
+\Section{3. Characters}
+
+\Label{UNIT-CHAR-SPECIAL}
+\noindent \aa\ \AE\ \ae\ \oe\ \OE\ \o\ \O\ \ss\ \i\ \j\ \l\ \L\par
+\noindent \dag\ \ddag\ \S\ \P\ \copyright\ \TeX\ \Orb\par
+\vskip 1em
+
+\Label{UNIT-CHAR-ACCENT}
+\noindent \`a \'e \^i \~n \=o \.z \u{g} \v{s} \H{o}\par
+\vskip 1em
+
+\Label{UNIT-CATCODE-TILDE}
+\noindent a~b\par
+
+\eject
+
+\Section{4. Math}
+
+\Label{UNIT-MATH-BASIC}
+\noindent $\alpha+\beta=\gamma$ \quad
+$\sum_{i=1}^n i^2$ \quad
+$\int_0^1 x^2\,dx$\par
+\noindent ${a+b\over c+d}$ \quad
+$\sqrt{2}$ \quad
+$\root 3 \of{x}$\par
+\noindent $a\ne b$ \quad
+$A\subseteq B$ \quad
+$x\notin Y$\par
+\vskip 1em
+
+\Label{UNIT-MATH-BIG}
+\noindent $\displaystyle \sum_{k=1}^n k = {n(n+1)\over 2}$\par
+\noindent $\displaystyle \prod_{i=1}^n i = n!$\par
+\noindent $\displaystyle \lim_{x\to 0} {\sin x\over x} = 1$\par
+\noindent $\bigl( \Bigl( \biggl( \Biggl( \quad
+\bigr) \Bigr) \biggr) \Biggr)$\par
+\noindent $\left( {a\over b} \right)$ \quad
+$\left[ {a\over b} \right]$ \quad
+$\left\{ {a\over b} \right\}$\par
+\vskip 1em
+
+\Label{UNIT-MATH-GREEK}
+\noindent $\alpha\beta\gamma\delta\epsilon\zeta\eta\theta\iota\kappa\lambda\mu$\par
+\noindent $\nu\xi\pi\rho\sigma\tau\upsilon\phi\chi\psi\omega$\par
+\noindent $\varepsilon\vartheta\varpi\varrho\varsigma\varphi$\par
+\noindent $\Gamma\Delta\Theta\Lambda\Xi\Pi\Sigma\Upsilon\Phi\Psi\Omega$\par
+\vskip 1em
+
+\Label{UNIT-MATH-OPS}
+\noindent $\sum_{i=1}^n i$ \quad $\prod_{i=1}^n i$
+\quad $\int_0^1 x\,dx$ \quad $\oint_C f$\par
+\noindent $\lim_{x\to0}$ \quad $\sin x$ \quad $\cos x$
+\quad $\log x$ \quad $\ln x$ \quad $\exp x$\par
+\noindent $\max(x,y)$ \quad $\min(x,y)$ \quad $\gcd(a,b)$
+\quad $\det A$ \quad $\Pr(A)$\par
+
+\eject
+
+\Section{5. Boxes and Rules}
+
+\Label{UNIT-BOX}
+\noindent\hskip 2em \raise 3pt\hbox{raised}\par
+\noindent\hskip 2em \lower 3pt\hbox{lowered}\par
+\noindent\hskip 2em \rlap{overlap}\hskip 4em (text sticks out right)\par
+\noindent\hskip 2em \llap{lap}\hskip 4em (text sticks out left)\par
+\noindent\hskip 2em \smash{smash}\hskip 4em (zero height/depth)\par
+\noindent\hskip 2em \phantom{phantom}visible\par
+\vskip 1em
+
+\Label{UNIT-RULE}
+\noindent\hskip 2em \hrulefill\par
+\vskip .3em
+\noindent\hskip 2em \dotfill\par
+\vskip .3em
+\noindent\hskip 2em \rightarrowfill\par
+\vskip .3em
+\noindent\hskip 2em \leftarrowfill\par
+\vskip .3em
+\noindent\hskip 2em \downbracefill\par
+\vskip .3em
+\noindent\hskip 2em \upbracefill\par
+
+\eject
+
+\Section{6. More Math}
+
+\Label{UNIT-MATH-SCRIPTS}
+\noindent $x^2$ \quad $x_i$ \quad $x_i^2$ \quad $x^{2^n}$ \quad
+$x_{i_j}$ \quad $x^{a+b}$\par
+\noindent $\sum_{i=1}^n$ \quad $\int_a^b$ \quad $\lim_{n\to\infty}$\par
+\vskip 1em
+
+\Label{UNIT-MATH-ACCENTS}
+\noindent $\hat{x}$ \quad $\check{x}$ \quad $\tilde{x}$ \quad
+$\acute{x}$ \quad $\grave{x}$ \quad $\bar{x}$ \quad $\vec{x}$ \quad
+$\dot{x}$ \quad $\ddot{x}$ \quad $\breve{x}$\par
+\noindent $\widehat{xyz}$ \quad $\widetilde{xyz}$\par
+\vskip 1em
+
+\Label{UNIT-MATH-OVERLINE}
+\noindent $\overline{a+b}$ \quad $\underline{a+b}$ \quad
+$\overline{\overline{a}}$\par
+\vskip 1em
+
+\Label{UNIT-MATH-NOT}
+\noindent $\ne$ \quad $\notin$ \quad $\not=$ \quad
+$\not<$ \quad $\not>$ \quad $\not\equiv$\par
+\vskip 1em
+
+\Label{UNIT-MATH-ATOP}
+\noindent ${n \choose k}$ \quad ${n \brack k}$ \quad
+${n \brace k}$ \quad ${a \atop b}$\par
+\vskip 1em
+
+\Label{UNIT-MATH-MOD}
+\noindent $a \bmod b$ \quad $x \equiv y \pmod{n}$\par
+\vskip 1em
+
+\Label{UNIT-MATH-BRACE}
+\noindent $\overbrace{a+b+c}^{n}$\par
+\noindent $\underbrace{a+b+c}_{n}$\par
+\noindent $\overrightarrow{AB}$ \quad $\overleftarrow{AB}$\par
+
+\bye

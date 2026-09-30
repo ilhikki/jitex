@@ -18,6 +18,10 @@ const REPO_ROOT = new URL('../../../', import.meta.url)
 const JITEX_VERSION = '0.1.0'
 const BUILD_DIR = new URL('.build/jitex/', REPO_ROOT)
 const DIST_DIR = new URL('dist/', REPO_ROOT)
+/** dist/lib/ —— 产物真源：自包含发布物（jitex.js + manifest + fonts.css + fonts/） */
+const LIB_DIR = new URL('lib/', DIST_DIR)
+/** dist/site/ —— 自包含演示站：官网文件 + lib/ 的整份复制 */
+const SITE_DIR = new URL('site/', DIST_DIR)
 
 /** 官网的静态文件（非包，原样拷进 dist；app.js 引用同目录的 jitex.js、worker.js、initial-tex.js 与 logo-tex.js） */
 const SITE_FILES = ['index.html', 'styles.css', 'app.js', 'worker.js', 'initial-tex.js', 'logo-tex.js']
@@ -44,6 +48,31 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const buffer = new Uint8Array(bytes)
   const digest = await crypto.subtle.digest('SHA-256', buffer)
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** 递归复制目录树（src / dst 均为目录 URL；dst 不存在则创建） */
+async function copyDir(src: URL, dst: URL): Promise<void> {
+  await Deno.mkdir(dst, { recursive: true })
+  for await (const entry of Deno.readDir(src)) {
+    if (entry.isDirectory) {
+      await copyDir(new URL(`${entry.name}/`, src), new URL(`${entry.name}/`, dst))
+    } else {
+      await Deno.copyFile(new URL(entry.name, src), new URL(entry.name, dst))
+    }
+  }
+}
+
+/** 递归列出目录下的文件，返回相对路径（以 / 分隔） */
+async function listFiles(dir: URL, prefix = ''): Promise<string[]> {
+  const out: string[] = []
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isDirectory) {
+      out.push(...await listFiles(new URL(`${entry.name}/`, dir), `${prefix}${entry.name}/`))
+    } else {
+      out.push(`${prefix}${entry.name}`)
+    }
+  }
+  return out
 }
 
 /**
@@ -141,14 +170,15 @@ export function createBuildJitexSuite(): Suite {
         const entry = await writeBundleInputs(texFiles.texJs, plainFmt.plainFmtBytes, texFiles.poolFile, tfmFiles)
         const { code } = await bundle(entry, { importMap: IMPORT_MAP })
 
-        // 发布目录每次重建：改过名/删过的产物不许残留（Pages 上是直接对外的那份）
+        // dist 每次重建：改过名/删过的产物不许残留。
+        // dist/lib/ 是产物真源——自包含发布物（jitex.js + manifest + fonts.css + fonts/）。
         await Deno.remove(DIST_DIR, { recursive: true }).catch((error: unknown) => {
           if (!(error instanceof Deno.errors.NotFound)) {
             throw error
           }
         })
-        await Deno.mkdir(DIST_DIR, { recursive: true })
-        await Deno.writeTextFile(new URL('jitex.js', DIST_DIR), code)
+        await Deno.mkdir(LIB_DIR, { recursive: true })
+        await Deno.writeTextFile(new URL('jitex.js', LIB_DIR), code)
         const codeBytes = new TextEncoder().encode(code)
         attach('jitex.js', codeBytes)
 
@@ -176,7 +206,7 @@ export function createBuildJitexSuite(): Suite {
           fonts: JSON.parse(plainFmt.fontsJson) as unknown,
         }
         const manifestText = JSON.stringify(manifest, undefined, 2)
-        await Deno.writeTextFile(new URL('jitex.manifest.json', DIST_DIR), manifestText)
+        await Deno.writeTextFile(new URL('jitex.manifest.json', LIB_DIR), manifestText)
         attach('jitex.manifest.json', new TextEncoder().encode(manifestText))
 
         log(`jitex.js = ${codeBytes.length} bytes (${manifest.sha256.slice(0, 12)}…)`)
@@ -184,9 +214,9 @@ export function createBuildJitexSuite(): Suite {
       },
     ))
 
-    const smokeStage = cache(stage('smoke: tex ⇒ svg', [jitexStage], async () => {
+    cache(stage('smoke: tex ⇒ svg', [jitexStage], async () => {
       // 只 import 产物本身：被测的必须是发布物
-      const jitex = await import(new URL('jitex.js', DIST_DIR).href) as JitexModule
+      const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
       assert(typeof jitex.createTexEngine === 'function', 'createTexEngine should be exported')
       const engine = jitex.createTexEngine()
 
@@ -238,7 +268,7 @@ export function createBuildJitexSuite(): Suite {
     // 官网正文那段 tex 的产物：每页 svg + console，全部进报告，点开就能与网页对照。
     // 不用断言守门——改 tex 复现问题时，报错的产物本身就是要看的东西。
     stage('site tex ⇒ svg', [jitexStage], async () => {
-      const jitex = await import(new URL('jitex.js', DIST_DIR).href) as JitexModule
+      const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
       let consoleText = ''
       const run = jitex.createTexEngine().render(INITIAL_TEX, {
         onConsole: (chunk: string) => {
@@ -255,31 +285,9 @@ export function createBuildJitexSuite(): Suite {
       return { sitePages: svgs.length }
     })
 
-    stage('copy site', [jitexStage], async () => {
-      // 官网是几个静态文件，原样拷进 dist：index.html 引用 ./styles.css 与
-      // `<script type="module" src="./app.js">`，app.js 再 import 同目录的 jitex.js。
-      //
-      // 不内联、也不另打一份 jitex：页面用的就是发布的那个库文件，同批产出、版本一致。
-      const siteSource = new URL('src/web/', REPO_ROOT)
-      for (const name of SITE_FILES) {
-        const bytes = await Deno.readFile(new URL(name, siteSource))
-        await Deno.writeFile(new URL(name, DIST_DIR), bytes)
-        attach(name, bytes)
-        const text = new TextDecoder().decode(bytes)
-        // GitHub Pages 挂在 /<repo>/ 下：出现以 / 开头的资源路径就会白屏
-        assert(
-          !/\s(?:src|href)="\//.test(text) && !/from '\//.test(text),
-          `${name}: 不能出现以 / 开头的资源路径（Pages 下会 404）`,
-        )
-      }
-      const jitexFile = await Deno.stat(new URL('jitex.js', DIST_DIR))
-      assert(jitexFile.size > 0, 'dist/jitex.js 必须与官网同批产出')
-      log(`site: ${SITE_FILES.join(' + ')}（app.js 引用同目录 jitex.js）`)
-      return { siteFiles: SITE_FILES.length }
-    })
-
     /*
-     * 字体：resources/fonts/ 的 woff2 原样拷进 dist/fonts/，并按文件名生成 @font-face 清单。
+     * 字体：resources/fonts/ 的 woff2 写进 dist/lib/，并按文件名生成 @font-face 清单。
+     * lib 是产物真源——自包含发布物：jitex.js + jitex.manifest.json + fonts.css + fonts/。
      * 清单只**声明**、不下载——浏览器只为页面上真正用到的族取文件，这就是按需加载。
      * 依赖 jitexStage 是因为它负责重建 dist（先清空），晚跑会把字体删掉。
      */
@@ -293,11 +301,11 @@ export function createBuildJitexSuite(): Suite {
       }
       names.sort()
 
-      await Deno.mkdir(new URL('fonts/', DIST_DIR), { recursive: true })
+      await Deno.mkdir(new URL('fonts/', LIB_DIR), { recursive: true })
       const lines = ['/* 由 build:jitex 生成：CM 字体清单（源自 resources/fonts/）。勿手改。 */']
       for (const name of names) {
         const bytes = await Deno.readFile(new URL(name, fontDir))
-        await Deno.writeFile(new URL(`fonts/${name}`, DIST_DIR), bytes)
+        await Deno.writeFile(new URL(`fonts/${name}`, LIB_DIR), bytes)
         // 族名 = 文件名大写（CMR10…），与运行期 resolveFont 的输出一致
         lines.push(
           `@font-face {\n  font-family: '${name.replace(/\.woff2$/, '').toUpperCase()}';\n` +
@@ -306,14 +314,88 @@ export function createBuildJitexSuite(): Suite {
       }
       const css = lines.join('\n') + '\n'
       assert(!/url\(\s*['"]?\//.test(css), 'fonts.css: 不能出现以 / 开头的资源路径（Pages 下会 404）')
-      await Deno.writeTextFile(new URL('fonts.css', DIST_DIR), css)
+      await Deno.writeTextFile(new URL('fonts.css', LIB_DIR), css)
       attach('fonts.css', new TextEncoder().encode(css))
-      log(`fonts: ${names.length} 个 woff2 + fonts.css`)
+      log(`fonts: ${names.length} 个 woff2 + fonts.css → dist/lib/`)
       return { fontFiles: names.length }
     }))
 
-    stage('publish', [jitexStage, smokeStage, fontsStage], async () => {
-      const names = [...SITE_FILES, 'fonts.css', 'jitex.js', 'jitex.manifest.json']
+    /*
+     * 官网：src/web/ 的静态文件写进 dist/site/，再把 dist/lib/ **整份复制**进来——
+     * 于是 dist/site/ 是自包含演示站：worker.js → ./jitex.js、index.html → ./fonts.css
+     * 都就地成立；发布时 GitHub Pages 直接托管 dist/site/ 即可。
+     */
+    const copySiteStage = stage('copy site', [jitexStage, fontsStage], async () => {
+      await Deno.mkdir(SITE_DIR, { recursive: true })
+      const siteSource = new URL('src/web/', REPO_ROOT)
+      for (const name of SITE_FILES) {
+        const bytes = await Deno.readFile(new URL(name, siteSource))
+        await Deno.writeFile(new URL(name, SITE_DIR), bytes)
+        attach(name, bytes)
+        const text = new TextDecoder().decode(bytes)
+        // GitHub Pages 挂在 /<repo>/ 下：出现以 / 开头的资源路径就会白屏
+        assert(
+          !/\s(?:src|href)="\//.test(text) && !/from '\//.test(text),
+          `${name}: 不能出现以 / 开头的资源路径（Pages 下会 404）`,
+        )
+      }
+      await copyDir(LIB_DIR, SITE_DIR)
+      const jitexFile = await Deno.stat(new URL('jitex.js', LIB_DIR))
+      assert(jitexFile.size > 0, 'dist/lib/jitex.js 必须与官网同批产出')
+      log(`site: ${SITE_FILES.join(' + ')} + dist/lib/ 复制（自包含）`)
+      return { siteFiles: SITE_FILES.length }
+    })
+
+    /*
+     * 可视化检查页：把 resources/jitex/plain-visual.tex 编译成 dist/site/plain-visual.html，
+     * 正文只有每页 SVG，引用同目录的 ./fonts.css（随 lib 复制而来）。随站点一起托管。
+     */
+    const plainVisualStage = stage('plain-visual ⇒ html', [jitexStage, copySiteStage], async () => {
+      const source = await Deno.readTextFile(new URL('resources/jitex/plain-visual.tex', REPO_ROOT))
+      const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
+      let consoleText = ''
+      const run = jitex.createTexEngine().render(source, {
+        onConsole: (chunk: string) => {
+          consoleText += chunk
+        },
+      })
+
+      const svgs = run.status === 'completed' ? run.svgs : []
+      const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>plain-visual</title>
+<link rel="stylesheet" href="./fonts.css">
+<style>body{margin:0}svg{display:block}</style>
+</head>
+<body>
+${svgs.join('\n')}
+</body>
+</html>
+`
+      await Deno.writeTextFile(new URL('plain-visual.html', SITE_DIR), html)
+      attach('plain-visual.html', new TextEncoder().encode(html))
+      svgs.forEach((svg, i) => attach(`plain-visual.${i + 1}.svg`, new TextEncoder().encode(svg)))
+      attachText('plain-visual.console.txt', consoleText)
+
+      const status = run.status === 'completed' ? 'ok' : `error: ${run.error.message}`
+      log(`[plain-visual] ${status} · pages=${svgs.length} → dist/site/`)
+      return { plainVisualPages: svgs.length }
+    })
+
+    /*
+     * 发布清单：递归列出 dist/lib + dist/site（两块自包含发布面），哈希留档。
+     * 对外分家：site → GitHub Pages，lib → GitHub Release。
+     */
+    stage('publish', [jitexStage, fontsStage, copySiteStage, plainVisualStage], async () => {
+      const names: string[] = []
+      for (const area of ['lib', 'site']) {
+        for (const rel of await listFiles(new URL(`${area}/`, DIST_DIR))) {
+          names.push(`${area}/${rel}`)
+        }
+      }
+      names.sort()
       const lines: string[] = []
       for (const name of names) {
         const bytes = await Deno.readFile(new URL(name, DIST_DIR))
