@@ -7,15 +7,7 @@ This is only how to use it.
 Create `my-pipeline.ts`:
 
 ```ts
-import {
-  assert,
-  attachJson,
-  attachText,
-  cache,
-  log,
-  stage,
-  suite,
-} from '@jitex/integration'
+import { assert, attachJson, attachText, cache, log, stage, suite } from '@jitex/integration'
 
 export default suite('demo', () => {
   const build = cache(
