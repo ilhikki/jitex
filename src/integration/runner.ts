@@ -1,8 +1,8 @@
-// Runner：拓扑排序 + 调度 + 失败策略 + 缓存集成。
+// Runner: topological sort + scheduling + failure policy + cache integration.
 //
-// 入口：run(suite, options) → Promise<RunReport>
+// Entry: run(suite, options) -> Promise<RunReport>
 //
-// 执行顺序：before → stages(拓扑序, 含缓存判定) → after
+// Execution order: before -> stages (topological order, with cache decision) -> after
 
 import { RunContext, setGlobalRunContext, setLogSink, StageContext } from './context.ts'
 import { _drainDeclLogs } from './dsl.ts'
@@ -12,17 +12,17 @@ import { purgeCacheDir, tryRecoverCache, writeCache } from './cache.ts'
 import { buildArtifactMap, writeReport } from './reporter.ts'
 
 export interface RunOptions {
-  reportDir?: string // 默认 ./reports
+  reportDir?: string
   runId?: string
   filter?: (stage: Stage<unknown>) => boolean
   failFast?: boolean
-  cacheDir?: string // 默认 {reportDir}/.cache
-  withCache?: boolean // CLI --with-cache：严格模式，无 cache 则报错；默认 false（刷新）
-  purge?: boolean // 启动前清空 cacheDir
-  noReport?: boolean // 只跑不落盘报告
-  args?: string[] // 记录到报告
+  cacheDir?: string
+  withCache?: boolean
+  purge?: boolean
+  noReport?: boolean
+  args?: string[]
   env?: Record<string, string>
-  log?: (msg: string) => void // 日志 sink；默认 console.log
+  log?: (msg: string) => void
 }
 
 export interface StageRecord {
@@ -50,8 +50,6 @@ export interface RunReport {
   runLogs: string[]
 }
 
-// runId 生成
-
 function defaultRunId(): string {
   const now = new Date()
   const pad = (n: number, w = 2) => String(n).padStart(w, '0')
@@ -72,13 +70,13 @@ function artifactRecord(a: { name: string; bytes: Uint8Array }) {
   return { name: a.name, size: a.bytes.length, lines }
 }
 
-// 拓扑排序（Kahn）
+// Topological sort (Kahn)
 //
-// universe = 全 suite 的 stages（用于 dep 归属校验）
-// active   = 用户 filter 后要真正执行/展示的 stages（图仅由 active 构成）
+// universe = all stages in the suite (used for dep ownership validation)
+// active   = stages to actually execute/display after user filter (the graph is built only from active)
 //
-// 如果 active 中某 stage 的 dep 不在 active 但在 universe 中 → 允许（该 dep 将通过"预恢复"从缓存拿结果）
-// 如果 active 中某 stage 的 dep 也不在 universe → 抛错（不属于这个 suite，非法）
+// If a stage's dep is not in active but in universe -> allowed (the dep will be fetched from cache via "pre-recovery")
+// If a stage's dep is not in universe either -> throw (not part of this suite, illegal)
 
 function topoSort(
   active: Stage<unknown>[],
@@ -98,20 +96,17 @@ function topoSort(
   }
   for (const s of active) {
     for (const dep of s.deps) {
-      // dep 不在 universe → 非法
       if (!universeByName.has(dep.name)) {
         throw new Error(
           `stage '${s.name}' depends on '${dep.name}' which is not in suite '${/* name available outside */ '?'}'`,
         )
       }
-      // dep 不在 active（被 filter 排除）→ 依赖通过缓存满足（不算图中边）
       if (!byId.has(dep.id)) {
         continue
       }
       indeg.set(s.id, (indeg.get(s.id) ?? 0) + 1)
     }
   }
-  // 循环检测
   const queue: string[] = []
   for (const [id, d] of indeg) {
     if (d === 0) {
@@ -138,9 +133,10 @@ function topoSort(
   return order
 }
 
-// 对"不在 active（被 filter 排除）但被某个 active stage 依赖"的 stages，
-// 按需递归地尝试从缓存恢复其结果/checksum，塞到 stageResultById / checksumByName 里。
-// 如果 withCache=true 且恢复失败 → 抛错。
+// For stages "not in active (filtered out) but depended on by some active stage",
+// recursively attempt to recover their results/checksum from cache on demand,
+// and store them into stageResultById / checksumByName.
+// If withCache=true and recovery fails -> throw.
 async function preRecoverFilteredDeps(
   target: Stage<unknown>,
   ctx: {
@@ -157,13 +153,12 @@ async function preRecoverFilteredDeps(
   for (const dep of target.deps) {
     if (ctx.activeStageNames.has(dep.name)) {
       continue
-    } // active：主循环中会处理
+    }
     if (ctx.recovering.has(dep.name)) {
       continue
     }
     ctx.recovering.add(dep.name)
 
-    // 先递归处理 dep 的 deps
     await preRecoverFilteredDeps(dep, ctx)
 
     if (!dep.cacheable) {
@@ -172,11 +167,9 @@ async function preRecoverFilteredDeps(
           `--with-cache: stage '${target.name}' needs '${dep.name}' (filtered out), but '${dep.name}' is not cache() marked`,
         )
       }
-      // 非 strict：不给结果，下游 map 里取不到 → 传 undefined
       continue
     }
 
-    // 组装依赖 checksums（可能是递归恢复过的，也可能是 dep 的依赖也被 filter 掉了）
     const depChecksums = new Map<string, string>()
     for (const dd of dep.deps) {
       const c = ctx.checksumByName.get(dd.name)
@@ -199,8 +192,6 @@ async function preRecoverFilteredDeps(
   }
 }
 
-// run 主流程
-
 export async function run(suite: Suite, options: RunOptions = {}): Promise<RunReport> {
   const startedAt = Date.now()
   const runId = options.runId ?? defaultRunId()
@@ -220,7 +211,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
   setGlobalRunContext(runCtx)
   setLogSink(options.log ?? ((msg: string) => console.log(msg)))
 
-  // suite 回调（声明期）里 log 的消息：此时才有 runLogs 和日志 sink，灌进去
   for (const msg of _drainDeclLogs()) {
     runCtx.log(msg)
   }
@@ -228,7 +218,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
   let suiteSuccess = true
 
   try {
-    // --- 开始时：列出本次要跑的 stage ---
     const filtered = filter ? suite.stages.filter(filter) : suite.stages.slice()
     runCtx.log(`suite '${suite.name}' (${filtered.length} stage${filtered.length === 1 ? '' : 's'})`)
     for (const s of filtered) {
@@ -237,7 +226,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
       runCtx.log(`  [${s.id}] ${s.name}${depsText}${cacheText}`)
     }
 
-    // --- before hook ---
     if (suite.beforeFn) {
       try {
         const r = suite.beforeFn()
@@ -246,7 +234,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
         }
       } catch (_err) {
         suiteSuccess = false
-        // before 失败 → 所有 stage skipped
         for (const s of suite.stages) {
           if (filter && !filter(s)) {
             continue
@@ -260,24 +247,18 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     }
 
     if (suiteSuccess) {
-      // --- filter ---
       const activeStageNames = new Set(filtered.map((s) => s.name))
 
-      // --- 拓扑 ---
       const order = topoSort(filtered, suite.stages, suite.name)
 
-      // results 缓存：stageId -> 返回值（执行或恢复得到）
       const stageResultById = new Map<string, unknown>()
-      // stageName -> checksum（仅 cacheable 且成功/cached 有值）
       const checksumByName = new Map<string, string>()
-      // 已失败 stage（后继跳过）
       const failedIds = new Set<string>()
 
       const recovering = new Set<string>()
       let step = 0
 
       for (const s of order) {
-        // 对被 filter 排除的依赖（在 active 之外）先预恢复（递归）
         await preRecoverFilteredDeps(s, {
           suiteName: suite.name,
           cacheDir,
@@ -289,7 +270,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
           checksumByName,
         })
 
-        // 依赖检查：任一 dep failedIds → skip
         const depFailed = s.deps.some((d) => failedIds.has(d.id))
 
         const sc = new StageContext(s.id, s.name)
@@ -306,17 +286,11 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
 
           const depResults: unknown[] = s.deps.map((d) => {
             if (!stageResultById.has(d.id)) {
-              // dep 没结果：要么是（1）非 strict 且非 cacheable 且被 filter 排除，
-              // 要么是（2）严格 cache 没命中（已经在上面抛错了）。
-              // 传 undefined，下游 fn 自己决定。
               return undefined
             }
             return stageResultById.get(d.id)
           })
 
-          // --- 尝试缓存恢复 ---
-          // 默认（withCache=false）：不恢复，每次刷新重跑（保持 CLI 注释约定）。
-          // 仅 --with-cache 严格模式下才走 tryRecoverCache。
           if (s.cacheable && withCache) {
             const depChecksums = new Map<string, string>()
             for (const d of s.deps) {
@@ -351,7 +325,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
             }
           }
 
-          // --- 执行 fn ---
           const t0 = performance.now()
           try {
             const ret = s.fn(depResults)
@@ -363,7 +336,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
             stageResultById.set(s.id, value)
             runCtx.log(`[${s.id}] done (${sc.durationMs}ms)`)
 
-            // 写缓存（仅 cacheable 标记 + 成功）
             if (s.cacheable) {
               const asRecord = value as CacheableRecord
               const depsChecksums: DepChecksum[] = s.deps
@@ -397,7 +369,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
       }
     }
 
-    // --- after hook ---
     if (suite.afterFn) {
       try {
         const r = suite.afterFn()
@@ -406,7 +377,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
         }
       } catch (_err) {
         suiteSuccess = false
-        // after 失败不影响已完成 stage 状态
       }
     }
   } finally {
@@ -414,7 +384,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     setLogSink(undefined)
   }
 
-  // --- 构建报告 ---
   const totalMs = Date.now() - startedAt
   const stagesRec: StageRecord[] = runCtx.stages.map((s) => ({
     id: s.id,
@@ -449,7 +418,6 @@ export async function run(suite: Suite, options: RunOptions = {}): Promise<RunRe
     runLogs: runCtx.runLogs,
   }
 
-  // --- 写盘报告 ---
   const noReport = options.noReport ?? false
   if (!noReport) {
     const artifacts = buildArtifactMap(runCtx.stages)

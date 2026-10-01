@@ -38,10 +38,10 @@ async function runTripTex(args: RunTripTexArgs) {
 // suite
 
 /**
- * 构建 boot tex 流水线。
+ * Black-box entry: callers only supply the "inline" switch; the rest of the
+ * stages are orchestrated internally by this suite.
  *
- * 作为黑盒入口：调用方只需提供「是否内联」开关，其余阶段由本 suite 内部编排，
- * 各阶段耗时由 runner 记录在 RunReport.stages[].duration 中。
+ * Stage durations are recorded by the runner in RunReport.stages[].duration.
  */
 export function createBootTexSuite(): Suite {
   return suite('boot tex', ({ debug }) => {
@@ -199,7 +199,6 @@ export function createBootTexSuite(): Suite {
         log(`[pass2 verify] assert status === 'terminated', actual = ${JSON.stringify(actual.status)}`)
         assertEquals(actual.status, 'terminated')
 
-        // trip.dvi 字节级比较
         log(`[pass2 verify] assert trip.dvi exists, tripDvi defined = ${actual.tripDvi !== undefined}`)
         assert(actual.tripDvi !== undefined, 'trip.dvi not found')
         log(
@@ -220,7 +219,6 @@ export function createBootTexSuite(): Suite {
         log(`[pass2 verify] assert trip.dvi bytes match, mismatch count = ${divMismatchCount}`)
         assert(divMismatchCount === 0, `mismatch ${divMismatchCount}`)
 
-        // tripos.tex 直接比较
         log(
           `[pass2 verify] assert tripos.tex match, actual length = ${
             actual.triposTex?.length ?? 'undefined'
@@ -228,22 +226,21 @@ export function createBootTexSuite(): Suite {
         )
         assertEquals(actual.triposTex, expect.triposTex, 'tripos.tex mismatch')
 
-        // 8terminal.tex 应为空
         log(`[pass2 verify] assert 8terminal.tex exists, terminalTex defined = ${actual.terminalTex !== undefined}`)
         assert(actual.terminalTex !== undefined, '8terminal.tex not found')
         log(`[pass2 verify] assert 8terminal.tex empty, actual length = ${actual.terminalTex.length}`)
         assertEquals(actual.terminalTex.length, 0, '8terminal.tex should be empty')
 
-        // trip.log 比较：tripman Step 5 允许若干例外（日期、glue set、accent kern、
-        // 容量值、help messages、strings 总数/长度、内存统计）。
-        // 第一版先做严格断言，暴露差异后再做归一化。
+        // trip.log comparison: tripman Step 5 allows several exceptions (date,
+        // glue set, accent kern, capacity values, help messages, string
+        // count/length, memory stats). The first pass uses strict assertion;
+        // normalization will be added after differences are exposed.
         log(
           `[pass2 verify] assert trip.log match, actual length = ${
             actual.tripLog?.length ?? 'undefined'
           }, expected length = ${expect.tripLog.length}`,
         )
         assertEquals(actual.tripLog, expect.tripLog, 'trip.log mismatch (may need normalization per tripman Step 5)')
-        // 终端输出 == trip.fot
         log(
           `[pass2 verify] assert console output === trip.fot, actual length = ${actual.consoleOutput.length}, expected length = ${expect.tripFot.length}`,
         )

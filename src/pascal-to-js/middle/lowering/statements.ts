@@ -254,7 +254,7 @@ function loweringIf(
 /**
  * 循环回边 / goto 前的步数检查。
  *
- * **非 debug 构建不生成这条语句** —— 它该不该存在取决于插入位置，而位置知识在本层
+ * **非 debug 构建不生成这条语句** -- 它该不该存在取决于插入位置，而位置知识在本层
  * （rewrite 看不到位置，所以不能由它来删）。
  */
 function stepsCheckStmts(a: Analysis): JsonCode.Statement[] {
@@ -525,7 +525,7 @@ function loweringProcedureCall(
     return loweringUserCallStmt(sym.funcId, node.arguments, a, funcId, ws)
   }
 
-  // 无本体调用（内置过程 + 注入过程）：机械翻译 —— 名字拼进 key，实参与类型描述
+  // 无本体调用（内置过程 + 注入过程）：机械翻译 -- 名字拼进 key，实参与类型描述
   // 平铺传递。名 → 翻译的映射、实参形态是否合法，全部在 rewrite；注入的 callable
   // 由其 sysCallName 在 transform 里自动注册为同 key 的 rewriter。
   return [evalStmt(syscall(callKey(name), loweringCallActuals(node.arguments, a, ws)))]
@@ -552,7 +552,7 @@ function loweringUserCallStmt(
       continue
     }
     if (param.isVarParam) {
-      // ISO 7185 6.6.3.3: var 实参必须是 variable-access（6.5.1）——
+      // ISO 7185 6.6.3.3: var 实参必须是 variable-access（6.5.1）--
       // 整个变量、数组元素、记录字段、指针解引用、文件缓冲区皆可。
       // 用 cell 承载实参当前值，调用结束后按目标位置写回。
       const argNode = args[i]
@@ -564,7 +564,7 @@ function loweringUserCallStmt(
       cellVars.push({ cellVar, target: argNode })
     } else {
       // Pascal 值参数是赋值传递（ISO 7185 6.6.3.2）。record / array 这类复合值
-      // 的宿主表示可能是可变的字节视图或对象，必须整体拷贝——否则形参改元素
+      // 的宿主表示可能是可变的字节视图或对象，必须整体拷贝--否则形参改元素
       // 会直接回写到实参（标量与 set 无需拷贝：set 的运算都是函数式的，不就地改）
       let argExpr = loweringExpr(args[i], a, ws)
       if (param.typeInfo.tag === 'record' || param.typeInfo.tag === 'array') {

@@ -8,20 +8,16 @@ import { readFile, readTextFile } from '../utils.ts'
 import { createStageOfGetTangleJs, transformTex } from './build-tex.ts'
 
 /*
- * TeX82 的公共阶段：自举 TANGLE → 编译 tex.js → 攒 INITEX 的输入 → 建 plain.fmt。
+ * boot-plain (test) and build:jitex (release) share the same set of stages to
+ * avoid duplication.
  *
- * boot-plain（测试）与 build:jitex（发布）共用同一套，避免两处各写一遍。
- * 阶段名保持与原 boot-plain 一致，报告与缓存条目对得上。
+ * Stage names match the original boot-plain so reports and cache entries align.
  */
 
-/** 阶段 1：自举 TANGLE，产出 tangle.js */
 export type TangleJsStage = Stage<{ tangleJs: string }>
-/** 阶段 2：用 tangle.js 处理 tex.web，编译出 tex.js 与 pool */
 export type TexJsStage = Stage<{ texJs: string; poolFile: Uint8Array }>
-/** INITEX 的输入素材 */
 export type BaseFilesStage = Stage<Record<string, Uint8Array>>
 export type TfmFilesStage = Stage<Record<string, Uint8Array>>
-/** 阶段 3：跑 INITEX（`\input plain \dump`）产出 plain.fmt 与"随格式预加载的字体"清单 */
 export type PlainFmtStage = Stage<{ plainFmtBytes: Uint8Array; fontsJson: string }>
 
 export interface TexStages {
@@ -125,11 +121,10 @@ async function loadFiles(basePath: string, fileNames: string[]) {
 }
 
 /**
- * plain.tex 里 `\font\tenrm=cmr10` 这类声明 → 随格式预加载的字体文件清单。
- *
- * 预加载意味着它们的度量已随 plain.fmt 一起 dump（tex.web 的 store_fmt_file 会
- * dump font_info），运行期用这些字体不需要 tfm；但**换尺寸**（`at 12pt` / `scaled`）
- * 或换字体名时会走 read_font_info 去读 tfm——所以 jitex 仍要带 tfm。
+ * Preloaded fonts have their metrics dumped with plain.fmt (tex.web's
+ * store_fmt_file dumps font_info), so they need no tfm at runtime. However,
+ * **resizing** (`at 12pt` / `scaled`) or switching font names triggers
+ * read_font_info to read a tfm -- so jitex must still ship tfm files.
  */
 function extractPreloadedFonts(plainTex: string): string[] {
   const names = new Set<string>()
@@ -199,7 +194,7 @@ export function createTexStages(
       const plainFmtBytes = plainFmtStore.getData()
       attach('plain.fmt', plainFmtBytes)
 
-      // 支持范围要可知：哪些字体随格式走、哪些靠 tfm 文件
+      // Record which fonts ship with the format and which rely on tfm files, so the support scope is knowable.
       const fontsJson = JSON.stringify(
         {
           preloaded: extractPreloadedFonts(bytesToString(baseFiles['plain.tex'])),

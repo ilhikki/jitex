@@ -1,7 +1,8 @@
-// 上下文栈：RunContext (顶层) + StageContext (当前 stage)
+// Context stack: RunContext (top level) + StageContext (current stage)
 //
-// DSL 原语 assert/attach/log 都写入栈顶 StageContext。
-// 无 StageContext（suite 声明期 / hook 执行期）时调用这些原语 → 抛错。
+// DSL primitives assert/attach/log all write to the top StageContext.
+// Calling these primitives without a StageContext (during suite declaration /
+// hook execution) throws.
 
 export interface Artifact {
   name: string
@@ -94,15 +95,15 @@ export class RunContext {
   }
 }
 
-// 全局运行时上下文（同一时间只允许一个 run 并发）
+// Global runtime context (only one run allowed concurrently at a time)
 let globalCtx: RunContext | undefined = undefined
 
 export function setGlobalRunContext(ctx: RunContext | undefined): void {
   globalCtx = ctx
 }
 
-// 日志 sink：log / addLog 的每条消息实时转发到这里（默认控制台）。
-// runner 通过 setLogSink 注入，run 结束后清空。
+// Log sink: every message from log / addLog is forwarded here in real time (console by default).
+// runner injects it via setLogSink and clears it after the run ends.
 let activeSink: ((msg: string) => void) | undefined = undefined
 
 export function setLogSink(sink: ((msg: string) => void) | undefined): void {
@@ -120,7 +121,7 @@ export function requireRunContext(): RunContext {
   return globalCtx
 }
 
-/** 可空版本：suite 回调（声明期）里 run 尚未建立，需要问「现在有没有 run」 */
+/** Nullable version: inside the suite callback (declaration phase) the run is not yet established, so ask "is there a run now" */
 export function tryRunContext(): RunContext | undefined {
   return globalCtx
 }

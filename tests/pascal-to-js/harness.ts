@@ -5,54 +5,53 @@ import type { PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
 import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@^1.0.0'
 const textDecoder = new TextDecoder()
 /**
- * 单个 Pascal 测试用例。
+ * A single Pascal test case.
  *
- * 断言字段按 expectedError → expectedOutput → expectedContains →
- * expectedNotContains → expectedFileContains 依次校验，声明的每一项都必须满足。
+ * Assertion fields are checked in order: expectedError -> expectedOutput -> expectedContains -> expectedNotContains -> expectedFileContains; every declared field must hold.
  */
 export interface PascalTest {
-  /** 测试用例名称，在测试报告中显示 */
+  /** Test case name, shown in the test report */
   name: string
 
-  /** Pascal 源码 */
+  /** Pascal source code */
   code: string
 
-  /** 一句话描述本用例测什么 */
+  /** One-line description of what this case tests */
   purpose: string
 
-  /** 要求输出精确等于此字符串 */
+  /** Require output to exactly equal this string */
   expectedOutput?: string
 
-  /** 要求输出包含此子串 */
+  /** Require output to contain this substring */
   expectedContains?: string
 
-  /** 要求输出不包含此子串 */
+  /** Require output not to contain this substring */
   expectedNotContains?: string
 
   /**
-   * 要求执行报错。
-   * - 空字符串 '' 表示"只要报错即可，不校验消息"；
-   * - 具体消息表示"错误消息必须包含此子串"。
+   * Require execution to error.
+   * - Empty string '' means 'error is enough, message not checked';
+   * - A specific message means the error message must contain this substring.
    */
   expectedError?: string
 
-  /** 模拟输入（按行），供 readln/read 使用 */
+  /** Simulated input (per line), used by readln/read */
   input?: string
 
-  /** 额外 callable 注入（编译期声明） */
+  /** Extra callable injection (compile-time declaration) */
   extraCallables?: Record<string, ExtraCallable>
-  /** 额外 syscall 实现（运行期） */
+  /** Extra syscall implementation (runtime) */
   extraSyscalls?: Record<string, SyscallHandler>
 
-  /** 内存文件系统：文件名 → 文件内容 */
+  /** In-memory filesystem: filename -> file content */
   textFiles?: Map<string, Uint8Array>
-  /** 程序文件变量名 → files 中的键名 */
+  /** Program file variable name -> key in files */
   programFileUrls?: Record<string, string>
 
-  /** 要求指定文件内容包含此子串 */
+  /** Require the specified file content to contain this substring */
   expectedFileContains?: { url: string; contains: string }[]
 
-  /** 最大执行步数（默认 1e5） */
+  /** Maximum execution steps (default 1e5) */
   maxSteps?: number
 }
 
@@ -62,13 +61,13 @@ function newTextFile(mode: 'inspection' | 'generation', text?: string) {
   return store
 }
 
-/** 单个用例的执行结果：运行状态 + 编译产物（产物由调用方持有，runtime 不回传） */
+/** Execution result of a single case: run state + compiled artifact (artifact held by caller, runtime does not return it) */
 export interface PascalRunResult {
   state: RunState
   jsCode: string | undefined
 }
 
-/** 执行单个用例，返回运行状态与编译产物 */
+/** Execute a single case, return run state and compiled artifact */
 export async function runPascal(t: PascalTest): Promise<PascalRunResult> {
   const files = new Map<string, PascalFileStore>()
   files.set('INPUT', newTextFile('inspection', t.input))
@@ -77,8 +76,8 @@ export async function runPascal(t: PascalTest): Promise<PascalRunResult> {
     files.set(key, createMemoryFileStore(value))
   }
 
-  // 编译（@jitex/pascal-to-js）与执行（@jitex/runtime）分属两个包：先 transform 再 runJs。
-  // 编译期报错在此转成 error 状态，与运行期报错统一。
+  // Compilation (@jitex/pascal-to-js) and execution (@jitex/runtime) are in separate packages: transform first, then runJs.
+  // Compile-time errors are converted to error state here, unified with runtime errors.
   let jsCode: string
   try {
     jsCode = transform(t.code, {
@@ -99,10 +98,10 @@ export async function runPascal(t: PascalTest): Promise<PascalRunResult> {
 }
 
 /**
- * 注册一组用例。
+ * Register a group of cases.
  *
- * `group` 是该组用例的归属名（通常是 ISO 章节标题），会拼在每条用例名前。
- * 这是 harness 中唯一接触测试运行器的地方——更换测试框架只需改这里。
+ * `group` is the owning name of this group (usually an ISO section title), prepended to each case name.
+ * This is the only place in the harness that touches the test runner - changing the test framework only requires editing here.
  */
 export function runPascalTests(group: string, tests: PascalTest[]): void {
   for (const t of tests) {
@@ -115,7 +114,7 @@ function decode(store: PascalFileStore | undefined): string | undefined {
   }
   return textDecoder.decode(store.getData())
 }
-/** 执行并断言单个用例；失败时先输出编译产物，再抛出断言错误 */
+/** Execute and assert a single case; on failure, print the compiled artifact before throwing the assertion error */
 export async function runPascalTest(t: PascalTest): Promise<void> {
   const { state, jsCode } = await runPascal(t)
   const output = state.files.get('OUTPUT')
@@ -124,7 +123,7 @@ export async function runPascalTest(t: PascalTest): Promise<void> {
   try {
     const outputContent = decode(output)
     assertCase(t, state, outputContent ?? '', ctx)
-    // 期望编译通过的用例：额外验证源码往返（parse → print → parse → print）的稳定性
+    // Cases expected to compile: additionally verify the stability of source round-trip (parse -> print -> parse -> print)
     if (t.expectedError === undefined) {
       assertPrintRoundTripStable(t.code, ctx)
     }
@@ -140,42 +139,42 @@ export async function runPascalTest(t: PascalTest): Promise<void> {
 }
 
 /**
- * 源码往返检查：parse → print → parse → print。
+ * Source round-trip check: parse -> print -> parse -> print.
  *
- * 期望编译通过的用例，其打印结果必须稳定：第二次打印须与第一次完全相同。
- * 打印结果无法再次 parse、或两次打印不同，都说明 printer 丢失或改写了原 AST 的信息。
+ * For cases expected to compile, the printed result must be stable: the second print must be identical to the first.
+ * If the printed result cannot be parsed again, or the two prints differ, the printer has lost or altered information from the original AST.
  */
 function assertPrintRoundTripStable(code: string, ctx: string): void {
   const first = parse(code)
   if (!first.success) {
-    throw new Error(`${ctx}: parse 失败: ${first.error}`)
+    throw new Error(`${ctx}: parse failed: ${first.error}`)
   }
   const printedOnce = nodeToCode(first.astNode)
 
   const second = parse(printedOnce)
   if (!second.success) {
-    throw new Error(`${ctx}: 打印结果无法再次 parse: ${second.error}`)
+    throw new Error(`${ctx}: printed result cannot be parsed again: ${second.error}`)
   }
   const printedTwice = nodeToCode(second.astNode)
 
-  assertEquals(printedTwice, printedOnce, `${ctx}: 两次 print 的结果不一致`)
+  assertEquals(printedTwice, printedOnce, `${ctx}: the two print results differ`)
 }
 
-/** 按用例声明的断言字段逐项校验 */
+/** Check each assertion field declared by the case in order */
 function assertCase(t: PascalTest, state: RunState, output: string, ctx: string): void {
-  // 1. 期望报错：只要求报错，或额外要求错误消息包含指定子串
+  // 1. Expected error: only require an error, or additionally require the error message to contain the specified substring
   if (t.expectedError !== undefined) {
-    assert(state.status === 'error', `${ctx}: 期望执行报错，但执行成功`)
+    assert(state.status === 'error', `${ctx}: expected execution to error, but it succeeded`)
     if (t.expectedError.length > 0) {
       assertStringIncludes(state.error?.message ?? '', t.expectedError, ctx)
     }
     return
   }
 
-  // 2. 非预期报错
-  assert(state.status !== 'error', `${ctx}: 非预期错误: ${state.error?.message ?? ''}`)
+  // 2. Unexpected error
+  assert(state.status !== 'error', `${ctx}: unexpected error: ${state.error?.message ?? ''}`)
 
-  // 3. 输出断言
+  // 3. Output assertions
   if (t.expectedOutput !== undefined) {
     assertEquals(output, t.expectedOutput, ctx)
   }
@@ -185,17 +184,17 @@ function assertCase(t: PascalTest, state: RunState, output: string, ctx: string)
   if (t.expectedNotContains !== undefined) {
     assert(
       !output.includes(t.expectedNotContains),
-      `${ctx}: 输出不应包含 ${JSON.stringify(t.expectedNotContains)}`,
+      `${ctx}: output should not contain ${JSON.stringify(t.expectedNotContains)}`,
     )
   }
 
-  // 4. 文件断言
+  // 4. File assertions
   for (const { url, contains } of t.expectedFileContains ?? []) {
     const store = state.files.get(url)
     if (store?.getData() === undefined) {
-      assert(false, `file not found ${ctx}: 文件 ${url}`)
+      assert(false, `file not found ${ctx}: file ${url}`)
     }
 
-    assertStringIncludes(textDecoder.decode(store.getData()), contains, `${ctx}: 文件 ${url}`)
+    assertStringIncludes(textDecoder.decode(store.getData()), contains, `${ctx}: file ${url}`)
   }
 }

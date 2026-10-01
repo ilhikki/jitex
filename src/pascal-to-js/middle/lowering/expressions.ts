@@ -143,7 +143,7 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
     return litNull()
   }
   // 内置无参函数（parser 将无括号调用解析为 Identifier）：与带括号形式同一条
-  // 机械翻译路径 —— 名字即 key，交给 rewrite
+  // 机械翻译路径 -- 名字即 key，交给 rewrite
   if (name === 'eof' || name === 'eoln') {
     return syscall(callKey(name), [])
   }
@@ -234,7 +234,7 @@ export function callKey(name: string): SyscallKey {
  * 拆分字段规格语法 `x:w` / `x:w:p`。
  *
  * parser 把它解析为 `:` 二元表达式（`x:w:p` 形如 `(x:w):p`），这里只按 AST 形状
- * 拆成 [值, 宽度, 精度?] —— 纯结构翻译，不含任何语义判断。
+ * 拆成 [值, 宽度, 精度?] -- 纯结构翻译，不含任何语义判断。
  */
 function splitWidthSpec(arg: ExpressionNode): ExpressionNode[] | undefined {
   if (arg.kind !== 'BinaryExpression' || (arg as BinaryExpressionNode).operator !== ':') {
@@ -252,7 +252,7 @@ function splitWidthSpec(arg: ExpressionNode): ExpressionNode[] | undefined {
 }
 
 /**
- * 无本体调用（内置 + 注入）的实参翻译 —— 机械、无判定。
+ * 无本体调用（内置 + 注入）的实参翻译 -- 机械、无判定。
  *
  * 每个实参平铺成 (值, 类型描述)；字段规格 `x:w[:p]` 这类**仅由语法形状**决定的
  * 特殊写法，用一个专用 syscall（lowering.widthspec）表达，整体仍是一个实参。
@@ -301,7 +301,7 @@ function loweringFunctionCall(
     return callExpr(sym.funcId, args)
   }
 
-  // 内置函数与注入函数：机械翻译 —— 名字拼进 key，实参与类型描述平铺传递。
+  // 内置函数与注入函数：机械翻译 -- 名字拼进 key，实参与类型描述平铺传递。
   // 名 → 翻译的映射（含实参形态是否合法）全部在 rewrite；注入的 callable 由其
   // sysCallName 在 transform 里自动注册为同 key 的 rewriter，故此处无需区分两者。
   return syscall(callKey(node.name.name), loweringCallActuals(node.arguments, a, ws))

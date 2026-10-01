@@ -28,7 +28,7 @@ export interface Loop {
   readonly exits: ReadonlySet<BlockId>
 }
 
-/** 入口不唯一的强连通分量——不可约的本体 */
+/** 入口不唯一的强连通分量--不可约的本体 */
 export interface MultiEntryScc {
   readonly nodes: ReadonlySet<BlockId>
   readonly entries: readonly BlockId[]

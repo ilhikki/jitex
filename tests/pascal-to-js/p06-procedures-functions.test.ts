@@ -1,19 +1,19 @@
 // ISO/IEC 7185:1990 - 6.6 Procedure and function declarations
 //
-// 章节概括：
-//   规定过程与函数的声明语法与语义。procedure-declaration 有「directive + procedure-identification」、
-//   「procedure-heading + procedure-block」两种形式，function-declaration 与之类似并额外含 result-type
-//   （只能为 simple-type-identifier 或 pointer-type-identifier）。heading 中标识符构成定义点；
-//   forward 指令对应的标识符必须恰有一个应用出现在同一 procedure-and-function-declaration-part 内；
-//   一个 procedure/function-identifier 至多关联一个 block；function-block 至少要有一条以该函数标识符
-//   为赋值目标的赋值语句。参数部分规定 value/variable/procedural/functional 四类形式参数的定义点与绑定规则
-//   （变量参数的实参须为 variable-access，不得为变体的 selector 或 packed 类型的分量）、参数表 congruity
-//   判据，以及（扩展级别）conformant array 参数与 conformability 规则。required procedures 用前后断言定义
-//   文件处理过程 rewrite/put/reset/get 与 read/write、动态分配过程 new/dispose、转移过程 pack/unpack；
-//   required functions 定义算术函数（abs、sqr、sin、cos、exp、ln、sqrt、arctan）、转移函数（trunc、round）、
-//   序数函数（ord、chr、succ、pred）与布尔函数（odd、eof、eoln）的结果与出错条件。
+// Section summary:
+//   Specifies the declaration syntax and semantics of procedures and functions. procedure-declaration has the forms "directive + procedure-identification",
+//   and "procedure-heading + procedure-block". function-declaration is similar and additionally contains a result-type
+//   (which must be a simple-type-identifier or pointer-type-identifier). The identifier in a heading constitutes the point of definition;
+//   the identifier corresponding to a forward directive must have exactly one application occurrence within the same procedure-and-function-declaration-part;
+//   a procedure/function-identifier is associated with at most one block; a function-block must contain at least one assignment statement with the function-identifier
+//   as the assignment target. The parameter section specifies the points of definition and binding rules for the four formal-parameter kinds value/variable/procedural/functional
+//   (the actual parameter of a variable parameter must be a variable-access, not the selector of a variant or a component of a packed type), parameter list congruity
+//   criteria, and (at the extended level) conformant array parameters and conformability rules. Required procedures are defined by pre- and post-conditions for
+//   the file handling procedures rewrite/put/reset/get and read/write, the dynamic allocation procedures new/dispose, and the transfer procedures pack/unpack;
+//   required functions define the results and error conditions for arithmetic functions (abs, sqr, sin, cos, exp, ln, sqrt, arctan), transfer functions (trunc, round),
+//   ordinal functions (ord, chr, succ, pred), and boolean functions (odd, eof, eoln).
 //
-// 子章节：
+// Subsections:
 //   6.6.1 Procedure-declarations
 //   6.6.2 Function-declarations
 //   6.6.3 Parameters
@@ -45,67 +45,73 @@ function text(s: string): Uint8Array {
 }
 
 const tests: PascalTest[] = [
-  // 6.6.1 / 6.6.2 过程与函数的声明、定义点与 block 关联
+  // 6.6.1 / 6.6.2 Procedure and function declarations, points of definition, and block association
 
   {
-    name: '6.6 无参过程的声明与调用',
+    name: '6.6 Declaration and call of a parameterless procedure',
     code: `program test(output);
         procedure hello;
         begin writeln('HI'); end;
         begin hello; end.`,
-    purpose: 'ISO 6.6.1：procedure-heading 中标识符构成定义点，过程调用激活其 block',
+    purpose:
+      'ISO 6.6.1: the identifier in a procedure-heading constitutes the point of definition; a procedure call activates its block',
     expectedOutput: 'HI\n',
   },
   {
-    name: '6.6 带值参数的过程',
+    name: '6.6 Procedure with value parameters',
     code: `program test(output);
         procedure printn(n: integer);
         begin writeln(n); end;
         begin printn(42); end.`,
-    purpose: 'ISO 6.6.3.2：值参数的当前值在 block 激活时赋予形参变量',
+    purpose:
+      'ISO 6.6.3.2: the current value of the value parameter is assigned to the formal parameter variable upon block activation',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 带变量参数的过程',
+    name: '6.6 Procedure with variable parameters',
     code: `program test(output);
         var a: integer;
         procedure incvar(var x: integer);
         begin x := x + 1; end;
         begin a := 5; incvar(a); writeln(a); end.`,
-    purpose: 'ISO 6.6.3.3：变量参数引用实参变量，对形参的赋值反映到实参上',
+    purpose:
+      'ISO 6.6.3.3: a variable parameter references the actual parameter variable; assignments to the formal parameter are reflected in the actual parameter',
     expectedOutput: '6\n',
   },
   {
-    name: '6.6 无参函数的声明与调用',
+    name: '6.6 Declaration and call of a parameterless function',
     code: `program test(output);
         function getanswer: integer;
         begin getanswer := 42; end;
         begin writeln(getanswer); end.`,
-    purpose: 'ISO 6.6.2：function-heading 定义函数标识符，block 内对它赋值即函数结果',
+    purpose:
+      'ISO 6.6.2: the function-heading defines the function-identifier; assigning to it within the block yields the function result',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 带值参数与结果的函数',
+    name: '6.6 Function with value parameters and a result',
     code: `program test(output);
         function add(a, b: integer): integer;
         begin add := a + b; end;
         begin writeln(add(5, 3)); end.`,
-    purpose: 'ISO 6.6.2/6.6.3.2：函数调用以实参表达式激活 block，函数标识符的最终值即结果',
+    purpose:
+      'ISO 6.6.2/6.6.3.2: a function call activates the block with actual-parameter expressions; the final value of the function-identifier is the result',
     expectedOutput: '8\n',
   },
   {
-    name: '6.6 嵌套过程：过程标识符的定义点为其最内层块',
+    name: '6.6 Nested procedures: the point of definition of a procedure-identifier is its innermost block',
     code: `program test(output);
         procedure outer;
           procedure inner;
           begin writeln('IN'); end;
         begin inner; end;
         begin outer; end.`,
-    purpose: 'ISO 6.6.1：过程标识符的 region 是最接近包含该声明的 block，故 inner 在 outer 内可见',
+    purpose:
+      'ISO 6.6.1: the region of a procedure-identifier is the nearest block containing its declaration, so inner is visible within outer',
     expectedOutput: 'IN\n',
   },
   {
-    name: '6.6 递归函数：函数标识符在其自身 block 内可见',
+    name: '6.6 Recursive function: the function-identifier is visible within its own block',
     code: `program test(output);
         var r: integer;
         function fact(n: integer): integer;
@@ -114,22 +120,23 @@ const tests: PascalTest[] = [
           else fact := n * fact(n - 1);
         end;
         begin r := fact(5); writeln(r); end.`,
-    purpose: 'ISO 6.6.2：函数标识符在函数自身的 block 内可被应用（递归）',
+    purpose: "ISO 6.6.2: the function-identifier can be applied within the function's own block (recursion)",
     expectedOutput: '120\n',
   },
   {
-    name: '6.6 嵌套函数可访问外层函数的形参',
+    name: '6.6 A nested function can access the formal parameters of an enclosing function',
     code: `program test(output);
         function outer(x: integer): integer;
           function inner(y: integer): integer;
           begin inner := x + y; end;
         begin outer := inner(10); end;
         begin writeln(outer(5)); end.`,
-    purpose: 'ISO 6.6.3.1：外层函数的形参是其 block 的变量标识符，内层函数可引用',
+    purpose:
+      'ISO 6.6.3.1: the formal parameters of the enclosing function are variable identifiers of its block and can be referenced by the inner function',
     expectedOutput: '15\n',
   },
   {
-    name: '6.6 forward 过程声明与其后的定义',
+    name: '6.6 A forward procedure declaration followed by its definition',
     code: `program test(output);
         procedure p; forward;
         procedure q;
@@ -137,11 +144,12 @@ const tests: PascalTest[] = [
         procedure p;
         begin writeln('P'); end;
         begin q; end.`,
-    purpose: 'ISO 6.6.1：forward 声明的标识符须在同一声明部分有一个 procedure-identification 形式的应用（即后续定义）',
+    purpose:
+      'ISO 6.6.1: the identifier of a forward declaration must have an application in the form of a procedure-identification in the same declaration part (i.e. the subsequent definition)',
     expectedOutput: 'P\n',
   },
   {
-    name: '6.6 forward 函数声明与其后的定义',
+    name: '6.6 A forward function declaration followed by its definition',
     code: `program test(output);
         function f(n: integer): integer; forward;
         function g(n: integer): integer;
@@ -149,11 +157,12 @@ const tests: PascalTest[] = [
         function f(n: integer): integer;
         begin f := n * 2; end;
         begin writeln(g(5)); end.`,
-    purpose: 'ISO 6.6.2：forward 声明的函数标识符须在同一声明部分有 function-identification 形式的应用',
+    purpose:
+      'ISO 6.6.2: the function-identifier of a forward declaration must have an application in the form of a function-identification in the same declaration part',
     expectedOutput: '11\n',
   },
   {
-    name: '6.6 forward 声明用于互递归过程',
+    name: '6.6 Forward declarations used for mutually recursive procedures',
     code: `program test(output);
         procedure ping(n: integer); forward;
         procedure pong(n: integer);
@@ -167,149 +176,160 @@ const tests: PascalTest[] = [
           begin writeln('PING'); pong(n - 1); end;
         end;
         begin ping(3); end.`,
-    purpose: 'ISO 6.6.1：forward 使两个过程可以互相调用',
+    purpose: 'ISO 6.6.1: forward enables two procedures to call each other',
     expectedOutput: 'PING\nPONG\nPING\n',
   },
   {
-    name: '6.6 forward 声明的标识符缺少后续定义应报错',
+    name: '6.6 A forward-declared identifier lacking a subsequent definition should be an error',
     code: `program test(output);
         procedure p; forward;
         begin
         end.`,
-    purpose: 'ISO 6.6.1：forward 对应的标识符若无 procedure-identification 应用，则违反标准要求',
+    purpose:
+      'ISO 6.6.1: if the identifier corresponding to forward has no procedure-identification application, the standard requirement is violated',
     expectedError: '',
   },
   {
-    name: '6.6 同一过程标识符关联两个 block 应报错',
+    name: '6.6 Associating the same procedure-identifier with two blocks should be an error',
     code: `program test(output);
         procedure p;
         begin end;
         procedure p;
         begin end;
         begin p; end.`,
-    purpose: 'ISO 6.6.1：一个 procedure-identifier 至多关联一个 procedure-block',
+    purpose: 'ISO 6.6.1: a procedure-identifier is associated with at most one procedure-block',
     expectedError: '',
   },
   {
-    name: '6.6 函数 block 必须含对函数标识符的赋值语句',
+    name: '6.6 A function block must contain an assignment statement to the function-identifier',
     code: `program test(output);
         function f: integer;
         begin end;
         begin writeln(f); end.`,
-    purpose: 'ISO 6.6.2：function-block 至少要有一条以该函数标识符为赋值目标的赋值语句',
+    purpose:
+      'ISO 6.6.2: a function-block must contain at least one assignment statement with the function-identifier as the assignment target',
     expectedError: '',
   },
 
-  // 6.6.3.1 形式参数的定义点
+  // 6.6.3.1 Points of definition of formal parameters
 
   {
-    name: '6.6 形参标识符遮蔽块外层的同名变量',
+    name: '6.6 A formal parameter identifier shadows a like-named variable outside the block',
     code: `program test(output);
         var x: integer;
         procedure testparam(x: integer);
         begin writeln(x); end;
         begin x := 100; testparam(42); end.`,
-    purpose: 'ISO 6.6.3.1：标识符出现在 value-parameter-specification 中构成形参的定义点，遮蔽外层同名变量',
+    purpose:
+      'ISO 6.6.3.1: an identifier occurring in a value-parameter-specification constitutes the point of definition of the formal parameter, shadowing the like-named outer variable',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 形参与其所在 block 的局部变量同名应报错',
+    name: '6.6 A formal parameter having the same name as a local variable of its block should be an error',
     code: `program test(output);
         procedure testparam(a: integer);
         var a: integer;
         begin a := 10; writeln(a); end;
         begin testparam(5); end.`,
-    purpose: 'ISO 6.6.3.1：形参的 associated variable-identifier 的 region 是 block，不能再以局部变量声明同名',
+    purpose:
+      'ISO 6.6.3.1: the region of the associated variable-identifier of a formal parameter is the block, so no local variable may be declared with the same name',
     expectedError: '',
   },
 
-  // 6.6.3.2 值参数
+  // 6.6.3.2 Value parameters
 
   {
-    name: '6.6 值参数按值传递，不影响实参变量',
+    name: '6.6 Value parameters are passed by value and do not affect the actual parameter variable',
     code: `program test(output);
         var a: integer;
         procedure testvalue(x: integer);
         begin x := x + 1; end;
         begin a := 10; testvalue(a); writeln(a); end.`,
-    purpose: 'ISO 6.6.3.2：值参数与实参是不同的变量，对形参赋值不改变实参',
+    purpose:
+      'ISO 6.6.3.2: a value parameter and the actual parameter are distinct variables; assigning to the formal parameter does not change the actual parameter',
     expectedOutput: '10\n',
   },
   {
-    name: '6.6 值参数的实参可为任意表达式',
+    name: '6.6 The actual parameter of a value parameter may be any expression',
     code: `program test(output);
         procedure printvalue(x: integer);
         begin writeln(x); end;
         begin printvalue(5 + 3 * 2); end.`,
-    purpose: 'ISO 6.6.3.2：值参数的实参须为与形参赋值相容的表达式',
+    purpose:
+      'ISO 6.6.3.2: the actual parameter of a value parameter must be an expression assignment-compatible with the formal parameter',
     expectedOutput: '11\n',
   },
   {
-    name: '6.6 数组可作值参数',
+    name: '6.6 Arrays may be value parameters',
     code: `program test(output);
         type intarray = array[1..3] of integer;
         var a: intarray;
         procedure sum(v: intarray);
         begin writeln(v[1] + v[2] + v[3]); end;
         begin a[1] := 10; a[2] := 20; a[3] := 30; sum(a); end.`,
-    purpose: 'ISO 6.6.3.2：值参数的实参表达式类型须与形参赋值相容（结构化类型亦同）',
+    purpose:
+      'ISO 6.6.3.2: the type of the actual-parameter expression of a value parameter must be assignment-compatible with the formal parameter (structured types likewise)',
     expectedOutput: '60\n',
   },
   {
-    name: '6.6 记录可作值参数',
+    name: '6.6 Records may be value parameters',
     code: `program test(output);
         type point = record x, y: integer end;
         var p: point;
         procedure printpoint(v: point);
         begin writeln(v.x); writeln(v.y); end;
         begin p.x := 10; p.y := 20; printpoint(p); end.`,
-    purpose: 'ISO 6.6.3.2：记录类型的值参数按值传递整个结构',
+    purpose: 'ISO 6.6.3.2: a value parameter of record type passes the entire structure by value',
     expectedOutput: '10\n20\n',
   },
   {
-    name: '6.6 值参数的类型不得为文件类型',
+    name: '6.6 The type of a value parameter must not be a file type',
     code: `program test(output);
         procedure p(x: text);
         begin end;
         begin p(output); end.`,
-    purpose: 'ISO 6.6.3.2：形参所拥有的类型必须是允许作为 file-type 分量类型的类型，文件类型不满足',
+    purpose:
+      'ISO 6.6.3.2: the type possessed by the formal parameter must be a type permitted as a component type of a file-type; a file type does not satisfy this',
     expectedError: '',
   },
 
-  // 6.6.3.3 变量参数
+  // 6.6.3.3 Variable parameters
 
   {
-    name: '6.6 变量参数的实参必须是 variable-access，常量实参应报错',
+    name:
+      '6.6 The actual parameter of a variable parameter must be a variable-access; a constant actual parameter should be an error',
     code: `program test(output);
         procedure testvar(var x: integer);
         begin x := 1; end;
         begin testvar(5); end.`,
-    purpose: 'ISO 6.6.3.3：变量参数的实参须为 variable-access，常量表达式不是 variable-access',
+    purpose:
+      'ISO 6.6.3.3: the actual parameter of a variable parameter must be a variable-access; a constant expression is not a variable-access',
     expectedError: '',
   },
   {
-    name: '6.6 数组元素作变量参数',
+    name: '6.6 Array elements as variable parameters',
     code: `program test(output);
         var arr: array[1..3] of integer;
         procedure setit(var x: integer);
         begin x := 42; end;
         begin arr[2] := 0; setit(arr[2]); writeln(arr[2]); end.`,
-    purpose: 'ISO 6.5.1/6.6.3.3：indexed-variable 是 variable-access，可作变量参数并写回原分量',
+    purpose:
+      'ISO 6.5.1/6.6.3.3: an indexed-variable is a variable-access and may be a variable parameter, writing back to the original component',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 记录字段作变量参数',
+    name: '6.6 Record fields as variable parameters',
     code: `program test(output);
         type point = record x, y: integer end;
         var p: point;
         procedure setit(var v: integer);
         begin v := 42; end;
         begin p.x := 0; setit(p.x); writeln(p.x); end.`,
-    purpose: 'ISO 6.5.1/6.6.3.3：field-designator 是 variable-access，可作变量参数',
+    purpose: 'ISO 6.5.1/6.6.3.3: a field-designator is a variable-access and may be a variable parameter',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 变量下标访问的数组元素作变量参数',
+    name: '6.6 Array elements accessed by a variable index as variable parameters',
     code: `program test(output);
         type point = record x, y: integer end;
         var a: array[1..3] of point;
@@ -317,11 +337,12 @@ const tests: PascalTest[] = [
         procedure setit(var v: integer);
         begin v := 42; end;
         begin i := 2; a[i].x := 0; setit(a[i].x); writeln(a[i].x); end.`,
-    purpose: 'ISO 6.6.3.3：实参在被访问时确定所指变量，运行期下标亦成立',
+    purpose:
+      'ISO 6.6.3.3: the variable denoted by an actual parameter is determined when accessed; a runtime index is also valid',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 变体记录的变体字段可作变量参数',
+    name: '6.6 Variant fields of a variant record may be variable parameters',
     code: `program test(output);
         type kind = (kinda, kindb);
              rec = record
@@ -334,11 +355,12 @@ const tests: PascalTest[] = [
         procedure setit(var v: integer);
         begin v := 42; end;
         begin r.k := kinda; r.x := 0; setit(r.x); writeln(r.x); end.`,
-    purpose: 'ISO 6.6.3.3：仅禁止「变体的 selector 字段」，激活变体的分量字段仍可作变量参数',
+    purpose:
+      'ISO 6.6.3.3: only the "selector field of a variant" is prohibited; the component fields of the active variant may still be variable parameters',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 变体的 selector 字段作变量参数应报错',
+    name: '6.6 Using the selector field of a variant as a variable parameter should be an error',
     code: `program test(output);
         type kind = (kinda, kindb);
              rec = record
@@ -350,43 +372,44 @@ const tests: PascalTest[] = [
         procedure setkind(var v: kind);
         begin v := kindb; end;
         begin r.k := kinda; setkind(r.k); end.`,
-    purpose: 'ISO 6.6.3.3：实参变量不得表示变体部分的 selector 字段',
+    purpose: 'ISO 6.6.3.3: the actual-parameter variable must not denote the selector field of a variant part',
     expectedError: '',
   },
   {
-    name: '6.6 packed 类型的分量作变量参数应报错',
+    name: '6.6 A component of a packed type as a variable parameter should be an error',
     code: `program test(output);
         var a: packed array[1..3] of char;
         procedure setit(var c: char);
         begin c := 'X'; end;
         begin setit(a[1]); end.`,
-    purpose: 'ISO 6.6.3.3：实参变量不得表示 packed 类型变量的分量',
+    purpose: 'ISO 6.6.3.3: the actual-parameter variable must not denote a component of a variable of packed type',
     expectedError: '',
   },
   {
-    name: '6.6 变量参数的实参类型须与形参类型相同',
+    name: '6.6 The actual-parameter type of a variable parameter must be the same as the formal-parameter type',
     code: `program test(output);
         type small = 1..10;
         var n: integer;
         procedure setit(var x: small);
         begin x := 5; end;
         begin n := 3; setit(n); end.`,
-    purpose: 'ISO 6.6.3.3：实参所拥有的类型须与形参的 type-identifier 所表示的类型相同（integer 与子界非同一类型）',
+    purpose:
+      "ISO 6.6.3.3: the type possessed by the actual parameter must be the same as the type denoted by the formal parameter's type-identifier (integer and a subrange are not the same type)",
     expectedError: '',
   },
   {
-    name: '6.6 指针解引用作变量参数',
+    name: '6.6 Pointer dereference as a variable parameter',
     code: `program test(output);
         type ip = ^integer;
         var p: ip;
         procedure setit(var v: integer);
         begin v := 42; end;
         begin new(p); p^ := 0; setit(p^); writeln(p^); dispose(p); end.`,
-    purpose: 'ISO 6.5.1/6.6.3.3：identified-variable 是 variable-access，可作变量参数',
+    purpose: 'ISO 6.5.1/6.6.3.3: an identified-variable is a variable-access and may be a variable parameter',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 文件缓冲区变量作变量参数',
+    name: '6.6 File buffer variables as variable parameters',
     code: `program test(f);
         type r = record x: integer end;
         var f: file of r;
@@ -403,48 +426,50 @@ const tests: PascalTest[] = [
           rec := f^;
           writeln(rec.x);
         end.`,
-    purpose: 'ISO 6.5.1/6.6.3.3：buffer-variable 是 variable-access，可作变量参数',
+    purpose: 'ISO 6.5.1/6.6.3.3: a buffer-variable is a variable-access and may be a variable parameter',
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
     expectedOutput: '42\n',
   },
 
-  // 6.6.3.4 / 6.6.3.5 / 6.6.3.6 过程参数、函数参数与参数表 congruity
+  // 6.6.3.4 / 6.6.3.5 / 6.6.3.6 Procedural parameters, functional parameters, and parameter list congruity
 
   {
-    name: '6.6 过程可作形式参数',
+    name: '6.6 A procedure may be a formal parameter',
     code: `program test(output);
         procedure apply(procedure p);
         begin p; end;
         procedure hello;
         begin writeln('HELLO'); end;
         begin apply(hello); end.`,
-    purpose: 'ISO 6.6.3.4：形参可为过程，实参为有定义点的 procedure-identifier',
+    purpose:
+      'ISO 6.6.3.4: a formal parameter may be a procedure; the actual parameter is a procedure-identifier with a point of definition',
     expectedOutput: 'HELLO\n',
   },
   {
-    name: '6.6 函数可作形式参数',
+    name: '6.6 A function may be a formal parameter',
     code: `program test(output);
         function apply(function f(x: integer): integer; y: integer): integer;
         begin apply := f(y); end;
         function dbl(x: integer): integer;
         begin dbl := x * 2; end;
         begin writeln(apply(dbl, 21)); end.`,
-    purpose: 'ISO 6.6.3.5：形参可为函数，且 result-type 须与实参函数的返回类型表示同一类型',
+    purpose:
+      'ISO 6.6.3.5: a formal parameter may be a function, and the result-type must denote the same type as the return type of the actual-parameter function',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 过程参数的参数表不 congruity 应报错',
+    name: '6.6 Non-congruous parameter lists of procedural parameters should be an error',
     code: `program test(output);
         procedure apply(procedure p(x: integer));
         begin end;
         procedure noparam;
         begin end;
         begin apply(noparam); end.`,
-    purpose: 'ISO 6.6.3.4/6.6.3.6：两个 formal-parameter-list 须 congruous，或都不出现',
+    purpose: 'ISO 6.6.3.4/6.6.3.6: the two formal-parameter-lists must be congruous, or both must be absent',
     expectedError: '',
   },
   {
-    name: '6.6 过程形参可在块内多次调用',
+    name: '6.6 A procedural formal parameter may be called multiple times within the block',
     code: `program test(output);
         var k: integer;
         procedure twice(procedure p);
@@ -452,22 +477,24 @@ const tests: PascalTest[] = [
         procedure bump;
         begin k := k + 1; end;
         begin k := 0; twice(bump); writeln(k); end.`,
-    purpose: 'ISO 6.6.3.4：形参在块的整个激活期标识实参过程，可被多次调用',
+    purpose:
+      'ISO 6.6.3.4: the formal parameter denotes the actual-parameter procedure throughout the activation of the block and may be called multiple times',
     expectedOutput: '2\n',
   },
   {
-    name: '6.6 无形参表的函数形参',
+    name: '6.6 A functional formal parameter without a formal-parameter list',
     code: `program test(output);
         function apply(function f: integer): integer;
         begin apply := f + f; end;
         function seven: integer;
         begin seven := 7; end;
         begin writeln(apply(seven)); end.`,
-    purpose: 'ISO 6.6.3.5：functional-parameter-section 可无形参表，结果类型须表示同一类型',
+    purpose:
+      'ISO 6.6.3.5: a functional-parameter-section may have no formal-parameter list, and the result types must denote the same type',
     expectedOutput: '14\n',
   },
   {
-    name: '6.6 过程形参可转发给下一层形参',
+    name: '6.6 A procedural formal parameter may be forwarded to the next-level formal parameter',
     code: `program test(output);
         procedure outer(procedure p);
           procedure inner(procedure q);
@@ -476,11 +503,12 @@ const tests: PascalTest[] = [
         procedure hello;
         begin writeln('HI'); end;
         begin outer(hello); end.`,
-    purpose: 'ISO 6.6.3.4：形参本身亦可作另一过程形参的实参（链式传递）',
+    purpose:
+      'ISO 6.6.3.4: a formal parameter may itself be the actual parameter of another procedural formal parameter (chain passing)',
     expectedOutput: 'HI\n',
   },
   {
-    name: '6.6 实参过程访问其外层过程的变量',
+    name: '6.6 An actual-parameter procedure accesses variables of its enclosing procedure',
     code: `program test(output);
         procedure home;
           var k: integer;
@@ -490,11 +518,12 @@ const tests: PascalTest[] = [
           begin k := 7; p; writeln(k); end;
         begin call(bump); end;
         begin home; end.`,
-    purpose: 'ISO 6.6.3.4 / 6.2.2.5：形参标识实参过程，而实参过程访问其自身外层过程的变量',
+    purpose:
+      'ISO 6.6.3.4 / 6.2.2.5: the formal parameter denotes the actual-parameter procedure, which accesses the variables of its own enclosing procedure',
     expectedOutput: '8\n',
   },
   {
-    name: '6.6 过程形参带变量参数段',
+    name: '6.6 A procedural formal parameter with a variable-parameter section',
     code: `program test(output);
         var a: integer;
         procedure apply(procedure p(var x: integer); var y: integer);
@@ -502,22 +531,24 @@ const tests: PascalTest[] = [
         procedure bump(var v: integer);
         begin v := v + 1; end;
         begin a := 3; apply(bump, a); writeln(a); end.`,
-    purpose: 'ISO 6.6.3.4 / 6.6.3.6 b：变量参数段须与实参过程的形参表 congruous',
+    purpose:
+      'ISO 6.6.3.4 / 6.6.3.6 b: the variable-parameter section must be congruous with the formal-parameter list of the actual-parameter procedure',
     expectedOutput: '4\n',
   },
   {
-    name: '6.6 过程形参带值参数段',
+    name: '6.6 A procedural formal parameter with a value-parameter section',
     code: `program test(output);
         procedure apply(procedure p(x: integer); n: integer);
         begin p(n); end;
         procedure show(x: integer);
         begin writeln(x); end;
         begin apply(show, 9); end.`,
-    purpose: 'ISO 6.6.3.4 / 6.6.3.6 a：值参数段须与实参过程的形参表 congruous',
+    purpose:
+      'ISO 6.6.3.4 / 6.6.3.6 a: the value-parameter section must be congruous with the formal-parameter list of the actual-parameter procedure',
     expectedOutput: '9\n',
   },
   {
-    name: '6.6 多个形参的过程各对应一个实参',
+    name: '6.6 A procedure with multiple formal parameters each corresponding to one actual parameter',
     code: `program test(output);
         procedure two(procedure p; procedure q);
         begin p; q; end;
@@ -526,74 +557,81 @@ const tests: PascalTest[] = [
         procedure b;
         begin writeln('B'); end;
         begin two(a, b); end.`,
-    purpose: 'ISO 6.7.3：多个形参与多个实参一一对应',
+    purpose: 'ISO 6.7.3: multiple formal parameters correspond one-to-one with multiple actual parameters',
     expectedOutput: 'A\nB\n',
   },
   {
-    name: '6.6 过程形参的实参须为过程标识符',
+    name: '6.6 The actual parameter of a procedural formal parameter must be a procedure-identifier',
     code: `program test(output);
         var v: integer;
         procedure apply(procedure p);
         begin p; end;
         begin v := 1; apply(v); end.`,
-    purpose: 'ISO 6.6.3.4：实参须是有定义点的 procedure-identifier，变量不满足',
+    purpose:
+      'ISO 6.6.3.4: the actual parameter must be a procedure-identifier with a point of definition; a variable does not satisfy this',
     expectedError: '',
   },
   {
-    name: '6.6 内置过程不可作过程形参的实参',
+    name: '6.6 Built-in procedures may not be actual parameters of procedural formal parameters',
     code: `program test(output);
         procedure apply(procedure p);
         begin p; end;
         begin apply(write); end.`,
-    purpose: 'ISO 6.6.3.4：实参须有被 program-block 包含的定义点，内置过程没有定义点',
+    purpose:
+      'ISO 6.6.3.4: the actual parameter must have a point of definition contained by the program-block; built-in procedures have no point of definition',
     expectedError: '',
   },
   {
-    name: '6.6 函数形参的 result-type 须与实参函数相同',
+    name:
+      '6.6 The result-type of a functional formal parameter must be the same as that of the actual-parameter function',
     code: `program test(output);
         function apply(function f: real): real;
         begin apply := f; end;
         function n: integer;
         begin n := 1; end;
         begin writeln(apply(n)); end.`,
-    purpose: 'ISO 6.6.3.5：形参段的结果类型须与实参函数的结果类型表示同一类型',
+    purpose:
+      'ISO 6.6.3.5: the result type of the formal-parameter section must denote the same type as the result type of the actual-parameter function',
     expectedError: '',
   },
   {
-    name: '6.6 函数标识符不可作过程形参的实参',
+    name: '6.6 A function-identifier may not be the actual parameter of a procedural formal parameter',
     code: `program test(output);
         procedure apply(procedure p);
         begin p; end;
         function f: integer;
         begin f := 1; end;
         begin apply(f); end.`,
-    purpose: 'ISO 6.6.3.4：实参须为 procedure-identifier，函数标识符不满足',
+    purpose:
+      'ISO 6.6.3.4: the actual parameter must be a procedure-identifier; a function-identifier does not satisfy this',
     expectedError: '',
   },
   {
-    name: '6.6 形参表对应位置类型不同应报错',
+    name: '6.6 Different types at corresponding positions in the formal-parameter lists should be an error',
     code: `program test(output);
         procedure apply(procedure p(x: integer));
         begin end;
         procedure q(x: real);
         begin end;
         begin apply(q); end.`,
-    purpose: 'ISO 6.6.3.6 a：对应位置的值参数段的类型标识符须 denote 同一类型',
+    purpose:
+      'ISO 6.6.3.6 a: the type-identifiers of the value-parameter sections at corresponding positions must denote the same type',
     expectedError: '',
   },
   {
-    name: '6.6 值参数段与变量参数段不匹配应报错',
+    name: '6.6 Mismatch between a value-parameter section and a variable-parameter section should be an error',
     code: `program test(output);
         procedure apply(procedure p(x: integer));
         begin end;
         procedure q(var x: integer);
         begin end;
         begin apply(q); end.`,
-    purpose: 'ISO 6.6.3.6 a/b：对应位置须同为值参数段或同为变量参数段',
+    purpose:
+      'ISO 6.6.3.6 a/b: corresponding positions must both be value-parameter sections or both be variable-parameter sections',
     expectedError: '',
   },
   {
-    name: '6.6 实参可为 forward 声明的过程',
+    name: '6.6 The actual parameter may be a forward-declared procedure',
     code: `program test(output);
         procedure apply(procedure p);
         begin p; end;
@@ -601,11 +639,12 @@ const tests: PascalTest[] = [
         procedure hello;
         begin writeln('F'); end;
         begin apply(hello); end.`,
-    purpose: 'ISO 6.6.3.4 / 6.6.1：forward 与其后续定义构成同一定义点，可作实参',
+    purpose:
+      'ISO 6.6.3.4 / 6.6.1: forward and its subsequent definition constitute the same point of definition and may be used as an actual parameter',
     expectedOutput: 'F\n',
   },
   {
-    name: '6.6 形参过程可在循环内被反复调用',
+    name: '6.6 A formal-parameter procedure may be called repeatedly within a loop',
     code: `program test(output);
         var k: integer;
         procedure apply(procedure p; n: integer);
@@ -614,95 +653,99 @@ const tests: PascalTest[] = [
         procedure bump;
         begin k := k + 1; end;
         begin k := 0; apply(bump, 3); writeln(k); end.`,
-    purpose: 'ISO 6.6.3.4：形参在块的整个激活期内均可调用',
+    purpose: 'ISO 6.6.3.4: the formal parameter may be called throughout the entire activation period of the block',
     expectedOutput: '3\n',
   },
   {
-    name: '6.6 函数形参可在表达式内多次使用',
+    name: '6.6 A functional formal parameter may be used multiple times within an expression',
     code: `program test(output);
         function apply(function f: integer): integer;
         begin apply := f * f; end;
         function three: integer;
         begin three := 3; end;
         begin writeln(apply(three) + apply(three)); end.`,
-    purpose: 'ISO 6.6.3.5：形参函数可作 factor 出现在表达式中',
+    purpose: 'ISO 6.6.3.5: a formal-parameter function may appear in an expression as a factor',
     expectedOutput: '18\n',
   },
   {
-    name: '6.6 形参标识符遮蔽同名的外层过程',
+    name: '6.6 A formal parameter identifier shadows a like-named outer procedure',
     code: `program test(output);
         procedure p;
         begin writeln('GLOBAL'); end;
         procedure apply(procedure p);
         begin p; end;
         begin apply(p); end.`,
-    purpose: 'ISO 6.6.3.4 / 6.2.2.5：形参在其块内标识实参过程，实参可为同名外层过程',
+    purpose:
+      'ISO 6.6.3.4 / 6.2.2.5: the formal parameter denotes the actual-parameter procedure within its block; the actual parameter may be the like-named outer procedure',
     expectedOutput: 'GLOBAL\n',
   },
   {
-    name: '6.6 形参标识符与同 region 的过程名重复应报错',
+    name: '6.6 Duplicate formal-parameter identifier and procedure name in the same region should be an error',
     code: `program test(output);
         procedure apply(procedure p);
           procedure p;
           begin end;
         begin end;
         begin end.`,
-    purpose: 'ISO 6.2.2.7：形参标识符与同一 region 内的过程标识符不得各有定义点',
+    purpose:
+      'ISO 6.2.2.7: a formal-parameter identifier and a procedure-identifier in the same region must not both have points of definition',
     expectedError: '',
   },
   {
-    name: '6.6 rewrite(f) 后 f.M 为 Generation，可顺序写入',
+    name: '6.6 After rewrite(f), f.M is Generation and sequential writes are possible',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN REWRITE(F);WRITELN(F,'HELLO');END.`,
-    purpose: 'ISO 6.6.5.2：rewrite(f) 的后置断言为 f.L=f.R=S()、f.M=Generation、f^ 完全未定义',
+    purpose:
+      'ISO 6.6.5.2: the postcondition of rewrite(f) is f.L=f.R=S(), f.M=Generation, and f^ is completely undefined',
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
     expectedFileContains: [{ url: 'F', contains: 'HELLO' }],
   },
   {
-    name: '6.6 put(f) 将缓冲区内容附加到文件',
+    name: '6.6 put(f) appends the buffer contents to the file',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;V:CHAR;BEGIN REWRITE(F);V:='A';F^:=V;PUT(F);END.`,
-    purpose: 'ISO 6.6.5.2：put(f) 的后置断言为 f.L=f0.L~S(f0^)、f.M=Generation、f^ 完全未定义',
+    purpose:
+      'ISO 6.6.5.2: the postcondition of put(f) is f.L=f0.L~S(f0^), f.M=Generation, and f^ is completely undefined',
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
     expectedFileContains: [{ url: 'F', contains: 'A' }],
   },
   {
-    name: '6.6 未 rewrite 的 put 违反前断言应报错',
+    name: '6.6 put without rewrite violates the precondition and should be an error',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN F^:='A';PUT(F);END.`,
-    purpose: 'ISO 6.6.5.2：put(f) 的前断言要求 f0.M=Generation，否则为 error',
+    purpose: 'ISO 6.6.5.2: the precondition of put(f) requires f0.M=Generation; otherwise it is an error',
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
     expectedError: '',
     maxSteps: 1000,
   },
   {
-    name: '6.6 reset(f) 后 f^ 指向首个组件',
+    name: '6.6 After reset(f), f^ points to the first component',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);CH:=F^;WRITE(CH);END.`,
-    purpose: 'ISO 6.6.5.2：reset(f) 的后置断言为 f.M=Inspection 且 f^=f.R.first（f.R 非空时）',
+    purpose: 'ISO 6.6.5.2: the postcondition of reset(f) is f.M=Inspection and f^=f.R.first (when f.R is non-empty)',
     textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
     expectedOutput: 'A',
   },
   {
-    name: '6.6 reset 空文件后 eof 为真',
+    name: '6.6 After reset on an empty file, eof is true',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITE('EMPTY')ELSE WRITE('FULL');END.`,
-    purpose: 'ISO 6.6.5.2/6.6.6.5：reset(f) 后 f.R=S()，故 eof(f) 为真',
+    purpose: 'ISO 6.6.5.2/6.6.6.5: after reset(f), f.R=S(), so eof(f) is true',
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
     expectedOutput: 'EMPTY',
   },
   {
-    name: '6.6 get(f) 将 f^ 前进到下一个组件',
+    name: '6.6 get(f) advances f^ to the next component',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;CH:CHAR;BEGIN RESET(F);GET(F);CH:=F^;WRITE(CH);END.`,
-    purpose: 'ISO 6.6.5.2：get(f) 的后置断言为 f.R=f0.R.rest 且 f^=f.R.first',
+    purpose: 'ISO 6.6.5.2: the postcondition of get(f) is f.R=f0.R.rest and f^=f.R.first',
     textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
     expectedOutput: 'B',
   },
   {
-    name: '6.6 在 f.R 为空时 get 违反前断言应报错',
+    name: '6.6 get when f.R is empty violates the precondition and should be an error',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);GET(F);GET(F);GET(F);END.`,
-    purpose: 'ISO 6.6.5.2：get(f) 的前断言要求 f0.R<>S()，读到文件尾后再 get 为 error',
+    purpose: 'ISO 6.6.5.2: the precondition of get(f) requires f0.R<>S(); a get after reaching end-of-file is an error',
     textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
     expectedError: '',
     maxSteps: 1000,
   },
   {
-    name: '6.6 非文本文件的 write/read 等价于 f^ 赋值与 get',
+    name: '6.6 write/read on a non-text file is equivalent to f^ assignment and get',
     code: `program test(output);
         var f: file of integer;
             v: integer;
@@ -713,11 +756,12 @@ const tests: PascalTest[] = [
           read(f, v);
           writeln(v);
         end.`,
-    purpose: 'ISO 6.6.5.2：非 text 文件的 read(f,v) 等价于 v:=f^; get(f)，write(f,e) 等价于 f^:=e; put(f)',
+    purpose:
+      'ISO 6.6.5.2: on a non-text file, read(f,v) is equivalent to v:=f^; get(f), and write(f,e) is equivalent to f^:=e; put(f)',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6 file of record 的 f^ 缓冲变量与 put/get',
+    name: '6.6 f^ buffer variable and put/get for file of record',
     code: `program test(output);
 type r = record a: integer; b: char end;
 var f: file of r;
@@ -736,11 +780,11 @@ begin
   if eof(f) then writeln('DONE') else writeln('MORE');
 end.`,
     purpose:
-      'ISO 6.6.5.2/6.5.5：元素为 record 的文件，f^ 是该类型的缓冲变量；f^:=x 使缓冲变量取 x 的值，put(f) 把 f^ 追加为 f.L 的新组件，reset 后 f^ 为 f.R.first，get(f) 令 f.R=f.R.rest',
+      'ISO 6.6.5.2/6.5.5: for a file whose components are records, f^ is a buffer variable of that type; f^:=x makes the buffer variable take the value of x, put(f) appends f^ as a new component of f.L, after reset f^ is f.R.first, and get(f) sets f.R=f.R.rest',
     expectedOutput: 'HAS\n7Z\nDONE\n',
   },
   {
-    name: '6.6 file of 单字节子界 的逐字节 write/read',
+    name: '6.6 Byte-by-byte write/read for file of single-byte subrange',
     code: `program test(output);
 var f: packed file of 0..255;
     b: 0..255;
@@ -759,11 +803,11 @@ begin
   if eof(f) then writeln('EOF') else writeln('MORE');
 end.`,
     purpose:
-      'ISO 6.6.5.3/6.6.5.2：非 text 文件上 write(f,e) 等价于 f^:=e; put(f)、read(f,v) 等价于 v:=f^; get(f)；read 后再 get 使 f.R 为空，eof 为真',
+      'ISO 6.6.5.3/6.6.5.2: on a non-text file, write(f,e) is equivalent to f^:=e; put(f) and read(f,v) is equivalent to v:=f^; get(f); a get after read makes f.R empty, so eof is true',
     expectedOutput: '65\n66\nEOF\n',
   },
   {
-    name: '6.6 file of integer 上 f^ 赋值后再 put(f)',
+    name: '6.6 f^ assignment followed by put(f) on file of integer',
     code: `program test(output);
 var f: file of integer;
     v: integer;
@@ -775,21 +819,22 @@ begin
   read(f, v);
   writeln(v);
 end.`,
-    purpose: 'ISO 6.6.5.2：f^:=e 与 put(f) 使 e 成为文件的新组件，reset 后 read(f,v) 取回同一值（f^ 的编码实现相关）',
+    purpose:
+      'ISO 6.6.5.2: f^:=e and put(f) make e a new component of the file; after reset, read(f,v) retrieves the same value (the encoding of f^ is implementation-defined)',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6.5.2 reset 只接受一个 file-variable 实参',
+    name: '6.6.5.2 reset accepts only one file-variable actual parameter',
     code: `program test(output);
 var f: text;
 begin
   reset(f, 'NAME');
 end.`,
-    purpose: 'ISO 6.6.5.2：reset(f) 只有一个 file-variable 实参，file-name 不是 ISO 形式',
+    purpose: 'ISO 6.6.5.2: reset(f) takes only one file-variable actual parameter; file-name is not the ISO form',
     expectedError: '',
   },
   {
-    name: '6.6 program 参数中的文件变量在算法开始前绑定外部文件',
+    name: '6.6 File variables in the program parameter list are bound to external files before the algorithm starts',
     code: `program test(output, f);
 var f: text;
 begin
@@ -797,12 +842,12 @@ begin
   writeln(f, 'DATA');
 end.`,
     purpose:
-      'ISO 6.10：program-parameter-list 中的文件变量须在算法开始前绑定到外部文件，绑定机制为 implementation-defined',
+      'ISO 6.10: file variables in the program-parameter-list must be bound to external files before the algorithm starts; the binding mechanism is implementation-defined',
     programFileUrls: { f: 'MYFILE' },
     expectedFileContains: [{ url: 'f', contains: 'DATA' }],
   },
   {
-    name: '6.6.3.1 形参表可含多个以分号分隔的 parameter-section',
+    name: '6.6.3.1 A formal-parameter list may contain multiple parameter-sections separated by semicolons',
     code: `program test(output);
 procedure p(a: integer; b: char);
 begin
@@ -811,48 +856,50 @@ end;
 begin
   p(1, 'x');
 end.`,
-    purpose: 'ISO 6.6.3.1：formal-parameter-list = ( formal-parameter-section {; formal-parameter-section} )',
+    purpose: 'ISO 6.6.3.1: formal-parameter-list = ( formal-parameter-section {; formal-parameter-section} )',
     expectedOutput: '1x\n',
   },
   {
-    name: '6.6.3.1 形参表缺少右圆括号应报错',
+    name: '6.6.3.1 A formal-parameter list missing the closing parenthesis should be an error',
     code: 'program test; procedure p(a: integer; begin end; begin end.',
-    purpose: 'ISO 6.6.3.1：formal-parameter-list 以右圆括号结束',
+    purpose: 'ISO 6.6.3.1: a formal-parameter-list ends with a closing parenthesis',
     expectedError: '',
   },
   {
-    name: '6.6.3.2 形参名表之后缺少冒号应报错',
+    name: '6.6.3.2 Missing colon after the formal-parameter name list should be an error',
     code: 'program test; procedure p(a integer); begin end; begin end.',
-    purpose: 'ISO 6.6.3.1：formal-parameter-section 为 identifier-list : type-denoter 等形式',
+    purpose: 'ISO 6.6.3.1: a formal-parameter-section has the form identifier-list : type-denoter etc.',
     expectedError: '',
   },
   {
-    name: '6.6.1 过程头之后缺少分号应报错',
+    name: '6.6.1 Missing semicolon after the procedure heading should be an error',
     code: 'program test; procedure p begin end; begin end.',
-    purpose: 'ISO 6.6.1：procedure-declaration 的 heading 之后为分号与 procedure-block',
+    purpose: 'ISO 6.6.1: after the heading of a procedure-declaration comes a semicolon and a procedure-block',
     expectedError: '',
   },
   {
-    name: '6.6.1 同一过程标识符不得有两次 forward 声明',
+    name: '6.6.1 The same procedure-identifier may not have two forward declarations',
     code: `program test;
 procedure p; forward;
 procedure p; forward;
 procedure p; begin end;
 begin end.`,
-    purpose: 'ISO 6.6.1：forward 指令对应的标识符须恰有一个应用出现在同一声明部分内',
+    purpose:
+      'ISO 6.6.1: the identifier corresponding to a forward directive must have exactly one application occurrence within the same declaration part',
     expectedError: '',
   },
   {
-    name: '6.6.1 已给出过程体的标识符之后不得再出现 forward',
+    name: '6.6.1 A forward may not appear after an identifier that already has a procedure body',
     code: `program test;
 procedure p; begin end;
 procedure p; forward;
 begin end.`,
-    purpose: 'ISO 6.6.1：标识符至多关联一个 procedure-block，forward 声明须先于其定义',
+    purpose:
+      'ISO 6.6.1: an identifier is associated with at most one procedure-block; a forward declaration must precede its definition',
     expectedError: '',
   },
   {
-    name: '6.6.3.4 过程形参不得用作表达式',
+    name: '6.6.3.4 A procedural formal parameter may not be used in an expression',
     code: `program test;
 procedure p(procedure r);
 var x: integer;
@@ -860,11 +907,12 @@ begin
   x := r + 1;
 end;
 begin end.`,
-    purpose: 'ISO 6.6.3.4：过程形参标识符只能作过程语句使用，不得出现在表达式中',
+    purpose:
+      'ISO 6.6.3.4: a procedural formal-parameter identifier may only be used as a procedure statement and may not appear in an expression',
     expectedError: '',
   },
   {
-    name: '6.6.3.4 过程形参不得作函数调用',
+    name: '6.6.3.4 A procedural formal parameter may not be used as a function call',
     code: `program test;
 procedure p(procedure r(n: integer));
 var x: integer;
@@ -872,11 +920,11 @@ begin
   x := r(1);
 end;
 begin end.`,
-    purpose: 'ISO 6.6.3.4：过程形参不得被当作函数指示符用于表达式',
+    purpose: 'ISO 6.6.3.4: a procedural formal parameter may not be used as a function designator in an expression',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 函数形参的实参个数须与其 heading 一致',
+    name: '6.6.3.5 The number of actual parameters of a functional formal parameter must match its heading',
     code: `program test;
 function g(a: integer): integer;
 begin g := a; end;
@@ -886,66 +934,73 @@ begin
   x := f(1, 2);
 end;
 begin p(g); end.`,
-    purpose: 'ISO 6.6.3.5/6.7.3：函数形参的应用须给出与其 heading 的形参表相适应的实参表',
+    purpose:
+      'ISO 6.6.3.5/6.7.3: an application of a functional formal parameter must supply an actual-parameter list compatible with the formal-parameter list of its heading',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 可调用形参的实参须为过程/函数标识符',
+    name: '6.6.3.5 The actual parameter of a callable formal parameter must be a procedure/function identifier',
     code: `program test;
 function g(a: integer): integer;
 begin g := a; end;
 procedure p(function f(a: integer): integer);
 begin end;
 begin p(g(1)); end.`,
-    purpose: 'ISO 6.6.3.5/6.6.3.4：可调用形参对应的实参须是对应类型的标识符，而非函数调用的结果',
+    purpose:
+      'ISO 6.6.3.5/6.6.3.4: the actual parameter corresponding to a callable formal parameter must be an identifier of the corresponding type, not the result of a function call',
     expectedError: '',
   },
   {
-    name: '6.6.3.6 可调用形参的实参须与形参表 congruous（个数相同）',
+    name:
+      '6.6.3.6 The actual parameter of a callable formal parameter must be congruous with the formal-parameter list (same count)',
     code: `program test;
 function g(a: integer): integer;
 begin g := a; end;
 procedure p(function f(a: integer; b: integer): integer);
 begin end;
 begin p(g); end.`,
-    purpose: 'ISO 6.6.3.6：两个 formal-parameter-list congruous 要求个数相同',
+    purpose: 'ISO 6.6.3.6: two formal-parameter-lists being congruous requires the same count',
     expectedError: '',
   },
   {
-    name: '6.6.3.6 可调用形参的实参须与形参表 congruous（var 属性相同）',
+    name:
+      '6.6.3.6 The actual parameter of a callable formal parameter must be congruous with the formal-parameter list (same var attribute)',
     code: `program test;
 function g(a: integer): integer;
 begin g := a; end;
 procedure p(function f(var a: integer): integer);
 begin end;
 begin p(g); end.`,
-    purpose: 'ISO 6.6.3.6：对应段须同为值参数段或同为变量参数段',
+    purpose:
+      'ISO 6.6.3.6: corresponding sections must both be value-parameter sections or both be variable-parameter sections',
     expectedError: '',
   },
   {
-    name: '6.6.3.6 可调用形参的实参须与形参表 congruous（类型相同）',
+    name:
+      '6.6.3.6 The actual parameter of a callable formal parameter must be congruous with the formal-parameter list (same type)',
     code: `program test;
 function g(a: integer): integer;
 begin g := a; end;
 procedure p(function f(a: char): integer);
 begin end;
 begin p(g); end.`,
-    purpose: 'ISO 6.6.3.6：对应位置的形式参数类型须表示同一类型',
+    purpose: 'ISO 6.6.3.6: the formal-parameter types at corresponding positions must denote the same type',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 函数形参对应的实参须为函数标识符',
+    name: '6.6.3.5 The actual parameter corresponding to a functional formal parameter must be a function-identifier',
     code: `program test;
 procedure q;
 begin end;
 procedure p(function f: integer);
 begin end;
 begin p(q); end.`,
-    purpose: 'ISO 6.6.3.5：函数形参对应的实参须是函数标识符（procedure 与 function 不可互换）',
+    purpose:
+      'ISO 6.6.3.5: the actual parameter corresponding to a functional formal parameter must be a function-identifier (procedure and function are not interchangeable)',
     expectedError: '',
   },
   {
-    name: '6.6.3.3 变量参数可沿调用链继续作为变量参数传递',
+    name: '6.6.3.3 A variable parameter may be passed further as a variable parameter along the call chain',
     code: `program test(output);
 var g: integer;
 procedure b(var y: integer);
@@ -961,11 +1016,13 @@ begin
   a(g);
   writeln(g);
 end.`,
-    purpose: 'ISO 6.6.3.3：变量参数表示实参变量本身，沿传递链的赋值对最初实参可见',
+    purpose:
+      'ISO 6.6.3.3: a variable parameter denotes the actual-parameter variable itself; assignments along the passing chain are visible to the original actual parameter',
     expectedOutput: '2\n',
   },
   {
-    name: '6.6.3.3 值参数在其块内是变量，可作为变量参数的实参',
+    name:
+      '6.6.3.3 A value parameter is a variable within its block and may be the actual parameter of a variable parameter',
     code: `program test(output);
 var g: integer;
 procedure b(var y: integer);
@@ -982,11 +1039,12 @@ begin
   a(g);
   writeln(g);
 end.`,
-    purpose: 'ISO 6.6.3.3/6.6.3.2：值参数是局部变量，被取地址修改后不影响调用方的实参变量',
+    purpose:
+      "ISO 6.6.3.3/6.6.3.2: a value parameter is a local variable; modifications via address-taking do not affect the caller's actual-parameter variable",
     expectedOutput: '9\n1\n',
   },
   {
-    name: '6.6.3.2 含指针分量的记录作为值参数按值传递',
+    name: '6.6.3.2 A record with pointer components is passed by value as a value parameter',
     code: `program test(output);
 type node = record v: integer; next: ^node end;
 var p: node;
@@ -1005,11 +1063,12 @@ begin
   dispose(p.next);
 end.`,
     purpose:
-      'ISO 6.6.3.2/6.4.4：值参数以赋值方式传递，记录整体拷贝故普通字段的修改不影响调用方，而指针分量复制 identifying-value，故所指变量的修改可见',
+      'ISO 6.6.3.2/6.4.4: a value parameter is passed by assignment; the record is copied as a whole, so modifications to ordinary fields do not affect the caller, while pointer components copy the identifying-value, so modifications to the pointed variables are visible',
     expectedOutput: '1\n7\n',
   },
   {
-    name: '6.6.3.2 数组作为值参数，对形参元素的赋值不影响实参',
+    name:
+      '6.6.3.2 An array as a value parameter: assignments to formal-parameter elements do not affect the actual parameter',
     code: `program test(output);
 type intarray = array[1..3] of integer;
 var a: intarray;
@@ -1028,11 +1087,12 @@ begin
   writeln(a[2]);
   writeln(a[3]);
 end.`,
-    purpose: 'ISO 6.6.3.2：数组值参数以赋值方式传递，数组整体拷贝，故对形参元素的赋值不影响实参',
+    purpose:
+      'ISO 6.6.3.2: an array value parameter is passed by assignment; the array is copied as a whole, so assignments to formal-parameter elements do not affect the actual parameter',
     expectedOutput: '10\n20\n30\n',
   },
   {
-    name: '6.6.3.2 含指针分量的数组作为值参数按值传递',
+    name: '6.6.3.2 An array with pointer components is passed by value as a value parameter',
     code: `program test(output);
 type intptr = ^integer;
      ptrarray = array[1..2] of intptr;
@@ -1054,21 +1114,22 @@ begin
   dispose(a[2]);
 end.`,
     purpose:
-      'ISO 6.6.3.2/6.4.4：数组值参数整体拷贝，故对形参元素赋 nil 不影响实参；而元素中的指针分量复制 identifying-value，故所指变量的修改可见',
+      'ISO 6.6.3.2/6.4.4: an array value parameter is copied as a whole, so assigning nil to a formal-parameter element does not affect the actual parameter; while the pointer components in the elements copy the identifying-value, so modifications to the pointed variables are visible',
     expectedOutput: 'TRUE\n77\n',
   },
   {
-    name: '6.6.6.2 required 函数须给出规定个数的实参',
+    name: '6.6.6.2 Required functions must be given the prescribed number of actual parameters',
     code: `program test;
 var x: integer;
 begin
   x := abs();
 end.`,
-    purpose: 'ISO 6.6.6.1/6.6.6.2：abs 等 required 函数须给出与其定义一致的实参个数',
+    purpose:
+      'ISO 6.6.6.1/6.6.6.2: required functions such as abs must be given the number of actual parameters consistent with their definition',
     expectedError: '',
   },
   {
-    name: '6.6.3.3 变量参数的实参可表示记录字段中的数组分量',
+    name: '6.6.3.3 The actual parameter of a variable parameter may denote an array component in a record field',
     code: `program test(output);
 type r = record a: array[1..2] of integer end;
 var v: r;
@@ -1080,11 +1141,12 @@ begin
   setIt(v.a[2]);
   writeln(v.a[2]);
 end.`,
-    purpose: 'ISO 6.6.3.3/6.5.3：变量参数的实参须是 variable-access；分量不是 packed 变量的分量时合法',
+    purpose:
+      'ISO 6.6.3.3/6.5.3: the actual parameter of a variable parameter must be a variable-access; it is legal when the component is not a component of a packed variable',
     expectedOutput: '9\n',
   },
   {
-    name: '6.6.3.4 过程形参不得作为函数形参的实参',
+    name: '6.6.3.4 A procedural formal parameter may not be the actual parameter of a functional formal parameter',
     code: `program test;
 procedure outer(procedure f);
   procedure inner(function g: integer);
@@ -1093,11 +1155,12 @@ begin
   inner(f);
 end;
 begin end.`,
-    purpose: 'ISO 6.6.3.4/6.6.3.5：可调用形参作另一可调用形参的实参时，其种类须与目标形参一致',
+    purpose:
+      'ISO 6.6.3.4/6.6.3.5: when a callable formal parameter is the actual parameter of another callable formal parameter, its kind must match that of the target formal parameter',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 函数形参链式传递时结果类型须表示同一类型',
+    name: '6.6.3.5 The result types must denote the same type when functional formal parameters are chained',
     code: `program test;
 procedure outer(function f: real);
   procedure inner(function g: integer);
@@ -1106,11 +1169,11 @@ begin
   inner(f);
 end;
 begin end.`,
-    purpose: 'ISO 6.6.3.5：两个函数标识符的结果类型须表示同一类型',
+    purpose: 'ISO 6.6.3.5: the result types of the two function-identifiers must denote the same type',
     expectedError: '',
   },
   {
-    name: '6.6.3.6 可调用形参链式传递时形参表须 congruous（个数）',
+    name: '6.6.3.6 The formal-parameter lists must be congruous when callable formal parameters are chained (count)',
     code: `program test;
 procedure outer(function f(a: integer): integer);
   procedure inner(function g(a: integer; b: integer): integer);
@@ -1119,11 +1182,12 @@ begin
   inner(f);
 end;
 begin end.`,
-    purpose: 'ISO 6.6.3.6：两个 formal-parameter-list congruous 要求个数相同',
+    purpose: 'ISO 6.6.3.6: two formal-parameter-lists being congruous requires the same count',
     expectedError: '',
   },
   {
-    name: '6.6.3.6 可调用形参链式传递时形参表须 congruous（var 属性）',
+    name:
+      '6.6.3.6 The formal-parameter lists must be congruous when callable formal parameters are chained (var attribute)',
     code: `program test;
 procedure outer(function f(a: integer): integer);
   procedure inner(function g(var a: integer): integer);
@@ -1132,11 +1196,12 @@ begin
   inner(f);
 end;
 begin end.`,
-    purpose: 'ISO 6.6.3.6：对应段须同为值参数段或同为变量参数段',
+    purpose:
+      'ISO 6.6.3.6: corresponding sections must both be value-parameter sections or both be variable-parameter sections',
     expectedError: '',
   },
   {
-    name: '6.6.3.6 可调用形参链式传递时形参表须 congruous（类型）',
+    name: '6.6.3.6 The formal-parameter lists must be congruous when callable formal parameters are chained (type)',
     code: `program test;
 procedure outer(function f(a: integer): integer);
   procedure inner(function g(a: char): integer);
@@ -1145,11 +1210,11 @@ begin
   inner(f);
 end;
 begin end.`,
-    purpose: 'ISO 6.6.3.6：对应位置的形式参数类型须表示同一类型',
+    purpose: 'ISO 6.6.3.6: the formal-parameter types at corresponding positions must denote the same type',
     expectedError: '',
   },
   {
-    name: '6.6.5.2 读状态下对 file of record 执行 put 违反前断言',
+    name: '6.6.5.2 put on file of record in the Inspection state violates the precondition',
     code: `program test;
 type r = record a: integer end;
 var f: file of r;
@@ -1157,11 +1222,11 @@ begin
   reset(f);
   put(f);
 end.`,
-    purpose: 'ISO 6.6.5.2：put(f) 的前断言要求 f.M = Generation',
+    purpose: 'ISO 6.6.5.2: the precondition of put(f) requires f.M = Generation',
     expectedError: '',
   },
   {
-    name: '6.6.5.2 file of record 在 f.R 为空时 get 违反前断言应报错',
+    name: '6.6.5.2 get on file of record when f.R is empty violates the precondition and should be an error',
     code: `program test;
 type r = record a: integer end;
 var f: file of r;
@@ -1170,11 +1235,12 @@ begin
   reset(f);
   get(f);
 end.`,
-    purpose: 'ISO 6.6.5.2：get(f) 的前断言为 not eof(f)，元素类型为 record 的文件同样适用',
+    purpose:
+      'ISO 6.6.5.2: the precondition of get(f) is not eof(f); this also applies to files whose component type is record',
     expectedError: '',
   },
   {
-    name: '6.6.5.2 读状态下对 f^ 赋值违反前断言应报错',
+    name: '6.6.5.2 Assigning to f^ in the Inspection state violates the precondition and should be an error',
     code: `program test;
 type r = record a: integer end;
 var f: file of r;
@@ -1187,11 +1253,12 @@ begin
   reset(f);
   f^ := x;
 end.`,
-    purpose: 'ISO 6.6.5.2：对 f^ 赋值与 put(f) 的前断言要求 f.M = Generation，reset 后文件处于 Inspection',
+    purpose:
+      'ISO 6.6.5.2: the preconditions for assigning to f^ and for put(f) require f.M = Generation; after reset the file is in the Inspection state',
     expectedError: '',
   },
   {
-    name: '6.6.5.2 单字节元素文件上 f^ 赋值与 put',
+    name: '6.6.5.2 f^ assignment and put on a single-byte-component file',
     code: `program test(output);
 var f: packed file of 0..255;
     n: 0..255;
@@ -1203,11 +1270,12 @@ begin
   n := f^;
   writeln(n);
 end.`,
-    purpose: 'ISO 6.6.5.2：f^ 是缓冲变量，对 f^ 赋值后 put(f) 使其成为 f.L 的新分量，reset 后 f^ 即该分量',
+    purpose:
+      'ISO 6.6.5.2: f^ is a buffer variable; after assigning to f^, put(f) makes it a new component of f.L, and after reset f^ is that component',
     expectedOutput: '42\n',
   },
   {
-    name: '6.6.5.2 file of 枚举类型 的写读往返',
+    name: '6.6.5.2 Write/read round-trip for file of enumerated type',
     code: `program test(output);
 type color = (red, green, blue);
 var f: file of color;
@@ -1219,156 +1287,159 @@ begin
   read(f, c);
   if c = green then writeln('green');
 end.`,
-    purpose: 'ISO 6.4.3.5/6.6.5.3：file-type 的分量类型可为枚举类型，write/read 与 f^ 赋值、get 等价',
+    purpose:
+      'ISO 6.4.3.5/6.6.5.3: the component type of a file-type may be an enumerated type; write/read is equivalent to f^ assignment and get',
     expectedOutput: 'green\n',
   },
   {
-    name: '6.6.3.4 过程形参规格缺少标识符应报错',
+    name: '6.6.3.4 A procedural-parameter specification missing an identifier should be an error',
     code: 'program test; procedure p(procedure ); begin end; begin end.',
-    purpose: 'ISO 6.6.3.4：procedural-parameter-specification = procedure-heading，须给出标识符',
+    purpose: 'ISO 6.6.3.4: procedural-parameter-specification = procedure-heading; an identifier must be given',
     expectedError: '',
   },
   {
-    name: '6.6.3.4 过程形参规格的形参表非法应报错',
+    name: '6.6.3.4 An invalid formal-parameter list in a procedural-parameter specification should be an error',
     code: 'program test; procedure p(procedure r(1)); begin end; begin end.',
-    purpose: 'ISO 6.6.3.4：过程形参的 heading 中的 formal-parameter-list 须合法',
+    purpose: 'ISO 6.6.3.4: the formal-parameter-list in the heading of a procedural formal parameter must be valid',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 函数形参规格缺少标识符应报错',
+    name: '6.6.3.5 A functional-parameter specification missing an identifier should be an error',
     code: 'program test; procedure p(function : integer); begin end; begin end.',
-    purpose: 'ISO 6.6.3.5：functional-parameter-specification = function-heading，须给出标识符',
+    purpose: 'ISO 6.6.3.5: functional-parameter-specification = function-heading; an identifier must be given',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 函数形参规格的形参表非法应报错',
+    name: '6.6.3.5 An invalid formal-parameter list in a functional-parameter specification should be an error',
     code: 'program test; procedure p(function f(1): integer); begin end; begin end.',
-    purpose: 'ISO 6.6.3.5：函数形参的 heading 中的 formal-parameter-list 须合法',
+    purpose: 'ISO 6.6.3.5: the formal-parameter-list in the heading of a functional formal parameter must be valid',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 函数形参规格缺少结果类型应报错',
+    name: '6.6.3.5 A functional-parameter specification missing the result type should be an error',
     code: 'program test; procedure p(function f integer); begin end; begin end.',
-    purpose: 'ISO 6.6.3.5：function-heading = function identifier [ formal-parameter-list ] : result-type',
+    purpose: 'ISO 6.6.3.5: function-heading = function identifier [ formal-parameter-list ] : result-type',
     expectedError: '',
   },
   {
-    name: '6.6.3.5 函数形参规格的结果类型非法应报错',
+    name: '6.6.3.5 An invalid result type in a functional-parameter specification should be an error',
     code: 'program test; procedure p(function f: ); begin end; begin end.',
-    purpose: 'ISO 6.6.3.5：result-type 须为合法 type-denoter',
+    purpose: 'ISO 6.6.3.5: result-type must be a valid type-denoter',
     expectedError: '',
   },
   {
-    name: '6.6.3.1 形参的 type-denoter 非法应报错',
+    name: '6.6.3.1 An invalid type-denoter of a formal parameter should be an error',
     code: 'program test; procedure p(a: ); begin end; begin end.',
-    purpose: 'ISO 6.6.3.1：formal-parameter-section 的 type-denoter 须合法',
+    purpose: 'ISO 6.6.3.1: the type-denoter of a formal-parameter-section must be valid',
     expectedError: '',
   },
   {
-    name: '6.6.1 过程声明中的标识符非法应报错',
+    name: '6.6.1 An invalid identifier in a procedure declaration should be an error',
     code: 'program test; procedure 5; begin end; begin end.',
-    purpose: 'ISO 6.6.1：procedure-heading = procedure identifier ...',
+    purpose: 'ISO 6.6.1: procedure-heading = procedure identifier ...',
     expectedError: '',
   },
   {
-    name: '6.6.1 forward 指令之后须有分号',
+    name: '6.6.1 A semicolon must follow the forward directive',
     code: 'program test; procedure p; forward begin end; begin end.',
-    purpose: 'ISO 6.6.1：forward-directive = forward，其后以分号结束',
+    purpose: 'ISO 6.6.1: forward-directive = forward; it ends with a semicolon',
     expectedError: '',
   },
   {
-    name: '6.6.1 过程声明中的块非法应报错',
+    name: '6.6.1 An invalid block in a procedure declaration should be an error',
     code: `program test;
 procedure p;
 begin`,
-    purpose: 'ISO 6.6.1：procedure-declaration 须包含合法 procedure-block',
+    purpose: 'ISO 6.6.1: a procedure-declaration must contain a valid procedure-block',
     expectedError: '',
   },
   {
-    name: '6.6.2 函数声明中的标识符非法应报错',
+    name: '6.6.2 An invalid identifier in a function declaration should be an error',
     code: 'program test; function 5: integer; begin end; begin end.',
-    purpose: 'ISO 6.6.2：function-heading = function identifier ...',
+    purpose: 'ISO 6.6.2: function-heading = function identifier ...',
     expectedError: '',
   },
   {
-    name: '6.6.2 函数的形参表非法应报错',
+    name: '6.6.2 An invalid formal-parameter list of a function should be an error',
     code: 'program test; function f(1): integer; begin end; begin end.',
-    purpose: 'ISO 6.6.2：function-heading 中的 formal-parameter-list 须合法',
+    purpose: 'ISO 6.6.2: the formal-parameter-list in a function-heading must be valid',
     expectedError: '',
   },
   {
-    name: '6.6.2 函数声明缺少结果类型应报错',
+    name: '6.6.2 A function declaration missing the result type should be an error',
     code: 'program test; function f integer; begin end; begin end.',
-    purpose: 'ISO 6.6.2：函数声明须给出 result-type',
+    purpose: 'ISO 6.6.2: a function declaration must give a result-type',
     expectedError: '',
   },
   {
-    name: '6.6.2 函数的结果类型非法应报错',
+    name: '6.6.2 An invalid result type of a function should be an error',
     code: 'program test; function f: ; begin end; begin end.',
-    purpose: 'ISO 6.6.2：result-type 须为合法 type-denoter',
+    purpose: 'ISO 6.6.2: result-type must be a valid type-denoter',
     expectedError: '',
   },
   {
-    name: '6.6.2 函数头之后须有分号',
+    name: '6.6.2 A semicolon must follow the function heading',
     code: 'program test; function f: integer begin end; begin end.',
-    purpose: 'ISO 6.6.2：function-heading 之后为分号与 block',
+    purpose: 'ISO 6.6.2: after the function-heading comes a semicolon and a block',
     expectedError: '',
   },
   {
-    name: '6.6.2 函数 forward 指令之后须有分号',
+    name: '6.6.2 A semicolon must follow the function forward directive',
     code: 'program test; function f: integer; forward begin end; begin end.',
-    purpose: 'ISO 6.6.2：函数声明的 forward-directive 之后以分号结束',
+    purpose: 'ISO 6.6.2: the forward-directive of a function declaration ends with a semicolon',
     expectedError: '',
   },
   {
-    name: '6.6.2 函数声明中的块非法应报错',
+    name: '6.6.2 An invalid block in a function declaration should be an error',
     code: `program test;
 function f: integer;
 begin`,
-    purpose: 'ISO 6.6.2：function-declaration 须包含合法 function-block',
+    purpose: 'ISO 6.6.2: a function-declaration must contain a valid function-block',
     expectedError: '',
   },
 
   // 6.6.5.3 Dynamic allocation procedures
 
   {
-    name: '6.6 new 创建的新变量可读写',
+    name: '6.6 A new variable created by new can be read and written',
     code: `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN NEW(P);P^:=42;WRITE(P^);DISPOSE(P);END.`,
-    purpose: 'ISO 6.6.5.3：new(p) 创建新变量与该指针类型的新 identifying-value 并赋予 p',
+    purpose:
+      'ISO 6.6.5.3: new(p) creates a new variable and a new identifying-value of that pointer type, and assigns them to p',
     expectedOutput: '42',
   },
   {
-    name: '6.6 new 后指针不再是 nil',
+    name: '6.6 After new, the pointer is no longer nil',
     code:
       `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN NEW(P);IF P<>NIL THEN WRITE('NOTNIL')ELSE WRITE('NIL');DISPOSE(P);END.`,
-    purpose: 'ISO 6.6.5.3/6.4.4：new 创建的 identifying-value 不同于 nil-value',
+    purpose: 'ISO 6.6.5.3/6.4.4: the identifying-value created by new differs from the nil-value',
     expectedOutput: 'NOTNIL',
   },
   {
-    name: '6.6 new 可用于记录类型',
+    name: '6.6 new may be used for record types',
     code:
       `PROGRAM TEST(OUTPUT);TYPE RPTR=^REC;REC=RECORD X:INTEGER;Y:INTEGER END;VAR P:RPTR;BEGIN NEW(P);P^.X:=10;P^.Y:=20;WRITE(P^.X+P^.Y);DISPOSE(P);END.`,
-    purpose: 'ISO 6.6.5.3：新变量拥有指针类型 domain-type 的类型',
+    purpose: "ISO 6.6.5.3: the new variable has the type of the pointer type's domain-type",
     expectedOutput: '30',
   },
   {
-    name: '6.6 nil 指针（或未定义指针）解引用应报错',
+    name: '6.6 Dereferencing a nil (or undefined) pointer should be an error',
     code: `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN P^:=42;END.`,
-    purpose: 'ISO 6.5.4：identified-variable 的 pointer-variable 为 nil 或未定义时为 error',
+    purpose: 'ISO 6.5.4: an identified-variable is an error when its pointer-variable is nil or undefined',
     expectedError: '',
     maxSteps: 1000,
   },
   {
-    name: '6.6 dispose 未初始化（nil）指针应报错',
+    name: '6.6 dispose on an uninitialized (nil) pointer should be an error',
     code: `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN DISPOSE(P);END.`,
-    purpose: 'ISO 6.6.5.3：若 q 具有 nil-value 或未定义，则 dispose(q) 为 error',
+    purpose: 'ISO 6.6.5.3: if q has the nil-value or is undefined, dispose(q) is an error',
     expectedError: '',
     maxSteps: 1000,
   },
   {
-    name: '6.6 dispose 后访问所指变量应报错',
+    name: '6.6 Accessing the pointed variable after dispose should be an error',
     code: `PROGRAM TEST(OUTPUT);TYPE IPTR=^INTEGER;VAR P:IPTR;BEGIN NEW(P);DISPOSE(P);P^:=42;END.`,
-    purpose: 'ISO 6.6.5.3/6.5.4：identifying-value 被移除后，该指针变量所指变量不可访问',
+    purpose:
+      'ISO 6.6.5.3/6.5.4: after the identifying-value is removed, the variable pointed to by that pointer variable is inaccessible',
     expectedError: '',
     maxSteps: 1000,
   },
@@ -1376,7 +1447,7 @@ begin`,
   // 6.6.5.4 Transfer procedures (pack / unpack)
 
   {
-    name: '6.6 pack 将非紧缩数组的连续分量移入紧缩数组',
+    name: '6.6 pack moves consecutive components of a non-packed array into a packed array',
     code: `program test(output);
         var a: array[1..5] of integer;
             z: packed array[1..3] of integer;
@@ -1385,11 +1456,11 @@ begin`,
           pack(a, 2, z);
           writeln(z[1]); writeln(z[2]); writeln(z[3]);
         end.`,
-    purpose: 'ISO 6.6.5.4：pack(a,i,z) 等价于令 z[j]:=a[k]，k 从 i 起随 j 递增',
+    purpose: 'ISO 6.6.5.4: pack(a,i,z) is equivalent to z[j]:=a[k], with k increasing with j starting from i',
     expectedOutput: '20\n30\n40\n',
   },
   {
-    name: '6.6 unpack 将紧缩数组的分量移回非紧缩数组',
+    name: '6.6 unpack moves the components of a packed array back into a non-packed array',
     code: `program test(output);
         var a: array[1..5] of integer;
             z: packed array[1..3] of integer;
@@ -1398,154 +1469,159 @@ begin`,
           unpack(z, a, 2);
           writeln(a[2]); writeln(a[3]); writeln(a[4]);
         end.`,
-    purpose: 'ISO 6.6.5.4：unpack(z,a,i) 等价于令 a[k]:=z[j]，k 从 i 起随 j 递增',
+    purpose: 'ISO 6.6.5.4: unpack(z,a,i) is equivalent to a[k]:=z[j], with k increasing with j starting from i',
     expectedOutput: '1\n2\n3\n',
   },
 
   // 6.6.6.2 Arithmetic functions
 
   {
-    name: '6.6 abs 对整数参数返回同类型绝对值',
+    name: '6.6 abs returns the absolute value of the same type for integer arguments',
     code: `PROGRAM TEST(OUTPUT);VAR X:INTEGER;BEGIN X:=-5;WRITE(ABS(X));END.`,
-    purpose: 'ISO 6.6.6.2：abs(x) 结果类型与参数相同，值为绝对值',
+    purpose: 'ISO 6.6.6.2: the result type of abs(x) is the same as the argument, and the value is the absolute value',
     expectedOutput: '5',
   },
   {
-    name: '6.6 abs 对实数参数返回绝对值',
+    name: '6.6 abs returns the absolute value for real arguments',
     code: `PROGRAM TEST(OUTPUT);VAR X:REAL;BEGIN X:=-3.5;WRITE(TRUNC(ABS(X)*10));END.`,
-    purpose: 'ISO 6.6.6.2：abs 对实参返回实数；用 trunc 转为 integer 避免依赖实数输出格式',
+    purpose:
+      'ISO 6.6.6.2: abs returns real for real arguments; trunc is used to convert to integer to avoid depending on the real output format',
     expectedOutput: '35',
   },
   {
-    name: '6.6 sqr 对整数参数返回平方',
+    name: '6.6 sqr returns the square for integer arguments',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(SQR(7));END.`,
-    purpose: 'ISO 6.6.6.2：sqr(7)=49，结果类型与参数相同（integer）',
+    purpose: 'ISO 6.6.6.2: sqr(7)=49; the result type is the same as the argument (integer)',
     expectedOutput: '49',
   },
   {
-    name: '6.6 sqr 对实数参数返回平方',
+    name: '6.6 sqr returns the square for real arguments',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(TRUNC(SQR(1.5)*100));END.`,
-    purpose: 'ISO 6.6.6.2：sqr(1.5)=2.25，用 trunc 转为 integer 比较',
+    purpose: 'ISO 6.6.6.2: sqr(1.5)=2.25; trunc is used to convert to integer for comparison',
     expectedOutput: '225',
   },
   {
-    name: '6.6 sqrt 返回非负平方根',
+    name: '6.6 sqrt returns the non-negative square root',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(SQRT(4.0)));END.`,
-    purpose: 'ISO 6.6.6.2：sqrt(x) 为 x 的非负平方根，结果恒为 real-type',
+    purpose: 'ISO 6.6.6.2: sqrt(x) is the non-negative square root of x; the result is always of real-type',
     expectedOutput: '2',
   },
   {
-    name: '6.6 sqrt 对负数参数应报错',
+    name: '6.6 sqrt on a negative argument should be an error',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(SQRT(-1.0));END.`,
-    purpose: 'ISO 6.6.6.2：x 为负数时不存在非负平方根，为 error',
+    purpose: 'ISO 6.6.6.2: when x is negative there is no non-negative square root, so it is an error',
     expectedError: '',
     maxSteps: 1000,
   },
   {
-    name: '6.6 ln 返回自然对数',
+    name: '6.6 ln returns the natural logarithm',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(LN(1.0)));END.`,
-    purpose: 'ISO 6.6.6.2：ln(x) 为 x 的自然对数（x>0）；ln(1)=0',
+    purpose: 'ISO 6.6.6.2: ln(x) is the natural logarithm of x (x>0); ln(1)=0',
     expectedOutput: '0',
   },
   {
-    name: '6.6 ln 对非正参数应报错',
+    name: '6.6 ln on a non-positive argument should be an error',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(LN(0.0));END.`,
-    purpose: 'ISO 6.6.6.2：x 不大于零时 ln(x) 为 error',
+    purpose: 'ISO 6.6.6.2: when x is not greater than zero, ln(x) is an error',
     expectedError: '',
     maxSteps: 1000,
   },
   {
-    name: '6.6 exp 返回自然对数底的幂',
+    name: '6.6 exp returns the power of the base of the natural logarithm',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(EXP(0.0)));END.`,
-    purpose: 'ISO 6.6.6.2：exp(x) 为自然对数底 e 的 x 次幂；exp(0)=1',
+    purpose: 'ISO 6.6.6.2: exp(x) is the x-th power of e, the base of the natural logarithm; exp(0)=1',
     expectedOutput: '1',
   },
   {
-    name: '6.6 sin 返回正弦值',
+    name: '6.6 sin returns the sine value',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(SIN(0.0)));END.`,
-    purpose: 'ISO 6.6.6.2：sin(x) 为弧度 x 的正弦；sin(0)=0',
+    purpose: 'ISO 6.6.6.2: sin(x) is the sine of the radian x; sin(0)=0',
     expectedOutput: '0',
   },
   {
-    name: '6.6 cos 返回余弦值',
+    name: '6.6 cos returns the cosine value',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(COS(0.0)));END.`,
-    purpose: 'ISO 6.6.6.2：cos(x) 为弧度 x 的余弦；cos(0)=1',
+    purpose: 'ISO 6.6.6.2: cos(x) is the cosine of the radian x; cos(0)=1',
     expectedOutput: '1',
   },
   {
-    name: '6.6 arctan 返回反正切主值',
+    name: '6.6 arctan returns the principal value of the arctangent',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(ARCTAN(0.0)));END.`,
-    purpose: 'ISO 6.6.6.2：arctan(x) 为 x 的反正切主值（弧度）；arctan(0)=0',
+    purpose: 'ISO 6.6.6.2: arctan(x) is the principal value of the arctangent of x (in radians); arctan(0)=0',
     expectedOutput: '0',
   },
 
   // 6.6.6.3 Transfer functions
 
   {
-    name: '6.6 trunc 截断正实数',
+    name: '6.6 trunc truncates a positive real number',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(TRUNC(3.7));END.`,
-    purpose: 'ISO 6.6.6.3：x>=0 时 0<=x-trunc(x)<1',
+    purpose: 'ISO 6.6.6.3: when x>=0, 0<=x-trunc(x)<1',
     expectedOutput: '3',
   },
   {
-    name: '6.6 trunc 截断负实数',
+    name: '6.6 trunc truncates a negative real number',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(TRUNC(-3.7));END.`,
-    purpose: 'ISO 6.6.6.3：x<0 时 -1<x-trunc(x)<=0',
+    purpose: 'ISO 6.6.6.3: when x<0, -1<x-trunc(x)<=0',
     expectedOutput: '-3',
   },
   {
-    name: '6.6 round 对正数按 trunc(x+0.5) 取整',
+    name: '6.6 round rounds positive numbers as trunc(x+0.5)',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(3.5));END.`,
-    purpose: 'ISO 6.6.6.3：x>=0 时 round(x) 等价于 trunc(x+0.5)，round(3.5)=4',
+    purpose: 'ISO 6.6.6.3: when x>=0, round(x) is equivalent to trunc(x+0.5); round(3.5)=4',
     expectedOutput: '4',
   },
   {
-    name: '6.6 round 对负数按 trunc(x-0.5) 取整',
+    name: '6.6 round rounds negative numbers as trunc(x-0.5)',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ROUND(-3.5));END.`,
-    purpose: 'ISO 6.6.6.3：x<0 时 round(x) 等价于 trunc(x-0.5)，round(-3.5)=-4',
+    purpose: 'ISO 6.6.6.3: when x<0, round(x) is equivalent to trunc(x-0.5); round(-3.5)=-4',
     expectedOutput: '-4',
   },
 
   // 6.6.6.4 Ordinal functions
 
   {
-    name: '6.6 ord 对布尔值返回 0 与 1',
+    name: '6.6 ord returns 0 and 1 for boolean values',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ORD(FALSE));WRITE(ORD(TRUE));END.`,
-    purpose: 'ISO 6.4.2.2：false 与 true 的序数分别为 0 和 1',
+    purpose: 'ISO 6.4.2.2: the ordinal numbers of false and true are 0 and 1 respectively',
     expectedOutput: '01',
   },
   {
-    name: '6.6 ord 对整数返回其自身',
+    name: '6.6 ord returns the integer itself for integers',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(ORD(42));END.`,
-    purpose: 'ISO 6.4.2.2：integer-type 值的序数即其值本身',
+    purpose: 'ISO 6.4.2.2: the ordinal number of a value of integer-type is the value itself',
     expectedOutput: '42',
   },
   {
-    name: '6.6 chr 与 ord 互为逆运算',
+    name: '6.6 chr and ord are inverse operations of each other',
     code: `PROGRAM TEST(OUTPUT);VAR C:CHAR;BEGIN C:='A';IF CHR(ORD(C))=C THEN WRITE('OK')ELSE WRITE('BAD');END.`,
-    purpose: 'ISO 6.6.6.4：对任意 char 值 ch 有 chr(ord(ch))=ch（char 字符集为 implementation-defined，故用往返）',
+    purpose:
+      'ISO 6.6.6.4: for any char value ch, chr(ord(ch))=ch (the char character set is implementation-defined, so a round-trip is used)',
     expectedOutput: 'OK',
   },
   {
-    name: '6.6 succ 返回后继序数值（integer）',
+    name: '6.6 succ returns the successor ordinal value (integer)',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(SUCC(5));END.`,
-    purpose: 'ISO 6.6.6.4：succ(x) 结果的序数比 x 大 1，结果类型与 x 相同',
+    purpose:
+      'ISO 6.6.6.4: the ordinal number of the result of succ(x) is one greater than that of x; the result type is the same as x',
     expectedOutput: '6',
   },
   {
-    name: '6.6 pred 返回前驱序数值（integer）',
+    name: '6.6 pred returns the predecessor ordinal value (integer)',
     code: `PROGRAM TEST(OUTPUT);BEGIN WRITE(PRED(5));END.`,
-    purpose: 'ISO 6.6.6.4：pred(x) 结果的序数比 x 小 1，结果类型与 x 相同',
+    purpose:
+      'ISO 6.6.6.4: the ordinal number of the result of pred(x) is one less than that of x; the result type is the same as x',
     expectedOutput: '4',
   },
   {
-    name: '6.6 succ 对数字字符成立（数字字符连续有序）',
+    name: '6.6 succ holds for digit characters (digit characters are consecutively ordered)',
     code: `PROGRAM TEST(OUTPUT);VAR C:CHAR;BEGIN C:='0';IF SUCC(C)='1' THEN WRITE('OK')ELSE WRITE('BAD');END.`,
-    purpose: 'ISO 6.4.2.2：表示数字 0..9 的字符子集数值上有序且连续，故 succ(0 号数字字符) 为 1 号数字字符',
+    purpose:
+      'ISO 6.4.2.2: the subset of characters representing digits 0..9 is numerically ordered and consecutive, so succ(the 0 digit character) is the 1 digit character',
     expectedOutput: 'OK',
   },
   {
-    name: '6.6.6.4 succ/pred 作用于运行期取值的子界与枚举',
+    name: '6.6.6.4 succ/pred applied to subranges and enumerations with runtime values',
     code: `program test(output);
 type r = 1..10;
      c = (a1, b1, c1);
@@ -1559,76 +1635,78 @@ begin
   writeln(ord(succ(y)));
 end.`,
     purpose:
-      'ISO 6.6.6.4：succ/pred 的结果即其序数值 —— 实参不是编译期常量时同样成立（子界与枚举都要过运行期边界检查）',
+      'ISO 6.6.6.4: the result of succ/pred is its ordinal value - this also holds when the actual parameter is not a compile-time constant (both subranges and enumerations must pass runtime bounds checking)',
     expectedOutput: '6\n4\n1\n',
   },
   {
-    name: '6.6 succ 对枚举类型末值应报错',
+    name: '6.6 succ on the last value of an enumeration type should be an error',
     code: `PROGRAM TEST(OUTPUT);TYPE COLOR=(RED,GREEN,BLUE);VAR C:COLOR;BEGIN C:=BLUE;C:=SUCC(C);END.`,
-    purpose: 'ISO 6.6.6.4：不存在序数更大一的值时为 error',
+    purpose: 'ISO 6.6.6.4: it is an error when there is no value with a greater ordinal number',
     expectedError: '',
     maxSteps: 1000,
   },
   {
-    name: '6.6 pred 对枚举类型首值应报错',
+    name: '6.6 pred on the first value of an enumeration type should be an error',
     code: `PROGRAM TEST(OUTPUT);TYPE COLOR=(RED,GREEN,BLUE);VAR C:COLOR;BEGIN C:=RED;C:=PRED(C);END.`,
-    purpose: 'ISO 6.6.6.4：不存在序数更小一的值时为 error',
+    purpose: 'ISO 6.6.6.4: it is an error when there is no value with a smaller ordinal number',
     expectedError: '',
     maxSteps: 1000,
   },
 
   // 6.6.6.5 Boolean functions
-
   {
-    name: '6.6 odd 对奇数返回真',
+    name: '6.6 odd returns true for odd numbers',
     code: `PROGRAM TEST(OUTPUT);BEGIN IF ODD(7)THEN WRITE('ODD')ELSE WRITE('EVEN');END.`,
-    purpose: 'ISO 6.6.6.5：odd(x) 等价于 abs(x) mod 2 = 1',
+    purpose: 'ISO 6.6.6.5: odd(x) is equivalent to abs(x) mod 2 = 1',
     expectedOutput: 'ODD',
   },
   {
-    name: '6.6 odd 对偶数返回假',
+    name: '6.6 odd returns false for even numbers',
     code: `PROGRAM TEST(OUTPUT);BEGIN IF ODD(8)THEN WRITE('ODD')ELSE WRITE('EVEN');END.`,
-    purpose: 'ISO 6.6.6.5：odd(x) 等价于 abs(x) mod 2 = 1',
+    purpose: 'ISO 6.6.6.5: odd(x) is equivalent to abs(x) mod 2 = 1',
     expectedOutput: 'EVEN',
   },
   {
-    name: '6.6 odd 使用参数的绝对值（负奇数仍为真）',
+    name: '6.6 odd uses the absolute value of the argument (negative odd is still true)',
     code: `PROGRAM TEST(OUTPUT);BEGIN IF ODD(-7)THEN WRITE('ODD')ELSE WRITE('EVEN');END.`,
-    purpose: 'ISO 6.6.6.5：odd(x) 等价于 abs(x) mod 2 = 1，故参数符号不影响结果',
+    purpose:
+      'ISO 6.6.6.5: odd(x) is equivalent to abs(x) mod 2 = 1, so the sign of the argument does not affect the result',
     expectedOutput: 'ODD',
   },
   {
-    name: '6.6 eof(f) 在 f.R 为空序列时返回真',
+    name: '6.6 eof(f) returns true when f.R is an empty sequence',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITE('EOF');END.`,
-    purpose: 'ISO 6.6.6.5：eof(f) 在 f.R 为空序列时为 true',
+    purpose: 'ISO 6.6.6.5: eof(f) is true when f.R is an empty sequence',
     textFiles: new Map<string, Uint8Array>([['F', new Uint8Array(0)]]),
     expectedOutput: 'EOF',
   },
   {
-    name: '6.6 eof(f) 在 f.R 非空时返回假',
+    name: '6.6 eof(f) returns false when f.R is non-empty',
     code: `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);IF EOF(F)THEN WRITE('EOF')ELSE WRITE('MORE');END.`,
-    purpose: 'ISO 6.6.6.5：eof(f) 仅在 f.R 为空序列时为 true',
+    purpose: 'ISO 6.6.6.5: eof(f) is true only when f.R is an empty sequence',
     textFiles: new Map<string, Uint8Array>([['F', text('AB')]]),
     expectedOutput: 'MORE',
   },
   {
-    name: '6.6 eoln(f) 在行结束符处返回真',
+    name: '6.6 eoln(f) returns true at end-of-line',
     code:
       `PROGRAM TEST(OUTPUT,F);VAR F:TEXT;BEGIN RESET(F);WHILE NOT EOLN(F)DO GET(F);IF EOLN(F)THEN WRITE('EOLN');END.`,
-    purpose: 'ISO 6.6.6.5：eoln(f) 在 f.R.first 为 end-of-line 组件时为 true',
+    purpose: 'ISO 6.6.6.5: eoln(f) is true when f.R.first is an end-of-line component',
     textFiles: new Map<string, Uint8Array>([['F', text('AB\n')]]),
     expectedOutput: 'EOLN',
   },
   {
-    name: '6.6 省略参数的 eof 应用于 input',
+    name: '6.6 eof with omitted argument applies to input',
     code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOF THEN WRITE('IN_EOF');END.`,
-    purpose: 'ISO 6.6.6.5：eof 省略实参时应用于 input，且程序参数表须含 input',
+    purpose:
+      'ISO 6.6.6.5: when eof is called with its actual argument omitted, it applies to input, and the program parameter list must contain input',
     expectedOutput: 'IN_EOF',
   },
   {
-    name: '6.6 省略参数的 eoln 应用于 input',
+    name: '6.6 eoln with omitted argument applies to input',
     code: `PROGRAM TEST(INPUT,OUTPUT);BEGIN IF EOLN THEN WRITE('IN_EOLN');END.`,
-    purpose: 'ISO 6.6.6.5：eoln 省略实参时应用于 input，此时 eof(input) 须为假',
+    purpose:
+      'ISO 6.6.6.5: when eoln is called with its actual argument omitted, it applies to input; in this case eof(input) must be false',
     input: '\n',
     expectedOutput: 'IN_EOLN',
   },

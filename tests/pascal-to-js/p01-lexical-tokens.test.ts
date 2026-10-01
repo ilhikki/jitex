@@ -1,17 +1,6 @@
 // ISO/IEC 7185:1990 - 6.1 Lexical tokens
 //
-// 章节概括：
-//   规定 Pascal 程序的词法记号（lexical token）如何由字符构成、以及记号之间如何分隔，
-//   并声明本章语法与标准其余部分的语法规则不同。记号分为 special-symbols、identifiers、
-//   directives、unsigned-numbers、labels、character-strings 六类；除字符-串内部外，
-//   字母的大小写与字体对程序含义均无意义。给出 word-symbol（39 个）、identifier
-//   （letter{letter|digit}，长度不限、不得与 word-symbol 同拼写）、directive（仅 forward）、
-//   signed/unsigned-number（含 e 比例因子记法）、label（digit-sequence，0..9999）、
-//   character-string 的语法与语义。注释（{ } 与 (* *)）与空格、换行构成 token separator：
-//   由标识符/word-symbol/label/无符号数构成的相邻记号之间至少需要一个分隔符，记号内不得有分隔符。
-//   对不支持参考字符集的处理器提供替代表示：@ 代 ^、( . 代 [、. ) 代 ]，其提供与否为 implementation-defined。
 //
-// 子章节：
 //   6.1.1 General
 //   6.1.2 Special-symbols
 //   6.1.3 Identifiers
@@ -25,33 +14,31 @@
 import { type PascalTest, runPascalTests } from './harness.ts'
 
 const tests: PascalTest[] = [
-  // 6.1.1 General —— 字符-串之外，字母大小写对程序含义无影响
   {
-    name: '6.1 关键字与标识符大小写不敏感',
+    name: '6.1 keywords and identifiers are case-insensitive',
     code: `PROGRAM P(output);
 VAR Value: INTEGER;
 BEGIN
   VALUE := 7;
   WRITELN(value);
 END.`,
-    purpose: '同一标识符的不同大小写拼写指向同一定义，关键字大小写任意',
+    purpose: 'different case spellings of the same identifier refer to the same definition; keywords may be any case',
     expectedOutput: '7\n',
   },
 
-  // 6.1.2 Special-symbols —— 复合符号是单个记号
   {
-    name: '6.1 复合符号 <> <= >= 是单个记号',
+    name: '6.1 compound symbols <> <= >= are single tokens',
     code: `program p(output);
 var b: integer;
 begin
   b := 2;
   if (b >= 1) and (b <= 3) and (b <> 4) then writeln('ok');
 end.`,
-    purpose: '复合符号不被拆成两个单字符记号',
+    purpose: 'compound symbols are not split into two single-character tokens',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.1 复合符号 := 与 .. 是单个记号',
+    name: '6.1 compound symbols := and .. are single tokens',
     code: `program p(output);
 type t = array[1..3] of integer;
 var a: t;
@@ -59,66 +46,64 @@ begin
   a[2] := 5;
   writeln(a[2]);
 end.`,
-    purpose: '赋值号 := 与子界号 .. 被识别为单个记号',
+    purpose: 'assignment symbol := and subrange symbol .. are recognized as single tokens',
     expectedOutput: '5\n',
   },
 
-  // 6.1.3 Identifiers —— 任意长度，可由字母数字组成，不得与 word-symbol 同拼写
   {
-    name: '6.1 标识符可以任意长度',
+    name: '6.1 identifiers may be of any length',
     code: `program p(output);
 var InquireWorkstationIdentification: integer;
 begin
   InquireWorkstationIdentification := 1;
   writeln(InquireWorkstationIdentification);
 end.`,
-    purpose: 'ISO 6.1.3 标识符长度不限',
+    purpose: 'ISO 6.1.3 identifiers are unlimited in length',
     expectedOutput: '1\n',
   },
   {
-    name: '6.1 标识符可由字母和数字组成',
+    name: '6.1 identifiers may consist of letters and digits',
     code: `program p(output);
 var WG4: integer;
 begin
   WG4 := 4;
   writeln(WG4);
 end.`,
-    purpose: '标识符 = letter { letter | digit }',
+    purpose: 'identifier = letter { letter | digit }',
     expectedOutput: '4\n',
   },
   {
-    name: '6.1 标识符不得与 word-symbol 同拼写',
+    name: '6.1 identifiers must not spell the same as a word-symbol',
     code: `program p;
 var begin: integer;
 begin
   begin := 1;
 end.`,
-    purpose: 'ISO 6.1.3 任何标识符不得与 word-symbol 拼写相同',
+    purpose: 'ISO 6.1.3 no identifier may spell the same as a word-symbol',
     expectedError: '',
   },
   {
-    name: '6.1 标识符不得以数字开头',
+    name: '6.1 identifiers must not start with a digit',
     code: `program p;
 var 1x: integer;
 begin
 end.`,
-    purpose: '标识符必须以 letter 开头，digit-sequence 开头是数字记号',
+    purpose: 'identifiers must start with a letter; a digit-sequence start is a number token',
     expectedError: '',
   },
 
-  // 6.1.5 Numbers —— 十进制无符号整数 / 实数，e 为比例因子
   {
-    name: '6.1 无符号整数是十进制表示',
+    name: '6.1 unsigned integers are decimal',
     code: `program p(output);
 begin
   writeln(123);
   writeln(0);
 end.`,
-    purpose: 'unsigned-integer 用十进制记号表示 integer 值',
+    purpose: 'unsigned-integer denotes an integer value using decimal notation',
     expectedOutput: '123\n0\n',
   },
   {
-    name: '6.1 无符号整数带前导零时仍是十进制',
+    name: '6.1 unsigned integers with leading zeros are still decimal',
     code: `program p(output);
 begin
   writeln(0100000);
@@ -126,32 +111,33 @@ begin
   writeln(010 + 1);
 end.`,
     purpose:
-      'unsigned-integer 是十进制 digit-sequence，前导零只表示位数、不表示进制（0100000 = 100000，010 = 10）；生成的 JS 里不能把它写成前导 0 的字面量（JS 宽松模式下按八进制解析）',
+      'unsigned-integer is a decimal digit-sequence; leading zeros only indicate digit count, not base (0100000 = 100000, 010 = 10); generated JS must not write it as a leading-0 literal (parsed as octal in JS sloppy mode)',
     expectedOutput: '100000\n10\n11\n',
   },
   {
-    name: '6.1 const 值带前导零时仍是十进制',
+    name: '6.1 const values with leading zeros are still decimal',
     code: `program p(output);
 const
   k = 0100000;
 begin
   writeln(k);
 end.`,
-    purpose: '常量值经 evalLiteral 进入 IR，同样必须按十进制处理：const k = 0100000 的 k 是 100000',
+    purpose:
+      'constant values enter IR via evalLiteral and must also be treated as decimal: const k = 0100000 gives k = 100000',
     expectedOutput: '100000\n',
   },
   {
-    name: '6.1 实数带前导零与比例因子时仍是十进制',
+    name: '6.1 reals with leading zeros and scale factors are still decimal',
     code: `program p(output);
 begin
   writeln(trunc(010E2));
 end.`,
     purpose:
-      'unsigned-real 的 digit-sequence 允许前导零：010E2 = 1000；在 JS 里前导 0 的整数后紧跟 E 是指数写法不合法（八进制字面量不能带比例因子）',
+      'unsigned-real digit-sequence allows leading zeros: 010E2 = 1000; in JS a leading-0 integer immediately followed by E is not a valid exponent notation (octal literals cannot carry a scale factor)',
     expectedOutput: '1000\n',
   },
   {
-    name: '6.1 实数带小数点与小数部分',
+    name: '6.1 real with decimal point and fractional part',
     code: `program p(output);
 begin
   writeln(trunc(1.5));
@@ -160,58 +146,57 @@ end.`,
     expectedOutput: '1\n',
   },
   {
-    name: '6.1 实数可不带小数点直接用 e 比例因子',
+    name: '6.1 real may use e scale factor without decimal point',
     code: `program p(output);
 begin
   writeln(trunc(5e3));
 end.`,
-    purpose: 'ISO 6.1.5：unsigned-real 的第二种形式 digit-sequence e scale-factor，e 表示乘以十的若干次幂',
+    purpose:
+      'ISO 6.1.5: the second form of unsigned-real is digit-sequence e scale-factor, where e means multiplied by a power of ten',
     expectedOutput: '5000\n',
   },
   {
-    name: '6.1 实数的 e 比例因子可带负号',
+    name: '6.1 the e scale factor of a real may carry a negative sign',
     code: `program p(output);
 begin
   writeln(trunc(5.0e-1 * 10));
 end.`,
-    purpose: 'ISO 6.1.5：scale-factor = [ sign ] digit-sequence',
+    purpose: 'ISO 6.1.5: scale-factor = [ sign ] digit-sequence',
     expectedOutput: '5\n',
   },
   {
-    name: '6.1 实数的 E 比例因子（大写，带正号）',
+    name: '6.1 the E scale factor of a real (uppercase, with plus sign)',
     code: `program p(output);
 begin
   writeln(trunc(1.0E+3));
 end.`,
-    purpose: 'scale-factor = [ sign ] digit-sequence，字母大小写不敏感',
+    purpose: 'scale-factor = [ sign ] digit-sequence, letter case is insignificant',
     expectedOutput: '1000\n',
   },
   {
-    name: '6.1 带符号数是带符号的数记号',
+    name: '6.1 signed numbers are signed number tokens',
     code: `program p(output);
 begin
   writeln(+100);
   writeln(-100);
 end.`,
-    purpose: 'sign 可以是 + 或 -',
+    purpose: 'sign may be + or -',
     expectedOutput: '100\n-100\n',
   },
 
-  // 6.1.8 Token separators —— 相邻的标识符/word-symbol/label/无符号数之间至少一个分隔符
   {
-    name: '6.1 相邻的整数与标识符之间必须有分隔符',
+    name: '6.1 adjacent integer and identifier require a separator',
     code: `program p;
 var x: integer;
 begin
   x := 1x;
 end.`,
-    purpose: '无符号数与标识符相邻且无分隔符，不属于任何合法记号序列',
+    purpose: 'unsigned number adjacent to an identifier with no separator is not part of any legal token sequence',
     expectedError: '',
   },
 
-  // 6.1.6 Labels —— digit-sequence，取值闭区间 0..9999
   {
-    name: '6.1 标签取值为 9999 时合法',
+    name: '6.1 label value 9999 is legal',
     code: `program p(output);
 label 9999;
 begin
@@ -219,85 +204,84 @@ begin
 9999:
   writeln('ok');
 end.`,
-    purpose: 'ISO 6.1.6 标签取值范围 0..9999，上界合法',
+    purpose: 'ISO 6.1.6 label range is 0..9999, upper bound is legal',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.1 标签超出 9999 不合法',
+    name: '6.1 label exceeding 9999 is illegal',
     code: `program p(output);
 label 10000;
 begin
   writeln(1);
 end.`,
-    purpose: 'ISO 6.1.6 标签必须在闭区间 0..9999 内',
+    purpose: 'ISO 6.1.6 labels must be within the closed interval 0..9999',
     expectedError: '',
   },
 
-  // 6.1.7 Character-strings —— 单元素表示 char，多元素表示 string
   {
-    name: '6.1 单元素 character-string 表示 char 值',
+    name: '6.1 single-element character-string denotes a char value',
     code: `program p(output);
 var c: char;
 begin
   c := 'A';
   writeln(c);
 end.`,
-    purpose: '含单个 string-element 的字符-串表示 char-type 的值',
+    purpose: 'a character-string with a single string-element denotes a char-type value',
     expectedOutput: 'A\n',
   },
   {
-    name: '6.1 连续两个引号表示一个引号字符',
+    name: '6.1 two consecutive apostrophes denote one apostrophe character',
     code: `program p(output);
 begin
   writeln('''');
 end.`,
-    purpose: "apostrophe-image = '' 表示一个引号字符",
+    purpose: "apostrophe-image = '' denotes one apostrophe character",
     expectedOutput: "'\n",
   },
   {
-    name: '6.1 多元素 character-string 表示 string 值',
+    name: '6.1 multi-element character-string denotes a string value',
     code: `program p(output);
 begin
   writeln('Pascal');
 end.`,
-    purpose: '含多个 string-element 的字符-串表示分量数相同的 string-type 值',
+    purpose:
+      'a character-string with multiple string-elements denotes a string-type value with the same number of components',
     expectedOutput: 'Pascal\n',
   },
   {
-    name: '6.1 字符-串的大小写不被忽略',
+    name: '6.1 case within a character-string is not ignored',
     code: `program p(output);
 var c: char;
 begin
   c := 'a';
   if c = 'A' then writeln('same') else writeln('diff');
 end.`,
-    purpose: '字母大小写不敏感仅适用于字符-串之外，串内区分大小写',
+    purpose: 'case-insensitivity applies only outside character-strings; case is significant inside strings',
     expectedOutput: 'diff\n',
   },
 
-  // 6.1.8 Token separators —— 注释
   {
-    name: '6.1 花括号注释',
+    name: '6.1 brace comment',
     code: `program p(output);
 {a comment}
 begin
   writeln(1); {trailing}
 end.`,
-    purpose: 'f g 括起的 commentary 构成注释',
+    purpose: 'commentary enclosed by { } constitutes a comment',
     expectedOutput: '1\n',
   },
   {
-    name: '6.1 圆括号星号注释',
+    name: '6.1 parenthesis-star comment',
     code: `program p(output);
 (* a comment *)
 begin
   writeln(2);
 end.`,
-    purpose: '(* *) 是注释的另一种参考表示',
+    purpose: '(* *) is another reference representation of comments',
     expectedOutput: '2\n',
   },
   {
-    name: '6.1 注释可以跨行',
+    name: '6.1 comments may span multiple lines',
     code: `program p(output);
 {
   line 1
@@ -306,57 +290,58 @@ end.`,
 begin
   writeln(3);
 end.`,
-    purpose: 'commentary 可以包含换行',
+    purpose: 'commentary may contain line breaks',
     expectedOutput: '3\n',
   },
   {
-    name: '6.1 注释充当记号分隔符',
+    name: '6.1 comments act as token separators',
     code: `program p(output);
 var a: integer;
 begin
   a{ }:= 1;
   writeln(a);
 end.`,
-    purpose: '注释、空格、换行都算 token separator',
+    purpose: 'comments, spaces, and newlines all count as token separators',
     expectedOutput: '1\n',
   },
   {
-    name: '6.1 花括号注释可以星号右括号结尾',
+    name: '6.1 brace comment may end with star-parenthesis',
     code: `program p(output);
 { comment ends with *)
 begin
   writeln(4);
 end.`,
-    purpose: 'ISO 6.1.8 NOTE 1：注释可以以 { 开始、以 *) 结束',
+    purpose: 'ISO 6.1.8 NOTE 1: a comment may start with { and end with *)',
     expectedOutput: '4\n',
   },
   {
-    name: '6.1 注释不可嵌套',
+    name: '6.1 comments must not be nested',
     code: `program p(output);
 begin
   { outer { inner } writeln(1); }
 end.`,
-    purpose: '注释在遇到的第一个右定界符处结束，不会嵌套',
+    purpose: 'a comment ends at the first closing delimiter encountered and does not nest',
     expectedError: '',
   },
   {
-    name: '6.1 圆括号星号注释可以右花括号结尾',
+    name: '6.1 parenthesis-star comment may end with right brace',
     code: `program p(output);
 (* comment ends with }
 begin
   writeln(5);
 end.`,
-    purpose: 'ISO 6.1.8：注释以 (* 开始时可被 } 结束，两种结束定界符都能终止注释',
+    purpose: 'ISO 6.1.8: a comment starting with (* may be terminated by }; both closing delimiters can end a comment',
     expectedOutput: '5\n',
   },
   {
-    name: '6.1 注释正文以 $ 开头仍是注释',
+    name: '6.1 comment body starting with $ is still a comment',
     code: `program p(output);
 {$commentary}
 begin
   writeln(6);
 end.`,
-    purpose: 'ISO 6.1.8：commentary 是任意字符序列，正文内容不影响注释的识别与跳过',
+    purpose:
+      'ISO 6.1.8: commentary is any sequence of characters; body content does not affect comment recognition and skipping',
     expectedOutput: '6\n',
   },
 ]

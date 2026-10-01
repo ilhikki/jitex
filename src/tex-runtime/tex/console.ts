@@ -6,7 +6,7 @@ import type { PascalFileStore } from '@jitex/runtime'
  *
  * 语义写死为"真实终端"：读输入的同时把读过的字符回显到输出，行结束符由
  * eoln 的实现在读到时就消费并回显（见 syscalls.ts 的 eoln 覆盖）；程序结束时
- * 若最后一行没有换行，补一个——真实终端会把光标移回行首。
+ * 若最后一行没有换行，补一个--真实终端会把光标移回行首。
  *
  * 因此 getOutput() 得到的是"终端上看到的一切"，包含输入的回显。这与 TeX 的
  * transcript（<jobname>.log）不是一回事，两者不要混用。

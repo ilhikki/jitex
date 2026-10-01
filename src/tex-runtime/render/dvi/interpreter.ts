@@ -19,7 +19,7 @@ interface FontEntry {
   family: string
   /** 字号（pt），用于 SVG 的 font-size */
   size: number
-  /** fnt_def 的 scaled size（sp，已含 scale）——字符宽度的基准 */
+  /** fnt_def 的 scaled size（sp，已含 scale）--字符宽度的基准 */
   sizeSp: number
   weight?: string
   style?: string
@@ -275,7 +275,7 @@ class Interpreter {
   /**
    * 定稿每页的尺寸。
    *
-   * 优先用 bop 的 c1..c3（TeX82 通常写 0，即不声明）；否则用 post 的 u/l —— 那是 TeX
+   * 优先用 bop 的 c1..c3（TeX82 通常写 0，即不声明）；否则用 post 的 u/l -- 那是 TeX
    * 自己记下的"最宽页面的宽、最高页面的高"，含字符推进，**不需要读 TFM 就是正确值**。
    * 两者都没有（文件被截断）才退化为内容包围盒的估算。
    *
@@ -366,7 +366,7 @@ class Interpreter {
    * 放一个字形。
    *
    * `set_char` 的语义是"放在 (h,v)，然后 h 加上字符宽度"；宽度来自字体度量。
-   * 没有度量（宽度 0）时 h 停在原地——同一行的字形于是共用一个 x，渲染端会把
+   * 没有度量（宽度 0）时 h 停在原地--同一行的字形于是共用一个 x，渲染端会把
    * 它们并进同一个 text，字符间距交给字体度量承担。
    */
   private glyph(code: number, advances: boolean): void {

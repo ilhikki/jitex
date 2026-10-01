@@ -22,9 +22,9 @@ export type SNode =
     readonly then: readonly SNode[]
     readonly else: readonly SNode[]
   }
-  /** `L: while (true) { ... }`——唯一能承接 continue 的形态 */
+  /** `L: while (true) { ... }`--唯一能承接 continue 的形态 */
   | { readonly kind: 'loop'; readonly label: string; readonly body: readonly SNode[] }
-  /** `L: { ... }`——只能承接 break 的纯包裹 */
+  /** `L: { ... }`--只能承接 break 的纯包裹 */
   | { readonly kind: 'guard'; readonly label: string; readonly body: readonly SNode[] }
   | { readonly kind: 'break'; readonly label: string | undefined }
   | { readonly kind: 'continue'; readonly label: string | undefined }
@@ -49,7 +49,7 @@ export interface StructurizeContext {
   readonly compileStatement: (stmt: JsonCode.Statement) => string
 }
 
-/** IR 自身契约被违反——属于上游 bug，直接失败而不是降级 */
+/** IR 自身契约被违反--属于上游 bug，直接失败而不是降级 */
 export type StructurizerErrorCode =
   | 'fall-off-end'
   | 'unknown-label'

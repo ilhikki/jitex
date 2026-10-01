@@ -14,7 +14,7 @@ import {
 } from '@/frontend/node.ts'
 import { AnalysisSymbol, ExtraCallable, FuncInfo, TypeInfo, VarSymbol } from './analysis-type.ts'
 
-// AnalysisContext — 只读配置（非可变 state）
+// AnalysisContext - 只读配置（非可变 state）
 
 export class AnalysisContext {
   readonly extraCallables: Map<string, ExtraCallable> | undefined
@@ -34,7 +34,7 @@ export class AnalysisContext {
   }
 }
 
-// ScopeSnapshot — 作用域快照（Pass 1 建立可写，Pass 2 只读）
+// ScopeSnapshot - 作用域快照（Pass 1 建立可写，Pass 2 只读）
 
 export interface ScopeSnapshot {
   bindings: Map<string, AnalysisSymbol>
@@ -42,7 +42,7 @@ export interface ScopeSnapshot {
   outer: ScopeSnapshot | undefined
 }
 
-// DeclarationResult — Pass 1 输出
+// DeclarationResult - Pass 1 输出
 
 export interface DeclarationResult {
   /** 函数信息表 */
@@ -69,7 +69,7 @@ export interface DeclarationResult {
   globalBindings: Map<string, AnalysisSymbol>
 }
 
-// GotoRecord — Pass 2 收集的 goto 记录
+// GotoRecord - Pass 2 收集的 goto 记录
 
 export interface GotoRecord {
   labelVal: number
@@ -77,7 +77,7 @@ export interface GotoRecord {
   fromFuncId: number
 }
 
-// StatementResult — Pass 2 输出
+// StatementResult - Pass 2 输出
 
 export interface StatementResult {
   /** 表达式 → 类型 */

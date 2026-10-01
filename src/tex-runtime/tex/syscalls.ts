@@ -105,7 +105,7 @@ export interface TexRuntimeSyscallOptions {
    * 这次运行的 TTY 是否是交互式终端（ConsoleFile）。
    *
    * true（默认）时覆盖 eoln：读到行结束符即消费并回显，模拟真实终端对回车的处理。
-   * 非终端场景（例如 TANGLE 把 TTY 接在普通内存文件上）必须置 false——否则会
+   * 非终端场景（例如 TANGLE 把 TTY 接在普通内存文件上）必须置 false--否则会
    * 用终端的回显语义替掉 eoln 本身的行结束判定。
    */
   terminal?: boolean

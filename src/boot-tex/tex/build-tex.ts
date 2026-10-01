@@ -5,10 +5,8 @@ import { runTanglePascal, transformTangle } from '../tangle/build-tangle.ts'
 import { attachText, stage } from '@jitex/integration'
 
 /*
- * TeX82 的编译期声明：extra callable 名 + 重写表 + transform 包装。
- *
- * 运行期部分（TTY 终端、extra / open syscall 实现）在 @jitex/tex-runtime 的
- * tex/ 层；本文件只做"把 TeX 编译成 JS"这件事。
+ * Runtime parts (TTY terminal, extra/open syscall implementations) live in the
+ * tex/ layer of @jitex/tex-runtime; this file only handles compiling TeX to JS.
  */
 
 const texExtraCallables: Record<string, ExtraCallable> = {

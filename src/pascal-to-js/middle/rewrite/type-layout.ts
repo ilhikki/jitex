@@ -5,10 +5,10 @@
  * 布局以 runtime 为准（runtime 侧只认这些编译期算好的标量常量）。
  *
  * 布局约定：
- *   array  —— 扁平化为一维字节序列，offset 由各维 low/stride 算出
- *   record —— 固定字段顺序排列，其后是 variant 的 tag（4 字节），再是 variant 区
+ *   array  -- 扁平化为一维字节序列，offset 由各维 low/stride 算出
+ *   record -- 固定字段顺序排列，其后是 variant 的 tag（4 字节），再是 variant 区
  *             （各分支共享同一段空间，即 union，取最大值）
- *   set    —— 位图，字节数由基类型范围决定
+ *   set    -- 位图，字节数由基类型范围决定
  */
 
 import type { TypeDescriptor, VariantPartDescriptor } from '@/middle/lowering/type.ts'
@@ -37,7 +37,7 @@ const TAG_SIZE = 4
  * variant 的 tag 槽位数。
  *
  * ISO 允许 `case` 不带 tag 字段名；TeX 的 `memory_word` 全是无名 variant，
- * 实际布局就是各分支的 union（无 tag 空间）——旧 boot-tex 实现亦如此。
+ * 实际布局就是各分支的 union（无 tag 空间）--旧 boot-tex 实现亦如此。
  */
 function tagSize(vp: VariantPartDescriptor | undefined): number {
   return vp?.tagName !== undefined ? TAG_SIZE : 0

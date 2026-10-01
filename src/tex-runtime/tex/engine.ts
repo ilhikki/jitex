@@ -39,7 +39,7 @@ export interface TexRenderOptions {
 /**
  * render 的结果。
  *
- *   - completed：引擎跑完了（不一定成功——TeX 自己的报错留在 console 里由回调流出，
+ *   - completed：引擎跑完了（不一定成功--TeX 自己的报错留在 console 里由回调流出，
  *     不在这里判；DVI 为空就 svgs: []）。
  *   - interrupted：运行中断（引擎没跑起来，或 DVI→SVG 渲染抛了异常），error 给原因。
  *

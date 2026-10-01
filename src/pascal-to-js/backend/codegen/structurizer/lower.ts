@@ -1,7 +1,7 @@
 /*
  * Pass 6：把规划结果落成语法树。
  *
- * 这里没有任何判断——每条边该 fall 还是 break/continue 已经在 routes 里定好了，
+ * 这里没有任何判断--每条边该 fall 还是 break/continue 已经在 routes 里定好了，
  * 本模块只负责按盒的 items 顺序输出、按 routes 查表渲染跳转。
  */
 

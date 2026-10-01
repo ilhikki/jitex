@@ -6,7 +6,7 @@ import { ConsoleFile } from './console.ts'
  * TeX 的文件名区约定。
  *
  * 区前缀是编译在 TeX 程序里的常量（tex.web 的 TEX_font_area / TEX_formats），
- * 使用者不该知道它们——所以这套约定由本包持有，使用方只给"名字 + 字节"。
+ * 使用者不该知道它们--所以这套约定由本包持有，使用方只给"名字 + 字节"。
  */
 export const TEX_FONT_AREA = 'TeXfonts:'
 export const TEX_FORMAT_AREA = 'TeXformats:'
@@ -39,7 +39,7 @@ export interface TexJobInput {
   /**
    * 字符串池（TANGLE 产出的 TEX.POOL）字节。
    *
-   * TeX 的启动初始化（get_strings_started）就会读它，**每次运行都需要**——不是只有
+   * TeX 的启动初始化（get_strings_started）就会读它，**每次运行都需要**--不是只有
    * INITEX 才用；`&format` 载入时其字符串池虽来自 fmt，但初始化那一步已经先要过池文件。
    */
   pool: Uint8Array

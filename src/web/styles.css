@@ -23,7 +23,6 @@ body {
     overflow-x: auto;
 }
 
-/* ---------- 通用 UI 组件 ---------- */
 .stack {
     display: flex;
     flex-direction: column;
@@ -54,7 +53,6 @@ body {
 .text-subtle { color: #999; font-size: 12px; }
 .logo { width: 71px; height: 32.4px; }
 
-/* ---------- 应用骨架 ---------- */
 .app {
     flex: 1;
     min-height: 0;
@@ -153,7 +151,6 @@ body {
     height: auto;
 }
 
-/* ---------- 窄版：整页滚动 ---------- */
 @media (max-width: 1400px) {
     html, body { height: auto; }
     body { min-height: 100%; }
@@ -190,7 +187,6 @@ body {
     }
 }
 
-/* ---------- 宽版：左右分栏 ---------- */
 @media (min-width: 1401px) {
     :root {
         --col-max: 780px;

@@ -1,5 +1,5 @@
 /*
- * Pass 4：只做一件事——把不可约 CFG 修成可约。
+ * Pass 4：只做一件事--把不可约 CFG 修成可约。
  *
  * 不可约（某个强连通分量有多个入口）是唯一必须靠"复制代码"解决的问题：
  * 目标语言里没有任何语法能从一个结构跳进另一个结构的中间。
@@ -92,7 +92,7 @@ function duplicateBlocks(
   return makeCfg([...rewritten, ...duplicated])
 }
 
-/** 分量内被 entry 支配的节点——复制它们就能让 entry 成为私有的 */
+/** 分量内被 entry 支配的节点--复制它们就能让 entry 成为私有的 */
 function dominatedInside(
   cfg: Cfg,
   dom: Dominators,

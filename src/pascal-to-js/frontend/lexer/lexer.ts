@@ -32,9 +32,9 @@ export function createOffsetToPosition(source: string): (offset: number) => Posi
   }
 }
 
-// Lexer — pure function: LexerInput => Token[]
+// Lexer - pure function: LexerInput => Token[]
 
-// Only true reserved words — predefined identifiers (INTEGER, WRITE, etc.)
+// Only true reserved words - predefined identifiers (INTEGER, WRITE, etc.)
 // remain as IDENTIFIER tokens and are handled by the parser.
 const KEYWORDS = new Set([
   'PROGRAM',

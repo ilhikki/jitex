@@ -34,7 +34,7 @@ export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode>
   )
 }
 
-// parsePrimary — the base factor
+// parsePrimary - the base factor
 export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
   const token = peek(input)
 
@@ -220,7 +220,7 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
   )
 }
 
-// parsePostfix — handles function calls, array access, field access
+// parsePostfix - handles function calls, array access, field access
 export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   // 调用方（parsePrimary 的 IDENTIFIER 分支）已确认当前记号是标识符
@@ -320,7 +320,7 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
   return ok(pos, expr)
 }
 
-// parseNot — NOT factor
+// parseNot - NOT factor
 function parseNot(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const afterNot = { tokens: input.tokens, position: input.position + 1 }
@@ -343,12 +343,12 @@ function parseNot(input: ParserInput): ParseResult<ExpressionNode> {
   )
 }
 
-// parseFactor — handles multiplication-level operators
+// parseFactor - handles multiplication-level operators
 export function parseFactor(input: ParserInput): ParseResult<ExpressionNode> {
   return parsePrimary(input)
 }
 
-// parseTerm — term: factor { (* | / | DIV | MOD | AND) factor }
+// parseTerm - term: factor { (* | / | DIV | MOD | AND) factor }
 export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const result = parseFactor(input)
@@ -408,7 +408,7 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
   return ok(pos, left)
 }
 
-// parseSimpleExpression — [ (+|-|NOT) ] term { (+|-|OR) term }
+// parseSimpleExpression - [ (+|-|NOT) ] term { (+|-|OR) term }
 export function parseSimpleExpression(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   let pos = input.position
@@ -484,7 +484,7 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
   return ok(pos, left)
 }
 
-// parseExpression — simple_expression [ (= | <> | < | <= | > | >= | IN) simple_expression ]
+// parseExpression - simple_expression [ (= | <> | < | <= | > | >= | IN) simple_expression ]
 export function parseExpression(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const leftResult = parseSimpleExpression(input)

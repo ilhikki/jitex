@@ -1,7 +1,7 @@
-// Reporter：写盘 overview.json + 三份 txt 聚合 + 两份极简 index.html（零 style）。
+// Reporter: writes overview.json + three aggregated txt files + two minimal index.html (zero style).
 //
-// 对齐 pascal-ts/reports 目录结构。
-// 所有 HTML 禁止 <style> 与 style=""，只用语义标签。
+// Aligns with the pascal-ts/reports directory structure.
+// All HTML must not contain <style> or style=""; only semantic tags are used.
 
 import type { RunReport, StageRecord } from './runner.ts'
 
@@ -38,13 +38,11 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-// run 目录写盘
-
 export interface WriteReportResult {
   runDir: string
 }
 
-/** 写单份 run 报告。同时更新顶层 index.html。 */
+/** Write a single run report. Also updates the top-level index.html. */
 export async function writeReport(
   reportDir: string,
   report: RunReport,
@@ -56,8 +54,9 @@ export async function writeReport(
   // overview.json
   await Deno.writeFile(`${runDir}/overview.json`, enc.encode(JSON.stringify(report, undefined, 2)))
 
-  // 三份聚合日志：logs / consoleLogs / debugLogs
-  // DSL 统一用 log(msg)，默认 LogSink 写三份一样的；保留三份文件以对齐样例。
+  // Three aggregated log files: logs / consoleLogs / debugLogs.
+  // The DSL uses log(msg) uniformly; the default LogSink writes identical content to all three.
+  // Three files are kept to align with the sample structure.
   const runHeader = report.runLogs.length ? [...report.runLogs, ''] : []
   const allLogs: string[] = [...runHeader]
   const allConsole: string[] = [...runHeader]
@@ -89,17 +88,15 @@ export async function writeReport(
     }
   }
 
-  // run 级 index.html
   await writeRunIndex(runDir, report)
 
-  // 顶层 index.html（扫描整个 reportDir）
   await writeTopLevelIndex(reportDir)
 
   return { runDir }
 }
 
 function sanitizeFilename(name: string): string {
-  // 保留文件名中的路径分隔符？参考样例是单文件名。这里禁止路径穿越。
+  // Keep path separators in filenames? The sample uses single filenames. Path traversal is forbidden here.
   const s = name.replace(/\\/g, '/')
   const base = s.split('/').pop() ?? name
   if (!base || base === '.' || base === '..') {
@@ -108,7 +105,7 @@ function sanitizeFilename(name: string): string {
   return base
 }
 
-// HTML：run 详情页（对齐样例结构：h1 / env / files / stages）
+// HTML: run detail page (aligns with sample structure: h1 / env / files / stages)
 
 async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
   const status = r.success ? 'SUCCESS' : 'FAIL'
@@ -179,10 +176,10 @@ async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
   await Deno.writeFile(`${runDir}/index.html`, enc.encode(html))
 }
 
-// HTML：顶层 run 列表（扫描 reportDir 下所有 runId）
+// HTML: top-level run list (scans all runIds under reportDir)
 
 async function writeTopLevelIndex(reportDir: string): Promise<void> {
-  // 读取所有 runId（子目录，忽略 .cache）
+  // Read all runIds (subdirectories, ignoring .cache)
   const runs: Array<{ id: string; overview?: { timestamp: string; success: boolean; duration: number } }> = []
   let entries: Deno.DirEntry[] = []
   try {
@@ -212,7 +209,7 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
         overview = { timestamp: obj.timestamp, success: obj.success, duration: obj.duration }
       }
     } catch {
-      // 不完整的 run 目录：只列出名字
+      // Incomplete run directory: list the name only
     }
     runs.push({ id: e.name, overview })
   }
@@ -245,11 +242,11 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
   await Deno.writeFile(`${reportDir}/index.html`, enc.encode(html))
 }
 
-// 导出给 CLI：如果 CLI 只想刷新一下顶层 index（比如 --no-report 后手动触发重建），也可用。
+// Exported for CLI: usable when the CLI only wants to refresh the top-level index (e.g. manually trigger rebuild after --no-report).
 export { writeRunIndex as _writeRunIndex, writeTopLevelIndex as _writeTopLevelIndex }
 
-// 供 runner/cli：从 RunReport + stageContext 中拿 artifact bytes 写盘。
-// runner 里 StageContext 已经保存了 artifacts[] 字节，这里导出一个辅助把它转成 map。
+// For runner/cli: get artifact bytes from RunReport + stageContext to write to disk.
+// runner's StageContext already stores the artifacts[] bytes; here we export a helper to convert them into a map.
 export function buildArtifactMap(
   stages: Array<{ id: string; artifacts: Array<{ name: string; bytes: Uint8Array }> }>,
 ): Map<string, Array<{ name: string; bytes: Uint8Array }>> {
@@ -262,5 +259,5 @@ export function buildArtifactMap(
   return m
 }
 
-// 兼容导入未使用（留着给将来扩展）
+// Compatibility: imported but unused (kept for future extension)
 export type _StageRecord = StageRecord

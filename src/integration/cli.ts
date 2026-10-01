@@ -1,26 +1,27 @@
-// CLI 入口。
+// CLI entry point.
 //
-// 用法：
+// Usage:
 //   deno run -A cli.ts run <entry.ts> [options]
 //
-//   <entry.ts> 必须 export default Suite
+//   <entry.ts> must export default a Suite
 //
 //   options:
-//     --report-dir <path>     默认 ./reports
-//     --run-id <id>           自定义 runId
-//     --filter <glob>         按 stage name 过滤（minimatch 风格）
-//     --fail-fast             失败即停止
-//     --cache-dir <path>      默认 {reportDir}/.cache
-//     --with-cache            严格缓存模式：必须全部命中 cache，缺则报错
-//     --purge                 启动前清空 cache 目录
-//     --no-report             MVP 占位：当前不写报告文件
+//     --report-dir <path>     default ./reports
+//     --run-id <id>           explicit runId
+//     --filter <glob>         filter by stage name (minimatch style)
+//     --fail-fast             stop on first failure
+//     --cache-dir <path>      default {reportDir}/.cache
+//     --with-cache            strict cache mode: all cacheable stages must hit, throw otherwise
+//     --purge                 clear cache dir before run
+//     --no-report             MVP placeholder: do not write report files
 //
-//   另有通用透传参数：-a / --arguments 把 `key=value` 原样收进配置字典，
-//   交给 suite 的回调函数（见 dsl.ts 的 suite）。CLI 不解释这些 key 的语义：
-//     -a debug=true  -a mode=fast   →  { debug: 'true', mode: 'fast' }
-//     -a flag                       →  { flag: '' }
+//   Passthrough args: -a / --arguments collects `key=value` into the config dict
+//   and passes it to the suite callback (see suite in dsl.ts). The CLI does not
+//   interpret the semantics of these keys:
+//     -a debug=true  -a mode=fast   ->  { debug: 'true', mode: 'fast' }
+//     -a flag                       ->  { flag: '' }
 //
-// 默认不启用缓存（刷新执行）。只有传 --with-cache 才走严格缓存恢复。
+// Cache is disabled by default (fresh run). Only --with-cache enables strict cache recovery.
 
 import type { Suite } from './dsl.ts'
 import { _setDeclConfig } from './dsl.ts'
@@ -37,12 +38,12 @@ interface CliArgs {
   withCache: boolean
   purge: boolean
   noReport: boolean
-  /** -a/--arguments 收集的透传配置（非空） */
+  /** Passthrough config collected from -a/--arguments (always non-empty) */
   config: Record<string, string>
   rest: string[]
 }
 
-/** `key=value` → 配置字典；无 `=` 时 value 为空串 */
+/** Parse `key=value` into the config dict; value defaults to empty string when no `=` */
 function addArgument(kv: string, config: Record<string, string>): void {
   const eq = kv.indexOf('=')
   if (eq < 0) {
@@ -98,7 +99,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--no-report':
         out.noReport = true
         break
-      // 通用透传：CLI 不解释 key 的语义，原样交给 suite 回调
+      // Passthrough: the CLI does not interpret key semantics; passes through to suite callback
       case '-a':
       case '--arguments':
         addArgument(argv[++i] ?? '', out.config)
@@ -118,7 +119,7 @@ function parseArgs(argv: string[]): CliArgs {
 function printHelp(): void {
   console.log(
     [
-      'jitex-integration — e2e pipeline runner',
+      'jitex-integration - e2e pipeline runner',
       '',
       'USAGE:',
       '  deno run -A cli.ts run <entry.ts> [options]',
@@ -140,7 +141,7 @@ function printHelp(): void {
   )
 }
 
-// 极简 minimatch：支持 * 和 ?，不支持 **（够用）
+// Minimal minimatch: supports * and ?, not ** (sufficient)
 function globMatch(pattern: string, s: string): boolean {
   const p = pattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
@@ -161,10 +162,10 @@ async function main(argv: string[]): Promise<number> {
     return 2
   }
 
-  // 配置必须在加载入口之前注入：suite() 在 import 期执行，届时它就要读到配置
+  // Config must be injected before loading the entry: suite() runs during import and needs the config then.
   _setDeclConfig(args.config)
 
-  // 动态加载入口
+  // Dynamically load the entry
   const entryUrl = new URL(args.entry, `file://${Deno.cwd()}/`).href
   let mod: { default?: unknown }
   try {
@@ -196,7 +197,6 @@ async function main(argv: string[]): Promise<number> {
 
   const report = await run(suite, opts)
 
-  // 控制台摘要（MVP：不写报告文件）
   const okCount = report.stages.filter((s) => s.status === 'success').length
   const failCount = report.stages.filter((s) => s.status === 'failed').length
   const skipCount = report.stages.filter((s) => s.status === 'skipped').length
@@ -218,10 +218,6 @@ async function main(argv: string[]): Promise<number> {
         console.log(`           ${line}`)
       }
     }
-  }
-
-  if (!args.noReport) {
-    // TODO: reporter.ts — 下一期实现写盘
   }
 
   return report.success ? 0 : 1

@@ -3,7 +3,6 @@ import { emitSNode, structurize, type StructurizeContext } from './structurizer/
 
 export interface ToJsOptions {
   semantic?: SemanticCompiler
-  /** id → 可读名字映射。提供时，生成的变量/函数名变为 v{id}_{name}，便于调试。 */
   debugNames?: Map<number, string>
   debug: boolean
 }
@@ -24,7 +23,6 @@ export interface JsCompiler {
 
 export interface ToJsResult {
   code: string
-  /** 顶层函数的编译名，用于 ES module 的 export 语句 */
   mainName: string
 }
 
@@ -32,8 +30,6 @@ export function toJs(fn: JsonCode.Function, options: ToJsOptions = { debug: fals
   const longJumpTargets = new Set<number>()
   collectLongJumpTargets(fn, longJumpTargets)
 
-  // JSON code 的 id 全局唯一（见 json-code.ts §1），codegen 自造的标识符必须从既有
-  // id 的最大值之后编号，否则会与 var / label / function id 撞名。
   const usedIds = new Set<number>()
   collectUsedIds(fn, usedIds)
 
@@ -53,7 +49,6 @@ function collectLongJumpTargets(fn: JsonCode.Function, out: Set<number>): void {
   }
 }
 
-/** 收集 JSON code 图中出现过的全部 id（var / label / function 共用一个 id 空间） */
 function collectUsedIds(fn: JsonCode.Function, out: Set<number>): void {
   out.add(fn.id)
   for (const id of fn.params) {
@@ -117,16 +112,8 @@ function collectExprIds(expr: JsonCode.Expr, out: Set<number>): void {
   }
 }
 
-/**
- * JS 数字只能精确表示到 2^53-1，再往上自增会停在同一个值上、生成出重名的标识符。
- * 因此 id 触及上限即失败，而不是静默产出重复 id。
- */
 const MAX_ID = Number.MAX_SAFE_INTEGER
 
-/**
- * 不重复 id 生成器：从既有 id 的最大值之后开始分配，供 codegen 自造的标识符
- * （如 __sys 解包变量）使用，保证不与 JSON code 的 id 相撞。
- */
 class IdAllocator {
   private next: number
 
@@ -158,7 +145,6 @@ class IdAllocator {
 }
 
 class JsCompilerImpl implements JsCompiler {
-  /** 走 dispatcher 的 syscall key → 顶层解包变量名（全图共用一个解包） */
   private readonly sysVarNames = new Map<string, string>()
 
   constructor(
@@ -180,22 +166,9 @@ class JsCompilerImpl implements JsCompiler {
     return top ? this.compileMainFunction(fn, indent) : this.compileNestedFunction(fn, indent)
   }
 
-  /**
-   * 顶层函数是工厂，产物柯里化为两个参数：
-   *
-   *   main(__sys)(__ctx) — 注入 syscall 表后返回一个「注入 ctx 才运行」的函数。
-   *
-   * __sys 解包写在最外层：解包结果与 ctx 无关（handler 不绑定 ctx），故可在
-   * 「注入 sys」这一层一次性完成，跨多次运行复用（见 @jitex/runtime 的 exec.ts）。
-   * 状态（locals / 子函数 / 状态机标志）全部留在内层作用域，故每次调用都从干净
-   * 状态开始，互不污染。
-   */
   private compileMainFunction(fn: JsonCode.Function, indent: string): string {
-    // 内层函数体的缩进
     const runIndent = indent + '    '
 
-    // 先编译子函数与函数体：编译过程中登记走 dispatcher 的 syscall key，
-    // 而解包声明必须写在它们之前，所以只能编译完再组装。
     const children = fn.children
       .map((child) => this.compileNestedFunction(child, runIndent))
       .join('\n')
@@ -205,8 +178,6 @@ class JsCompilerImpl implements JsCompiler {
     const lines: string[] = []
     lines.push(`${indent}${this.functionHeader(fn, true)}`)
 
-    // __sys 解包：每个用到的 syscall 只取一次，省掉调用点的属性查找。
-    // key 由 compileExpr 的 dispatcher 回退分支登记（见 syscallVar）。
     for (const [key, name] of this.sysVarNames) {
       lines.push(`${indent}  const ${name} = __sys[${JSON.stringify(key)}];`)
     }
@@ -231,7 +202,6 @@ class JsCompilerImpl implements JsCompiler {
     return lines.join('\n')
   }
 
-  /** 内层函数（子函数）：靠闭包访问外层的 locals、解包变量与 __ctx，无额外形参 */
   private compileNestedFunction(fn: JsonCode.Function, indent: string): string {
     const lines: string[] = []
 
@@ -253,8 +223,6 @@ class JsCompilerImpl implements JsCompiler {
 
   private functionHeader(fn: JsonCode.Function, top: boolean): string {
     const params = fn.params.map((x) => this.compileId(x))
-    // 顶层函数添加 __sys 参数（ES module 导出后由外部注入 syscall 表；
-    // ctx 由返回的内层函数接收，见 compileMainFunction）
     if (top) {
       params.unshift('__sys')
     }
@@ -279,10 +247,6 @@ class JsCompilerImpl implements JsCompiler {
     lines.push(`${indent}  try {`)
     lines.push(`${indent}    switch (__pc) {`)
 
-    // 决策 10A：__pc 初始值 0，但 label ID 从 1 开始。
-    // 插入 case 0: 利用 switch 穿透语义，让 pc=0 落到第一个实际 label
-    // 或顺序执行非 label 的 statement（如变量初始化）。
-    // 前提：label ID 永远不为 0（Analyzer.nextId_ 从 1 起步，满足）。
     lines.push(`${indent}      case 0:`)
 
     for (const stmt of fn.body) {
@@ -348,7 +312,6 @@ class JsCompilerImpl implements JsCompiler {
         return `${this.compileId(expr.functionId)}(${expr.args.map((x) => this.compileExpr(x)).join(', ')})`
 
       case 'literal':
-        // semantic 由 transform 构造本编译器时提供
         return this.options.semantic!.literalToJs(expr, this) ?? this.error(`Unknown literal ${expr.key}`)
 
       case 'syscall': {
@@ -356,15 +319,12 @@ class JsCompilerImpl implements JsCompiler {
         if (js !== undefined) {
           return js
         }
-        // 走 __sys 的实参形态固定为 (ctx, ...args)：ctx 由本层闭包提供
-        // （__ctx 是 __run 的形参），见 compileMainFunction。
         const args = expr.args.map((arg) => this.compileExpr(arg))
         return `${this.syscallVar(expr.key)}(${['__ctx', ...args].join(', ')})`
       }
     }
   }
 
-  /** dispatcher 回退用的解包变量名：同一 key 全图复用一个 */
   private syscallVar(key: string): string {
     const existing = this.sysVarNames.get(key)
     if (existing !== undefined) {

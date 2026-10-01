@@ -1,86 +1,75 @@
 // ISO/IEC 7185:1990 - 6.3 Constant-definitions
 //
-// 章节概括：
-//   constant-definition 引入一个标识符来表示一个值，语法为
-//   constant-definition = identifier '=' constant，其中 constant 可为带符号的 unsigned-number、
-//   constant-identifier，或一个 character-string。规定该标识符在块的 constant-definition-part 中的
-//   出现构成其定义点，region 为整个块；constant 中不得包含该标识符自身的应用出现；该标识符的
-//   每个应用出现均为 constant-identifier，并表示 constant 所表示的值。若 constant 中含符号，
-//   则该 constant-identifier 必须已定义为表示 real 或 integer 类型的值。
-//   required constant-identifiers 见 6.4.2.2 与 6.7.2.2。
 //
-// 子章节：
-//   （无下级子章节）
 
 import { type PascalTest, runPascalTests } from './harness.ts'
 
 const tests: PascalTest[] = [
-  // constant 的三种形式：signed-number、constant-identifier、character-string
   {
-    name: '6.3 整数常量',
+    name: '6.3 integer constant',
     code: `program p(output);
 const N = 42;
 begin
   writeln(N);
 end.`,
-    purpose: 'constant 为 unsigned-number 时表示 integer 值',
+    purpose: 'constant as unsigned-number denotes an integer value',
     expectedOutput: '42\n',
   },
   {
-    name: '6.3 带符号的整数常量',
+    name: '6.3 signed integer constant',
     code: `program p(output);
 const N = -5;
 begin
   writeln(N);
 end.`,
-    purpose: 'constant 可以是带符号的 signed-integer',
+    purpose: 'constant may be a signed signed-integer',
     expectedOutput: '-5\n',
   },
   {
-    name: '6.3 实数常量',
+    name: '6.3 real constant',
     code: `program p(output);
 const R = 2.5;
 begin
   writeln(round(R * 2));
 end.`,
-    purpose: 'constant 为 unsigned-real 时表示 real 值（real 输出格式由实现定义，故转为整数比较）',
+    purpose:
+      'constant as unsigned-real denotes a real value (real output format is implementation-defined, so compare as integer)',
     expectedOutput: '5\n',
   },
   {
-    name: '6.3 字符常量',
+    name: '6.3 character constant',
     code: `program p(output);
 const C = 'A';
 begin
   writeln(C);
 end.`,
-    purpose: 'constant 为单元素 character-string 时表示 char 值',
+    purpose: 'constant as a single-element character-string denotes a char value',
     expectedOutput: 'A\n',
   },
   {
-    name: '6.3 多元素字符常量',
+    name: '6.3 multi-element character constant',
     code: `program p(output);
 const S = 'abc';
 begin
   writeln(S);
 end.`,
-    purpose: 'constant 为多元素 character-string 时表示 string 值，可作为 write 参数',
+    purpose: 'constant as a multi-element character-string denotes a string value, usable as a write argument',
     expectedOutput: 'abc\n',
   },
   {
-    name: '6.3 常量引用已定义的常量',
+    name: '6.3 constant referencing an already-defined constant',
     code: `program p(output);
 const A = 10;
       B = A;
 begin
   writeln(B);
 end.`,
-    purpose: 'constant 可以是 constant-identifier，表示其所表示的同一个值',
+    purpose: 'constant may be a constant-identifier, denoting the same value it denotes',
     expectedOutput: '10\n',
   },
 
-  // 常量的应用：数组边界、case 标签
   {
-    name: '6.3 常量用作数组下标类型的上界',
+    name: '6.3 constant used as upper bound of array index type',
     code: `program p(output);
 const N = 5;
 type T = array[1..N] of integer;
@@ -89,11 +78,11 @@ begin
   a[N] := 9;
   writeln(a[5]);
 end.`,
-    purpose: 'constant-identifier 可作为 index-type 的子界边界',
+    purpose: 'constant-identifier may serve as the subrange bound of an index-type',
     expectedOutput: '9\n',
   },
   {
-    name: '6.3 常量用作 case 标签',
+    name: '6.3 constant used as a case label',
     code: `program p(output);
 const A = 1;
 var x: integer;
@@ -103,91 +92,92 @@ begin
     A: writeln('one');
   end;
 end.`,
-    purpose: 'case-constant 可以是 constant-identifier',
+    purpose: 'case-constant may be a constant-identifier',
     expectedOutput: 'one\n',
   },
 
-  // 反向：constant 的合法形式限制
   {
-    name: '6.3 常量不得是表达式',
+    name: '6.3 constant must not be an expression',
     code: `program p(output);
 const N = 1 + 2;
 begin
   writeln(N);
 end.`,
-    purpose: 'ISO 6.3：constant 只能是带符号的数、constant-identifier 或 character-string，不含表达式',
+    purpose:
+      'ISO 6.3: constant may only be a signed number, constant-identifier, or character-string, not an expression',
     expectedError: '',
   },
   {
-    name: '6.3 常量不得引用自身',
+    name: '6.3 constant must not reference itself',
     code: `program p(output);
 const A = A;
 begin
   writeln(A);
 end.`,
-    purpose: 'ISO 6.3：constant 中不得包含该标识符自身的应用出现',
+    purpose: 'ISO 6.3: constant must not contain an applied occurrence of the identifier itself',
     expectedError: '',
   },
   {
-    name: '6.3 带符号常量必须表示 integer 或 real',
+    name: '6.3 signed constant must denote integer or real',
     code: `program p(output);
 const C = 'a';
       D = -C;
 begin
   writeln(D);
 end.`,
-    purpose: 'ISO 6.3：若 constant 中含符号，则该 constant-identifier 必须已定义为表示 integer 或 real 的值',
+    purpose:
+      'ISO 6.3: if constant contains a sign, the constant-identifier must already be defined to denote an integer or real value',
     expectedError: '',
   },
   {
-    name: '6.3 常量定义缺少等号应报错',
+    name: '6.3 constant definition missing equals sign is an error',
     code: `program p(output);
 const N 1;
 begin
   writeln(N);
 end.`,
-    purpose: 'ISO 6.3：constant-definition = identifier = constant',
+    purpose: 'ISO 6.3: constant-definition = identifier = constant',
     expectedError: '',
   },
   {
-    name: '6.3 常量定义等号右侧缺少常量应报错',
+    name: '6.3 constant definition missing constant after equals sign is an error',
     code: `program p(output);
 const N = ;
 begin
   writeln(N);
 end.`,
-    purpose: 'ISO 6.3：等号右侧须为 constant',
+    purpose: 'ISO 6.3: the right side of the equals sign must be a constant',
     expectedError: '',
   },
   {
-    name: '6.3 常量定义部分存在非法条目应报错',
+    name: '6.3 illegal entry in constant-definition-part is an error',
     code: `program p(output);
 const N = 1; = 2;
 begin
   writeln(N);
 end.`,
-    purpose: 'ISO 6.3：constant-definition-part 中每一项都须以标识符开始',
+    purpose: 'ISO 6.3: every entry in the constant-definition-part must start with an identifier',
     expectedError: '',
   },
   {
-    name: '6.3 布尔字面量可作常量值',
+    name: '6.3 boolean literals may be constant values',
     code: `program p(output);
 const F = true;
 begin
   if F then writeln('T');
 end.`,
-    purpose: 'ISO 6.3/6.4.2.2：true 与 false 是 required constant-identifier，可作 constant',
+    purpose: 'ISO 6.3/6.4.2.2: true and false are required constant-identifiers and may serve as constants',
     expectedOutput: 'T\n',
   },
   {
-    name: '6.3 常量标识符前可带显式符号',
+    name: '6.3 constant-identifier may be prefixed with an explicit sign',
     code: `program p(output);
 const A = 5;
       B = +A;
 begin
   writeln(B);
 end.`,
-    purpose: 'ISO 6.3：constant 允许带符号，操作数为表示 integer/real 的 constant-identifier',
+    purpose: 'ISO 6.3: constants may carry a sign; the operand is a constant-identifier denoting integer/real',
     expectedOutput: '5\n',
   },
 ]

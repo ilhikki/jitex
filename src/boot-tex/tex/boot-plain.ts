@@ -6,13 +6,6 @@ import { ConsoleFile, texFormatKey, texRuntimeSyscalls } from '@jitex/tex-runtim
 import { dviToSvg } from '../../tex-runtime/render/mod.ts'
 import { assert, attach, attachText, stage, type Suite, suite } from '@jitex/integration'
 
-/*
- * boot plain：用自举出来的 jitex 编译器编译 tex.web，建 plain.fmt，再用 plain 排版 story.tex
- * 并渲染成 SVG。
- *
- * 前四段（tangle → tex.js → 素材 → plain.fmt）是 TeX 侧的公共阶段，与 build:jitex 共用，
- * 见 tex/stages.ts。
- */
 function createBootPlainSuite(): Suite {
   return suite('boot plain', ({ debug }) => {
     const isDebug = debug === 'true'
@@ -47,7 +40,7 @@ function createBootPlainSuite(): Suite {
     )
 
     stage('dvi => svg', [validPlainFmtStage, tfmFilesStage], ([{ dviData }, tfmFiles]) => {
-      // 带上 tfm：渲染端据此按规范推进 h（否则位置只能交给渲染端的字体度量）
+      // Pass tfm so the renderer advances h per spec (otherwise positioning is left to the renderer's font metrics).
       const svgs = dviToSvg(dviData, tfmFiles)
       for (const [index, svg] of svgs.entries()) {
         attachText(`story.${index + 1}.svg`, svg)

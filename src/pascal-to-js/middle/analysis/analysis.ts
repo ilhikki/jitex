@@ -68,7 +68,7 @@ function buildAnalysis(
     debugNames: () => new Map(decl.idNames),
     extraCallables: () => ctx.extraCallables,
     // debug 构建开关。它决定 lowering 是否**生成**独立检查语句（步数 / 边界 /
-    // 函数进入钩子）——这些语句的插入位置只有 lowering 知道，所以"是否生成"也由
+    // 函数进入钩子）--这些语句的插入位置只有 lowering 知道，所以"是否生成"也由
     // 它决定，而不是生成之后再由 rewrite 抹掉。
     debug: () => debug,
   }

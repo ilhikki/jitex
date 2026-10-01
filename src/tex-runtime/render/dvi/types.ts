@@ -29,7 +29,7 @@ export interface DviConfig {
    * 字符宽度（sp）；`size` 是该字体在本次作业里的实际尺寸（sp）。
    *
    * 返回 undefined 表示该字体没有度量来源：此时字形不推进 h，位置退化成
-   * "整段交给渲染端的字体度量"——同一行的字形会落成同一个 x，于是被合并进
+   * "整段交给渲染端的字体度量"--同一行的字形会落成同一个 x，于是被合并进
    * 同一个 text 元素。有度量时 h 按规范推进，(h,v) 即绝对位置。
    */
   resolveWidth?(dviFontName: string, charCode: number, size: number): number | undefined
@@ -42,7 +42,7 @@ export type Drawable =
     x: number
     y: number
     /**
-     * 是否紧接上一个字形——其间没有任何位移。
+     * 是否紧接上一个字形--其间没有任何位移。
      * 渲染端可据此把相邻字符合并进同一个 text 元素，字符间距交给字体度量。
      */
     continues: boolean

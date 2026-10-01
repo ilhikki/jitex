@@ -1,15 +1,15 @@
-// DSL 原语与 hook 实现。
+// DSL primitives and hook implementation.
 //
-// 六个原语：stage / suite / cache / assert / attach / log
-//   语法糖：assertEquals / attachText / attachJson
-// 两个 hook：before / after（suite 级）
+// Six primitives: stage / suite / cache / assert / attach / log
+//   Syntactic sugar: assertEquals / attachText / attachJson
+// Two hooks: before / after (suite-level)
 //
-// 类型体操：Unwrap / UnwrapAll 负责从 Stage<X> 元组解包结果元组。
+// Type gymnastics: Unwrap / UnwrapAll unpack result tuples from Stage<X> tuples.
 
 import { requireRunContext, requireStageContext, tryRunContext } from './context.ts'
 import type { Artifact, AssertionRecord } from './context.ts'
 
-// 类型定义
+// Type definitions
 
 export interface Stage<R> {
   readonly __brand: 'Stage'
@@ -37,27 +37,28 @@ export type UnwrapAll<T extends readonly Stage<unknown>[]> = {
   [K in keyof T]: Unwrap<T[K]>
 }
 
-// 声明期全局状态（suite 注册用）
+// Declaration-phase global state (for suite registration)
 
 let currentDeclSuite: Suite | undefined = undefined
 let nextStageId = 1
 
 /**
- * 声明期配置：CLI 的任意 `--key[=value]` 都会解析进这里。
+ * Declaration-phase config: any `--key[=value]` from the CLI is parsed into this.
  *
- * 必须在动态 import 入口（即触发 suite() 调用）之前注入；suite 会把同一个
- * 对象交给它的回调。未注入时是空对象，因此回调参数**保证非空**。
+ * Must be injected before the dynamic import of the entry (which triggers the
+ * suite() call); suite hands the same object to its callback. When not injected
+ * it is an empty object, so the callback parameter is guaranteed non-empty.
  */
 let declConfig: Record<string, string> = {}
 
-/** 声明期（suite 回调）产生的日志：此时 run 还没建立，先缓冲 */
+/** Logs produced during the declaration phase (suite callback): the run is not yet established, so buffer them first */
 const pendingDeclLogs: string[] = []
 
 export function _setDeclConfig(config: Record<string, string>): void {
   declConfig = config
 }
 
-/** runner 用：run 建立后取走声明期日志，灌入 run 级日志 */
+/** For runner: after the run is established, take the declaration-phase logs and feed them into run-level logs */
 export function _drainDeclLogs(): string[] {
   return pendingDeclLogs.splice(0)
 }
@@ -70,8 +71,9 @@ export function _resetDeclState(): void {
 // suite
 
 /**
- * 声明一个 suite。`fn` 立即执行以登记 stages/hooks，参数是本次 run 的配置
- * （CLI 的 `--key[=value]` 解析结果，形如 `{debug: 'false'}`），永远非空。
+ * Declare a suite. `fn` runs immediately to register stages/hooks; its argument
+ * is the config for this run (parsed from CLI `--key[=value]`, e.g.
+ * `{debug: 'false'}`), always non-empty.
  */
 export function suite(name: string, fn: (config: Record<string, string>) => void): Suite {
   if (currentDeclSuite) {
@@ -118,7 +120,7 @@ export function stage<const T extends readonly Stage<unknown>[], R>(
   return stageObj
 }
 
-// cache（显式标记）
+// cache (explicit marking)
 
 export function cache<R extends CacheableRecord>(stage: Stage<R>): Stage<R> {
   if (!currentDeclSuite) {
@@ -144,7 +146,7 @@ export function after(fn: () => void | Promise<void>): void {
   currentDeclSuite.afterFn = fn
 }
 
-// assert 系列
+// assert family
 
 export class AssertionError extends Error {
   override name = 'AssertionError'
@@ -170,7 +172,7 @@ export function assertEquals<T>(actual: T, expected: T, message?: string): void 
   }
 }
 
-// attach 系列
+// attach family
 
 export function attach(name: string, bytes: Uint8Array): void {
   const ctx = requireStageContext()
@@ -190,10 +192,11 @@ export function attachJson(name: string, obj: unknown): void {
 // log
 
 /**
- * 输出一行日志。三个位置都能直接调用，不需要自己判断身处哪一层：
- *   - stage fn 内 → 当前 stage 的日志；
- *   - before / after hook 内 → run 级日志；
- *   - suite 回调（声明期，run 尚未建立）→ 先缓冲，run 开始时灌入 run 级日志。
+ * Emit a log line. Can be called directly from three places without needing to
+ * know which layer you are in:
+ *   - inside a stage fn -> current stage's logs;
+ *   - inside a before / after hook -> run-level logs;
+ *   - inside the suite callback (declaration phase, run not yet established) -> buffered first, fed into run-level logs when the run starts.
  */
 export function log(message: string): void {
   const run = tryRunContext()
@@ -208,7 +211,7 @@ export function log(message: string): void {
   run.log(message)
 }
 
-// 供 runner 用：确认在 run 内但不在 stage 内（hook 期安全检查）
+// For runner: ensure we are inside a run but not inside a stage (hook-phase safety check)
 
 export function _ensureNoActiveStage(): void {
   const run = requireRunContext()

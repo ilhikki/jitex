@@ -16,7 +16,7 @@ export interface PlainDviHooks {
  * plain.tex 的字体映射：CM 字体名 + OT1/cmmi/cmsy/cmex 码位表 + TFM 字符宽度。
  *
  * `fonts` 是随发布提供的度量源（键为 `cmr10.tfm` 这类文件名）。缺了它同样能跑，
- * 只是 h 不推进——位置退化成"整段交给渲染端的字体度量"。
+ * 只是 h 不推进--位置退化成"整段交给渲染端的字体度量"。
  */
 export function createPlainDviConfig(
   fonts: Record<string, Uint8Array> = {},

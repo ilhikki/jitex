@@ -1,17 +1,6 @@
 // ISO/IEC 7185:1990 - 6.4 Type-definitions
 //
-// 章节概括：
-//   type-definition 引入标识符表示一个类型，语法为 type-definition = identifier '=' type-denoter，
-//   type-denoter 为 type-identifier 或 new-type（new-ordinal-type / new-structured-type / new-pointer-type）；
-//   每个 new-type 的出现都表示一个与其他任何 new-type 都不同的类型。标识符在块的 type-definition-part
-//   中的出现构成定义点（region 为块）；除 new-pointer-type 的 domain-type 中的应用出现外，
-//   type-denoter 不得含该标识符的应用出现。子条款进一步规定：simple-types（required simple-types
-//   integer/real/Boolean/char 的语义，以及 enumerated-types、subrange-types）；structured-types 的通用规则
-//   （packed 表示及 array/record/set/file 四类，其中 file-types 含 textfile）；pointer-types
-//   （单个 nil 值与一集 identifying-value，仅由 new 创建）；compatible types 的四条情形；
-//   assignment-compatibility 的五条情形及 integer 到 real 的隐式转换。
 //
-// 子章节：
 //   6.4.1 General
 //   6.4.2 Simple-types
 //     6.4.2.1 General
@@ -32,41 +21,43 @@
 import { type PascalTest, runPascalTests } from './harness.ts'
 
 const tests: PascalTest[] = [
-  // 6.4.1 General — type-definition 与 new-type 的相互区别
-
   {
-    name: '6.4.1 type-definition 引入类型标识符（integer 的别名）',
+    name: '6.4.1 type-definition introduces a type identifier (alias for integer)',
     code: 'program test(output); type T = integer; var a: T; begin a := 5; writeln(a); end.',
-    purpose: '6.4.1：type-definition 用标识符 T 表示 integer，a 具有该类型',
+    purpose: '6.4.1: type-definition uses identifier T to denote integer; a has that type',
     expectedOutput: '5\n',
   },
   {
-    name: '6.4.1 type-denoter 可以是已定义的类型标识符',
+    name: '6.4.1 type-denoter may be an already-defined type identifier',
     code: 'program test(output); type A = 1..5; B = A; var v: B; begin v := 3; writeln(v); end.',
-    purpose: '6.4.1：type-denoter = type-identifier，B 与 A 表示同一个类型',
+    purpose: '6.4.1: type-denoter = type-identifier; B and A denote the same type',
     expectedOutput: '3\n',
   },
   {
-    name: '6.4.1 两次出现同一 new-type 表示不同类型，但同源子界彼此兼容',
+    name:
+      '6.4.1 two occurrences of the same new-type denote distinct types, but subranges of the same host are compatible',
     code: 'program test(output); type T1 = 1..10; T2 = 1..10; var a: T1; b: T2; begin a := 4; b := a; writeln(b); end.',
-    purpose: '6.4.1 每个 new-type 出现表示不同类型；6.4.5 b 二者都是 integer 的子界故兼容，赋值合法',
+    purpose:
+      '6.4.1 each occurrence of new-type denotes a distinct type; 6.4.5 b both are subranges of integer hence compatible, assignment is legal',
     expectedOutput: '4\n',
   },
   {
-    name: '6.4.1 两个不同的 record new-type 之间不可赋值',
+    name: '6.4.1 two distinct record new-types are not assignable',
     code:
       'program test; type A = record x: integer end; B = record x: integer end; var a: A; b: B; begin a.x := 1; b := a; end.',
-    purpose: '6.4.1 + 6.4.6 a：A、B 是互不相同的 new-type，既非同一类型也不兼容，赋值是错误',
+    purpose:
+      '6.4.1 + 6.4.6 a: A and B are distinct new-types, neither the same type nor compatible; assignment is an error',
     expectedError: '',
   },
   {
-    name: '6.4.1 type-denoter 不得自引用（array 组件为自身）',
+    name: '6.4.1 type-denoter must not self-reference (array component is itself)',
     code: 'program test; type T = array[1..2] of T; var a: T; begin a[1] := 1; end.',
-    purpose: '6.4.1：除 new-pointer-type 的 domain-type 外，type-denoter 不得含自身标识符的应用出现',
+    purpose:
+      '6.4.1: except for the domain-type of a new-pointer-type, a type-denoter must not contain an applied occurrence of its own identifier',
     expectedError: '',
   },
   {
-    name: '6.4.1 new-pointer-type 的 domain-type 可前向引用（递归记录）',
+    name: '6.4.1 the domain-type of a new-pointer-type may forward-reference (recursive record)',
     code: `program test(output);
 type
   P = ^Node;
@@ -78,20 +69,22 @@ begin
   q^.value := 7;
   writeln(q^.value);
 end.`,
-    purpose: '6.4.1/6.2.2.9：pointer-type 的 domain-type 允许引用尚未定义的类型，从而表达递归类型',
+    purpose:
+      '6.4.1/6.2.2.9: the domain-type of a pointer-type may reference a not-yet-defined type, thus expressing recursive types',
     expectedOutput: '7\n',
   },
   {
-    name: '6.4.1 非指针类型不得前向引用',
+    name: '6.4.1 non-pointer types must not forward-reference',
     code: 'program test; type A = array[1..2] of B; B = integer; var a: A; begin a[1] := 1; end.',
-    purpose: '6.2.2.9（与 6.4.1 的指针例外相对）：A 的定义中引用尚未定义的类型 B，是错误',
+    purpose:
+      '6.2.2.9 (as opposed to the pointer exception in 6.4.1): the definition of A references the not-yet-defined type B, which is an error',
     expectedError: '',
   },
 
   // 6.4.2.2 Required simple-types
 
   {
-    name: '6.4.2.2 四个 required simple-types 可作 type-denoter',
+    name: '6.4.2.2 the four required simple-types may serve as type-denoter',
     code: `program test(output);
 type
   I = integer; R = real; Bt = Boolean; C = char;
@@ -107,65 +100,67 @@ begin
   if bv then writeln('b-ok');
   writeln(cv);
 end.`,
-    purpose: '6.4.2.2：integer/real/Boolean/char 均存在且可作类型标识符使用',
+    purpose: '6.4.2.2: integer/real/Boolean/char all exist and may be used as type identifiers',
     expectedOutput: '3\n3\nb-ok\nx\n',
   },
   {
-    name: '6.4.2.2 real 不是 ordinal-type，不能作 subrange 边界',
+    name: '6.4.2.2 real is not an ordinal-type and cannot serve as a subrange bound',
     code: 'program test; type T = 1.0..2.0; var a: T; begin a := 1.5; end.',
-    purpose: '6.4.2.4：subrange 的两个常量须同属一个 ordinal-type，而 real 不是 ordinal-type',
+    purpose:
+      '6.4.2.4: the two constants of a subrange must belong to the same ordinal-type, and real is not an ordinal-type',
     expectedError: '',
   },
   {
-    name: '6.4.2.2 real 不能作数组的 index-type',
+    name: '6.4.2.2 real cannot serve as the index-type of an array',
     code: 'program test; var a: array[real] of integer; r: real; begin r := 1.0; a[r] := 1; end.',
-    purpose: '6.4.3.2：index-type 必须是 ordinal-type，real 不满足',
+    purpose: '6.4.3.2: index-type must be an ordinal-type; real does not satisfy this',
     expectedError: '',
   },
   {
-    name: '6.4.2.2 Boolean 中 false 是 true 的前驱',
+    name: '6.4.2.2 in Boolean, false is the predecessor of true',
     code: "program test(output); begin if false < true then writeln('ok'); end.",
-    purpose: '6.4.2.2 c：false 是 true 的前驱，二者序数为 0 与 1',
+    purpose: '6.4.2.2 c: false is the predecessor of true; their ordinals are 0 and 1',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.4.2.2 char 的数字与大小写字母各自有序',
+    name: '6.4.2.2 digits and upper/lowercase letters of char are each ordered',
     code: "program test(output); begin if ('0' < '9') and ('A' < 'Z') and ('a' < 'z') then writeln('ok'); end.",
-    purpose: '6.4.2.2 d：数字 0..9 数值有序、A..Z 与 a..z 字典有序',
+    purpose: '6.4.2.2 d: digits 0..9 are numerically ordered; A..Z and a..z are lexicographically ordered',
     expectedOutput: 'ok\n',
   },
 
   // 6.4.2.3 Enumerated-types
 
   {
-    name: '6.4.2.3 枚举常量的序数从 0 起连续',
+    name: '6.4.2.3 enumeration constants have consecutive ordinals starting from 0',
     code: 'program test(output); type Color = (red, green, blue); begin writeln(ord(red), ord(green), ord(blue)); end.',
-    purpose: '6.4.2.3 NOTE：枚举常量按定义顺序获得从 0 开始的连续序数',
+    purpose: '6.4.2.3 NOTE: enumeration constants receive consecutive ordinals starting from 0 in declaration order',
     expectedOutput: '012\n',
   },
   {
-    name: '6.4.2.3 枚举常量按定义顺序排序',
+    name: '6.4.2.3 enumeration constants are ordered by declaration order',
     code:
       "program test(output); type Color = (red, green, blue); begin if (red < green) and (green < blue) then writeln('ok'); end.",
-    purpose: '6.4.2.1：ordinal-type 的序关系与其序数一致（6.4.2.3 依次递增）',
+    purpose: '6.4.2.1: the ordering relation of an ordinal-type matches its ordinals (6.4.2.3 increasing in order)',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.4.2.3 succ/pred 作用于枚举值',
+    name: '6.4.2.3 succ/pred applied to enumeration values',
     code:
       'program test(output); type Color = (red, green, blue); begin writeln(ord(succ(red))); writeln(ord(pred(blue))); end.',
-    purpose: '6.4.2.3+6.7.2.2：枚举类型的后继与前驱沿序数递增/递减',
+    purpose:
+      '6.4.2.3+6.7.2.2: successor and predecessor of an enumerated type move along increasing/decreasing ordinals',
     expectedOutput: '1\n1\n',
   },
   {
-    name: '6.4.2.3 枚举类型可作数组 index-type',
+    name: '6.4.2.3 enumerated type may serve as array index-type',
     code:
       'program test(output); type Color = (red, green, blue); var a: array[Color] of integer; begin a[red] := 1; a[blue] := 3; writeln(a[red], a[blue]); end.',
-    purpose: '6.4.3.2：index-type 为 ordinal-type，枚举类型满足',
+    purpose: '6.4.3.2: index-type is an ordinal-type; enumerated types satisfy this',
     expectedOutput: '13\n',
   },
   {
-    name: '6.4.2.3 枚举常量可作 case-constant',
+    name: '6.4.2.3 enumeration constants may serve as case-constants',
     code: `program test(output);
 type Color = (red, green, blue);
 var c: Color; n: integer;
@@ -178,11 +173,12 @@ begin
   end;
   writeln(n);
 end.`,
-    purpose: '6.4.2.3：枚举常量是 constant-identifier，可作 case-constant 且类型兼容 tag 表达式',
+    purpose:
+      '6.4.2.3: enumeration constants are constant-identifiers, usable as case-constants and type-compatible with the tag expression',
     expectedOutput: '2\n',
   },
   {
-    name: '6.4.2.3 枚举类型变量的赋值与比较',
+    name: '6.4.2.3 assignment and comparison of enumerated type variables',
     code: `program test(output);
 type Color = (red, green, blue);
 var a, b: Color;
@@ -192,22 +188,23 @@ begin
   if a <> b then writeln('different');
   if a = red then writeln('red');
 end.`,
-    purpose: '6.4.2.3：枚举常量可赋给同类型变量，同类型值可比较',
+    purpose: '6.4.2.3: enumeration constants may be assigned to same-type variables; same-type values may be compared',
     expectedOutput: 'different\nred\n',
   },
   {
-    name: '6.4.2.3 整数字面量不可赋给枚举类型变量',
+    name: '6.4.2.3 integer literals cannot be assigned to enumerated type variables',
     code: `program test;
 type Color = (red, green, blue);
 var c: Color;
 begin
   c := 5;
 end.`,
-    purpose: '6.4.2.3 + 6.4.6：枚举类型只能取该枚举类型的值，integer 与其不满足赋值兼容',
+    purpose:
+      '6.4.2.3 + 6.4.6: an enumerated type can only take values of that enumerated type; integer is not assignment-compatible with it',
     expectedError: '',
   },
   {
-    name: '6.4.2.3 不同枚举类型之间不可赋值',
+    name: '6.4.2.3 assignment between different enumerated types is not allowed',
     code: `program test;
 type Color = (red, green, blue);
      Light = (on, off);
@@ -216,32 +213,32 @@ var c: Color;
 begin
   c := l;
 end.`,
-    purpose: '6.4.1 + 6.4.6：两个枚举类型互不相同，彼此不赋值兼容',
+    purpose: '6.4.1 + 6.4.6: two enumerated types are distinct and not assignment-compatible with each other',
     expectedError: '',
   },
 
   // 6.4.2.4 Subrange-types
 
   {
-    name: '6.4.2.4 整数子界类型的赋值',
+    name: '6.4.2.4 assignment of integer subrange type',
     code: 'program test(output); type T = 1..10; var a: T; begin a := 5; writeln(a); end.',
-    purpose: '6.4.2.4：子界 1..10 的 host-type 为 integer，可赋值范围内值',
+    purpose: '6.4.2.4: the host-type of subrange 1..10 is integer; in-range values may be assigned',
     expectedOutput: '5\n',
   },
   {
-    name: '6.4.2.4 负边界的子界',
+    name: '6.4.2.4 subrange with negative bounds',
     code: 'program test(output); type T = -10..10; var a: T; begin a := -10; writeln(a); a := 10; writeln(a); end.',
-    purpose: '6.4.2.4：subrange 边界常量可带符号（-10..10）',
+    purpose: '6.4.2.4: subrange bound constants may carry signs (-10..10)',
     expectedOutput: '-10\n10\n',
   },
   {
-    name: '6.4.2.4 字符子界',
+    name: '6.4.2.4 character subrange',
     code: "program test(output); type T = 'A'..'Z'; var c: T; begin c := 'M'; writeln(c); end.",
-    purpose: '6.4.2.4：char 是 ordinal-type，字符子界以字符常量为边界',
+    purpose: '6.4.2.4: char is an ordinal-type; character subranges use character constants as bounds',
     expectedOutput: 'M\n',
   },
   {
-    name: '6.4.2.4 枚举子界（host-type 为枚举类型）',
+    name: '6.4.2.4 enumerated subrange (host-type is enumerated type)',
     code: `program test(output);
 type Color = (red, green, blue); Sunny = red..blue;
 var c: Sunny;
@@ -249,73 +246,73 @@ begin
   c := blue;
   writeln(ord(c));
 end.`,
-    purpose: '6.4.2.4：subrange 的 host-type 可为枚举类型，取值限于边界之间',
+    purpose: '6.4.2.4: the host-type of a subrange may be an enumerated type; values are limited to between the bounds',
     expectedOutput: '2\n',
   },
   {
-    name: '6.4.2.4 单值子界',
+    name: '6.4.2.4 single-value subrange',
     code: 'program test(output); type T = 5..5; var a: T; begin a := 5; writeln(a); end.',
-    purpose: '6.4.2.4：第一个常量须小于或等于第二个，5..5 合法',
+    purpose: '6.4.2.4: the first constant must be less than or equal to the second; 5..5 is legal',
     expectedOutput: '5\n',
   },
   {
-    name: '6.4.2.4 下界大于上界的子界是错误',
+    name: '6.4.2.4 a subrange with lower bound greater than upper bound is an error',
     code: 'program test; type T = 10..1; var a: T; begin a := 1; end.',
-    purpose: '6.4.2.4：第一个常量（最小値）须小于或等于第二个常量',
+    purpose: '6.4.2.4: the first constant (minimum) must be less than or equal to the second constant',
     expectedError: '',
   },
   {
-    name: '6.4.2.4 子界两个边界常量必须同属一个 ordinal-type',
+    name: '6.4.2.4 the two bound constants of a subrange must belong to the same ordinal-type',
     code: "program test; type T = 'a'..5; var a: T; begin a := 'a'; end.",
-    purpose: '6.4.2.4：两个常量须为同一 ordinal-type，char 与 integer 混用是错误',
+    purpose: '6.4.2.4: the two constants must be of the same ordinal-type; mixing char and integer is an error',
     expectedError: '',
   },
 
-  // 6.4.3.1 General — packed
-
   {
-    name: '6.4.3.1 packed array 的取值与访问不受 packed 影响',
+    name: '6.4.3.1 the values and access of a packed array are unaffected by packed',
     code: 'program test(output); var a: packed array[1..3] of integer; begin a[1] := 5; writeln(a[1]); end.',
-    purpose: '6.4.3.1：packed 只影响 data-storage 表示，不改变类型的值与分量对应关系',
+    purpose:
+      '6.4.3.1: packed only affects the data-storage representation; it does not change the values of the type or the component correspondence',
     expectedOutput: '5\n',
   },
 
   // 6.4.3.2 Array-types
 
   {
-    name: '6.4.3.2 Boolean 作为 index-type',
+    name: '6.4.3.2 Boolean as index-type',
     code:
       'program test(output); var a: array[boolean] of integer; begin a[false] := 0; a[true] := 1; writeln(a[false], a[true]); end.',
-    purpose: '6.4.3.2：index-type 为 ordinal-type，Boolean 的两个值各对应一个分量',
+    purpose: '6.4.3.2: index-type is an ordinal-type; the two values of Boolean each correspond to one component',
     expectedOutput: '01\n',
   },
   {
-    name: '6.4.3.2 char 作为 index-type（按具体字符索引，不假设字符集范围）',
+    name: '6.4.3.2 char as index-type (index by specific character, no charset range assumption)',
     code:
       "program test(output); var a: array[char] of integer; begin a['A'] := 1; a['B'] := 2; writeln(a['A'], a['B']); end.",
-    purpose: '6.4.3.2：index-type 为 char，各分量由 index-type 的取值逐一映射',
+    purpose: '6.4.3.2: index-type is char; each component is mapped one-to-one by the values of the index-type',
     expectedOutput: '12\n',
   },
   {
-    name: '6.4.3.2 多维 index-type 的缩写形式',
+    name: '6.4.3.2 abbreviated form of multi-dimensional index-type',
     code:
       'program test(output); var a: array[1..2, 1..2] of integer; begin a[1,1] := 1; a[1,2] := 2; a[2,1] := 3; a[2,2] := 4; writeln(a[1,1], a[1,2]); writeln(a[2,1], a[2,2]); end.',
-    purpose: '6.4.3.2：array[1..2, 1..2] 是 array[1..2] of array[1..2] 的缩写，全形式与缩写形式等价',
+    purpose:
+      '6.4.3.2: array[1..2, 1..2] is an abbreviation of array[1..2] of array[1..2]; the full and abbreviated forms are equivalent',
     expectedOutput: '12\n34\n',
   },
   {
-    name: '6.4.3.2 缩写形式 a[i,j] 与全形式 a[i][j] 指同一分量',
+    name: '6.4.3.2 abbreviated a[i,j] and full a[i][j] denote the same component',
     code: `program test(output);
 var a: array[1..2, 1..2] of integer;
 begin
   a[1][2] := 7;
   writeln(a[1,2] + a[1][2]);
 end.`,
-    purpose: '6.4.3.2：两种写法表示同一分量，相加应为 7+7',
+    purpose: '6.4.3.2: both notations denote the same component; the sum should be 7+7',
     expectedOutput: '14\n',
   },
   {
-    name: '6.4.3.2 component-type 可为 record',
+    name: '6.4.3.2 component-type may be record',
     code: `program test(output);
 type Point = record x, y: integer end;
 var a: array[1..2] of Point;
@@ -324,32 +321,32 @@ begin
   a[2].y := 4;
   writeln(a[1].x, a[2].y);
 end.`,
-    purpose: '6.4.3.2：component-type 是任意 type-denoter，可取 record-type',
+    purpose: '6.4.3.2: component-type is any type-denoter and may be a record-type',
     expectedOutput: '14\n',
   },
   {
-    name: '6.4.3.2 数组下标超出 index-type 是错误',
+    name: '6.4.3.2 array index outside index-type is an error',
     code: 'program test; var a: array[1..3] of integer; begin a[5] := 10; end.',
-    purpose: '6.4.3.2+6.4.6 c：5 与 index-type 1..3 兼容但不在其闭区间内，是错误',
+    purpose:
+      '6.4.3.2+6.4.6 c: 5 is compatible with index-type 1..3 but not within its closed interval, which is an error',
     expectedError: '',
   },
 
-  // 6.4.3.2 Array-types — string-type（packed array[1..n] of char）
-
   {
-    name: '6.4.3.2 string-type 的逐字符访问',
+    name: '6.4.3.2 character-by-character access of string-type',
     code: "program test(output); var s: packed array[1..5] of char; begin s := 'hello'; write(s[1]); write(s[5]); end.",
-    purpose: '6.4.3.2：string-type 的分量与字符串元素按 index 递增一一对应',
+    purpose: '6.4.3.2: the components of a string-type correspond one-to-one with string elements by increasing index',
     expectedOutput: 'ho',
   },
   {
-    name: '6.4.3.2 string-type 整体写出',
+    name: '6.4.3.2 writing string-type as a whole',
     code: "program test(output); var s: packed array[1..5] of char; begin s := 'hello'; writeln(s); end.",
-    purpose: '6.9.3.6+6.4.3.2：string-type 的值可整体写出，默认宽度为分量数',
+    purpose:
+      '6.9.3.6+6.4.3.2: the value of a string-type may be written as a whole; the default width is the number of components',
     expectedOutput: 'hello\n',
   },
   {
-    name: '6.4.5 d 分量数相同的两个 string-type 之间可赋值',
+    name: '6.4.5 d assignment between two string-types with the same number of components is allowed',
     code: `program test(output);
 type A3 = packed array[1..3] of char; B3 = packed array[1..3] of char;
 var a: A3; b: B3;
@@ -358,40 +355,42 @@ begin
   b := a;
   writeln(b);
 end.`,
-    purpose: '6.4.5 d+6.4.6 e：A3、B3 是互不相同的 new-type，但同为 3 分量 string-type 故兼容',
+    purpose:
+      '6.4.5 d+6.4.6 e: A3 and B3 are distinct new-types, but both are 3-component string-types hence compatible',
     expectedOutput: 'abc\n',
   },
   {
-    name: '6.4.3.2 分量数不同的 string-type 之间不可赋值',
+    name: '6.4.3.2 assignment between string-types with different numbers of components is not allowed',
     code: "program test(output); var s: packed array[1..10] of char; begin s := 'hello'; writeln(s); end.",
-    purpose: "6.1.7/'hello' 为 5 分量 string-type；6.4.5 d 只兼容分量数相同的 string-type，故赋值是错误",
+    purpose:
+      "6.1.7: 'hello' is a 5-component string-type; 6.4.5 d only makes string-types with the same number of components compatible, so the assignment is an error",
     expectedError: '',
   },
 
   // 6.4.3.3 Record-types
 
   {
-    name: '6.4.3.3 固定部分的字段读写',
+    name: '6.4.3.3 reading and writing fields of the fixed part',
     code:
       'program test(output); type Point = record x, y: integer end; var p: Point; begin p.x := 10; p.y := 20; writeln(p.x, p.y); end.',
-    purpose: '6.4.3.3：record-section 的每个 field-identifier 关联一个独立分量',
+    purpose: '6.4.3.3: each field-identifier in a record-section is associated with a distinct component',
     expectedOutput: '1020\n',
   },
   {
-    name: '6.4.3.3 空 field-list 的 record 只有单个 null 值',
+    name: '6.4.3.3 a record with an empty field-list has only a single null value',
     code: "program test(output); type Empty = record end; var e: Empty; begin writeln('ok'); end.",
-    purpose: '6.4.3.3：既无 fixed-part 又无 variant-part 的 field-list 为空，是合法类型',
+    purpose: '6.4.3.3: a field-list with neither a fixed-part nor a variant-part is empty, which is a legal type',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.4.3.3 嵌套 record',
+    name: '6.4.3.3 nested record',
     code:
       'program test(output); type Point = record x, y: integer end; Circle = record center: Point; radius: integer end; var c: Circle; begin c.center.x := 10; c.center.y := 20; c.radius := 5; writeln(c.center.x, c.center.y); end.',
-    purpose: '6.4.3.3：record-section 的 type-denoter 可取另一 record-type',
+    purpose: '6.4.3.3: the type-denoter of a record-section may be another record-type',
     expectedOutput: '1020\n',
   },
   {
-    name: '6.4.3.3 同一 record 类型整体赋值',
+    name: '6.4.3.3 whole-record assignment of the same record type',
     code: `program test(output);
 type Point = record x, y: integer end;
 var p, q: Point;
@@ -401,11 +400,12 @@ begin
   q := p;
   writeln(q.x, q.y);
 end.`,
-    purpose: '6.4.6 a：T1 与 T2 为同一 record 类型且可作 file 分量类型，整体赋值合法',
+    purpose:
+      '6.4.6 a: T1 and T2 are the same record type and may serve as file component types; whole assignment is legal',
     expectedOutput: '34\n',
   },
   {
-    name: '6.4.3.3 带 tag-field 的 variant-part：设置 tag 使变体激活后可访问其字段',
+    name: '6.4.3.3 variant-part with tag-field: setting the tag activates the variant and its fields become accessible',
     code: `program test(output);
 type
   shape = (circle, square);
@@ -420,11 +420,12 @@ begin
   f.radius := 5;
   writeln(f.radius);
 end.`,
-    purpose: '6.4.3.3：selector 为 field，其值使对应变体 active，可读写该变体的分量',
+    purpose:
+      '6.4.3.3: the selector is a field; its value activates the corresponding variant, and the components of that variant may be read and written',
     expectedOutput: '5\n',
   },
   {
-    name: '6.4.3.3 无 tag-field 的 variant-part：访问分量时 selector 取关联值',
+    name: '6.4.3.3 variant-part without tag-field: accessing a component makes the selector take the associated value',
     code: `program test(output);
 type
   four_choices = 1..4;
@@ -440,14 +441,15 @@ begin
   m.int_field := 42;
   writeln(m.int_field);
 end.`,
-    purpose: '6.5.3.3：selector 不是 field 时，对某变体分量的访问把关联值赋给 selector 使其激活',
+    purpose:
+      '6.5.3.3: when the selector is not a field, accessing a variant component assigns the associated value to the selector to activate it',
     expectedOutput: '42\n',
   },
 
   // 6.4.3.4 Set-types
 
   {
-    name: '6.4.3.4 set of 子界的构造与 in 运算',
+    name: '6.4.3.4 constructing a set of subrange and the in operation',
     code: `program test(output);
 type S = set of 1..10;
 var a: S;
@@ -456,11 +458,11 @@ begin
   if 4 in a then writeln('4');
   if 5 in a then writeln('5') else writeln('no-5');
 end.`,
-    purpose: '6.4.3.4：set-type 的值是 base-type 值的幂集，in 判断成员资格',
+    purpose: '6.4.3.4: the value of a set-type is the power set of base-type values; in tests membership',
     expectedOutput: '4\nno-5\n',
   },
   {
-    name: '6.4.3.4 set of 枚举类型',
+    name: '6.4.3.4 set of enumerated type',
     code: `program test(output);
 type Color = (red, green, blue);
 var s: set of Color;
@@ -469,17 +471,17 @@ begin
   if red in s then writeln('red');
   if green in s then writeln('green') else writeln('no-green');
 end.`,
-    purpose: '6.4.3.4：base-type 为 ordinal-type，枚举类型满足',
+    purpose: '6.4.3.4: base-type is an ordinal-type; enumerated types satisfy this',
     expectedOutput: 'red\nno-green\n',
   },
   {
-    name: '6.4.3.4 base-type 必须是 ordinal-type，set of real 是错误',
+    name: '6.4.3.4 base-type must be an ordinal-type; set of real is an error',
     code: 'program test; type S = set of real; var a: S; begin a := []; end.',
-    purpose: '6.4.3.4：base-type = ordinal-type，real 不是 ordinal-type',
+    purpose: '6.4.3.4: base-type = ordinal-type; real is not an ordinal-type',
     expectedError: '',
   },
   {
-    name: '6.4.3.4 base-type 兼容的 set 之间可赋值（成员在目标区间内）',
+    name: '6.4.3.4 assignment between sets with compatible base-type is allowed (members within target range)',
     code: `program test(output);
 type S1 = set of 1..10; S2 = set of 1..5;
 var a: S1; b: S2;
@@ -488,11 +490,12 @@ begin
   b := a;
   if 3 in b then writeln('ok');
 end.`,
-    purpose: '6.4.5 c+6.4.6 d：1..5 与 1..10 同为 integer 子界故兼容，且成员 3 在目标 base-type 区间内',
+    purpose:
+      '6.4.5 c+6.4.6 d: 1..5 and 1..10 are both integer subranges hence compatible, and member 3 is within the target base-type range',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.4.3.4 packed set 的构造与 in 运算',
+    name: '6.4.3.4 constructing a packed set and the in operation',
     code: `program test(output);
 type S = packed set of 1..5;
 var a: S;
@@ -500,14 +503,14 @@ begin
   a := [1, 5];
   if 5 in a then writeln('ok');
 end.`,
-    purpose: '6.4.3.1+6.4.3.4：packed set-type 的取值与 set 运算不受 packed 影响',
+    purpose: '6.4.3.1+6.4.3.4: the values and set operations of a packed set-type are unaffected by packed',
     expectedOutput: 'ok\n',
   },
 
   // 6.4.3.5 File-types
 
   {
-    name: '6.4.3.5 record-type 可以作 file 的分量类型',
+    name: '6.4.3.5 record-type may serve as the component type of a file',
     code: `program test(f);
 type
   Point = record x, y: integer end;
@@ -523,38 +526,39 @@ begin
   p := f^;
   writeln(p.x, p.y);
 end.`,
-    purpose: '6.4.3.5：component-type 可为任意 permissible 的 type-denoter，record-type 满足',
+    purpose: '6.4.3.5: component-type may be any permissible type-denoter; record-type satisfies this',
     expectedOutput: '42\n',
   },
   {
-    name: '6.4.3.5 file-type 的分量类型不得是 file-type',
+    name: '6.4.3.5 the component type of a file-type must not be a file-type',
     code: 'program test; type F = file of integer; G = file of F; var g: G; begin rewrite(g); end.',
-    purpose: '6.4.3.5：denote file-type 的 type-denoter 不可作分量类型',
+    purpose: '6.4.3.5: a type-denoter denoting a file-type must not serve as a component type',
     expectedError: '',
   },
 
   // 6.4.4 Pointer-types
 
   {
-    name: '6.4.4 nil 值的赋值与比较',
+    name: '6.4.4 nil value assignment and comparison',
     code: "program test(output); type TP = ^integer; var p: TP; begin p := nil; if p = nil then writeln('nil'); end.",
-    purpose: '6.4.4：pointer-type 的值集含唯一的 nil-value，token nil 表示它',
+    purpose: '6.4.4: the value set of a pointer-type contains the unique nil-value; the token nil denotes it',
     expectedOutput: 'nil\n',
   },
   {
-    name: '6.4.4 new 创建变量并解引用',
+    name: '6.4.4 new creates a variable and dereferencing',
     code: 'program test(output); type TP = ^integer; var p: TP; begin new(p); p^ := 7; writeln(p^); end.',
-    purpose: '6.4.4：identifying-value 与所标识变量仅由 new 创建，可通过 p^ 访问',
+    purpose: '6.4.4: the identifying-value and the identified variable are created only by new; accessible via p^',
     expectedOutput: '7\n',
   },
   {
-    name: '6.4.4 同一 pointer-type 的变量间赋值',
+    name: '6.4.4 assignment between variables of the same pointer-type',
     code: 'program test(output); type TP = ^integer; var p, q: TP; begin new(p); p^ := 3; q := p; writeln(q^); end.',
-    purpose: '6.4.6 a+6.4.4：p、q 同属 pointer-type TP，赋值后二者标识同一变量',
+    purpose:
+      '6.4.6 a+6.4.4: p and q belong to the same pointer-type TP; after assignment both identify the same variable',
     expectedOutput: '3\n',
   },
   {
-    name: '6.4.4 nil 可赋给 record 的 pointer 分量',
+    name: '6.4.4 nil may be assigned to a pointer component of a record',
     code: `program test(output);
 type
   Node = record value: integer; next: ^Node end;
@@ -566,11 +570,12 @@ begin
   p^.next := nil;
   writeln(p^.value);
 end.`,
-    purpose: '6.4.4 NOTE 2+6.4.6：nil 可适配任意 pointer-type，故可赋给 pointer 类型的 record 字段',
+    purpose:
+      '6.4.4 NOTE 2+6.4.6: nil is compatible with any pointer-type, so it may be assigned to a record field of pointer type',
     expectedOutput: '1\n',
   },
   {
-    name: '6.4.4 nil 可适配任意 pointer-type',
+    name: '6.4.4 nil is compatible with any pointer-type',
     code: `program test(output);
 type PI = ^integer; PR = ^real;
 var a: PI; b: PR;
@@ -579,80 +584,85 @@ begin
   b := nil;
   if (a = nil) and (b = nil) then writeln('ok');
 end.`,
-    purpose: '6.4.4 NOTE 2：nil 没有单一类型，可按赋值兼容规则适配任意 pointer-type',
+    purpose:
+      '6.4.4 NOTE 2: nil has no single type and may be compatible with any pointer-type per assignment-compatibility rules',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.4.4 两个不同的 pointer-type 之间不可赋值',
+    name: '6.4.4 assignment between two distinct pointer-types is not allowed',
     code: 'program test; type P = ^integer; Q = ^integer; var p: P; q: Q; begin new(p); q := p; end.',
-    purpose: '6.4.1+6.4.6 a：^integer 的两次出现是互不相同的 new-pointer-type，赋值是错误',
+    purpose: '6.4.1+6.4.6 a: the two occurrences of ^integer are distinct new-pointer-types; assignment is an error',
     expectedError: '',
   },
 
   // 6.4.6 Assignment-compatibility
 
   {
-    name: '6.4.6 b integer 到 real 的隐式转换',
+    name: '6.4.6 b implicit conversion from integer to real',
     code: 'program test(output); var i: integer; r: real; begin i := 5; r := i; writeln(trunc(r)); end.',
-    purpose: '6.4.6 b：T1 为 real、T2 为 integer 时赋值兼容，并执行 integer→real 隐式转换',
+    purpose:
+      '6.4.6 b: when T1 is real and T2 is integer they are assignment-compatible, and an integer->real implicit conversion is performed',
     expectedOutput: '5\n',
   },
   {
-    name: '6.4.6 real 到 integer 的赋值不兼容',
+    name: '6.4.6 assignment from real to integer is not compatible',
     code: 'program test; var i: integer; r: real; begin r := 1.5; i := r; end.',
-    purpose: '6.4.6：real 不是 ordinal-type，也不满足 a/b/d/e，故 real→integer 不是赋值兼容',
+    purpose:
+      '6.4.6: real is not an ordinal-type and does not satisfy a/b/d/e, so real->integer is not assignment-compatible',
     expectedError: '',
   },
   {
-    name: '6.4.6 c 子界值赋给其 host-type（integer）',
+    name: '6.4.6 c assigning a subrange value to its host-type (integer)',
     code: 'program test(output); type T = 1..10; var a: T; i: integer; begin a := 5; i := a; writeln(i); end.',
-    purpose: '6.4.5 b+6.4.6 c：T 是 integer 的子界，二者兼容且值在 integer 区间内',
+    purpose:
+      '6.4.5 b+6.4.6 c: T is a subrange of integer; the two are compatible and the value is within the integer range',
     expectedOutput: '5\n',
   },
   {
-    name: '6.4.6 c 兼容 ordinal-type 且值在目标区间内',
+    name: '6.4.6 c compatible ordinal-type and value within target range',
     code: 'program test(output); type T = 1..10; var a: T; i: integer; begin i := 5; a := i; writeln(a); end.',
-    purpose: '6.4.6 c：integer 与子界 T 兼容，值 5 在 T 的闭区间 1..10 内',
+    purpose: '6.4.6 c: integer and subrange T are compatible; value 5 is within the closed interval 1..10 of T',
     expectedOutput: '5\n',
   },
   {
-    name: '6.4.6 c 兼容 ordinal-type 但值超出目标区间是错误',
+    name: '6.4.6 c compatible ordinal-type but value outside target range is an error',
     code: 'program test; type T = 1..10; var a: T; i: integer; begin i := 100; a := i; end.',
-    purpose: '6.4.6 错误规则 a：T1、T2 是兼容 ordinal-type 但值 100 不在 1..10 内',
+    purpose: '6.4.6 error rule a: T1 and T2 are compatible ordinal-types but value 100 is not within 1..10',
     expectedError: '',
   },
   {
-    name: '6.4.6 c 整数常量超出子界上界是错误',
+    name: '6.4.6 c integer constant exceeding subrange upper bound is an error',
     code: 'program test; type T = 1..10; var a: T; begin a := 11; end.',
-    purpose: '6.4.6 c：常量 11 与 T 兼容但不在 1..10 内，是错误',
+    purpose: '6.4.6 c: constant 11 is compatible with T but not within 1..10, which is an error',
     expectedError: '',
   },
   {
-    name: '6.4.6 c 算术结果超出子界上界是错误',
+    name: '6.4.6 c arithmetic result exceeding subrange upper bound is an error',
     code: 'program test; type T = 1..10; var a: T; begin a := 8; a := a + 5; end.',
-    purpose: '6.7.2.1+6.4.6 c：子界因子按 host-type integer 参与运算得 13，不在 1..10 内',
+    purpose:
+      '6.7.2.1+6.4.6 c: the subrange factor participates in the operation as host-type integer yielding 13, which is not within 1..10',
     expectedError: '',
   },
   {
-    name: '6.4.6 c 兼容子界之间赋值且值在目标区间内',
+    name: '6.4.6 c assignment between compatible subranges with value within target range',
     code: 'program test(output); type T1 = 1..10; T2 = 1..5; var a: T1; b: T2; begin a := 3; b := a; writeln(b); end.',
-    purpose: '6.4.5 b+6.4.6 c：T1、T2 同为 integer 的子界而兼容，值 3 在 1..5 内',
+    purpose: '6.4.5 b+6.4.6 c: T1 and T2 are both subranges of integer hence compatible; value 3 is within 1..5',
     expectedOutput: '3\n',
   },
   {
-    name: '6.4.6 c 兼容子界之间赋值但值超出目标区间是错误',
+    name: '6.4.6 c assignment between compatible subranges but value outside target range is an error',
     code: 'program test; type T1 = 1..10; T2 = 1..5; var a: T1; b: T2; begin a := 8; b := a; end.',
-    purpose: '6.4.6 错误规则 a：值 8 不在目标子界 1..5 内',
+    purpose: '6.4.6 error rule a: value 8 is not within the target subrange 1..5',
     expectedError: '',
   },
   {
-    name: '6.4.6 c 字符子界赋值超出上界是错误',
+    name: '6.4.6 c character subrange assignment exceeding upper bound is an error',
     code: "program test; type T = 'A'..'C'; var c: T; begin c := 'Z'; end.",
-    purpose: "6.4.2.2 d 2)+6.4.6 c：A..Z 字典有序，'Z' 不在 'A'..'C' 内",
+    purpose: "6.4.2.2 d 2)+6.4.6 c: A..Z is lexicographically ordered; 'Z' is not within 'A'..'C'",
     expectedError: '',
   },
   {
-    name: '6.4.3.1 packed 可前缀于 record 类型',
+    name: '6.4.3.1 packed may prefix a record type',
     code: `program test(output);
 type r = packed record x: integer; y: char end;
 var v: r;
@@ -661,53 +671,54 @@ begin
   v.y := 'A';
   writeln(v.x, v.y);
 end.`,
-    purpose: 'ISO 6.4.3.1：packed 可前缀于 array/record/file/set 四种结构类型，packed record 的字段仍可访问',
+    purpose:
+      'ISO 6.4.3.1: packed may prefix the four structured types array/record/file/set; fields of a packed record are still accessible',
     expectedOutput: '3A\n',
   },
   {
-    name: '6.4.3.1 packed 不得前缀于非结构类型',
+    name: '6.4.3.1 packed must not prefix a non-structured type',
     code: 'program test; type t = packed integer; begin end.',
-    purpose: 'ISO 6.4.3.1：packed 只允许前缀于 array、record、file、set 类型',
+    purpose: 'ISO 6.4.3.1: packed may only prefix array, record, file, and set types',
     expectedError: '',
   },
   {
-    name: '6.4.3.2 array 缺少 index-type 表应报错',
+    name: '6.4.3.2 array missing the index-type list is an error',
     code: 'program test; type t = array of integer; begin end.',
-    purpose: 'ISO 6.4.3.2：array-type 须给出方括号括起的 index-type 表',
+    purpose: 'ISO 6.4.3.2: array-type must provide an index-type list enclosed in brackets',
     expectedError: '',
   },
   {
-    name: '6.4.3.2 array 缺少 of 应报错',
+    name: '6.4.3.2 array missing of is an error',
     code: 'program test; type t = array[1..3] integer; begin end.',
-    purpose: 'ISO 6.4.3.2：index-type 表之后须有 of 与 component-type',
+    purpose: 'ISO 6.4.3.2: the index-type list must be followed by of and a component-type',
     expectedError: '',
   },
   {
-    name: '6.4.3.2 array 缺少右方括号应报错',
+    name: '6.4.3.2 array missing the right bracket is an error',
     code: 'program test; type t = array[1..3 of integer; begin end.',
-    purpose: 'ISO 6.4.3.2：index-type 表须以右方括号结束',
+    purpose: 'ISO 6.4.3.2: the index-type list must end with a right bracket',
     expectedError: '',
   },
   {
-    name: '6.4.3.2 array 的 component-type 非法应报错',
+    name: '6.4.3.2 illegal component-type of array is an error',
     code: 'program test; type t = array[1..3] of 5; begin end.',
-    purpose: 'ISO 6.4.3.2：of 之后须为合法 type-denoter',
+    purpose: 'ISO 6.4.3.2: of must be followed by a legal type-denoter',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 record 缺少 end 应报错',
+    name: '6.4.3.3 record missing end is an error',
     code: 'program test; type t = record x: integer; begin end.',
-    purpose: 'ISO 6.4.3.3：record-type 以 end 结束',
+    purpose: 'ISO 6.4.3.3: record-type ends with end',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 record 字段缺少类型应报错',
+    name: '6.4.3.3 record field missing type is an error',
     code: 'program test; type t = record x; end; begin end.',
-    purpose: 'ISO 6.4.3.3：field-declaration 为 identifier-list : type-denoter',
+    purpose: 'ISO 6.4.3.3: field-declaration is identifier-list : type-denoter',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 变体分支的 field-list 可含多个字段',
+    name: '6.4.3.3 the field-list of a variant branch may contain multiple fields',
     code: `program test(output);
 type r = record
   case tag: integer of
@@ -721,65 +732,67 @@ begin
   v.b := 'X';
   writeln(v.a, v.b);
 end.`,
-    purpose: 'ISO 6.4.3.3：variant 的分支为 ( field-list )，其中可含多个以分号分隔的字段',
+    purpose:
+      'ISO 6.4.3.3: a variant branch is ( field-list ), which may contain multiple fields separated by semicolons',
     expectedOutput: '5X\n',
   },
   {
-    name: '6.4.3.3 variant 的 case-constant 之后缺少冒号应报错',
+    name: '6.4.3.3 variant case-constant missing colon is an error',
     code: 'program test; type r = record case tag: integer of 1 (a: integer) end; begin end.',
-    purpose: 'ISO 6.4.3.3：variant = case-constant-list : ( field-list )',
+    purpose: 'ISO 6.4.3.3: variant = case-constant-list : ( field-list )',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 variant 的 field-list 缺少左圆括号应报错',
+    name: '6.4.3.3 variant field-list missing left parenthesis is an error',
     code: 'program test; type r = record case tag: integer of 1: a: integer end; begin end.',
-    purpose: 'ISO 6.4.3.3：case-constant-list 的冒号之后须为左圆括号',
+    purpose: 'ISO 6.4.3.3: the colon of the case-constant-list must be followed by a left parenthesis',
     expectedError: '',
   },
   {
-    name: '6.4.2.3 枚举值表须为 identifier-list',
+    name: '6.4.2.3 the enumeration value list must be an identifier-list',
     code: 'program test; type t = (1, 2); begin end.',
-    purpose: 'ISO 6.4.2.3：enumeration-type 的值表由标识符组成',
+    purpose: 'ISO 6.4.2.3: the value list of an enumeration-type consists of identifiers',
     expectedError: '',
   },
   {
-    name: '6.4.2.3 枚举值表缺少右圆括号应报错',
+    name: '6.4.2.3 enumeration value list missing right parenthesis is an error',
     code: 'program test; type t = (a, b; begin end.',
-    purpose: 'ISO 6.4.2.3：enumeration-type = ( identifier-list )',
+    purpose: 'ISO 6.4.2.3: enumeration-type = ( identifier-list )',
     expectedError: '',
   },
   {
-    name: '6.4.4 指针类型缺少 domain-type 应报错',
+    name: '6.4.4 pointer type missing domain-type is an error',
     code: 'program test; type t = ^; begin end.',
-    purpose: 'ISO 6.4.4：pointer-type = ^ domain-type',
+    purpose: 'ISO 6.4.4: pointer-type = ^ domain-type',
     expectedError: '',
   },
   {
-    name: '6.4.3.5 file of 之后缺少分量类型应报错',
+    name: '6.4.3.5 file of missing component type is an error',
     code: 'program test; type t = file of ; begin end.',
-    purpose: 'ISO 6.4.3.5：file-type 给出 of 之后须有 component-type',
+    purpose: 'ISO 6.4.3.5: file-type must have a component-type after of',
     expectedError: '',
   },
   {
-    name: '6.4.3.4 set 类型缺少 of 应报错',
+    name: '6.4.3.4 set type missing of is an error',
     code: 'program test; type t = set 1..3; begin end.',
-    purpose: 'ISO 6.4.3.4：set-type = set of base-type',
+    purpose: 'ISO 6.4.3.4: set-type = set of base-type',
     expectedError: '',
   },
   {
-    name: '6.4.1 type-denoter 不得是孤立常量',
+    name: '6.4.1 type-denoter must not be an isolated constant',
     code: 'program test; type t = 5; begin end.',
-    purpose: 'ISO 6.4.1：type-denoter 为 type-identifier 或 new-type，孤立的常量不构成任何 new-type',
+    purpose:
+      'ISO 6.4.1: type-denoter is a type-identifier or a new-type; an isolated constant does not constitute any new-type',
     expectedError: '',
   },
   {
-    name: '6.4.2.4 子界类型缺少右边界应报错',
+    name: '6.4.2.4 subrange type missing right bound is an error',
     code: 'program test; type t = 1..; begin end.',
-    purpose: 'ISO 6.4.2.4：subrange-type = constant .. constant',
+    purpose: 'ISO 6.4.2.4: subrange-type = constant .. constant',
     expectedError: '',
   },
   {
-    name: '6.4.2.4 Boolean 是 ordinal-type，可作为子界的 base-type',
+    name: '6.4.2.4 Boolean is an ordinal-type and may serve as the base-type of a subrange',
     code: `program test(output);
 type t = false..true;
 var b: t;
@@ -788,11 +801,11 @@ begin
   if b = true then writeln('T') else writeln('F');
 end.`,
     purpose:
-      'ISO 6.4.2.2 d/6.4.2.4：Boolean 是序数类型，其值可作为子界的两端常量，该子界与其宿主的宿主类型 Boolean 兼容',
+      'ISO 6.4.2.2 d/6.4.2.4: Boolean is an ordinal type; its values may serve as both bounds of a subrange, and that subrange is compatible with its host type Boolean',
     expectedOutput: 'T\n',
   },
   {
-    name: '6.4.3.2 index-type 可为已定义的子界类型标识符',
+    name: '6.4.3.2 index-type may be an already-defined subrange type identifier',
     code: `program test(output);
 type idx = 1..3;
      t = array[idx] of integer;
@@ -801,85 +814,87 @@ begin
   a[2] := 7;
   writeln(a[2]);
 end.`,
-    purpose: 'ISO 6.4.3.2/6.4.1：index-type 是 ordinal-type，可写成先前定义的子界类型标识符',
+    purpose:
+      'ISO 6.4.3.2/6.4.1: index-type is an ordinal-type and may be written as a previously-defined subrange type identifier',
     expectedOutput: '7\n',
   },
   {
-    name: '6.4.3.2 分量数不同的 string-type 之间不得赋值',
+    name: '6.4.3.2 assignment between string-types with different numbers of components is not allowed',
     code: `program test;
 var a: array[1..2, 1..2] of char;
 begin
   a := 'ab';
 end.`,
     purpose:
-      'ISO 6.4.3.2/6.4.6 e：string-type 是分量数为 n 的一维 packed char 数组，二维 char 数组不属 string-type，分量数亦不同',
+      'ISO 6.4.3.2/6.4.6 e: a string-type is a one-dimensional packed char array with n components; a 2D char array is not a string-type and has a different number of components',
     expectedError: '',
   },
   {
-    name: '6.4.1 类型定义缺少等号应报错',
+    name: '6.4.1 type definition missing equals sign is an error',
     code: 'program test; type t integer; begin end.',
-    purpose: 'ISO 6.4.1：type-definition = identifier = type-denoter',
+    purpose: 'ISO 6.4.1: type-definition = identifier = type-denoter',
     expectedError: '',
   },
   {
-    name: '6.2.2.9 非类型标识符不得用作类型名',
+    name: '6.2.2.9 non-type identifiers must not be used as type names',
     code: `program test;
 var v: integer;
 type t = v;
 begin end.`,
-    purpose: 'ISO 6.2.2.9/6.4.1：type-denoter 中的标识符须有类型定义点，变量标识符不是类型',
+    purpose:
+      'ISO 6.2.2.9/6.4.1: an identifier in a type-denoter must have a type definition point; a variable identifier is not a type',
     expectedError: '',
   },
   {
-    name: '6.4.1 type-denoter 处出现非法记号应报错',
+    name: '6.4.1 illegal token at type-denoter is an error',
     code: 'program test; type t = [1; begin end.',
-    purpose: 'ISO 6.4.1：type-denoter 须为 type-identifier 或合法 new-type',
+    purpose: 'ISO 6.4.1: type-denoter must be a type-identifier or a legal new-type',
     expectedError: '',
   },
   {
-    name: '6.4.3.2 array 的 index-type 表为空应报错',
+    name: '6.4.3.2 empty index-type list of array is an error',
     code: 'program test; type t = array[;] of integer; begin end.',
-    purpose: 'ISO 6.4.3.2：index-type 表中每项都须为合法 ordinal-type',
+    purpose: 'ISO 6.4.3.2: each entry in the index-type list must be a legal ordinal-type',
     expectedError: '',
   },
   {
-    name: '6.4.3.4 set 的 base-type 非法应报错',
+    name: '6.4.3.4 illegal base-type of set is an error',
     code: 'program test; type t = set of ; begin end.',
-    purpose: 'ISO 6.4.3.4：of 之后须为合法 ordinal-type',
+    purpose: 'ISO 6.4.3.4: of must be followed by a legal ordinal-type',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 variant-part 的 tag-type 非法应报错',
+    name: '6.4.3.3 illegal tag-type of variant-part is an error',
     code: 'program test; type r = record case tag: ; of 1: (a: integer) end; begin end.',
-    purpose: 'ISO 6.4.3.3：variant-part = case [ tag-field : ] tag-type of variant {; variant}',
+    purpose: 'ISO 6.4.3.3: variant-part = case [ tag-field : ] tag-type of variant {; variant}',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 variant-part 缺少 of 应报错',
+    name: '6.4.3.3 variant-part missing of is an error',
     code: 'program test; type r = record case tag: integer 1: (a: integer) end; begin end.',
-    purpose: 'ISO 6.4.3.3：tag-type 之后须有 of',
+    purpose: 'ISO 6.4.3.3: tag-type must be followed by of',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 variant 的 case-constant-list 非法应报错',
+    name: '6.4.3.3 illegal case-constant-list of variant is an error',
     code: 'program test; type r = record case tag: integer of : (a: integer) end; begin end.',
-    purpose: 'ISO 6.4.3.3：variant = case-constant-list : ( field-list )',
+    purpose: 'ISO 6.4.3.3: variant = case-constant-list : ( field-list )',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 variant 的 field-list 中字段声明非法应报错',
+    name: '6.4.3.3 illegal field declaration in variant field-list is an error',
     code: 'program test; type r = record case tag: integer of 1: (5) end; begin end.',
-    purpose: 'ISO 6.4.3.3：field-list 中的每项须为合法 field-declaration',
+    purpose: 'ISO 6.4.3.3: each entry in the field-list must be a legal field-declaration',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 variant 的 field-list 缺少右圆括号应报错',
+    name: '6.4.3.3 variant field-list missing right parenthesis is an error',
     code: 'program test; type r = record case tag: integer of 1: (a: integer end; begin end.',
-    purpose: 'ISO 6.4.3.3：field-list 以右圆括号结束',
+    purpose: 'ISO 6.4.3.3: the field-list ends with a right parenthesis',
     expectedError: '',
   },
   {
-    name: '6.4.3.3 variant 之间的多余分号被接受（实现宽化形式）',
+    name: '6.4.3.3 extra semicolons between variants are accepted (implementation leniency)',
     code: `program test(output);
 type r = record
   case tag: integer of
@@ -892,11 +907,12 @@ begin
   v.b := 4;
   writeln(v.b);
 end.`,
-    purpose: 'ISO 6.4.3.3 的 variant 之间以单个分号分隔，出现连续分号时按空 variant 处理；本实现直接跳过（扩展）',
+    purpose:
+      'ISO 6.4.3.3 variants are separated by a single semicolon; consecutive semicolons are treated as an empty variant; this implementation simply skips them (extension)',
     expectedOutput: '4\n',
   },
   {
-    name: '6.4.3.3 variant 的 field-list 内可再嵌 variant-part（以 end 终止的实现形式）',
+    name: '6.4.3.3 a variant-part may be nested within a variant field-list (implementation form terminated by end)',
     code: `program test(output);
 type r = record
   case tag: integer of
@@ -913,23 +929,24 @@ begin
   v.p := 'Z';
   writeln(v.p);
 end.`,
-    purpose: 'ISO 6.4.3.3 允许 variant-part 嵌套在 field-list 内（此处按实现要求以内层 end 终止该嵌套部分）',
+    purpose:
+      'ISO 6.4.3.3 allows a variant-part to be nested inside a field-list (here the nested part is terminated by an inner end per implementation requirement)',
     expectedOutput: 'Z\n',
   },
   {
-    name: '6.4.3.2 index-type 可为简单类型 integer',
+    name: '6.4.3.2 index-type may be the simple type integer',
     code: `program test;
 type t = array[integer] of char;
 begin end.`,
-    purpose: 'ISO 6.4.3.2：index-type 是 ordinal-type，预定义类型 integer 本身即可作 index-type',
+    purpose: 'ISO 6.4.3.2: index-type is an ordinal-type; the predefined type integer itself may serve as index-type',
     expectedOutput: '',
   },
   {
-    name: '6.4.3.5 file-type 可不给出分量类型',
+    name: '6.4.3.5 file-type may omit the component type',
     code: `program test;
 type t = file;
 begin end.`,
-    purpose: 'ISO 6.4.3.5：file-type = file [ of component-type ]，省略 of 时分量类型为 undefined',
+    purpose: 'ISO 6.4.3.5: file-type = file [ of component-type ]; when of is omitted the component type is undefined',
     expectedOutput: '',
   },
 ]

@@ -17,7 +17,7 @@ type InlineGen = (args: string[]) => string | undefined
  * Pascal 数字字面量 → 合法的 JS 数字字面量。
  *
  * Pascal 的 digit-sequence 是十进制，前导零只表示位数（0100000 = 100000，ISO 6.1.5）。
- * 编译产物按 ES 模块执行（严格模式），而严格模式禁用前导 0 的八进制字面量——
+ * 编译产物按 ES 模块执行（严格模式），而严格模式禁用前导 0 的八进制字面量--
  * `0100000`、`010E2` 都会直接 parse 失败。因此以 0 开头且紧跟数字的字面量一律
  * 按十进制重新求值再输出。
  */
@@ -65,15 +65,15 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.castInt32ToChar]: (a) => `((${a[0]}) & 0xff)`,
 
   // 注：bytes.host / alloc / clone / copy / view.subarray 以及 bytes.get.* / bytes.set.*
-  // 都不内联——宿主是 { bytes, dv } 对象，构造与标量读写统一由 mem.ts 的 handler 承担
+  // 都不内联--宿主是 { bytes, dv } 对象，构造与标量读写统一由 mem.ts 的 handler 承担
   // （dv 随宿主走，不再需要按 ArrayBuffer 缓存）。
 
-  // 槽赋值：内联为 JS 赋值表达式。**必须内联** —— dispatcher 的实参只能拿到槽的
+  // 槽赋值：内联为 JS 赋值表达式。**必须内联** -- dispatcher 的实参只能拿到槽的
   // 值而非引用，无法写回（见 @jitex/runtime 的 keys.ts 的 assign 说明）。
   [rtKeys.assign]: (a) => `((${a[0]}) = ${a[1]})`,
 
   // 求值序列（闭包）：用一个立即执行函数把多个表达式按顺序求值（见 @jitex/runtime 的 keys.ts）。
-  // 参数必须 >= 2 —— 只有一项时规则应直接返回该项，包一层闭包没有意义。
+  // 参数必须 >= 2 -- 只有一项时规则应直接返回该项，包一层闭包没有意义。
   [rtKeys.closureNoValue]: (a) => {
     if (a.length < 2) {
       throw new Error(`runtime.closure.noValue 至少需要 2 个参数，实际 ${a.length} 个`)

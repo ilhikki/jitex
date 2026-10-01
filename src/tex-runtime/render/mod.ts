@@ -5,7 +5,7 @@ import { renderPage } from './svg/render.ts'
 /**
  * 缺字符映射：DVI 用到了渲染器没有编码表的字体。
  *
- * 这类字形画不出来（位置也无从按规范推进），所以不做退化渲染，直接失败——
+ * 这类字形画不出来（位置也无从按规范推进），所以不做退化渲染，直接失败--
  * `fonts` 里带齐所有出问题的字体名与码位，便于一次看清全部缺口。
  */
 export class UnmappedFontError extends Error {
@@ -28,7 +28,7 @@ export function dviToSvg(dvi: Uint8Array, fonts: Record<string, Uint8Array> = {}
 /**
  * 渲染一个 DVI；缺字符映射就抛 `UnmappedFontError`。
  *
- * 收集发生在解释阶段、抛在解释之后——这样一次能报出所有缺口的字体与码位，
+ * 收集发生在解释阶段、抛在解释之后--这样一次能报出所有缺口的字体与码位，
  * 而不是撞见第一个就中断。`fonts` 是随发布提供的度量源（键为 `cmr10.tfm` 这类文件名）。
  */
 export function renderDvi(dvi: Uint8Array, fonts: Record<string, Uint8Array> = {}): string[] {

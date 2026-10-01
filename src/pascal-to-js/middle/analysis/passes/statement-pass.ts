@@ -413,7 +413,7 @@ class StatementPass {
         } else if (sym?.kind === 'func') {
           info = sym.retTypeInfo ?? this.unknown(node, `func '${node.name}' 无返回类型`)
         } else {
-          // 内置无参标识符的类型来自声明表 —— analysis 不写内置名字分支
+          // 内置无参标识符的类型来自声明表 -- analysis 不写内置名字分支
           // （内置语义归 rewrite，这里只查「它是什么类型」）
           info = BUILTIN_IDENTIFIER_TYPES[node.name.toLowerCase()] ??
             this.unknown(node, `identifier '${node.name}' 未解析到符号`)
@@ -650,7 +650,7 @@ class StatementPass {
    *
    * 这是唯一允许 analysis 依赖的内置语义，且只依赖「返回类型」：规则取自
    * BUILTIN_FUNCTION_RETURN_TYPES，本函数不含任何内置函数名分支。实参个数、
-   * 实参形态、合法调用形式一律不问——那些归 rewrite 解释。
+   * 实参形态、合法调用形式一律不问--那些归 rewrite 解释。
    */
   private builtinFuncReturnType(name: string, args: ExpressionNode[]): TypeInfo {
     const rule = BUILTIN_FUNCTION_RETURN_TYPES[name.toLowerCase()]
@@ -766,7 +766,7 @@ class StatementPass {
   // 辅助
 
   /**
-   * ISO 7185 6.6.3.4/6.6.3.5：校验可调用形参对应的实参——
+   * ISO 7185 6.6.3.4/6.6.3.5：校验可调用形参对应的实参--
    * 实参须是有定义点、且该定义点被 program-block 包含的过程/函数标识符。
    */
   private checkCallableActuals(

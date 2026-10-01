@@ -87,7 +87,7 @@ export function serializeTypeInfo(ti: TypeInfo, expandPointer = true): TypeDescr
   if (ti.tag === 'set') {
     return { tag: 'set', elem: ti.setBase ? serializeTypeInfo(ti.setBase, expandPointer) : undefined }
   }
-  // pointer：展开一层领域类型（new(p) 需要其布局）。内层不再展开 pointer ——
+  // pointer：展开一层领域类型（new(p) 需要其布局）。内层不再展开 pointer --
   // 否则递归类型（record 里的 pointer 指回自身）会形成无限递归。
   if (ti.tag === 'pointer') {
     return {

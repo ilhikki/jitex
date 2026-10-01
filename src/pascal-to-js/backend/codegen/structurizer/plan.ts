@@ -1,5 +1,5 @@
 /*
- * Pass 5：结构规划——决定每个块在输出里的位置，以及每条边用什么表达。
+ * Pass 5：结构规划--决定每个块在输出里的位置，以及每条边用什么表达。
  *
  * 输出的语法是一棵树（嵌套语句），而 CFG 是一张图。把图放进树只有三种手段：
  * 顺序（fall）、跳出（break）、跳回（continue）。本模块把每条边归到其中之一；
@@ -9,9 +9,9 @@
  * （见 layoutOf）。分类用的落点和 emit 出来的落点因此不可能不一致。
  *
  * 三个子遍，交替跑到不动点：
- *   5a layout —— 建盒树（循环盒由自然循环而来），把块和子盒排进各自的盒
- *   5b routes —— 逐边归类
- *   5c lift   —— 对归不了的边提升 guard 盒，回到 5b
+ *   5a layout -- 建盒树（循环盒由自然循环而来），把块和子盒排进各自的盒
+ *   5b routes -- 逐边归类
+ *   5c lift   -- 对归不了的边提升 guard 盒，回到 5b
  */
 
 import { type BlockId, type Cfg, EXIT, successorsOf } from './cfg.ts'
@@ -51,7 +51,7 @@ export interface Layout {
   /** 父盒；盒树的形状完全由 items 决定，不另存 */
   parentOf(boxId: number): number | undefined
   /**
-   * 离开某个盒之后控制流落到哪个块——也就是 `break` 的落点。
+   * 离开某个盒之后控制流落到哪个块--也就是 `break` 的落点。
    *
    * 由 items 唯一决定：紧跟该盒的那一项的入口；该盒是父盒最后一项时顺延为父盒的落点；
    * root 的落点是 EXIT。落点不能再有第二个来源，否则 break 会跳到别的地方。
@@ -114,7 +114,7 @@ function rewrap(seed: BoxSeed, items: readonly Item[]): Box {
 /**
  * 组装 Layout：父子关系和落点全部从 items 推出来。
  *
- * 这是盒树唯一的成形处——buildLayout 和 liftToGuard 都只交出 items，
+ * 这是盒树唯一的成形处--buildLayout 和 liftToGuard 都只交出 items，
  * 别处不许再单独维护一份"谁是谁的父盒""出口在哪"。
  */
 function layoutOf(
@@ -172,7 +172,7 @@ interface MutableBox {
 /**
  * item 顺序：CFG 的逆后序（RPO）。
  *
- * 可约图删掉回边就是 DAG，而 DFS 的逆后序恰好保证"非回边的目标一定排在源头后面"——
+ * 可约图删掉回边就是 DAG，而 DFS 的逆后序恰好保证"非回边的目标一定排在源头后面"--
  * 也就是排完之后**没有"往前跳不回去"的边**：唯一向后的是回边，而回边的头一定支配尾，
  * 正好落成 continue。前序做不到这一点（汇合点会被塞进某条分支的子树里）。
  */
@@ -254,7 +254,7 @@ function buildLayout(cfg: Cfg, analysis: Analysis): Layout {
   }
 
   // 排序：本盒直接拥有的块 + 子盒，一起按全局前序排。
-  // 顺序决定落点，也就是决定哪些边能走 break——见 layoutOf。
+  // 顺序决定落点，也就是决定哪些边能走 break--见 layoutOf。
   const order = globalOrder(cfg)
   const entryOf = (item: Item): BlockId => item.kind === 'block' ? item.id : (boxes.get(item.id) as MutableBox).entry
 
@@ -284,21 +284,18 @@ function classify(layout: Layout, from: BlockId, to: BlockId): JumpKind | undefi
   }
   const box = layout.boxes.get(owner) as Box
 
-  // 1) 紧跟在 from 后面的那一项就是 to：同级块，或某个子盒的入口
   const slot = box.slotOf.get(from)
   const next = slot === undefined ? undefined : box.items[slot + 1]
   if (next !== undefined && entryOfItem(layout.boxes, next) === to) {
     return { kind: 'fall' }
   }
 
-  // 2) 目标是某个祖先循环盒的入口 ⇒ 进入下一轮
   for (const ancestor of boxAncestors(layout, owner)) {
     if (ancestor.kind === 'loop' && ancestor.entry === to) {
       return { kind: 'continue', label: ancestor.label }
     }
   }
 
-  // 3) 目标是某个祖先盒的落点 ⇒ 离开该盒
   for (const ancestor of boxAncestors(layout, owner)) {
     if (layout.continuationOf(ancestor.id) === to) {
       return { kind: 'break', label: ancestor.label }
@@ -364,7 +361,7 @@ interface Span {
 }
 
 /**
- * from → to 这条边需要的包裹区间。在**最近的那个**能把 to 摆成直接项的祖先盒里算——
+ * from → to 这条边需要的包裹区间。在**最近的那个**能把 to 摆成直接项的祖先盒里算--
  * from 可能埋在子盒里，而 to 未必和它同盒。
  */
 function spanFor(layout: Layout, from: BlockId, to: BlockId): Span | undefined {
@@ -385,7 +382,7 @@ function spanFor(layout: Layout, from: BlockId, to: BlockId): Span | undefined {
  * 把 from 和 to 之间那一段包成一个 guard 盒：from 留在盒内，to 变成盒的落点，
  * 于是这条边从"够不着"变成一次 break。
  *
- * 落点不需要写下来——guard 插到 to 前面，`continuationOf(guard)` 自然就是 to。
+ * 落点不需要写下来--guard 插到 to 前面，`continuationOf(guard)` 自然就是 to。
  * 被圈进来那一段里的嵌套盒也不必重新认父：父子关系同样由 items 算。
  */
 function liftToGuard(layout: Layout, from: BlockId, to: BlockId): Layout | undefined {

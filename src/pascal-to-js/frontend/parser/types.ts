@@ -20,7 +20,7 @@ import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
 // Type Parsers
 
-// parseType — dispatches to the correct type parser based on lookahead
+// parseType - dispatches to the correct type parser based on lookahead
 export function parseType(input: ParserInput): ParseResult<TypeNode> {
   const token = peek(input)
 

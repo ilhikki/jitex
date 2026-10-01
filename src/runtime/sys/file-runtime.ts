@@ -1,44 +1,13 @@
-/*
- * 文件原语：runtime.file.*
- *
- * 设计要点：
- *   - **不接类型参数**。句柄（PascalFile）在 create 时已带编译期算定的
- *     `fileKind`（存储形态：text / bytes / blocks），用于区分读写路径。
- *   - **值的宿主表示由 key 承载，不由实参承载**：写入路径按值形态拆成
- *     write.text（string）/ write.byte（number）/ write.bytes、write.block（Uint8Array），
- *     以及 put.buffer.block / .byte / .character / .text。handler 内不做类型判断。
- *   - **存储统一为连续字节流**（MemoryTextFile）；fileKind 区分读写语义
- *     （行结束符处理 / 缓冲落盘），不区分存储实现。
- *   - **record size 内联到操作参数**：fileGet / filePeek / fileReadCharacter
- *     在 blocks 模式下由 rewriter 传 sizeOf，不在文件对象上记录。
- *   - **f^ 写缓冲是 PascalFile 的属性**（ISO 6.5.5 buffer variable），
- *     不是存储层的状态。仅 blocks 写模式使用；读模式 f^ 直接从 store 取视图。
- *   - key 与 Pascal 原生 io 过程一一对应：reset / rewrite / get / put / read / write /
- *     readln / writeln / eof / eoln / page / peek(f^)。
- *   - rewrite 只负责「值 → 文件单位」的转换（convert.*）；语义（如 read = 读+推进）
- *     由本文件承担。
- */
-
 import { rtKeys } from '../keys.ts'
 import type { ByteHost, PascalFile, PascalFileStore, RuntimeContext, SyscallHandler } from '../runtime-type.ts'
 import { bytesToString, encodeUtf8 } from '../runtime-util.ts'
 import { makeByteHost } from './mem.ts'
 import { createMemoryFileStore } from './memory-text-file.ts'
 
-// 辅助
-
-/**
- * 定长字节块文件（元素含 record）：每条记录是一段定长字节。
- */
 function isBlockFile(f: PascalFile): boolean {
   return f.fileKind === 'blocks'
 }
 
-/**
- * 单字节单位文件（`packed file of byte`）：元素是单字节标量。
- * 这类文件按 `Uint8Array` 逐字节语义处理，不做行结束符 / 编码转换
- * （TeX 的 `dvi_file`、`tfm_file`）。
- */
 function isByteFile(f: PascalFile): boolean {
   return f.fileKind === 'bytes'
 }
@@ -47,7 +16,6 @@ function textStore(f: PascalFile): PascalFileStore {
   return f.value as unknown as PascalFileStore
 }
 
-/** 默认 input / output（f 为 null 时） */
 function defaultStore(ctx: RuntimeContext, isOutput: boolean): PascalFileStore {
   const store = ctx.files.get(isOutput ? 'OUTPUT' : 'INPUT')
   if (store === undefined) {
@@ -60,17 +28,10 @@ function pick(ctx: RuntimeContext, f: unknown, isOutput: boolean): PascalFileSto
   return f === undefined ? defaultStore(ctx, isOutput) : textStore(f as PascalFile)
 }
 
-/** 写目标存储：f 缺省表示默认 output（ISO 的 write 不带文件参数的形式） */
 function writeStore(ctx: RuntimeContext, f: unknown): PascalFileStore {
   return f === undefined ? defaultStore(ctx, true) : textStore(f as PascalFile)
 }
 
-/**
- * 无 file-name 的 reset / rewrite：建立初始存储。
- *
- * ISO 7185 6.6.5.2 把「文件未定义时使用」定为 error，而 reset / rewrite 的作用正是让
- * 文件进入定义状态；未初始化的文件变量在此建立存储。
- */
 function ensureStore(p: PascalFile): PascalFileStore {
   let store = p.value
   if (store === undefined) {
@@ -80,7 +41,6 @@ function ensureStore(p: PascalFile): PascalFileStore {
   return store
 }
 
-/** 读一个字符单位；行结束符消耗后返回空格（char 用 ord 值表示） */
 function readCharUnit(store: PascalFileStore): number {
   if (!store.hasMore()) {
     return 32
@@ -97,7 +57,6 @@ function readCharUnit(store: PascalFileStore): number {
   return b
 }
 
-/** 读一个 token（跳过前导空白，读到下一空白） */
 function readTokenUnit(store: PascalFileStore): string {
   while (store.hasMore()) {
     const b = store.peekByte()!
@@ -156,7 +115,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.fileGet]: (_ctx, f, size) => {
       const p = f as PascalFile
       const store = textStore(p)
-      // ISO 6.6.5.2: get(f) 的 pre-assertion 是 not eof(f)
       if (!store.hasMore()) {
         throw new Error('get(f) at EOF: pre-assertion violated')
       }
@@ -164,7 +122,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         store.advanceBy(size as number)
         return undefined
       }
-      // 字节文件：单纯推进，不做行结束符处理
       if (isByteFile(p)) {
         store.advance()
         return undefined
@@ -176,7 +133,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       const p = f as PascalFile
       if (isBlockFile(p)) {
         const store = textStore(p)
-        // 写模式：f^ 恒为 p.buffer（每次 put 后清空，保证多次 f^.field := x 互不干扰）
         if (store.getMode() === 'generation') {
           if (p.buffer !== undefined) {
             return p.buffer
@@ -185,7 +141,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
           p.buffer = makeByteHost(nb)
           return p.buffer
         }
-        // 读模式：当前记录
         const rec = store.peekBytes(size as number)
         if (rec !== undefined) {
           return makeByteHost(rec)
@@ -196,13 +151,11 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       const store = textStore(p)
       const b = store.peekByte()
       if (b === undefined) {
-        // 字节文件在 EOF 处取 0（WEB 的 fbyte 语义），文本文件取空格
         return isByteFile(p) ? 0 : 32
       }
       return b
     },
 
-    // put(f)：把缓冲区落盘。仅 blocks 需要落盘，text / bytes 无缓冲语义
     [rtKeys.filePut]: (_ctx, f) => {
       const p = f as PascalFile
       if (isBlockFile(p)) {
@@ -218,33 +171,26 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return undefined
     },
 
-    // `f^ := x`（blocks）：x 是记录字节宿主
     [rtKeys.filePutBufferBlock]: (_ctx, f, unit) => {
       const p = f as PascalFile
       const store = textStore(p)
-      // ISO 6.6.5.2: 写缓冲区的前置条件是文件处于写状态
       if (store.getMode() !== 'generation') {
         throw new Error('f^ := x before rewrite: pre-assertion violated')
       }
-      // `f^ := x` 是赋值（值语义），x 可能是共享视图（如 mem[k]），
-      // 必须深拷贝后落缓冲：否则改 x 会连带改掉已写入的缓冲内容。
       p.buffer = makeByteHost((unit as ByteHost).bytes.slice())
       return undefined
     },
 
-    // `f^ := x`（file of byte）：x 是单个字节
     [rtKeys.filePutBufferByte]: (_ctx, f, unit) => {
       textStore(f as PascalFile).writeByte((unit as number) & 0xff)
       return undefined
     },
 
-    // `f^ := x`（text，elem 为 char）：char 即字节，直接写低 8 位
     [rtKeys.filePutBufferCharacter]: (_ctx, f, unit) => {
       textStore(f as PascalFile).writeByte((unit as number) & 0xff)
       return undefined
     },
 
-    // `f^ := x`（text，elem 非 char）：rewrite 已按元素类型格式化为文本
     [rtKeys.filePutBufferText]: (_ctx, f, unit) => {
       writeTextUnit(textStore(f as PascalFile), unit as string)
       return undefined
@@ -264,7 +210,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
         }
         return makeByteHost(new Uint8Array(0))
       }
-      // 字节文件：原样取一个字节
       if (isByteFile(p)) {
         const b = store.peekByte() ?? 0
         store.advance()
@@ -280,22 +225,18 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
       return readTokenUnit(textStore(p))
     },
 
-    // 写文本单位：值是 string（char 与格式化文本的宿主表示都是 string）
     [rtKeys.fileWriteText]: (ctx, f, unit) => {
       writeTextUnit(writeStore(ctx, f), unit as string)
       return undefined
     },
-    // 写单个字节：值是 number（file of byte）
     [rtKeys.fileWriteByte]: (ctx, f, unit) => {
       writeStore(ctx, f).writeByte((unit as number) & 0xff)
       return undefined
     },
-    // 写字节序列：值是字节宿主（char 数组 / 二进制转换结果）
     [rtKeys.fileWriteBytes]: (ctx, f, unit) => {
       writeStore(ctx, f).writeBytes((unit as ByteHost).bytes)
       return undefined
     },
-    // 写一个定长块：值是字节宿主（file of record）
     [rtKeys.fileWriteBlock]: (_ctx, f, unit) => {
       textStore(f as PascalFile).writeBytes((unit as ByteHost).bytes)
       return undefined
@@ -313,7 +254,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.filePage]: (ctx, f) => {
       const store = pick(ctx, f, true)
-      // ISO 7185 6.9.5: 若 f.L 非空且 f.L.last 不是 end-of-line，page(f) 先隐式 writeln(f)
       if (store.currentLineHasContent()) {
         store.writeByte(10)
       }
@@ -355,16 +295,6 @@ export function fileRuntimeSyscalls(): Record<string, SyscallHandler> {
   }
 }
 
-/**
- * 文本单位写入。
- *
- * 单字符即一个字节：按 code unit 写一字节，跳过 TextEncoder。这是 TeX / TANGLE
- * 的主输出路径（WEB 的 print_char 逐字符写出），走 TextEncoder 时每个字符都要
- * 分配一个 1 字节缓冲、再穿过 JS/Rust 边界调 op_encode，实测约 2µs/字符，
- * 比直写字节贵一个数量级。
- *
- * 多字符（数字格式化结果等）是 ASCII 文本，仍走 UTF-8 编码。
- */
 function writeTextUnit(store: PascalFileStore, s: string): void {
   if (s.length === 1) {
     store.writeByte(s.charCodeAt(0) & 0xff)

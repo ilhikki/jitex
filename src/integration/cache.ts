@@ -1,9 +1,9 @@
-// 缓存机制（目录结构 + checksum + 恢复判定 + 写入）。
+// Cache mechanism (directory layout + checksum + recovery decision + writing).
 //
-// 目录：{cacheDir}/{suiteName}/{stageName}/
-//   meta.json          // 版本、时间戳、依赖列表及 checksum、自身 checksum
-//   results.json       // CacheableRecord（JSON 序列化，Uint8Array 用 base64）
-//   attachments/{name} // 附件原样保留
+// Layout: {cacheDir}/{suiteName}/{stageName}/
+//   meta.json          // version, timestamp, dep list & checksums, self checksum
+//   results.json       // CacheableRecord (JSON serialized, Uint8Array as base64)
+//   attachments/{name} // attachments kept as-is
 //   assertions.json
 //   logs.txt
 
@@ -39,8 +39,6 @@ function dec(): TextDecoder {
   return new TextDecoder()
 }
 
-// 将 Uint8Array 序列化为 { "__bytes": "base64" } 的占位对象；
-// 其余 CacheableValue 原样保留。
 function serializeResults(r: CacheableRecord): unknown {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(r)) {
@@ -78,7 +76,6 @@ function deserializeResults(obj: unknown): CacheableRecord {
 }
 
 async function sha256Hex(chunks: Uint8Array[]): Promise<string> {
-  // 手工拼接 chunks
   let total = 0
   for (const c of chunks) {
     total += c.length
@@ -123,7 +120,7 @@ function sanitize(s: string): string {
   return s.replace(/[^A-Za-z0-9_.-]/g, '_')
 }
 
-// 计算某个 stage（results + attachments）的 checksum。
+// Compute checksum for a stage (results + attachments).
 export async function computeChecksum(
   results: CacheableRecord,
   artifacts: Artifact[],
@@ -137,7 +134,7 @@ export async function computeChecksum(
   return await sha256Hex(chunks)
 }
 
-// 读取 meta.json；不存在返回 undefined。
+// Read meta.json; return undefined if it does not exist.
 export async function readMeta(dir: string): Promise<MetaJson | undefined> {
   const p = `${dir}/meta.json`
   try {
@@ -153,7 +150,7 @@ export async function writeMeta(dir: string, meta: MetaJson): Promise<void> {
   await Deno.writeFile(`${dir}/meta.json`, enc().encode(JSON.stringify(meta, undefined, 2)))
 }
 
-// 写缓存条目（成功后调用）。
+// Write a cache entry (called after success).
 export async function writeCache(
   cacheDir: string,
   suiteName: string,
@@ -167,9 +164,10 @@ export async function writeCache(
   const dir = stageDir(cacheDir, suiteName, stageName)
   await Deno.mkdir(dir, { recursive: true })
 
-  // 归一化 attachments：按落盘文件名（sanitize 后）去重，后者覆盖前者。
-  // 恢复端只能看到磁盘上的文件列表，checksum 必须能由该列表完全重现；
-  // 否则「同名 artifact 被多次 attach」（如 boot-tex 的 tangle.js）会导致校验失败。
+  // Normalize attachments: dedup by on-disk filename (after sanitize), later wins.
+  // The recovery side only sees the on-disk file list, so the checksum must be
+  // fully reproducible from that list; otherwise repeated attach of the same
+  // artifact name (e.g. boot-tex's tangle.js) would break verification.
   const normalized: Artifact[] = []
   const byName = new Map<string, number>()
   for (const a of artifacts) {
@@ -203,15 +201,15 @@ export async function writeCache(
   return checksum
 }
 
-// 尝试从缓存恢复；不满足条件返回 undefined。
-// 若 requireCacheStrict=true（CLI --with-cache 场景）：
-//   - 该 stage 被标记 cacheable 但缓存条目不存在 → 抛错
-//   - 依赖被标记 cacheable 但依赖缓存不存在/不匹配 → 抛错
+// Attempt to recover from cache; return undefined if conditions are not met.
+// When requireCacheStrict=true (CLI --with-cache):
+//   - stage is cacheable but no cache entry exists -> throw
+//   - a dep is cacheable but its cache is missing/mismatched -> throw
 export async function tryRecoverCache(
   cacheDir: string,
   suiteName: string,
   stage: Stage<unknown>,
-  depChecksums: Map<string, string>, // stageName -> 当前依赖的实际 checksum
+  depChecksums: Map<string, string>, // stageName -> actual checksum of the current dep
   requireCacheStrict: boolean,
 ): Promise<RecoveredData | undefined> {
   if (!stage.cacheable) {
@@ -234,7 +232,6 @@ export async function tryRecoverCache(
     return undefined
   }
 
-  // 依赖校验：所有直接 deps 都必须 cacheable + 在 depChecksums 里 + 和 meta.deps 里的 checksum 匹配
   for (const dep of stage.deps) {
     if (requireCacheStrict && !dep.cacheable) {
       throw new Error(
@@ -275,7 +272,6 @@ export async function tryRecoverCache(
     }
   }
 
-  // 读取本地
   let results: CacheableRecord
   let assertions: AssertionRecord[]
   let logs: string[]
@@ -284,7 +280,6 @@ export async function tryRecoverCache(
     results = deserializeResults(JSON.parse(dec().decode(await Deno.readFile(`${dir}/results.json`))))
     assertions = JSON.parse(dec().decode(await Deno.readFile(`${dir}/assertions.json`))) as AssertionRecord[]
     logs = dec().decode(await Deno.readFile(`${dir}/logs.txt`)).split('\n').filter((_, _i, arr) => {
-      // 空文件 split 得到 ['']；过滤掉
       if (arr.length === 1 && arr[0] === '') {
         return false
       }
@@ -296,7 +291,7 @@ export async function tryRecoverCache(
     try {
       entries = Array.from(Deno.readDirSync(attachDir))
     } catch {
-      // 目录不存在 ≡ 无附件
+      // ignored
     }
     for (const e of entries) {
       if (!e.isFile) {
@@ -312,7 +307,6 @@ export async function tryRecoverCache(
     return undefined
   }
 
-  // 自身 checksum 校验
   const actualChecksum = await computeChecksum(results, artifacts)
   if (actualChecksum !== meta.checksum) {
     if (requireCacheStrict) {
@@ -326,7 +320,7 @@ export async function tryRecoverCache(
   return { results, artifacts, assertions, logs, checksum: actualChecksum }
 }
 
-// 整目录 purge
+// Purge the entire cache directory.
 export async function purgeCacheDir(cacheDir: string): Promise<void> {
   try {
     await Deno.remove(cacheDir, { recursive: true })

@@ -1,15 +1,3 @@
-% tex.trip.ch — TRIP 测试专用 WEB change file（tripman.tex Appendix A step 2）
-%
-% 按 tripman.tex step 2 "Prepare a special version of INITEX" 要求：
-%   1. init/tini 宏改为 null（启用 INITEX 模式的全部初始化代码）
-%   2. stat/tats 宏改为 @t@>（启用统计代码：var_used/dyn_used 跟踪等）
-%   3. mem_min/mem_bot: 0 → 1, mem_top/mem_max: 30000 → 3000
-%   4. error_line: 72 → 64, half_error_line: 42 → 32, max_print_line: 79 → 72
-%      （这些参数影响 show_context 截断/缩进、print 行宽、内存统计数字）
-%
-% @x 块按 tex.web 行号递增排列（TANGLE 单调扫描，不可逆序）。
-% @x 后的旧行必须与 tex.web 中的行字节级匹配（不含行尾符）。
-
 @x
 @d stat==@{ {change this to `$\\{stat}\equiv\null$' when gathering
   usage statistics}

@@ -1,5 +1,5 @@
 /*
- * JsonCode — 通用中间表示（IR）
+ * JsonCode - 通用中间表示（IR）
  *
  * 0. 设计原则
  *
@@ -188,7 +188,7 @@ export interface Eval {
  * - Call    : 调用用户定义的 Function。
  * - Syscall : 调用运行时提供的原语能力。
  *
- * JsonCode 不表达任何"高级运算符"或"内置函数"——加减法、比较、数组下标、
+ * JsonCode 不表达任何"高级运算符"或"内置函数"--加减法、比较、数组下标、
  * 记录字段访问一律走 Syscall。
  */
 export type Expr = Ref | Literal | Call | Syscall

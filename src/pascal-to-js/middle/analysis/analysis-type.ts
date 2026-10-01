@@ -212,7 +212,7 @@ export const BUILTIN_IDENTIFIERS = new Set(['maxint', 'nil', 'eof', 'eoln'])
 /**
  * 内置函数的返回类型规则，只有两种形式。
  *
- * 规则里刻意不含实参个数、实参形态与合法调用形式——那些属于内置语义，
+ * 规则里刻意不含实参个数、实参形态与合法调用形式--那些属于内置语义，
  * 归 rewrite 解释（见下表的说明）。
  */
 export type BuiltinReturnTypeRule =
@@ -256,7 +256,7 @@ export const BUILTIN_FUNCTION_RETURN_TYPES: Record<string, BuiltinReturnTypeRule
  * 内置无参标识符的类型（parser 把无参调用解析为 Identifier）。
  *
  * 与 BUILTIN_FUNCTION_RETURN_TYPES 同理：只声明「这个标识符是什么类型」，
- * 不涉及调用形态或行为。maxint 未收录——它沿用缺省（unknown）类型。
+ * 不涉及调用形态或行为。maxint 未收录--它沿用缺省（unknown）类型。
  */
 export const BUILTIN_IDENTIFIER_TYPES: Record<string, TypeInfo> = {
   eof: { tag: 'boolean' },
@@ -325,7 +325,7 @@ export function evalConstInt(
     case 'Identifier': {
       const sym = lookup(node.name)
       // 序数常量（integer / char / boolean / enum / subrange）在常量表里都以 'number' 编码；
-      // real 常量同用该编码，须排除 —— 它不能作 subrange 边界、数组下标或 case 常量
+      // real 常量同用该编码，须排除 -- 它不能作 subrange 边界、数组下标或 case 常量
       if (sym?.kind === 'const' && sym.literal.key === 'number' && sym.typeInfo.tag !== 'real') {
         return parseInt(sym.literal.arg, 10)
       }
@@ -377,7 +377,7 @@ export function evalLiteral(
   }
 }
 
-// Analysis — 编译阶段可见的只读接口
+// Analysis - 编译阶段可见的只读接口
 
 export interface Analysis {
   nextId(): number

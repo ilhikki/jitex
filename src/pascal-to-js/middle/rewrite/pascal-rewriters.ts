@@ -67,7 +67,7 @@ function isCharArray(t: TypeDescriptor | undefined): boolean {
   return t?.tag === 'array' && t.elem?.tag === 'char'
 }
 
-/** 目标文件是否为二进制 record 文件（file of record）—— 只有它走字节转换 */
+/** 目标文件是否为二进制 record 文件（file of record）-- 只有它走字节转换 */
 function isBinaryFile(fileType: TypeDescriptor | undefined): boolean {
   return fileType?.tag === 'file' && fileType.elem?.tag === 'record'
 }
@@ -88,9 +88,9 @@ function isByteFile(fileType: TypeDescriptor | undefined): boolean {
  * 文件的存储形态。
  *
  * 只描述「单位是什么」，不含 Pascal 类型语义：
- *   text   —— 单位是字符（UTF-8 文本，含行结束符语义）
- *   bytes  —— 单位是单个字节
- *   blocks —— 单位是定长字节块
+ *   text   -- 单位是字符（UTF-8 文本，含行结束符语义）
+ *   bytes  -- 单位是单个字节
+ *   blocks -- 单位是定长字节块
  *
  * runtime 据该标量决定存储实现与读写路径，不做 Pascal 类型判断。
  */
@@ -109,7 +109,7 @@ function fileKind(fileType: TypeDescriptor | undefined): string {
  * object 表示的类型的默认值表达式，编译期整棵树展开。
  *
  * 含 file / pointer 的类型无法字节化，值由 JS 对象承载（见 isObjectRepr），
- * 因此默认值必须在编译期展开成构造表达式——运行期不再接收类型描述符。
+ * 因此默认值必须在编译期展开成构造表达式--运行期不再接收类型描述符。
  */
 function defaultValueExpr(td: TypeDescriptor): JsonCode.Expr {
   switch (td.tag) {
@@ -346,7 +346,7 @@ function fromConvertKey(td: TypeDescriptor | undefined, binary: boolean): string
 /**
  * ISO 7185 6.6.5.2 形态检查：reset(f) / rewrite(f) 只有一个 file-variable 实参。
  *
- * 检查落在 rewrite —— 实参形态属于内置语义，lowering 只做结构翻译与类型描述过境，
+ * 检查落在 rewrite -- 实参形态属于内置语义，lowering 只做结构翻译与类型描述过境，
  * 不判定。实参多于 ISO 形态即为非标形式（带 file-name），此处报错；使用方若要
  * 以 rewrite 扩展表达该方言，覆盖同名 lowering.* key 即可，本检查随之让位。
  *
@@ -560,7 +560,7 @@ function readCall(sys: JsonCode.Syscall, skipLine: boolean, debug: boolean): Jso
  * 为注入的 callable 生成重写项：`lowering.call.<名>` → 使用方指定的 syscall 名。
  *
  * 注入只是"声明这个名字存在并给出实现"，实参布局由 lowering 统一为平铺的
- * (值, 类型描述)——还原成纯值后交给使用方的 syscall（其 handler 只面对值）。
+ * (值, 类型描述)--还原成纯值后交给使用方的 syscall（其 handler 只面对值）。
  */
 export function buildExtraCallableRewriters(
   extraCallables?: Record<string, ExtraCallable>,
@@ -833,7 +833,7 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
     // 可调用形参的间接调用：callee 为函数值，是个原子操作，无需类型分派
     'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
     // 这三条只在 debug 构建由 lowering 生成（"是否生成"已由 lowering 决定），
-    // 因此此处无条件翻译 —— rewrite 不再需要"删除语句"的能力
+    // 因此此处无条件翻译 -- rewrite 不再需要"删除语句"的能力
     'lowering.range.check': (sys) => sc(rtKeys.debugRangeCheck, sys.args),
     'lowering.steps.check': () => sc(rtKeys.debugStepsCheck, []),
     'lowering.hook.function.enter': () => sc(rtKeys.hookFunctionEnter, []),

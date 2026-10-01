@@ -22,7 +22,7 @@ const ENTRY_ID: BlockId = 0
 /**
  * 调试探针：lowering 决策 13 在每次 goto 前插入的 steps.check（见
  * middle/lowering/statements.ts）。它只服务于 maxSteps 兜底，不参与 Pascal 语义，
- * 所以"块里只剩它"等于块是空的——否则每个 goto 都会独占一个基本块，跳转穿线失效。
+ * 所以"块里只剩它"等于块是空的--否则每个 goto 都会独占一个基本块，跳转穿线失效。
  */
 const DEBUG_PROBE_KEYS: ReadonlySet<string> = new Set(['runtime.debug.steps.check'])
 
@@ -111,8 +111,6 @@ export function dropUnreachable(cfg: Cfg): Cfg {
   return kept.length === cfg.blocks.length ? cfg : makeCfg(kept)
 }
 
-// ---------- 语句 → 终结符 ----------
-
 interface Lowered {
   readonly line: string | undefined
   readonly term: Terminator | undefined
@@ -120,10 +118,6 @@ interface Lowered {
 
 const EXIT_TERM: Terminator = { kind: 'exit' }
 
-/**
- * 全流水线唯一一处按 Statement.kind 分派的地方。
- * jump / jumpIf / return / longJump 在这里变成终结符，其余变成文本。
- */
 function lowerStatement(stmt: JsonCode.Statement, ctx: StructurizeContext): Lowered {
   switch (stmt.kind) {
     case 'eval':
@@ -157,7 +151,7 @@ function splitBlocks(body: readonly JsonCode.Statement[], ctx: StructurizeContex
 
   let labelId: BlockId | undefined
   let lines: string[] = []
-  /** lines 里有多少条来自调试探针——用于判断"这个块其实什么都没有" */
+  /** lines 里有多少条来自调试探针--用于判断"这个块其实什么都没有" */
   let probes = 0
   let term: Terminator | undefined
 
@@ -179,10 +173,8 @@ function splitBlocks(body: readonly JsonCode.Statement[], ctx: StructurizeContex
           `block ${labelId ?? ENTRY_ID} runs off the end of the function without a terminator`,
         )
       }
-      // 块末尾没有终结符 ⇒ 落到下一个块（与 switch 穿透语义一致）
       term = { kind: 'goto', to: nextLabel }
     }
-    // 只剩调试探针的 goto 块 = 空块：目标语言里它没有任何可执行内容
     const body = term.kind === 'goto' && probes === lines.length ? [] : lines
     blocks.push({ id: labelId ?? ENTRY_ID, body, term })
     labelId = undefined

@@ -1,13 +1,3 @@
-/*
- * Pass 1: 声明处理。
- *
- * 递归遍历每个 block，处理 label/const/type/var/param 声明 + allocFunc 建函数表。
- * 建立作用域快照（blockScopes），供 Pass 2 只读 lookup。
- *
- * 输入：ProgramNode, AnalysisContext
- * 输出：DeclarationResult
- */
-
 import {
   BlockNode,
   CallableParameterSpec,
@@ -38,11 +28,7 @@ import {
 } from '../analysis-type.ts'
 import { AnalysisContext, DeclarationResult, ScopeSnapshot } from '../stage-types.ts'
 
-// 内部作用域栈
-
 interface MutableScope extends ScopeSnapshot {}
-
-// Pass 1 入口
 
 export function runDeclarationPass(
   program: ProgramNode,
@@ -196,7 +182,7 @@ class DeclarationPass {
   // Block 分析（声明部分）
 
   private analyzeBlock(block: BlockNode, funcId: number): void {
-    // LABEL — per-function 作用域：每个函数有自己的 label 表。
+    // LABEL - per-function 作用域：每个函数有自己的 label 表。
     if (block.labelDeclarations) {
       let funcLabels = this.labels.get(funcId)
       if (!funcLabels) {
@@ -218,7 +204,7 @@ class DeclarationPass {
       this.analyzeConst(c)
     }
 
-    // TYPE — 两遍处理，支持 ISO 7185 6.4.4 指针前向引用
+    // TYPE - 两遍处理，支持 ISO 7185 6.4.4 指针前向引用
     const typePlaceholders = new Map<string, TypeInfo>()
     for (const t of block.typeDeclarations) {
       const lower = t.name.name.toLowerCase()
@@ -261,7 +247,7 @@ class DeclarationPass {
       }
     }
 
-    // PROCEDURE / FUNCTION — 两遍分析
+    // PROCEDURE / FUNCTION - 两遍分析
     for (const p of block.procedureDeclarations) {
       this.declareProcName(p)
     }

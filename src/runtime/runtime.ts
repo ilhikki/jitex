@@ -1,23 +1,3 @@
-/*
- * IL Runtime — 同步 syscall 实现。
- *
- * 决策依据：
- *   - 决策 7：全部同步，无 async/await
- *   - 决策 8：steps.check 在循环回边由 compiler.ts 插入
- *   - 决策 9：RunState 复用 src/runtime/run-state.ts；
- *             file ops 逻辑参考 file-model.ts 但同步化
- *
- * 提供给 transform.ts 生成的 JS 代码调用的 syscall 表 `__sys`：
- *   __sys[key](ctx, ...args) → unknown
- *
- * handler 形参里的 ctx 由生成代码在调用点透传（生成产物柯里化为
- * `main(__sys)(ctx)`），**不在构造期 bind**：表因此与「某一次运行」无关，
- * 可跨运行复用（见 exec.ts 的三段式）。
- *
- * transform.ts 的 SemanticCompiler 决定哪些 syscall inline（算术/比较），
- * 哪些走 `__sys`（IO/file/cell/mem/set）。本文件实现所有走 `__sys` 的 key。
- */
-
 import type { RunState } from './run-state.ts'
 import type { RuntimeContext, RuntimeOptions, SyscallHandler, SyscallTable } from './runtime-type.ts'
 import { arithSyscalls } from './sys/arith.ts'

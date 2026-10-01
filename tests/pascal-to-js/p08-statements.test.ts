@@ -1,19 +1,32 @@
 // ISO/IEC 7185:1990 - 6.8 Statements
 //
-// 章节概括：
-//   规定语句表示可执行的算法动作，语法为 statement = [label ':'] (simple-statement | structured-statement)，
-//   并给出某语句的标签能否作为某 goto 语句目标的三条判据。simple-statement 包括 empty-statement、
-//   assignment-statement、procedure-statement、goto-statement：赋值语句把表达式值赋给变量或函数激活结果
-//   （要求 assignment-compatible），并定义变量的 undefined 与 structured-type 变量的 totally-undefined 状态；
-//   过程语句激活对应过程块（read/readln/write/writeln 的参数形式指称相应 required procedure）；
-//   goto 语句使处理在该标签所指程序点继续，并终止除相关激活外的所有激活。structured-statement 包括
-//   compound-statement、conditional-statement（if、case）、repetitive-statement（repeat、while、for）
-//   与 with-statement：statement-sequence 按文本顺序执行；if 的 else 配对规则（无 else 的 if 不得紧跟 else）；
-//   case 的 case-index 选择与 case 常量互异要求（无匹配即错误）；repeat/while/for 的重复语义，
-//   其中 for 要求 control-variable 为 entire-variable 且为序数类型、执行后变 undefined，并定义
-//   "threatening a variable" 及 for 的等价展开；with 规定 field-designator-identifier 的定义点与作用域。
+// Section summary:
+//   Statements represent executable algorithmic actions, with the syntax
+//   statement = [label ':'] (simple-statement | structured-statement),
+//   and three criteria are given for whether a given statement's label can be
+//   the target of a given goto statement. simple-statement includes
+//   empty-statement, assignment-statement, procedure-statement, and
+//   goto-statement: an assignment statement assigns the value of an expression
+//   to a variable or a function activation result (requiring
+//   assignment-compatibility), and defines the undefined state of a variable
+//   and the totally-undefined state of a structured-type variable; a procedure
+//   statement activates the corresponding procedure block (the parameter forms
+//   of read/readln/write/writeln denote the corresponding required procedures);
+//   a goto statement causes processing to continue at the program point denoted
+//   by the label and terminates all activations except the relevant one.
+//   structured-statement includes compound-statement, conditional-statement
+//   (if, case), repetitive-statement (repeat, while, for), and with-statement:
+//   a statement-sequence is executed in textual order; the else-matching rule
+//   of if (an if without else must not be immediately followed by else); the
+//   case-index selection of case and the requirement that case constants be
+//   distinct (an error if none match); the repetition semantics of
+//   repeat/while/for, where for requires the control-variable to be an
+//   entire-variable of an ordinal type and becomes undefined after execution,
+//   and defines "threatening a variable" and the equivalent expansion of for;
+//   with defines the point of definition and scope of the
+//   field-designator-identifier.
 //
-// 子章节：
+// Subsections:
 //   6.8.1 General
 //   6.8.2 Simple-statements
 //     6.8.2.1 General
@@ -35,10 +48,10 @@
 import { type PascalTest, runPascalTests } from './harness.ts'
 
 const tests: PascalTest[] = [
-  // 6.8.2.1 空语句
+  // 6.8.2.1 Empty-statement
 
   {
-    name: '6.8 空语句不含符号且不执行任何动作',
+    name: '6.8 empty-statement contains no symbol and performs no action',
     code: `program test(output);
 var i: integer;
 begin
@@ -48,11 +61,12 @@ begin
   ;
   writeln(i);
 end.`,
-    purpose: '6.8.2.1：空语句不含符号、表示无动作，夹在语句序列中不影响结果',
+    purpose:
+      '6.8.2.1: an empty-statement contains no symbol, denotes no action, and does not affect the result when placed within a statement-sequence',
     expectedOutput: '2\n',
   },
   {
-    name: '6.8 label 可前缀空语句',
+    name: '6.8 a label may prefix an empty-statement',
     code: `program test(output);
 label 10;
 begin
@@ -62,14 +76,14 @@ begin
   ;
   writeln('after');
 end.`,
-    purpose: '6.8.1：label 可前缀空语句，goto 跳到该处以空动作继续',
+    purpose: '6.8.1: a label may prefix an empty-statement; a goto jumps to it to continue with an empty action',
     expectedOutput: 'after\n',
   },
 
-  // 6.8.2.2 赋值语句
+  // 6.8.2.2 Assignment-statements
 
   {
-    name: '6.8 赋值语句把表达式值赋给变量',
+    name: '6.8 assignment-statement assigns the value of an expression to a variable',
     code: `program test(output);
 var x: integer;
     c: char;
@@ -81,11 +95,12 @@ begin
   if b then
     writeln(c);
 end.`,
-    purpose: '6.8.2.2：赋值语句把与变量类型赋值兼容的表达式值赋给变量',
+    purpose:
+      '6.8.2.2: an assignment-statement assigns the value of an expression that is assignment-compatible with the variable type to the variable',
     expectedOutput: 'q\n',
   },
   {
-    name: '6.8 整数可赋值给实数变量（赋值兼容）',
+    name: '6.8 an integer can be assigned to a real variable (assignment-compatible)',
     code: `program test(output);
 var r: real;
     i: integer;
@@ -95,22 +110,22 @@ begin
   if r = 3.0 then
     writeln('compatible');
 end.`,
-    purpose: '6.8.2.2 / 6.4.6：integer 类型的值对 real 变量赋值兼容',
+    purpose: '6.8.2.2 / 6.4.6: a value of type integer is assignment-compatible with a real variable',
     expectedOutput: 'compatible\n',
   },
   {
-    name: '6.8 赋值语句要求赋值兼容（不兼容的赋值是错误）',
+    name: '6.8 assignment-statement requires assignment-compatibility (an incompatible assignment is an error)',
     code: `program test;
 var i: integer;
 begin
   i := true;
 end.`,
     purpose:
-      '【乙类·D.49】6.8.2.2：值须与变量类型赋值兼容，boolean 不兼容 integer，程序非法——designated error，§5.1 f) 允许在随附文档中声明不报告；本处理器选择检出并报告',
+      '[Class B . D.49] 6.8.2.2: a value must be assignment-compatible with the variable type; boolean is incompatible with integer, so the program is invalid - a designated error, §5.1 f) permits not reporting it in the accompanying documentation; this processor chooses to detect and report it',
     expectedError: '',
   },
   {
-    name: '6.8 同一记录类型可整体赋值',
+    name: '6.8 variables of the same record type can be assigned as a whole',
     code: `program test(output);
 type
   point = record
@@ -125,11 +140,11 @@ begin
   b := a;
   writeln(b.x, b.y);
 end.`,
-    purpose: '6.4.6：同一记录类型的变量之间赋值兼容，可整体赋值',
+    purpose: '6.4.6: variables of the same record type are assignment-compatible and can be assigned as a whole',
     expectedOutput: '45\n',
   },
   {
-    name: '6.8 赋值语句可给函数标识符（activation result）赋值',
+    name: '6.8 an assignment-statement can assign to a function-identifier (activation result)',
     code: `program test(output);
 function double(n: integer): integer;
 begin
@@ -138,25 +153,27 @@ end;
 begin
   writeln(double(4));
 end.`,
-    purpose: '6.8.2.2：赋值语句可把值赋给函数标识符所指称的 activation result',
+    purpose:
+      '6.8.2.2: an assignment-statement can assign a value to the activation result denoted by a function-identifier',
     expectedOutput: '8\n',
   },
   {
-    name: '6.8 变量赋值前处于 undefined 状态，赋值后其值确定',
+    name: '6.8 a variable is in an undefined state before assignment and its value is determined after assignment',
     code: `program test(output);
 var x: integer;
 begin
   x := 7;
   writeln(x);
 end.`,
-    purpose: '6.8.2.2：未赋值的变量状态为 undefined；赋值后其值由所赋表达式确定',
+    purpose:
+      '6.8.2.2: the state of an unassigned variable is undefined; after assignment its value is determined by the assigned expression',
     expectedOutput: '7\n',
   },
 
-  // 6.8.2.3 过程语句
+  // 6.8.2.3 Procedure-statements
 
   {
-    name: '6.8 无参过程语句激活过程块',
+    name: '6.8 a parameterless procedure-statement activates a procedure block',
     code: `program test(output);
 procedure hello;
 begin
@@ -165,11 +182,12 @@ end;
 begin
   hello;
 end.`,
-    purpose: '6.8.2.3：过程语句指定激活与其过程标识符关联的过程块',
+    purpose:
+      '6.8.2.3: a procedure-statement specifies activation of the procedure block associated with its procedure-identifier',
     expectedOutput: 'hello\n',
   },
   {
-    name: '6.8 过程语句实参与形参按位置对应',
+    name: '6.8 actual and formal parameters of a procedure-statement correspond by position',
     code: `program test(output);
 procedure pair(a, b: char);
 begin
@@ -178,35 +196,37 @@ end;
 begin
   pair('x', 'y');
 end.`,
-    purpose: '6.8.2.3：实参与形参按各自列表中的位置一一对应且数量相等',
+    purpose:
+      '6.8.2.3: actual and formal parameters correspond one-to-one by position in their respective lists and are equal in number',
     expectedOutput: 'xy\n',
   },
   {
-    name: '6.8 read 过程语句读取字符变量',
+    name: '6.8 the read procedure-statement reads a character variable',
     code: `program test(input, output);
 var c: char;
 begin
   read(c);
   writeln(c);
 end.`,
-    purpose: '6.8.2.3 / 6.9.1：read-parameter-list 的过程标识符指称 required procedure read',
+    purpose: '6.8.2.3 / 6.9.1: the procedure-identifier of a read-parameter-list denotes the required procedure read',
     input: 'Z',
     expectedOutput: 'Z\n',
   },
   {
-    name: '6.8 readln 过程语句读取整数变量',
+    name: '6.8 the readln procedure-statement reads an integer variable',
     code: `program test(input, output);
 var i: integer;
 begin
   readln(i);
   writeln(i);
 end.`,
-    purpose: '6.8.2.3 / 6.9.2：readln-parameter-list 的过程标识符指称 required procedure readln',
+    purpose:
+      '6.8.2.3 / 6.9.2: the procedure-identifier of a readln-parameter-list denotes the required procedure readln',
     input: '42',
     expectedOutput: '42\n',
   },
   {
-    name: '6.8 write/writeln 过程语句输出字符与换行',
+    name: '6.8 the write/writeln procedure-statement outputs characters and newlines',
     code: `program test(output);
 begin
   write('a');
@@ -214,14 +234,14 @@ begin
   writeln;
   writeln('c');
 end.`,
-    purpose: '6.8.2.3 / 6.9.3：write/writeln-parameter-list 指称 required procedure write/writeln',
+    purpose: '6.8.2.3 / 6.9.3: a write/writeln-parameter-list denotes the required procedure write/writeln',
     expectedOutput: 'ab\nc\n',
   },
 
-  // 6.8.2.4 goto 语句
+  // 6.8.2.4 Goto-statements
 
   {
-    name: '6.8 goto 向前跳转跳过语句',
+    name: '6.8 goto jumps forward to skip statements',
     code: `program test(output);
 label 10;
 begin
@@ -231,11 +251,12 @@ begin
 10:
   writeln('c');
 end.`,
-    purpose: '6.8.2.4 / 6.8.1 b)：label 与 goto 处于同一 statement-sequence，处理在 label 处继续',
+    purpose:
+      '6.8.2.4 / 6.8.1 b): the label and the goto are in the same statement-sequence, so processing continues at the label',
     expectedOutput: 'a\nc\n',
   },
   {
-    name: '6.8 goto 向后跳转构成循环',
+    name: '6.8 goto jumps backward to form a loop',
     code: `program test(output);
 label 20;
 var i: integer;
@@ -247,11 +268,12 @@ begin
   if i < 3 then
     goto 20;
 end.`,
-    purpose: '6.8.2.4：goto 使处理在 label 所指程序点继续，可向后构成循环',
+    purpose:
+      '6.8.2.4: goto causes processing to continue at the program point denoted by the label, and may go backward to form a loop',
     expectedOutput: '1\n2\n3\n',
   },
   {
-    name: '6.8 goto 到包含它的语句中的 label（判据 a）',
+    name: '6.8 goto to a label in a statement that contains it (criterion a)',
     code: `program test(output);
 label 30;
 var i: integer;
@@ -266,11 +288,12 @@ begin
   end;
   writeln('done');
 end.`,
-    purpose: '6.8.1 a)：label 前缀的语句 S 包含 goto，故该 label 允许作为目标',
+    purpose: '6.8.1 a): the statement S prefixed by the label contains the goto, so that label is allowed as a target',
     expectedOutput: '1\n2\n3\ndone\n',
   },
   {
-    name: '6.8 goto 到所在块顶层 label（判据 c，goto 位于嵌套复合语句内）',
+    name:
+      '6.8 goto to a top-level label in the enclosing block (criterion c, the goto is inside a nested compound-statement)',
     code: `program test(output);
 label 40;
 begin
@@ -283,11 +306,12 @@ begin
 40:
   writeln('label');
 end.`,
-    purpose: '6.8.1 c)：label 前缀块 statement-part 复合语句中的语句，块内任意位置的 goto 均可引用',
+    purpose:
+      '6.8.1 c): the label prefixes a statement in the compound-statement of the block statement-part, so a goto anywhere in the block may reference it',
     expectedOutput: 'outer\ninner\nlabel\n',
   },
   {
-    name: '6.8 goto 可跳出 while 循环',
+    name: '6.8 goto can jump out of a while loop',
     code: `program test(output);
 label 50;
 var i: integer;
@@ -303,11 +327,11 @@ begin
 50:
   writeln('done');
 end.`,
-    purpose: '6.8.2.4：goto 跳到循环外的 label，终止循环语句的执行',
+    purpose: '6.8.2.4: goto jumps to a label outside the loop, terminating execution of the repetitive-statement',
     expectedOutput: '1\n2\ndone\n',
   },
   {
-    name: '6.8 goto 可跳出 for 循环',
+    name: '6.8 goto can jump out of a for loop',
     code: `program test(output);
 label 60;
 var i: integer;
@@ -321,11 +345,12 @@ begin
 60:
   writeln('done');
 end.`,
-    purpose: '6.8.2.4：goto 跳出 for 语句（属"被 goto 离开"的情形，控制变量状态不再受约束）',
+    purpose:
+      '6.8.2.4: goto jumps out of a for-statement (a case of "being left by goto"; the control variable state is no longer constrained)',
     expectedOutput: '1\n2\ndone\n',
   },
   {
-    name: '6.8 goto 可跳出 repeat 循环',
+    name: '6.8 goto can jump out of a repeat loop',
     code: `program test(output);
 label 70;
 var i: integer;
@@ -340,11 +365,11 @@ begin
 70:
   writeln('done');
 end.`,
-    purpose: '6.8.2.4：goto 跳出 repeat 语句，终止其重复执行',
+    purpose: '6.8.2.4: goto jumps out of a repeat-statement, terminating its repeated execution',
     expectedOutput: '1\n2\n3\ndone\n',
   },
   {
-    name: '6.8 goto 跳出嵌套循环',
+    name: '6.8 goto jumps out of nested loops',
     code: `program test(output);
 label 80;
 var i, j: integer;
@@ -359,30 +384,30 @@ begin
 80:
   writeln('end');
 end.`,
-    purpose: '6.8.2.4：goto 一次跳出两层 for 循环，终止其间所有激活',
+    purpose: '6.8.2.4: a single goto jumps out of two layers of for loops, terminating all activations between them',
     expectedOutput: '11 12 13 21 end\n',
   },
   {
-    name: '6.8 goto 不可跳到未声明的 label',
+    name: '6.8 goto must not jump to an undeclared label',
     code: `program test;
 begin
   goto 999;
 end.`,
-    purpose: '6.8.2.4 / 6.2.1：goto 的 label 必须在某 label-declaration-part 中声明',
+    purpose: '6.8.2.4 / 6.2.1: the label of a goto must be declared in some label-declaration-part',
     expectedError: '',
   },
   {
-    name: '6.8 label 须在 label-declaration-part 中声明',
+    name: '6.8 a label must be declared in the label-declaration-part',
     code: `program test(output);
 begin
 140:
   writeln('ok');
 end.`,
-    purpose: '6.2.1：block 中出现的语句 label 须在 label-declaration-part 声明',
+    purpose: '6.2.1: a statement label appearing in a block must be declared in the label-declaration-part',
     expectedError: '',
   },
   {
-    name: '6.8 同一 label 不得前缀两个语句',
+    name: '6.8 the same label must not prefix two statements',
     code: `program test(output);
 label 100;
 begin
@@ -391,21 +416,22 @@ begin
 100:
   writeln('second');
 end.`,
-    purpose: '6.2.1：块须 closest-contain 恰好一个带该 label 的语句，重复前缀非法',
+    purpose:
+      '6.2.1: the block must closest-contain exactly one statement bearing that label; duplicate prefixes are invalid',
     expectedError: '',
   },
   {
-    name: '6.8 声明但未使用的 label 合法',
+    name: '6.8 a declared but unused label is valid',
     code: `program test(output);
 label 110;
 begin
   writeln('ok');
 end.`,
-    purpose: '6.2.1：label 声明后可以没有对应的语句前缀与 goto 使用',
+    purpose: '6.2.1: a label may be declared without a corresponding statement prefix or goto usage',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.8 goto 不可跳到 if 分支内的 label',
+    name: '6.8 goto must not jump to a label inside an if branch',
     code: `program test(output);
 label 120;
 begin
@@ -417,11 +443,12 @@ begin
     end;
   writeln('after');
 end.`,
-    purpose: '6.8.1：label 既不在 goto 所在 statement-sequence 内，也不在块 statement-part 顶层，故不可达',
+    purpose:
+      '6.8.1: the label is neither in the statement-sequence containing the goto nor at the top level of the block statement-part, so it is unreachable',
     expectedError: '',
   },
   {
-    name: '6.8 goto 不可跳到 while 循环体内的 label',
+    name: '6.8 goto must not jump to a label inside a while loop body',
     code: `program test;
 label 130;
 var i: integer;
@@ -431,11 +458,12 @@ begin
     130: i := i + 1;
   goto 130;
 end.`,
-    purpose: '6.8.1：label 在 while 语句体（非块 statement-part 顶层、非同一 statement-sequence）内，不可达',
+    purpose:
+      '6.8.1: the label is inside the while-statement body (not at the top level of the block statement-part, nor in the same statement-sequence), so it is unreachable',
     expectedError: '',
   },
   {
-    name: '6.8 goto 与 label 处于同一 statement-sequence（if 分支内）合法',
+    name: '6.8 goto and label in the same statement-sequence (inside an if branch) are valid',
     code: `program test(output);
 label 140;
 var d: integer;
@@ -449,11 +477,13 @@ begin
   end;
   writeln('done', d);
 end.`,
-    purpose: '6.8.1 b)：label 前缀的语句与 goto 处于同一 statement-sequence，故允许',
+    purpose:
+      '6.8.1 b): the statement prefixed by the label and the goto are in the same statement-sequence, so it is allowed',
     expectedOutput: 'done1\n',
   },
   {
-    name: '6.8 从内层过程 goto 到主程序顶层 label（终止中间激活）',
+    name:
+      '6.8 goto from an inner procedure to a top-level label in the main program (terminating intermediate activations)',
     code: `program test(output);
 label 150;
 procedure outer;
@@ -475,11 +505,12 @@ begin
 150:
   writeln('label');
 end.`,
-    purpose: '6.8.2.4 / 6.8.1 c)：goto 终止除含程序点的激活及包裹它的激活外的所有激活',
+    purpose:
+      '6.8.2.4 / 6.8.1 c): a goto terminates all activations except the activation containing the program point and any activations enclosing it',
     expectedOutput: 'main\nouter\ninner\nlabel\n',
   },
   {
-    name: '6.8 从内层过程 goto 到外层过程顶层 label',
+    name: '6.8 goto from an inner procedure to a top-level label in an outer procedure',
     code: `program test(output);
 procedure outer;
 label 160;
@@ -498,11 +529,12 @@ end;
 begin
   outer;
 end.`,
-    purpose: '6.8.1 NOTE 2 / c)：内层块的 goto 可引用外层块 statement-part 顶层的 label',
+    purpose:
+      '6.8.1 NOTE 2 / c): a goto in an inner block may reference a label at the top level of the statement-part of an outer block',
     expectedOutput: 'inner\nlabel 160\n',
   },
   {
-    name: '6.8 goto 不可跳到另一过程内的 label',
+    name: '6.8 goto must not jump to a label inside another procedure',
     code: `program test(output);
 procedure p1;
 label 170;
@@ -517,11 +549,11 @@ end;
 begin
   p2;
 end.`,
-    purpose: '6.8.1：label 不在 goto 所在块或其外层块中，不可达',
+    purpose: '6.8.1: the label is not in the block containing the goto or any enclosing block, so it is unreachable',
     expectedError: '',
   },
   {
-    name: '6.8 主程序 goto 不可跳到过程内的 label',
+    name: '6.8 a goto in the main program must not jump to a label inside a procedure',
     code: `program test(output);
 procedure p;
 label 180;
@@ -532,11 +564,11 @@ end;
 begin
   goto 180;
 end.`,
-    purpose: '6.8.1：goto 不得进入一个块去引用其内部 label',
+    purpose: '6.8.1: a goto must not enter a block to reference its internal label',
     expectedError: '',
   },
   {
-    name: '6.8 函数中 goto 到函数块顶层 label',
+    name: '6.8 goto in a function to a top-level label in the function block',
     code: `program test(output);
 function f: integer;
 label 190;
@@ -549,14 +581,15 @@ end;
 begin
   writeln(f);
 end.`,
-    purpose: '6.8.1 c)：函数块内 goto 可引用该函数块 statement-part 顶层的 label',
+    purpose:
+      '6.8.1 c): a goto within a function block may reference a label at the top level of the function block statement-part',
     expectedOutput: '2\n',
   },
 
-  // 6.8.3.2 复合语句
+  // 6.8.3.2 Compound-statements
 
   {
-    name: '6.8 复合语句按文本顺序执行 statement-sequence',
+    name: '6.8 a compound-statement executes its statement-sequence in textual order',
     code: `program test(output);
 var a: integer;
 begin
@@ -567,11 +600,11 @@ begin
   a := a + 1;
   writeln(a);
 end.`,
-    purpose: '6.8.3.1 / 6.8.3.2：statement-sequence 按文本顺序执行（除 goto 修改外）',
+    purpose: '6.8.3.1 / 6.8.3.2: a statement-sequence is executed in textual order (except as modified by goto)',
     expectedOutput: '1\n2\n3\n',
   },
   {
-    name: '6.8 复合语句可嵌套',
+    name: '6.8 compound-statements can be nested',
     code: `program test(output);
 begin
   writeln('a');
@@ -583,14 +616,15 @@ begin
   end;
   writeln('d');
 end.`,
-    purpose: '6.8.3.2：复合语句本身是语句，可出现在另一复合语句的 statement-sequence 中',
+    purpose:
+      '6.8.3.2: a compound-statement is itself a statement and may appear in the statement-sequence of another compound-statement',
     expectedOutput: 'a\nb\nc\nd\n',
   },
 
-  // 6.8.3.4 if 语句
+  // 6.8.3.4 If-statements
 
   {
-    name: '6.8 if 条件为真时执行 then 的语句',
+    name: '6.8 if executes the then-statement when the condition is true',
     code: `program test(output);
 var x: integer;
 begin
@@ -598,11 +632,11 @@ begin
   if x > 0 then
     writeln('positive');
 end.`,
-    purpose: '6.8.3.4：Boolean-expression 为 true 时执行 if 语句的语句',
+    purpose: '6.8.3.4: when the Boolean-expression is true, the statement of the if-statement is executed',
     expectedOutput: 'positive\n',
   },
   {
-    name: '6.8 if 条件为假时不执行 then 的语句',
+    name: '6.8 if does not execute the then-statement when the condition is false',
     code: `program test(output);
 var x: integer;
 begin
@@ -611,11 +645,11 @@ begin
     writeln('positive');
   writeln('done');
 end.`,
-    purpose: '6.8.3.4：Boolean-expression 为 false 且无 else-part 时，不执行任何分支',
+    purpose: '6.8.3.4: when the Boolean-expression is false and there is no else-part, no branch is executed',
     expectedOutput: 'done\n',
   },
   {
-    name: '6.8 if-then-else 条件为真执行 then',
+    name: '6.8 if-then-else executes then when the condition is true',
     code: `program test(output);
 var x: integer;
 begin
@@ -625,11 +659,11 @@ begin
   else
     writeln('less');
 end.`,
-    purpose: '6.8.3.4：条件为 true 时执行 then 的语句，不执行 else-part',
+    purpose: '6.8.3.4: when the condition is true, the then-statement is executed and the else-part is not',
     expectedOutput: 'greater\n',
   },
   {
-    name: '6.8 if-then-else 条件为假执行 else',
+    name: '6.8 if-then-else executes else when the condition is false',
     code: `program test(output);
 var x: integer;
 begin
@@ -639,11 +673,11 @@ begin
   else
     writeln('less');
 end.`,
-    purpose: '6.8.3.4：条件为 false 时执行 else-part 的语句',
+    purpose: '6.8.3.4: when the condition is false, the statement of the else-part is executed',
     expectedOutput: 'less\n',
   },
   {
-    name: '6.8 else 与最近的未配对 then 配对',
+    name: '6.8 else pairs with the nearest unpaired then',
     code: `program test(output);
 var a, b: boolean;
 begin
@@ -655,11 +689,11 @@ begin
     else
       writeln('a-then-b-else');
 end.`,
-    purpose: '6.8.3.4 NOTE：else-part 与最近的前一个未配对 then 配对',
+    purpose: '6.8.3.4 NOTE: an else-part pairs with the nearest preceding unpaired then',
     expectedOutput: 'a-then-b-else\n',
   },
   {
-    name: '6.8 用复合语句使无 else 的 if 不紧接 else',
+    name: '6.8 using a compound-statement so that an if without else is not immediately followed by else',
     code: `program test(output);
 var a: boolean;
 begin
@@ -673,11 +707,11 @@ begin
     writeln('outer else');
   writeln('done');
 end.`,
-    purpose: '6.8.3.4：以 begin..end 结束内层无 else 的 if，使 else 与外层 then 配对',
+    purpose: '6.8.3.4: use begin..end to close the inner if without else, so that else pairs with the outer then',
     expectedOutput: 'done\n',
   },
   {
-    name: '6.8 if 的条件须是 Boolean 表达式',
+    name: '6.8 the condition of an if must be a Boolean expression',
     code: `program test(output);
 var x: integer;
 begin
@@ -685,11 +719,11 @@ begin
   if x then
     writeln('x');
 end.`,
-    purpose: '6.8.3.4：if 的 Boolean-expression 须为 Boolean 类型，integer 作条件不合法',
+    purpose: '6.8.3.4: the Boolean-expression of an if must be of type Boolean; an integer as a condition is invalid',
     expectedError: '',
   },
   {
-    name: '6.8 while 的条件须是 Boolean 表达式',
+    name: '6.8 the condition of a while must be a Boolean expression',
     code: `program test;
 var x: integer;
 begin
@@ -697,11 +731,11 @@ begin
   while x do
     x := x + 1;
 end.`,
-    purpose: '6.8.3.4：while 的条件须为 Boolean 类型，integer 作条件不合法',
+    purpose: '6.8.3.4: the condition of a while must be of type Boolean; an integer as a condition is invalid',
     expectedError: '',
   },
   {
-    name: '6.8 repeat 的 until 条件须是 Boolean 表达式',
+    name: '6.8 the until condition of a repeat must be a Boolean expression',
     code: `program test;
 var x: integer;
 begin
@@ -710,11 +744,11 @@ begin
     x := x + 1;
   until x;
 end.`,
-    purpose: '6.8.3.4：repeat 的 until 条件须为 Boolean 类型，integer 作条件不合法',
+    purpose: '6.8.3.4: the until condition of a repeat must be of type Boolean; an integer as a condition is invalid',
     expectedError: '',
   },
   {
-    name: '6.8 if 与布尔运算符组合的条件',
+    name: '6.8 a condition combining if with Boolean operators',
     code: `program test(output);
 var a, b, c: integer;
 begin
@@ -726,11 +760,11 @@ begin
   if (a > 10) or (b < 10) then
     writeln('or ok');
 end.`,
-    purpose: '6.8.3.4：if 的条件可为含 and/or 的 Boolean 表达式',
+    purpose: '6.8.3.4: the condition of an if may be a Boolean expression containing and/or',
     expectedOutput: 'and ok\nor ok\n',
   },
   {
-    name: '6.8 循环体中的 if 语句',
+    name: '6.8 an if-statement inside a loop body',
     code: `program test(output);
 var i: integer;
 begin
@@ -738,11 +772,11 @@ begin
     if i mod 2 = 0 then
       writeln(i);
 end.`,
-    purpose: '6.8.3.4：if 语句可作为 for 语句体的语句',
+    purpose: '6.8.3.4: an if-statement may serve as the statement body of a for-statement',
     expectedOutput: '2\n4\n',
   },
   {
-    name: '6.8 过程体中的 if-then-else',
+    name: '6.8 if-then-else in a procedure body',
     code: `program test(output);
 procedure check(n: integer);
 begin
@@ -755,14 +789,14 @@ begin
   check(5);
   check(-3);
 end.`,
-    purpose: '6.8.3.4：if 语句出现在过程块 statement-part 中',
+    purpose: '6.8.3.4: an if-statement appears in the statement-part of a procedure block',
     expectedOutput: 'positive\nnon-positive\n',
   },
 
-  // 6.8.3.5 case 语句
+  // 6.8.3.5 Case-statements
 
   {
-    name: '6.8 case 执行含 case-index 值的 case-list-element',
+    name: '6.8 case executes the case-list-element whose value matches the case-index',
     code: `program test(output);
 var x: integer;
 begin
@@ -773,11 +807,12 @@ begin
     3: writeln('three');
   end;
 end.`,
-    purpose: '6.8.3.5：case-index 的值指定执行 closest-containing 相应 case-constant 的语句',
+    purpose:
+      '6.8.3.5: the value of the case-index designates execution of the statement closest-containing the corresponding case-constant',
     expectedOutput: 'two\n',
   },
   {
-    name: '6.8 case 常量列表可含多个常量',
+    name: '6.8 a case constant list may contain multiple constants',
     code: `program test(output);
 var x: integer;
 begin
@@ -787,11 +822,11 @@ begin
     3, 4: writeln('high');
   end;
 end.`,
-    purpose: '6.8.3.5：case-constant-list 可含多个 case 常量',
+    purpose: '6.8.3.5: a case-constant-list may contain multiple case constants',
     expectedOutput: 'high\n',
   },
   {
-    name: '6.8 case 分支可为复合语句',
+    name: '6.8 a case branch may be a compound-statement',
     code: `program test(output);
 var x: integer;
 begin
@@ -808,11 +843,11 @@ begin
       end;
   end;
 end.`,
-    purpose: '6.8.3.5：case-list-element 的语句可为复合语句',
+    purpose: '6.8.3.5: the statement of a case-list-element may be a compound-statement',
     expectedOutput: 'two\nagain\n',
   },
   {
-    name: '6.8 case-index 只求值一次',
+    name: '6.8 the case-index is evaluated only once',
     code: `program test(output);
 var n: integer;
 function f: integer;
@@ -828,11 +863,11 @@ begin
   end;
   writeln(n);
 end.`,
-    purpose: '6.8.3.5：执行 case 语句时 case-index 求值一次',
+    purpose: '6.8.3.5: when executing a case-statement, the case-index is evaluated once',
     expectedOutput: 'two\n1\n',
   },
   {
-    name: '6.8 case 可用于字符序数类型',
+    name: '6.8 case can be used with the char ordinal type',
     code: `program test(output);
 var c: char;
 begin
@@ -843,11 +878,11 @@ begin
     'c': writeln('C');
   end;
 end.`,
-    purpose: '6.8.3.5：case 常量须为与 case-index 相同的序数类型，char 类型适用',
+    purpose: '6.8.3.5: case constants must be of the same ordinal type as the case-index; the char type is applicable',
     expectedOutput: 'B\n',
   },
   {
-    name: '6.8 case 常量必须互异',
+    name: '6.8 case constants must be distinct',
     code: `program test(output);
 var x: integer;
 begin
@@ -857,11 +892,12 @@ begin
     1: writeln('b');
   end;
 end.`,
-    purpose: '6.8.3.5：各 case-constant-list 的 case 常量所表示的值须互异，重复非法',
+    purpose:
+      '6.8.3.5: the values denoted by the case constants of each case-constant-list must be distinct; duplicates are invalid',
     expectedError: '',
   },
   {
-    name: '6.8 嵌套 case',
+    name: '6.8 nested case',
     code: `program test(output);
 var x, y: integer;
 begin
@@ -876,11 +912,11 @@ begin
     2: writeln('2');
   end;
 end.`,
-    purpose: '6.8.3.5：case-list-element 的语句可为另一 case 语句',
+    purpose: '6.8.3.5: the statement of a case-list-element may be another case-statement',
     expectedOutput: '1-2\n',
   },
   {
-    name: '6.8 循环中的 case 按 case-index 选择分支',
+    name: '6.8 a case inside a loop selects a branch by case-index',
     code: `program test(output);
 var i: integer;
 begin
@@ -891,14 +927,15 @@ begin
       3: writeln('c');
     end;
 end.`,
-    purpose: '6.8.3.5：case 语句可作为 for 语句体的语句，每次按 case-index 选择分支',
+    purpose:
+      '6.8.3.5: a case-statement may serve as the body of a for-statement, selecting a branch by case-index each time',
     expectedOutput: 'a\nb\nc\nb\n',
   },
 
-  // 6.8.3.7 repeat 语句
+  // 6.8.3.7 Repeat-statements
 
   {
-    name: '6.8 repeat 至少执行一次（条件初始即为真）',
+    name: '6.8 repeat executes at least once (the condition is already true initially)',
     code: `program test(output);
 var i: integer;
 begin
@@ -908,11 +945,12 @@ begin
     i := i + 1;
   until i > 5;
 end.`,
-    purpose: '6.8.3.7：Boolean-expression 在 statement-sequence 执行后求值，故至少执行一次',
+    purpose:
+      '6.8.3.7: the Boolean-expression is evaluated after the statement-sequence executes, so the body executes at least once',
     expectedOutput: 'once\n',
   },
   {
-    name: '6.8 repeat 重复执行直到条件为真',
+    name: '6.8 repeat executes repeatedly until the condition becomes true',
     code: `program test(output);
 var i: integer;
 begin
@@ -922,11 +960,11 @@ begin
     writeln(i);
   until i >= 3;
 end.`,
-    purpose: '6.8.3.7：statement-sequence 重复执行，直到 Boolean-expression 为 true',
+    purpose: '6.8.3.7: the statement-sequence is executed repeatedly until the Boolean-expression is true',
     expectedOutput: '1\n2\n3\n',
   },
   {
-    name: '6.8 repeat 的 statement-sequence 可含多条语句',
+    name: '6.8 the statement-sequence of a repeat may contain multiple statements',
     code: `program test(output);
 var i, s: integer;
 begin
@@ -938,11 +976,11 @@ begin
   until i >= 4;
   writeln(s);
 end.`,
-    purpose: '6.8.3.7：repeat 的 statement-sequence 可含多条以分号分隔的语句',
+    purpose: '6.8.3.7: the statement-sequence of a repeat may contain multiple statements separated by semicolons',
     expectedOutput: '10\n',
   },
   {
-    name: '6.8 嵌套 repeat',
+    name: '6.8 nested repeat',
     code: `program test(output);
 var i, j: integer;
 begin
@@ -957,14 +995,15 @@ begin
     writeln;
   until i >= 2;
 end.`,
-    purpose: '6.8.3.7：repeat 语句可嵌套，内层重复次数依赖外层当前状态',
+    purpose:
+      '6.8.3.7: repeat-statements may be nested; the number of inner repetitions depends on the current state of the outer one',
     expectedOutput: '*\n**\n',
   },
 
-  // 6.8.3.8 while 语句
+  // 6.8.3.8 While-statements
 
   {
-    name: '6.8 while 条件初始为假时语句不执行',
+    name: '6.8 while does not execute the body when the condition is initially false',
     code: `program test(output);
 var i: integer;
 begin
@@ -973,11 +1012,12 @@ begin
     writeln('never');
   writeln('done');
 end.`,
-    purpose: '6.8.3.8：while 等价展开首先判断条件，为 false 时语句不执行',
+    purpose:
+      '6.8.3.8: the equivalent expansion of while first checks the condition; when it is false, the statement is not executed',
     expectedOutput: 'done\n',
   },
   {
-    name: '6.8 while 重复执行直到条件为假',
+    name: '6.8 while executes repeatedly until the condition becomes false',
     code: `program test(output);
 var i: integer;
 begin
@@ -988,11 +1028,11 @@ begin
     writeln(i);
   end;
 end.`,
-    purpose: '6.8.3.8：while 语句体重复执行直到 Boolean-expression 为 false',
+    purpose: '6.8.3.8: the body of a while-statement is executed repeatedly until the Boolean-expression is false',
     expectedOutput: '1\n2\n3\n',
   },
   {
-    name: '6.8 while 的布尔表达式每次迭代前重新求值',
+    name: '6.8 the Boolean-expression of a while is re-evaluated before each iteration',
     code: `program test(output);
 var n: integer;
 function cond: boolean;
@@ -1005,11 +1045,11 @@ begin
   while cond do
     writeln(n);
 end.`,
-    purpose: '6.8.3.8：按等价展开，每次重复前重新求值 Boolean-expression',
+    purpose: '6.8.3.8: by the equivalent expansion, the Boolean-expression is re-evaluated before each repetition',
     expectedOutput: '1\n2\n3\n',
   },
   {
-    name: '6.8 嵌套 while',
+    name: '6.8 nested while',
     code: `program test(output);
 var i, j: integer;
 begin
@@ -1026,11 +1066,11 @@ begin
     writeln;
   end;
 end.`,
-    purpose: '6.8.3.8：while 语句可嵌套',
+    purpose: '6.8.3.8: while-statements may be nested',
     expectedOutput: 'xx\nxx\n',
   },
   {
-    name: '6.8 过程体中的 while 循环',
+    name: '6.8 a while loop in a procedure body',
     code: `program test(output);
 procedure count(n: integer);
 var i: integer;
@@ -1045,36 +1085,37 @@ end;
 begin
   count(3);
 end.`,
-    purpose: '6.8.3.8：while 语句出现在过程块 statement-part 中',
+    purpose: '6.8.3.8: a while-statement appears in the statement-part of a procedure block',
     expectedOutput: '1\n2\n3\n',
   },
 
-  // 6.8.3.9 for 语句
+  // 6.8.3.9 For-statements
 
   {
-    name: '6.8 for-to 依次给控制变量赋递增值',
+    name: '6.8 for-to assigns incrementing values to the control variable in sequence',
     code: `program test(output);
 var i: integer;
 begin
   for i := 1 to 3 do
     writeln(i);
 end.`,
-    purpose: '6.8.3.9：for-to 按等价展开对控制变量依次赋值并执行语句',
+    purpose:
+      '6.8.3.9: for-to assigns to the control variable in sequence and executes the statement according to the equivalent expansion',
     expectedOutput: '1\n2\n3\n',
   },
   {
-    name: '6.8 for-downto 依次给控制变量赋递减值',
+    name: '6.8 for-downto assigns decrementing values to the control variable in sequence',
     code: `program test(output);
 var i: integer;
 begin
   for i := 3 downto 1 do
     writeln(i);
 end.`,
-    purpose: '6.8.3.9：for-downto 按等价展开用 pred 递减控制变量',
+    purpose: '6.8.3.9: for-downto uses pred to decrement the control variable according to the equivalent expansion',
     expectedOutput: '3\n2\n1\n',
   },
   {
-    name: '6.8 for-to 初始值大于终止值时零次迭代',
+    name: '6.8 for-to iterates zero times when the initial value is greater than the final value',
     code: `program test(output);
 var i: integer;
 begin
@@ -1082,11 +1123,12 @@ begin
     writeln('never');
   writeln('done');
 end.`,
-    purpose: '6.8.3.9：for-to 等价展开中 initial-value > final-value 时语句不执行',
+    purpose:
+      '6.8.3.9: in the equivalent expansion of for-to, the statement is not executed when initial-value > final-value',
     expectedOutput: 'done\n',
   },
   {
-    name: '6.8 for-downto 初始值小于终止值时零次迭代',
+    name: '6.8 for-downto iterates zero times when the initial value is less than the final value',
     code: `program test(output);
 var i: integer;
 begin
@@ -1094,22 +1136,23 @@ begin
     writeln('never');
   writeln('done');
 end.`,
-    purpose: '6.8.3.9：for-downto 等价展开中 initial-value < final-value 时语句不执行',
+    purpose:
+      '6.8.3.9: in the equivalent expansion of for-downto, the statement is not executed when initial-value < final-value',
     expectedOutput: 'done\n',
   },
   {
-    name: '6.8 for-to 初始值等于终止值时迭代一次',
+    name: '6.8 for-to iterates once when the initial value equals the final value',
     code: `program test(output);
 var i: integer;
 begin
   for i := 2 to 2 do
     writeln(i);
 end.`,
-    purpose: '6.8.3.9：initial-value = final-value 时语句恰好执行一次',
+    purpose: '6.8.3.9: the statement executes exactly once when initial-value = final-value',
     expectedOutput: '2\n',
   },
   {
-    name: '6.8 for 的 initial-value 与 final-value 各求值一次',
+    name: '6.8 the initial-value and final-value of a for are each evaluated once',
     code: `program test(output);
 var i, n: integer;
 begin
@@ -1120,22 +1163,23 @@ begin
     n := 1;
   end;
 end.`,
-    purpose: '6.8.3.9：等价展开将 final-value 先存入辅助变量，故循环中改变 n 不影响迭代次数',
+    purpose:
+      '6.8.3.9: the equivalent expansion stores the final-value in an auxiliary variable first, so changing n during the loop does not affect the iteration count',
     expectedOutput: 'x\nx\nx\n',
   },
   {
-    name: '6.8 for 的控制变量须为整个变量',
+    name: '6.8 the control variable of a for must be an entire variable',
     code: `program test(output);
 var a: array[1..3] of integer;
 begin
   for a[1] := 1 to 3 do
     writeln('x');
 end.`,
-    purpose: '6.8.3.9：control-variable 语法上须为 entire-variable，下标变量不合法',
+    purpose: '6.8.3.9: the control-variable must syntactically be an entire-variable; an indexed variable is invalid',
     expectedError: '',
   },
   {
-    name: '6.8 for 结束后控制变量为 undefined，其后可重新赋值',
+    name: '6.8 the control variable is undefined after a for ends and may be reassigned thereafter',
     code: `program test(output);
 var i: integer;
 begin
@@ -1144,22 +1188,23 @@ begin
   i := 9;
   writeln(i);
 end.`,
-    purpose: '6.8.3.9：for 语句执行后（非 goto 离开）控制变量为 undefined，可在语句外重新赋值',
+    purpose:
+      '6.8.3.9: after a for-statement executes (without being left by goto), the control variable is undefined and may be reassigned outside the statement',
     expectedOutput: 'x\nx\n9\n',
   },
   {
-    name: '6.8 for 的控制变量可为子界序数类型',
+    name: '6.8 the control variable of a for may be of a subrange ordinal type',
     code: `program test(output);
 var i: 1..5;
 begin
   for i := 1 to 3 do
     writeln(i);
 end.`,
-    purpose: '6.8.3.9：control-variable 须具序数类型，子界类型满足此要求',
+    purpose: '6.8.3.9: the control-variable must be of an ordinal type; a subrange type satisfies this requirement',
     expectedOutput: '1\n2\n3\n',
   },
   {
-    name: '6.8 嵌套 for',
+    name: '6.8 nested for',
     code: `program test(output);
 var i, j: integer;
 begin
@@ -1170,11 +1215,11 @@ begin
     writeln;
   end;
 end.`,
-    purpose: '6.8.3.9：for 语句可嵌套',
+    purpose: '6.8.3.9: for-statements may be nested',
     expectedOutput: '**\n**\n',
   },
   {
-    name: '6.8 过程体中的 for 循环求和',
+    name: '6.8 a for loop in a procedure body sums values',
     code: `program test(output);
 procedure sum(n: integer);
 var i, s: integer;
@@ -1187,11 +1232,12 @@ end;
 begin
   sum(5);
 end.`,
-    purpose: '6.8.3.9：for 语句出现在过程块 statement-part 中，语句体为赋值语句',
+    purpose:
+      '6.8.3.9: a for-statement appears in the statement-part of a procedure block, with an assignment-statement as its body',
     expectedOutput: '15\n',
   },
   {
-    name: '6.8 for 循环体内递归调用后循环上界仍然有效',
+    name: '6.8 the loop upper bound remains valid after a recursive call within a for-loop body',
     code: `program test(output);
 function f(k: integer): integer;
 var i, s: integer;
@@ -1208,14 +1254,15 @@ end;
 begin
   writeln(f(3));
 end.`,
-    purpose: '6.8.3.9：final-value 在循环开始前求值一次，循环体内递归调用不得改变本层的循环上界（f(3)=6）',
+    purpose:
+      '6.8.3.9: the final-value is evaluated once before the loop starts; a recursive call inside the loop body must not change the loop upper bound of the current level (f(3)=6)',
     expectedOutput: '6\n',
   },
 
-  // 6.8.3.10 with 语句
+  // 6.8.3.10 With-statements
 
   {
-    name: '6.8 with 使字段标识符指称记录变量的分量',
+    name: '6.8 with causes field-identifiers to denote components of the record variable',
     code: `program test(output);
 type
   point = record
@@ -1235,11 +1282,12 @@ begin
   end;
   writeln(p.x);
 end.`,
-    purpose: '6.8.3.10：with 的单记录变量定义各字段标识符为 field-designator-identifier',
+    purpose:
+      '6.8.3.10: a single record variable in with defines each field-identifier as a field-designator-identifier',
     expectedOutput: '10\n20\n30\n',
   },
   {
-    name: '6.8 with 可含多个记录变量（等价于嵌套 with）',
+    name: '6.8 with may contain multiple record variables (equivalent to nested with)',
     code: `program test(output);
 type
   inner = record
@@ -1260,11 +1308,11 @@ begin
     writeln(a);
   end;
 end.`,
-    purpose: '6.8.3.10：with v1,v2 do s 等价于 with v1 do with v2 do s',
+    purpose: '6.8.3.10: with v1,v2 do s is equivalent to with v1 do with v2 do s',
     expectedOutput: '1\n2\n',
   },
   {
-    name: '6.8 嵌套 with 中内层字段标识符遮蔽外层同名字段',
+    name: '6.8 in nested with, an inner field-identifier shadows a same-named outer field',
     code: `program test(output);
 type
   inner = record
@@ -1287,11 +1335,12 @@ begin
     writeln(v);
   end;
 end.`,
-    purpose: '6.8.3.10 / 6.2.2：内层 with 为字段标识符建立新的定义点，遮蔽外层同名字段',
+    purpose:
+      '6.8.3.10 / 6.2.2: the inner with establishes a new point of definition for the field-identifier, shadowing the same-named outer field',
     expectedOutput: '1\n2\n1\n',
   },
   {
-    name: '6.8 with 的字段标识符优先于外层同名变量',
+    name: '6.8 a field-identifier of with takes precedence over a same-named outer variable',
     code: `program test(output);
 type
   r = record
@@ -1307,11 +1356,12 @@ begin
     writeln(x);
   writeln(x);
 end.`,
-    purpose: '6.8.3.10：with 语句内字段标识符的定义点使同名外层变量被遮蔽',
+    purpose:
+      '6.8.3.10: the point of definition of a field-identifier inside a with-statement causes a same-named outer variable to be shadowed',
     expectedOutput: '2\n1\n',
   },
   {
-    name: '6.8 with 语句体内可嵌套 if 并修改字段',
+    name: '6.8 the body of a with-statement may contain a nested if and modify fields',
     code: `program test(output);
 type
   date = record
@@ -1334,11 +1384,12 @@ begin
   writeln(d.month);
   writeln(d.year);
 end.`,
-    purpose: '6.8.3.10 示例：with 语句体中字段标识符直接指称记录变量的分量',
+    purpose:
+      '6.8.3.10 example: within the body of a with-statement, a field-identifier directly denotes a component of the record variable',
     expectedOutput: '1\n2000\n',
   },
   {
-    name: '6.6.2 函数标识符的赋值可嵌于各结构化语句内',
+    name: '6.6.2 assignment to a function-identifier may be embedded within various structured-statements',
     code: `program test(output);
 function f1: integer;
 var i: integer;
@@ -1386,76 +1437,77 @@ end;
 begin
   writeln(f1, f2, f3, f4, f5, f6);
 end.`,
-    purpose: 'ISO 6.6.2：function-block 须含至少一条以函数标识符为赋值目标的赋值语句，该赋值可位于任何语句位置',
+    purpose:
+      'ISO 6.6.2: a function-block must contain at least one assignment-statement whose target is the function-identifier; that assignment may be located at any statement position',
     expectedOutput: '123456\n',
   },
   {
-    name: '6.8.3.4 if 语句缺少 then 应报错',
+    name: '6.8.3.4 an if-statement missing then should report an error',
     code: 'program test(output); var b: boolean; begin b := true; if b writeln(1); end.',
-    purpose: 'ISO 6.8.3.4：if-statement = if Boolean-expression then statement [ else statement ]',
+    purpose: 'ISO 6.8.3.4: if-statement = if Boolean-expression then statement [ else statement ]',
     expectedError: '',
   },
   {
-    name: '6.8.3.5 while 语句缺少 do 应报错',
+    name: '6.8.3.5 a while-statement missing do should report an error',
     code: 'program test(output); var b: boolean; begin b := false; while b writeln(1); end.',
-    purpose: 'ISO 6.8.3.5：while-statement = while Boolean-expression do statement',
+    purpose: 'ISO 6.8.3.5: while-statement = while Boolean-expression do statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.9 for 语句的方向词只能是 to 或 downto',
+    name: '6.8.3.9 the direction word of a for-statement may only be to or downto',
     code: 'program test(output); var i: integer; begin for i := 1 by 2 do writeln(i); end.',
-    purpose: 'ISO 6.8.3.9：for-statement = for ... := ... ( to | downto ) ... do statement',
+    purpose: 'ISO 6.8.3.9: for-statement = for ... := ... ( to | downto ) ... do statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.9 for 语句缺少 do 应报错',
+    name: '6.8.3.9 a for-statement missing do should report an error',
     code: 'program test(output); var i: integer; begin for i := 1 to 2 writeln(i); end.',
-    purpose: 'ISO 6.8.3.9：final-value 之后须有 do 与 statement',
+    purpose: 'ISO 6.8.3.9: after the final-value there must be do and a statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.5 case 语句缺少 of 应报错',
+    name: '6.8.3.5 a case-statement missing of should report an error',
     code: 'program test(output); var i: integer; begin i := 1; case i 1: writeln(1); end; end.',
-    purpose: 'ISO 6.8.3.5：case-statement = case case-index of case-list-element ... end',
+    purpose: 'ISO 6.8.3.5: case-statement = case case-index of case-list-element ... end',
     expectedError: '',
   },
   {
-    name: '6.8.3.5 case 常量之后缺少冒号应报错',
+    name: '6.8.3.5 a missing colon after a case constant should report an error',
     code: 'program test(output); var i: integer; begin i := 1; case i of 1 writeln(1); end; end.',
-    purpose: 'ISO 6.8.3.5：case-list-element = case-constant-list : statement',
+    purpose: 'ISO 6.8.3.5: case-list-element = case-constant-list : statement',
     expectedError: '',
   },
   {
-    name: '6.8.2.4 goto 的目标须为 label',
+    name: '6.8.2.4 the target of a goto must be a label',
     code: `program test(output);
 label 1;
 begin
   goto 1x;
   1: writeln(1);
 end.`,
-    purpose: 'ISO 6.8.2.4：goto-statement = goto label，label 为数字序列',
+    purpose: 'ISO 6.8.2.4: goto-statement = goto label, where a label is a digit sequence',
     expectedError: '',
   },
   {
-    name: '6.8.3.10 with 语句缺少 do 应报错',
+    name: '6.8.3.10 a with-statement missing do should report an error',
     code: 'program test; type r = record x: integer end; var v: r; begin with v x := 1; end.',
-    purpose: 'ISO 6.8.3.10：with-statement = with record-variable-list do statement',
+    purpose: 'ISO 6.8.3.10: with-statement = with record-variable-list do statement',
     expectedError: '',
   },
   {
-    name: '6.6.5.3 new 的实参须为指针类型的变量',
+    name: '6.6.5.3 the actual parameter of new must be a variable of pointer type',
     code: 'program test; var i: integer; begin new(i); end.',
-    purpose: 'ISO 6.6.5.3：new(q) 要求 q 具有 pointer-type',
+    purpose: 'ISO 6.6.5.3: new(q) requires q to be of a pointer-type',
     expectedError: '',
   },
   {
-    name: '6.6.5.3 dispose 的实参须为指针类型的变量',
+    name: '6.6.5.3 the actual parameter of dispose must be a variable of pointer type',
     code: 'program test; var i: integer; begin dispose(i); end.',
-    purpose: 'ISO 6.6.5.3：dispose(q) 要求 q 具有 pointer-type',
+    purpose: 'ISO 6.6.5.3: dispose(q) requires q to be of a pointer-type',
     expectedError: '',
   },
   {
-    name: '6.8.3.5 case 标签可为 char 类型的常量标识符',
+    name: '6.8.3.5 a case label may be a constant-identifier of type char',
     code: `program test(output);
 const A = 'a';
       B = 'b';
@@ -1467,11 +1519,11 @@ begin
     B: writeln('b');
   end;
 end.`,
-    purpose: 'ISO 6.8.3.5/6.3：case-constant 可为 constant-identifier，其值须互异',
+    purpose: 'ISO 6.8.3.5/6.3: a case-constant may be a constant-identifier, and its value must be distinct',
     expectedOutput: 'b\n',
   },
   {
-    name: '6.8.3.5 case 索引可为 Boolean 类型',
+    name: '6.8.3.5 the case-index may be of type Boolean',
     code: `program test(output);
 const T = true;
       F = false;
@@ -1484,11 +1536,11 @@ begin
   end;
 end.`,
     purpose:
-      'ISO 6.8.3.5/6.4.2.2：Boolean 是序数类型，可作 case-index 的类型，其 required constant-identifier 可作 case-constant',
+      'ISO 6.8.3.5/6.4.2.2: Boolean is an ordinal type and may be used as the type of the case-index; its required constant-identifiers may serve as case-constants',
     expectedOutput: 'T\n',
   },
   {
-    name: '6.8.2.2 同一类型的数组变量可整体赋值',
+    name: '6.8.2.2 array variables of the same type can be assigned as a whole',
     code: `program test(output);
 type t = array[1..3] of integer;
 var a, b: t;
@@ -1499,11 +1551,12 @@ begin
   b := a;
   writeln(b[1], b[2], b[3]);
 end.`,
-    purpose: 'ISO 6.8.2.2/6.4.6：赋值的左部与右部表示同一类型时，整体赋值把值复制到每个分量',
+    purpose:
+      'ISO 6.8.2.2/6.4.6: when the left-hand and right-hand sides of an assignment denote the same type, whole assignment copies the value to each component',
     expectedOutput: '123\n',
   },
   {
-    name: '6.8.2.2 元素为 record 的数组分量可整体赋值',
+    name: '6.8.2.2 an array component whose element type is record can be assigned as a whole',
     code: `program test(output);
 type r = record x: integer; y: char end;
 var a: array[1..2] of r;
@@ -1514,11 +1567,12 @@ begin
   a[2] := v;
   writeln(a[2].x, a[2].y);
 end.`,
-    purpose: 'ISO 6.5.3.1/6.8.2.2：数组分量是变量，可作赋值目标并接受同类型记录值',
+    purpose:
+      'ISO 6.5.3.1/6.8.2.2: an array component is a variable and may serve as an assignment target accepting a record value of the same type',
     expectedOutput: '5Q\n',
   },
   {
-    name: '6.8.2.2 含数组字段的记录可整体赋值',
+    name: '6.8.2.2 a record containing an array field can be assigned as a whole',
     code: `program test(output);
 type r = record n: integer; s: array[1..2] of integer end;
 var a, b: r;
@@ -1529,11 +1583,11 @@ begin
   b := a;
   writeln(b.n, b.s[1], b.s[2]);
 end.`,
-    purpose: 'ISO 6.8.2.2：结构化类型的整体赋值递归复制全部分量的值',
+    purpose: 'ISO 6.8.2.2: whole assignment of a structured type recursively copies the values of all components',
     expectedOutput: '123\n',
   },
   {
-    name: '6.8.2.2 指针元素的数组赋值复制 identifying-value',
+    name: '6.8.2.2 array assignment of pointer elements copies the identifying-value',
     code: `program test(output);
 type ip = ^integer;
 var a: array[1..2] of ip;
@@ -1546,241 +1600,242 @@ begin
   writeln(a[2]^);
   dispose(p);
 end.`,
-    purpose: 'ISO 6.4.4/6.8.2.2：指针的赋值复制 identifying-value，故 a[1] 与 a[2] 标识同一个变量',
+    purpose:
+      'ISO 6.4.4/6.8.2.2: pointer assignment copies the identifying-value, so a[1] and a[2] identify the same variable',
     expectedOutput: '8\n',
   },
   {
-    name: '6.8.1 语句前缀的 label 不得超出允许范围',
+    name: '6.8.1 a label prefixing a statement must not exceed the allowed range',
     code: `program test(output);
 begin
   10000: writeln(1);
 end.`,
-    purpose: 'ISO 6.1.6/6.8.1：label 的取值为 0..9999',
+    purpose: 'ISO 6.1.6/6.8.1: a label takes a value in 0..9999',
     expectedError: '',
   },
   {
-    name: '6.8.1 语句前缀的 label 之后须有冒号',
+    name: '6.8.1 a label prefixing a statement must be followed by a colon',
     code: `program test(output);
 begin
   1 writeln(1);
 end.`,
-    purpose: 'ISO 6.8.1：label : statement',
+    purpose: 'ISO 6.8.1: label : statement',
     expectedError: '',
   },
   {
-    name: '6.8.1 带 label 的语句本身须合法',
+    name: '6.8.1 a labeled statement must itself be valid',
     code: `program test(output);
 begin
   1: )
 end.`,
-    purpose: 'ISO 6.8.1：label 之后须为一合法 statement',
+    purpose: 'ISO 6.8.1: after a label there must be a valid statement',
     expectedError: '',
   },
   {
-    name: '6.8.2.2 赋值语句缺少赋值号应报错',
+    name: '6.8.2.2 an assignment-statement missing the assignment operator should report an error',
     code: `program test(output);
 var x: integer;
 begin
   x 1;
 end.`,
-    purpose: 'ISO 6.8.2.2：assignment-statement = variable-access := expression',
+    purpose: 'ISO 6.8.2.2: assignment-statement = variable-access := expression',
     expectedError: '',
   },
   {
-    name: '6.9.3 write 的实参表达式非法应报错',
+    name: '6.9.3 an invalid actual-parameter expression of write should report an error',
     code: `program test(output);
 begin
   write(1 + );
 end.`,
-    purpose: 'ISO 6.9.3.1：write-parameter 的 expression 须合法',
+    purpose: 'ISO 6.9.3.1: the expression of a write-parameter must be valid',
     expectedError: '',
   },
   {
-    name: '6.9.3.1 write 的小数位数位置缺少表达式应报错',
+    name: '6.9.3.1 a missing expression at the decimal-places position of write should report an error',
     code: `program test(output);
 begin
   write(1:2:);
 end.`,
-    purpose: 'ISO 6.9.3.1：write-parameter 给出第二个冒号后须有 expression',
+    purpose: 'ISO 6.9.3.1: after a write-parameter provides a second colon, there must be an expression',
     expectedError: '',
   },
   {
-    name: '6.8.3.4 if 语句的条件表达式非法应报错',
+    name: '6.8.3.4 an invalid condition expression of an if-statement should report an error',
     code: `program test(output);
 begin
   if + then writeln(1);
 end.`,
-    purpose: 'ISO 6.8.3.4：if Boolean-expression then statement',
+    purpose: 'ISO 6.8.3.4: if Boolean-expression then statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.4 if 语句的 then 分支非法应报错',
+    name: '6.8.3.4 an invalid then-branch of an if-statement should report an error',
     code: `program test(output);
 begin
   if true then )
 end.`,
-    purpose: 'ISO 6.8.3.4：then 之后须为合法 statement',
+    purpose: 'ISO 6.8.3.4: after then there must be a valid statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.4 if 语句的 else 分支非法应报错',
+    name: '6.8.3.4 an invalid else-branch of an if-statement should report an error',
     code: `program test(output);
 begin
   if true then writeln(1) else )
 end.`,
-    purpose: 'ISO 6.8.3.4：else 之后须为合法 statement',
+    purpose: 'ISO 6.8.3.4: after else there must be a valid statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.5 while 语句的条件表达式非法应报错',
+    name: '6.8.3.5 an invalid condition expression of a while-statement should report an error',
     code: `program test(output);
 begin
   while + do writeln(1);
 end.`,
-    purpose: 'ISO 6.8.3.5：while Boolean-expression do statement',
+    purpose: 'ISO 6.8.3.5: while Boolean-expression do statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.5 while 语句的循环体非法应报错',
+    name: '6.8.3.5 an invalid loop body of a while-statement should report an error',
     code: `program test(output);
 begin
   while true do )
 end.`,
-    purpose: 'ISO 6.8.3.5：do 之后须为合法 statement',
+    purpose: 'ISO 6.8.3.5: after do there must be a valid statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.6 repeat 语句的语句序列中某语句非法应报错',
+    name: '6.8.3.6 an invalid statement in the statement-sequence of a repeat-statement should report an error',
     code: `program test(output);
 begin
   repeat ) until true;
 end.`,
-    purpose: 'ISO 6.8.3.6：repeat statement-sequence until Boolean-expression',
+    purpose: 'ISO 6.8.3.6: repeat statement-sequence until Boolean-expression',
     expectedError: '',
   },
   {
-    name: '6.8.3.6 repeat 语句序列中相邻语句须以分号分隔',
+    name: '6.8.3.6 adjacent statements in a repeat statement-sequence must be separated by semicolons',
     code: `program test(output);
 begin
   repeat writeln(1) writeln(2) until true;
 end.`,
-    purpose: 'ISO 6.8.3.6：statement-sequence = statement { ; statement }',
+    purpose: 'ISO 6.8.3.6: statement-sequence = statement { ; statement }',
     expectedError: '',
   },
   {
-    name: '6.8.3.6 repeat 的 until 之后表达式非法应报错',
+    name: '6.8.3.6 an invalid expression after until of repeat should report an error',
     code: `program test(output);
 begin
   repeat until + ;
 end.`,
-    purpose: 'ISO 6.8.3.6：until 之后须为合法 Boolean-expression',
+    purpose: 'ISO 6.8.3.6: after until there must be a valid Boolean-expression',
     expectedError: '',
   },
   {
-    name: '6.8.3.9 for 语句的控制变量须为标识符',
+    name: '6.8.3.9 the control variable of a for-statement must be an identifier',
     code: `program test(output);
 begin
   for 5 := 1 to 2 do writeln(1);
 end.`,
-    purpose: 'ISO 6.8.3.9：for-statement 的控制变量为 variable-access（identifier）',
+    purpose: 'ISO 6.8.3.9: the control variable of a for-statement is a variable-access (identifier)',
     expectedError: '',
   },
   {
-    name: '6.8.3.9 for 语句的初值表达式非法应报错',
+    name: '6.8.3.9 an invalid initial-value expression of a for-statement should report an error',
     code: `program test(output);
 var i: integer;
 begin
   for i := + to 2 do writeln(i);
 end.`,
-    purpose: 'ISO 6.8.3.9：initial-value 须为合法 expression',
+    purpose: 'ISO 6.8.3.9: the initial-value must be a valid expression',
     expectedError: '',
   },
   {
-    name: '6.8.3.9 for 语句的终值表达式非法应报错',
+    name: '6.8.3.9 an invalid final-value expression of a for-statement should report an error',
     code: `program test(output);
 var i: integer;
 begin
   for i := 1 to + do writeln(i);
 end.`,
-    purpose: 'ISO 6.8.3.9：final-value 须为合法 expression',
+    purpose: 'ISO 6.8.3.9: the final-value must be a valid expression',
     expectedError: '',
   },
   {
-    name: '6.8.3.9 for 语句的循环体非法应报错',
+    name: '6.8.3.9 an invalid loop body of a for-statement should report an error',
     code: `program test(output);
 var i: integer;
 begin
   for i := 1 to 2 do )
 end.`,
-    purpose: 'ISO 6.8.3.9：do 之后须为合法 statement',
+    purpose: 'ISO 6.8.3.9: after do there must be a valid statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.7 case 语句的选择器表达式非法应报错',
+    name: '6.8.3.7 an invalid selector expression of a case-statement should report an error',
     code: `program test(output);
 begin
   case + of
     1: writeln(1);
   end;
 end.`,
-    purpose: 'ISO 6.8.3.7：case-statement = case case-index of ...',
+    purpose: 'ISO 6.8.3.7: case-statement = case case-index of ...',
     expectedError: '',
   },
   {
-    name: '6.8.3.7 case 的 case-constant-list 非法应报错',
+    name: '6.8.3.7 an invalid case-constant-list of a case should report an error',
     code: `program test(output);
 begin
   case 1 of
     : writeln(1);
   end;
 end.`,
-    purpose: 'ISO 6.8.3.7：case-list-element = case-constant-list : statement',
+    purpose: 'ISO 6.8.3.7: case-list-element = case-constant-list : statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.7 case 分支的语句非法应报错',
+    name: '6.8.3.7 an invalid statement in a case branch should report an error',
     code: `program test(output);
 begin
   case 1 of
     1: )
   end;
 end.`,
-    purpose: 'ISO 6.8.3.7：case-constant-list 的冒号后须为合法 statement',
+    purpose: 'ISO 6.8.3.7: after the colon of a case-constant-list there must be a valid statement',
     expectedError: '',
   },
   {
-    name: '6.8.2.4 goto 之后须为 label',
+    name: '6.8.2.4 goto must be followed by a label',
     code: `program test(output);
 label 1;
 begin
   goto ;
   1: writeln(1);
 end.`,
-    purpose: 'ISO 6.8.2.4：goto-statement = goto label',
+    purpose: 'ISO 6.8.2.4: goto-statement = goto label',
     expectedError: '',
   },
   {
-    name: '6.8.3.10 with 语句的 record-variable-list 非法应报错',
+    name: '6.8.3.10 an invalid record-variable-list of a with-statement should report an error',
     code: `program test(output);
 begin
   with ; do writeln(1);
 end.`,
-    purpose: 'ISO 6.8.3.10：with record-variable-list do statement',
+    purpose: 'ISO 6.8.3.10: with record-variable-list do statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.10 with 语句的语句体非法应报错',
+    name: '6.8.3.10 an invalid body of a with-statement should report an error',
     code: `program test(output);
 type r = record x: integer end;
 var v: r;
 begin
   with v do )
 end.`,
-    purpose: 'ISO 6.8.3.10：do 之后须为合法 statement',
+    purpose: 'ISO 6.8.3.10: after do there must be a valid statement',
     expectedError: '',
   },
   {
-    name: '6.8.3.10 with 语句体内可对记录的分量赋值',
+    name: '6.8.3.10 components of a record may be assigned within the body of a with-statement',
     code: `program test(output);
 type r = record a: array[1..2] of integer end;
 var v: r;
@@ -1792,11 +1847,12 @@ begin
   end;
   writeln(v.a[1], v.a[2]);
 end.`,
-    purpose: 'ISO 6.8.3.10/6.5.3：with 体内字段标识符指称记录变量的分量，其分量可作赋值目标',
+    purpose:
+      'ISO 6.8.3.10/6.5.3: within a with body, a field-identifier denotes a component of the record variable, and its component may serve as an assignment target',
     expectedOutput: '56\n',
   },
   {
-    name: '6.6.3.1 实参个数多于形参个数应报错',
+    name: '6.6.3.1 more actual parameters than formal parameters should report an error',
     code: `program test(output);
 procedure q(a: integer);
 begin
@@ -1805,11 +1861,12 @@ end;
 begin
   q(1, 2);
 end.`,
-    purpose: 'ISO 6.6.3.1：actual-parameter-list 须与 formal-parameter-list 一一对应',
+    purpose: 'ISO 6.6.3.1: the actual-parameter-list must correspond one-to-one with the formal-parameter-list',
     expectedError: '',
   },
   {
-    name: '6.8 goto 从内层循环一次跳出外层循环并执行跳转目标处的语句',
+    name:
+      '6.8 goto jumps out of an outer loop from an inner loop in one step and executes the statement at the jump target',
     code: `program test(output);
 label 97, 98, 99;
 var i, j: integer;
@@ -1837,7 +1894,8 @@ begin
 99:
   writeln('C');
 end.`,
-    purpose: 'ISO 6.8.2.4：goto 终止其间所有激活，并在 tag 所指程序点继续，标签处语句须执行',
+    purpose:
+      'ISO 6.8.2.4: goto terminates all activations between them and continues at the program point denoted by the tag; the statement at the label must be executed',
     expectedOutput: '1 AC\n',
   },
 ]

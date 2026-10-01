@@ -20,14 +20,13 @@ const tangleExtraCallables: Record<string, ExtraCallable> = {
   },
 }
 
-// TANGLE 的 TTY 接在普通内存文件上（不是交互式终端），故关掉终端的 eoln 覆盖
+// TANGLE's TTY is backed by a plain memory file (not an interactive terminal), so the terminal eoln override is disabled.
 const tangleExtraSyscalls: Record<string, SyscallHandler> = texRuntimeSyscalls({ terminal: false })
 
 export type TangleInput = {
   tangleContent: string
   webContent: string
   changeContent?: string
-  /** debug 构建开关（默认 true），透传给 transform */
   debug?: boolean
 }
 export type TangleOutput = {
@@ -36,7 +35,6 @@ export type TangleOutput = {
 }
 export type RunTangleResult = {
   state: RunState
-  /** 编译产物（调用方持有；runtime 不再回传源码） */
   jsCode: string
   pasFile: string
   poolFile: Uint8Array

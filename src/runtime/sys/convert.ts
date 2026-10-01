@@ -1,19 +1,8 @@
-/*
- * 转换原语：值 ↔ 文件单位。
- *
- * 只服务「值参数类型多态」（write / read 的值参数），
- * 由 rewrite 按值类型 + 文件元素类型选择具体 key。
- * runtime 侧不含 Pascal 类型信息，只做纯粹的格式 / 字节转换。
- *
- * 文本文件：单位是字符串；二进制文件：单位是 Uint8Array。
- */
-
 import { rtKeys } from '../keys.ts'
 import type { ByteHost, SyscallHandler } from '../runtime-type.ts'
 import { bytesToString, formatField, formatReal } from '../runtime-util.ts'
 import { makeByteHost } from './mem.ts'
 
-/** 按宽度右对齐（width 为 undefined 时原样返回） */
 function pad(s: string, w: unknown): string {
   return w === undefined ? s : formatField(s, w as number)
 }
@@ -28,12 +17,6 @@ export function convertSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.convertBooleanToText]: (_ctx, b, w) => pad(b ? 'TRUE' : 'FALSE', w),
     [rtKeys.convertInt32ToChar]: (_ctx, n, w) => pad(String.fromCharCode((n as number) & 0xff), w),
-    /**
-     * ISO 6.9.3.6：string-type 值的字段宽度。
-     * TotalWidth > n 时先写 (TotalWidth - n) 个空格再写全部字符；
-     * 1 <= TotalWidth <= n 时只写前 TotalWidth 个字符；
-     * TotalWidth < 1 为 error（ISO 6.9.3.1 / D.58）。
-     */
     [rtKeys.convertBytesToTextField]: (_ctx, bytes, w) => {
       const text = bytesToString((bytes as ByteHost).bytes)
       const width = w as number
@@ -81,7 +64,6 @@ export function convertSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.convertBytesToBoolean]: (_ctx, b) => ((b as ByteHost).bytes[0] ? 1 : 0),
 
-    // char 的宿主表示统一为字节值（number），无类型分派
     [rtKeys.convertCharToInt32]: (_ctx, c) => (c as number) & 0xff,
   }
 }

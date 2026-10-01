@@ -25,7 +25,7 @@ import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
 // Statement Parsers
 
-// parseStatement — dispatches based on lookahead
+// parseStatement - dispatches based on lookahead
 export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
   const token = peek(input)
 
@@ -174,7 +174,7 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
   const startToken = peek(input)
   const token = peek(input)
 
-  // Special handling for WRITE/WRITELN — they support format specifiers: expr:width:precision
+  // Special handling for WRITE/WRITELN - they support format specifiers: expr:width:precision
   if (token.type === 'IDENTIFIER') {
     const upper = token.content.toUpperCase()
     if (upper === 'WRITE' || upper === 'WRITELN') {
@@ -279,7 +279,7 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
         }
         pos = widthResult.newPosition
 
-        // Wrap in a special node — use BinaryExpression with ":" operator to represent format
+        // Wrap in a special node - use BinaryExpression with ":" operator to represent format
         arg = loc(
           {
             kind: 'BinaryExpression',

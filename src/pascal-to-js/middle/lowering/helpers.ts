@@ -25,7 +25,7 @@ export interface WithBinding {
 /**
  * 编译器内部不变量被违反（非 ISO 语义报错）。
  *
- * 与「面向用户的 ISO 报错」区分：这里的不变量由前序层保证——analysis 的检查先于
+ * 与「面向用户的 ISO 报错」区分：这里的不变量由前序层保证--analysis 的检查先于
  * lowering 执行，能到达这些位置说明编译器自身有缺陷，而不是被编译程序的问题。
  */
 export class AssertionError extends Error {
@@ -106,7 +106,7 @@ export function jumpIfStmt(cond: JsonCode.Expr, then: number, els: number): Json
 /**
  * 槽赋值：产出一条 `lowering.assign` syscall 语句。
  *
- * 赋值没有独立的 IL 语句形态 —— 它与其它写入一样是 syscall 表达式，由 rewrite
+ * 赋值没有独立的 IL 语句形态 -- 它与其它写入一样是 syscall 表达式，由 rewrite
  * 译成 `runtime.assign`（codegen 内联为 `(x = v)`）。这样"写回某个位置"可以由
  * rewrite 生成，lowering 不必为此生成语句。
  */
@@ -147,7 +147,7 @@ export const syscallKeys = {
   setLiteral: 'lowering.set.literal', // [...elems, typeDesc]
 
   // 文件过程：首参为文件变量、次参为其类型描述，其余实参（方言形式的文件名 /
-  // 选项）原样过境 —— 实参数量与形态由 rewrite 解释，lowering 不做判定
+  // 选项）原样过境 -- 实参数量与形态由 rewrite 解释，lowering 不做判定
   fileCreate: 'lowering.file.create', // [typeDesc]
   fileReset: 'lowering.file.reset', // [f, typeDesc, ...rest]
   fileRewrite: 'lowering.file.rewrite', // [f, typeDesc, ...rest]

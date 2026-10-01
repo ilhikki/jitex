@@ -1,18 +1,6 @@
 // ISO/IEC 7185:1990 - 6.2 Blocks, scopes, and activations
 //
-// 章节概括：
-//   定义 block 的语法与语义：block 由 label-declaration-part、constant-definition-part、
-//   type-definition-part、variable-declaration-part、procedure-and-function-declaration-part
-//   与 statement-part 组成，并规定标签声明与其语句的一一对应关系、标签的定义点。
-//   规定每个标识符或标签定义点具有 region 与 scope：scope 一般为该 region 及其包围的所有区域，
-//   但被内层同名定义点排除；field-designator 的 field-specifier 区域被排除在包围作用域之外。
-//   同一区域内不得有同名定义点，所有应用出现须能唯一定位，且定义点须先于其在程序块内的所有应用出现
-//   （唯一例外是 new-pointer-type 域类型中的类型标识符）。required identifiers 视为其定义点区域包围整个程序。
-//   activations 部分规定块的一次激活所包含的实体（statement-part 的算法、各标签对应的程序点、
-//   各变量、局部过程/函数、函数结果）、激活的嵌套关系，并定义 activation-point：激活开始时
-//   变量（除程序参数外）与结果处于 totally-undefined，直到激活终止才消失。
 //
-// 子章节：
 //   6.2.1 Blocks
 //   6.2.2 Scopes
 //   6.2.3 Activations
@@ -20,20 +8,19 @@
 import { type PascalTest, runPascalTests } from './harness.ts'
 
 const tests: PascalTest[] = [
-  // 6.2.1 / 6.2.2 —— 全局实体的作用域覆盖整个程序
   {
-    name: '6.2 主程序可访问全局变量',
+    name: '6.2 main program can access global variables',
     code: `program test(output);
 var x: integer;
 begin
   x := 42;
   writeln(x);
 end.`,
-    purpose: '全局变量的 scope 覆盖整个程序块',
+    purpose: 'the scope of a global variable covers the entire program block',
     expectedOutput: '42\n',
   },
   {
-    name: '6.2 过程内可访问全局变量',
+    name: '6.2 procedure can access global variables',
     code: `program test(output);
 var x: integer;
 procedure show;
@@ -44,11 +31,11 @@ begin
   x := 100;
   show;
 end.`,
-    purpose: '过程体处于全局变量的 scope 之内',
+    purpose: 'the procedure body is within the scope of the global variable',
     expectedOutput: '100\n',
   },
   {
-    name: '6.2 嵌套过程内可访问全局变量',
+    name: '6.2 nested procedure can access global variables',
     code: `program test(output);
 var x: integer;
 procedure outer;
@@ -63,11 +50,12 @@ begin
   x := 200;
   outer;
 end.`,
-    purpose: 'scope 为 region 及其包围的所有区域，嵌套过程同样在全局变量 scope 内',
+    purpose:
+      'scope is the region and all enclosing regions; nested procedures are also within the global variable scope',
     expectedOutput: '200\n',
   },
   {
-    name: '6.2 函数内可访问全局变量',
+    name: '6.2 function can access global variables',
     code: `program test(output);
 var x: integer;
 function getx: integer;
@@ -78,11 +66,11 @@ begin
   x := 50;
   writeln(getx);
 end.`,
-    purpose: '函数体处于全局变量的 scope 之内',
+    purpose: 'the function body is within the scope of the global variable',
     expectedOutput: '50\n',
   },
   {
-    name: '6.2 多个全局变量均可见',
+    name: '6.2 multiple global variables are all visible',
     code: `program test(output);
 var a, b, c: integer;
 procedure calc;
@@ -95,13 +83,12 @@ begin
   c := 3;
   calc;
 end.`,
-    purpose: '同一 variable-declaration 声明的多个标识符各自表示一个变量',
+    purpose: 'multiple identifiers in the same variable-declaration each denote a distinct variable',
     expectedOutput: '6\n',
   },
 
-  // 6.2.2 —— 局部声明的作用域与遮蔽
   {
-    name: '6.2 过程内的局部变量',
+    name: '6.2 local variables inside a procedure',
     code: `program test(output);
 procedure proc;
 var x: integer;
@@ -112,11 +99,11 @@ end;
 begin
   proc;
 end.`,
-    purpose: '过程内声明的变量其 region 为该过程块',
+    purpose: 'the region of a variable declared in a procedure is that procedure block',
     expectedOutput: '10\n',
   },
   {
-    name: '6.2 函数内的局部变量',
+    name: '6.2 local variables inside a function',
     code: `program test(output);
 function func: integer;
 var x: integer;
@@ -127,11 +114,11 @@ end;
 begin
   writeln(func);
 end.`,
-    purpose: '函数内声明的变量其 region 为该函数块',
+    purpose: 'the region of a variable declared in a function is that function block',
     expectedOutput: '20\n',
   },
   {
-    name: '6.2 局部变量遮蔽同名全局变量',
+    name: '6.2 local variable shadows same-named global variable',
     code: `program test(output);
 var x: integer;
 procedure proc;
@@ -145,11 +132,12 @@ begin
   proc;
   writeln(x);
 end.`,
-    purpose: 'ISO 6.2.2.5：内层同名定义点将外层定义点排除出该内层的 scope',
+    purpose:
+      'ISO 6.2.2.5: an inner same-named definition point excludes the outer definition point from the inner scope',
     expectedOutput: '99\n1\n',
   },
   {
-    name: '6.2 内层局部变量遮蔽外层局部变量',
+    name: '6.2 inner local variable shadows outer local variable',
     code: `program test(output);
 procedure outer;
 var x: integer;
@@ -167,11 +155,11 @@ end;
 begin
   outer;
 end.`,
-    purpose: '内层过程的同名局部变量遮蔽外层过程的局部变量',
+    purpose: 'the same-named local variable of an inner procedure shadows that of the outer procedure',
     expectedOutput: '3\n2\n',
   },
   {
-    name: '6.2 兄弟过程的局部变量互不影响',
+    name: '6.2 local variables of sibling procedures do not affect each other',
     code: `program test(output);
 procedure proc1;
 var x: integer;
@@ -189,11 +177,11 @@ begin
   proc1;
   proc2;
 end.`,
-    purpose: '两个过程各自的名字空间独立，同名局部变量是不同实体',
+    purpose: 'each procedure has its own namespace; same-named local variables are distinct entities',
     expectedOutput: '10\n20\n',
   },
   {
-    name: '6.2 局部变量在其作用域外不可见',
+    name: '6.2 local variable is not visible outside its scope',
     code: `program test(output);
 procedure proc;
 var x: integer;
@@ -203,13 +191,13 @@ end;
 begin
   writeln(x);
 end.`,
-    purpose: 'ISO 6.2.2：过程内的局部变量不在主程序块的 scope 内，引用应报错',
+    purpose:
+      'ISO 6.2.2: a local variable inside a procedure is not in the scope of the main program block; referencing it is an error',
     expectedError: 'undefined identifier',
   },
 
-  // 6.2.2 —— 形式参数的可见性
   {
-    name: '6.2 值参数不修改实参',
+    name: '6.2 value parameter does not modify the actual argument',
     code: `program test(output);
 var a: integer;
 procedure setx(n: integer);
@@ -222,11 +210,12 @@ begin
   setx(a);
   writeln(a);
 end.`,
-    purpose: '值参数是调用时赋值的局部变量，对其赋值不影响实参',
+    purpose:
+      'a value parameter is a local variable assigned at call time; assigning to it does not affect the actual argument',
     expectedOutput: '11\n10\n',
   },
   {
-    name: '6.2 var 参数修改实参',
+    name: '6.2 var parameter modifies the actual argument',
     code: `program test(output);
 var a: integer;
 procedure setx(var n: integer);
@@ -238,11 +227,12 @@ begin
   setx(a);
   writeln(a);
 end.`,
-    purpose: '变量参数与实参表示同一变量，对其赋值即修改实参',
+    purpose:
+      'a variable parameter denotes the same variable as the actual argument; assigning to it modifies the actual argument',
     expectedOutput: '11\n',
   },
   {
-    name: '6.2 形式参数遮蔽同名全局变量',
+    name: '6.2 formal parameter shadows same-named global variable',
     code: `program test(output);
 var x: integer;
 procedure proc(x: integer);
@@ -253,11 +243,12 @@ begin
   x := 100;
   proc(5);
 end.`,
-    purpose: '形式参数的定义点在其过程块内遮蔽同名的外层定义点',
+    purpose:
+      'the definition point of a formal parameter shadows same-named outer definition points within its procedure block',
     expectedOutput: '5\n',
   },
   {
-    name: '6.2 形式参数遮蔽同名局部变量',
+    name: '6.2 formal parameter shadows same-named local variable',
     code: `program test(output);
 procedure outer;
 var x: integer;
@@ -272,11 +263,11 @@ end;
 begin
   outer;
 end.`,
-    purpose: '内层过程的形式参数遮蔽外层变量的同名定义点',
+    purpose: 'the formal parameter of an inner procedure shadows the same-named definition point of the outer variable',
     expectedOutput: '20\n',
   },
   {
-    name: '6.2 嵌套过程可访问外层过程的形式参数',
+    name: '6.2 nested procedure can access formal parameters of the enclosing procedure',
     code: `program test(output);
 procedure outer(a: integer);
 procedure inner;
@@ -289,11 +280,11 @@ end;
 begin
   outer(42);
 end.`,
-    purpose: '外层过程的形式参数在其嵌套过程的 scope 内可见',
+    purpose: 'the formal parameter of an outer procedure is visible within the scope of its nested procedure',
     expectedOutput: '42\n',
   },
   {
-    name: '6.2 嵌套函数可访问外层过程参数',
+    name: '6.2 nested function can access enclosing procedure parameters',
     code: `program test(output);
 procedure outer(n: integer);
 function inner: integer;
@@ -306,11 +297,11 @@ end;
 begin
   outer(10);
 end.`,
-    purpose: '外层过程参数在嵌套函数的 scope 内可见',
+    purpose: 'the outer procedure parameter is visible within the scope of the nested function',
     expectedOutput: '20\n',
   },
   {
-    name: '6.2 函数形式参数遮蔽外层局部变量',
+    name: '6.2 function formal parameter shadows outer local variable',
     code: `program test(output);
 procedure outer;
 var x: integer;
@@ -325,11 +316,12 @@ end;
 begin
   outer;
 end.`,
-    purpose: '函数形式参数遮蔽外层过程局部变量的同名定义点',
+    purpose:
+      'the function formal parameter shadows the same-named definition point of the outer procedure local variable',
     expectedOutput: '6\n',
   },
   {
-    name: '6.2 多个形式参数',
+    name: '6.2 multiple formal parameters',
     code: `program test(output);
 procedure calc(a, b, c: integer);
 begin
@@ -338,13 +330,12 @@ end;
 begin
   calc(1, 2, 3);
 end.`,
-    purpose: '同一 parameter-group 声明的多个标识符各自表示一个形式参数',
+    purpose: 'multiple identifiers in the same parameter-group each denote a formal parameter',
     expectedOutput: '6\n',
   },
 
-  // 6.2.2 —— 函数标识符在函数体内的作用
   {
-    name: '6.2 函数名在函数体内作为返回值变量',
+    name: '6.2 function name serves as result variable inside function body',
     code: `program test(output);
 function double(n: integer): integer;
 begin
@@ -353,11 +344,12 @@ end;
 begin
   writeln(double(5));
 end.`,
-    purpose: 'ISO 6.6.2：函数标识符在函数块内可用作赋值目标，赋的值即函数结果',
+    purpose:
+      'ISO 6.6.2: the function identifier can be used as an assignment target within the function block; the assigned value is the function result',
     expectedOutput: '10\n',
   },
   {
-    name: '6.2 函数调用结果参与表达式',
+    name: '6.2 function call result participates in an expression',
     code: `program test(output);
 function add(a, b: integer): integer;
 begin
@@ -366,11 +358,11 @@ end;
 begin
   writeln(add(3, 4) * 2);
 end.`,
-    purpose: 'function-designator 表示函数激活的结果值，可用在表达式中',
+    purpose: 'a function-designator denotes the result value of a function activation and may be used in an expression',
     expectedOutput: '14\n',
   },
   {
-    name: '6.2 嵌套函数的返回值',
+    name: '6.2 return value of nested function',
     code: `program test(output);
 procedure outer;
 function inner(n: integer): integer;
@@ -383,11 +375,11 @@ end;
 begin
   outer;
 end.`,
-    purpose: '嵌套函数在其所在块的 scope 内可被调用',
+    purpose: 'a nested function can be called within the scope of its enclosing block',
     expectedOutput: '15\n',
   },
   {
-    name: '6.2 递归函数的返回值',
+    name: '6.2 return value of recursive function',
     code: `program test(output);
 function fact(n: integer): integer;
 begin
@@ -399,13 +391,12 @@ end;
 begin
   writeln(fact(5));
 end.`,
-    purpose: '函数标识符的 scope 覆盖其自身函数块，因此可以递归调用',
+    purpose: 'the scope of a function identifier covers its own function block, so it can be called recursively',
     expectedOutput: '120\n',
   },
 
-  // 6.2.2 / 6.8 —— 标签的作用域
   {
-    name: '6.2 过程内的 goto 与标签',
+    name: '6.2 goto and label inside a procedure',
     code: `program test(output);
 procedure proc;
 label 10;
@@ -418,11 +409,11 @@ end;
 begin
   proc;
 end.`,
-    purpose: '标签的 scope 与其所在块一致，过程内的 goto 目标在同一块内',
+    purpose: 'the scope of a label matches its block; a goto target inside a procedure is within the same block',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.2 主程序内的 goto 与标签',
+    name: '6.2 goto and label in the main program',
     code: `program test(output);
 label 20;
 begin
@@ -431,11 +422,11 @@ begin
   20:
   writeln('done');
 end.`,
-    purpose: '主程序块内声明的标签可在该块内作为 goto 目标',
+    purpose: 'a label declared in the main program block can serve as a goto target within that block',
     expectedOutput: 'done\n',
   },
   {
-    name: '6.2 从过程跳到外层块的标签',
+    name: '6.2 goto from a procedure to a label in the enclosing block',
     code: `program test(output);
 label 10;
 procedure proc;
@@ -447,11 +438,12 @@ begin
   10:
   writeln('end');
 end.`,
-    purpose: 'ISO 6.8.1 c) / 6.8.2.4：外层块声明的标签在嵌套块内仍可作为 goto 目标',
+    purpose:
+      'ISO 6.8.1 c) / 6.8.2.4: a label declared in an outer block can still serve as a goto target inside nested blocks',
     expectedOutput: 'start\nend\n',
   },
   {
-    name: '6.2 嵌套过程中的标签',
+    name: '6.2 label in a nested procedure',
     code: `program test(output);
 procedure outer;
 procedure inner;
@@ -468,11 +460,11 @@ end;
 begin
   outer;
 end.`,
-    purpose: '标签声明与使用在同一过程块内',
+    purpose: 'label declaration and use are within the same procedure block',
     expectedOutput: 'yes\n',
   },
   {
-    name: '6.2 不同作用域中的同名标签互不冲突',
+    name: '6.2 same-named labels in different scopes do not conflict',
     code: `program test(output);
 procedure proc1;
 label 10;
@@ -492,23 +484,24 @@ begin
   proc1;
   proc2;
 end.`,
-    purpose: '标签由块中的定义点确定，不同块的同名数值标签是不同实体',
+    purpose:
+      'a label is determined by its definition point in a block; same-named numeric labels in different blocks are distinct entities',
     expectedOutput: 'p1\np2\n',
   },
 
-  // 6.2.2 —— 常量与类型的可见性
   {
-    name: '6.2 过程内可访问全局常量',
+    name: '6.2 procedure can access global constants',
     code: `program test(output);
 const PI = 3.14;
 begin
   writeln(round(PI * 100));
 end.`,
-    purpose: '全局常量定义点的 scope 覆盖整个程序块（real 输出格式由实现定义，故转为整数比较）',
+    purpose:
+      'the scope of a global constant definition point covers the entire program block (real output format is implementation-defined, so compare as integer)',
     expectedOutput: '314\n',
   },
   {
-    name: '6.2 局部常量遮蔽同名全局常量',
+    name: '6.2 local constant shadows same-named global constant',
     code: `program test(output);
 const x = 10;
 procedure proc;
@@ -519,11 +512,11 @@ end;
 begin
   proc;
 end.`,
-    purpose: '内层常量定义点遮蔽外层同名常量',
+    purpose: 'an inner constant definition point shadows a same-named outer constant',
     expectedOutput: '20\n',
   },
   {
-    name: '6.2 过程内的局部常量',
+    name: '6.2 local constant inside a procedure',
     code: `program test(output);
 procedure proc;
 const LIMIT = 100;
@@ -533,11 +526,11 @@ end;
 begin
   proc;
 end.`,
-    purpose: '过程块内可声明常量，其 scope 为该过程块',
+    purpose: 'constants may be declared inside a procedure block; their scope is that procedure block',
     expectedOutput: '100\n',
   },
   {
-    name: '6.2 嵌套过程内可见的常量',
+    name: '6.2 constant visible inside a nested procedure',
     code: `program test(output);
 procedure outer;
 const C = 50;
@@ -551,11 +544,11 @@ end;
 begin
   outer;
 end.`,
-    purpose: '外层过程的常量在其嵌套过程的 scope 内可见',
+    purpose: 'constants of an outer procedure are visible within the scope of its nested procedure',
     expectedOutput: '50\n',
   },
   {
-    name: '6.2 过程内可访问全局类型',
+    name: '6.2 procedure can access global types',
     code: `program test(output);
 type T = integer;
 var x: T;
@@ -568,11 +561,11 @@ end;
 begin
   proc;
 end.`,
-    purpose: '全局类型标识符的 scope 覆盖整个程序块',
+    purpose: 'the scope of a global type identifier covers the entire program block',
     expectedOutput: '10\n',
   },
   {
-    name: '6.2 过程内定义的局部类型',
+    name: '6.2 local type defined inside a procedure',
     code: `program test(output);
 procedure proc;
 type T = integer;
@@ -584,13 +577,12 @@ end;
 begin
   proc;
 end.`,
-    purpose: '过程块内可声明类型，其 scope 为该过程块',
+    purpose: 'types may be declared inside a procedure block; their scope is that procedure block',
     expectedOutput: '20\n',
   },
 
-  // 6.2.2 —— 跨作用域访问复合类型的变量
   {
-    name: '6.2 跨作用域访问记录字段',
+    name: '6.2 accessing record fields across scopes',
     code: `program test(output);
 type
   Person = record
@@ -605,11 +597,11 @@ begin
   setAge(30);
   writeln(p.age);
 end.`,
-    purpose: '全局变量的分量在过程的 scope 内可访问',
+    purpose: 'components of a global variable are accessible within the procedure scope',
     expectedOutput: '30\n',
   },
   {
-    name: '6.2 跨作用域使用数组类型',
+    name: '6.2 using array types across scopes',
     code: `program test(output);
 type
   Arr = array[1..5] of integer;
@@ -624,11 +616,11 @@ end;
 begin
   fill;
 end.`,
-    purpose: '全局数组变量的分量在过程内可访问',
+    purpose: 'components of a global array variable are accessible inside the procedure',
     expectedOutput: '3\n',
   },
   {
-    name: '6.2 跨作用域使用枚举类型',
+    name: '6.2 using enumerated types across scopes',
     code: `program test(output);
 type
   Color = (red, green, blue);
@@ -641,11 +633,11 @@ end;
 begin
   setColor;
 end.`,
-    purpose: '全局类型与全局变量在过程内均可访问',
+    purpose: 'both global types and global variables are accessible inside the procedure',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.2 过程可通过全局变量间接修改状态',
+    name: '6.2 procedure can indirectly modify state via global variables',
     code: `program test(output);
 var x: integer;
 procedure proc;
@@ -659,13 +651,13 @@ begin
   proc;
   writeln(x);
 end.`,
-    purpose: '过程中的局部变量与全局变量是不同实体，全局变量可被过程修改',
+    purpose:
+      'local variables in a procedure and global variables are distinct entities; global variables can be modified by the procedure',
     expectedOutput: '6\n',
   },
 
-  // 6.2.2.7 —— 同一 region 内定义点须唯一
   {
-    name: '6.2.2.7 同一 region 内 type 与 var 不得同拼写',
+    name: '6.2.2.7 type and var in the same region must not spell the same',
     code: `program test;
 type P = ^integer;
 var p: P;
@@ -673,78 +665,79 @@ begin
   new(p);
   p^ := 1;
 end.`,
-    purpose: 'ISO 6.2.2.7：同一 region 内任何两个同拼写的定义点都不允许（type P 与 var p）',
+    purpose:
+      'ISO 6.2.2.7: any two definition points with the same spelling in the same region are not allowed (type P and var p)',
     expectedError: '',
   },
   {
-    name: '6.2.2.7 同一 region 内 const 与 var 不得同拼写',
+    name: '6.2.2.7 const and var in the same region must not spell the same',
     code: `program test;
 const N = 1;
 var n: integer;
 begin
   n := N;
 end.`,
-    purpose: 'ISO 6.2.2.7：同一 region 内 const N 与 var n 拼写相同，不允许',
+    purpose: 'ISO 6.2.2.7: const N and var n have the same spelling in the same region, not allowed',
     expectedError: '',
   },
 
-  // 6.2.2 —— 标识符须先声明后使用（含 required identifiers）
   {
-    name: '6.2 正向：内置过程 writeln 可正常调用',
+    name: '6.2 positive: built-in procedure writeln can be called normally',
     code: `PROGRAM P(output);BEGIN WRITELN('ok');END.`,
-    purpose: 'required procedure 不依赖用户声明，不应被误判为无定义',
+    purpose: 'required procedures do not depend on user declaration and should not be misjudged as undefined',
     expectedOutput: 'ok\n',
   },
   {
-    name: '6.2 正向：内置函数 abs 可正常调用',
+    name: '6.2 positive: built-in function abs can be called normally',
     code: `PROGRAM P(output);VAR X:INTEGER;BEGIN X:=ABS(-5);WRITELN(X);END.`,
-    purpose: 'required function 不依赖用户声明，不应被误判为无定义',
+    purpose: 'required functions do not depend on user declaration and should not be misjudged as undefined',
     expectedOutput: '5\n',
   },
   {
-    name: '6.2 正向：maxint 是预定义常量',
+    name: '6.2 positive: maxint is a predefined constant',
     code: `PROGRAM P(output);BEGIN IF MAXINT > 0 THEN WRITELN('positive');END.`,
-    purpose: 'ISO 6.7.2.2：maxint 表示 integer 类型的最大取值，其具体数值由实现定义，故只断言其为正',
+    purpose:
+      'ISO 6.7.2.2: maxint denotes the maximum value of the integer type; its concrete value is implementation-defined, so only assert it is positive',
     expectedOutput: 'positive\n',
   },
   {
-    name: '6.2 正向：nil 无参标识符',
+    name: '6.2 positive: nil is a parameterless identifier',
     code: `PROGRAM P(output);TYPE IP=^INTEGER;VAR P1:IP;BEGIN P1:=NIL;IF P1=NIL THEN WRITELN('nil');END.`,
-    purpose: 'ISO 6.4.4：nil 是 pointer-type 的预定义值，不应被误判为无定义',
+    purpose: 'ISO 6.4.4: nil is a predefined value of pointer-type and should not be misjudged as undefined',
     expectedOutput: 'nil\n',
   },
   {
-    name: '6.2 正向：eof 无参标识符',
+    name: '6.2 positive: eof is a parameterless identifier',
     code: `PROGRAM P(INPUT);BEGIN IF EOF THEN WRITELN('eof');END.`,
-    purpose: 'ISO 6.9.1：省略 file-variable 时作用于 program 参数 input，空输入下 eof 为真',
+    purpose: 'ISO 6.9.1: omitting the file-variable applies to the program parameter input; eof is true on empty input',
     expectedOutput: 'eof\n',
   },
   {
-    name: '6.2 反向：引用未声明变量应报错',
+    name: '6.2 negative: referencing an undeclared variable is an error',
     code: `PROGRAM P;VAR X:INTEGER;BEGIN Y:=1;END.`,
-    purpose: 'ISO 6.2.2：变量的定义点须先于其应用出现，Y 未声明',
+    purpose: 'ISO 6.2.2: the definition point of a variable must precede its applied occurrence; Y is undeclared',
     expectedError: 'undefined identifier',
   },
   {
-    name: '6.2 反向：调用未声明函数应报错',
+    name: '6.2 negative: calling an undeclared function is an error',
     code: `PROGRAM P;VAR X:INTEGER;BEGIN X:=FOO(1);END.`,
-    purpose: 'ISO 6.2.2：FOO 未声明，其应用出现无法被定位',
+    purpose: 'ISO 6.2.2: FOO is undeclared; its applied occurrence cannot be located',
     expectedError: 'unknown function',
   },
   {
-    name: '6.2 反向：调用未声明过程应报错',
+    name: '6.2 negative: calling an undeclared procedure is an error',
     code: `PROGRAM P;BEGIN BAR;END.`,
-    purpose: 'ISO 6.2.2：BAR 未声明，其应用出现无法被定位',
+    purpose: 'ISO 6.2.2: BAR is undeclared; its applied occurrence cannot be located',
     expectedError: 'unknown procedure',
   },
   {
-    name: '6.2 反向：嵌套过程中引用未声明变量应报错',
+    name: '6.2 negative: referencing undeclared variable in a nested procedure is an error',
     code: `PROGRAM P;PROCEDURE Q;BEGIN LOCAL:=1;END;BEGIN Q;END.`,
-    purpose: '局部作用域内未声明的变量引用同样违反先声明后使用',
+    purpose: 'referencing an undeclared variable in a local scope also violates declare-before-use',
     expectedError: 'undefined identifier',
   },
   {
-    name: '6.2 一条 label 声明可含多个逗号分隔的 label',
+    name: '6.2 a single label declaration may contain multiple comma-separated labels',
     code: `program p(output);
 label 1, 2;
 var x: integer;
@@ -754,47 +747,47 @@ begin
 1: x := 1;
 2: writeln(x);
 end.`,
-    purpose: 'ISO 6.2.2：label-declaration = label {, label}，一条声明可列举多个标号',
+    purpose: 'ISO 6.2.2: label-declaration = label {, label}; one declaration may list multiple labels',
     expectedOutput: '0\n',
   },
   {
-    name: '6.2 同一 label 声明部分内不得重复声明同一 label',
+    name: '6.2 the same label must not be declared twice in the same label declaration part',
     code: `program p(output);
 label 1, 1;
 begin
   1: writeln('x');
 end.`,
-    purpose: 'ISO 6.2.2.7：同一 region 内不得有重复的定义点',
+    purpose: 'ISO 6.2.2.7: there must be no duplicate definition points in the same region',
     expectedError: '',
   },
   {
-    name: '6.2 label 必须是数字序列',
+    name: '6.2 label must be a digit sequence',
     code: `program p(output);
 label abc;
 begin
   writeln('x');
 end.`,
-    purpose: 'ISO 6.1.6：label 是 digit-sequence，其余形式不是合法 label',
+    purpose: 'ISO 6.1.6: a label is a digit-sequence; other forms are not legal labels',
     expectedError: '',
   },
   {
-    name: '6.2 label 声明须以分号结束',
+    name: '6.2 label declaration must end with a semicolon',
     code: `program p(output);
 label 1
 begin
   writeln('x');
 end.`,
-    purpose: 'ISO 6.2.2：label-declaration-part 的每一项以分号终止',
+    purpose: 'ISO 6.2.2: each entry in the label-declaration-part is terminated by a semicolon',
     expectedError: '',
   },
   {
-    name: '6.2 label 取值不得超出允许范围',
+    name: '6.2 label value must not exceed the allowed range',
     code: `program p(output);
 label 10000;
 begin
   10000: writeln('x');
 end.`,
-    purpose: 'ISO 6.1.6：label 的取值范围为 0..9999',
+    purpose: 'ISO 6.1.6: the range of label values is 0..9999',
     expectedError: '',
   },
 ]

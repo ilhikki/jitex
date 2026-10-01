@@ -4,11 +4,12 @@ import type { SyscallRewriteTable } from '@jitex/pascal-to-js'
 import { texOpenKeys } from '@jitex/tex-runtime'
 
 /*
- * boot-tex 的宿主侧工具。
+ * Host-side utilities for boot-tex.
  *
- * 只保留两类东西：Deno 相关的文件读取，以及**编译期**的方言声明（重写表）。
- * 运行期部件——TTY 终端、TeX 的 extra / open syscall、文件名区约定——已归
- * @jitex/tex-runtime，本目录不再各写一份。
+ * Only two things live here: Deno-related file reading, and **compile-time**
+ * dialect declarations (rewrite tables). Runtime parts -- TTY terminal, TeX's
+ * extra/open syscalls, filename area conventions -- now belong to
+ * @jitex/tex-runtime; this directory no longer keeps its own copy.
  */
 
 export function readTextFile(path: string): Promise<string> {
@@ -19,21 +20,26 @@ export function readFile(path: string): Promise<Uint8Array> {
   return Deno.readFile(path)
 }
 
-// 具名文件打开（TeX 方言的 reset(f, name, opts) / rewrite(f, name, opts)）
+// Named file open (TeX dialect's reset(f, name, opts) / rewrite(f, name, opts))
 //
-// ISO 7185 6.6.5.2 的 reset / rewrite 只接受一个 file-variable 实参，不带 file-name。
-// 带 file-name 的形式以 rewrite 扩展接管（覆盖同名 lowering.* key）：
-//   - ISO 形式（file-variable + 类型描述）交回内部终态 key；
-//   - 方言形式改写成宿主侧注入的 openin / openout（选项实参丢弃）。
-// 编译器内部表对非 ISO 形式默认报错，这里的覆盖使方言形式合法化。
+// ISO 7185 6.6.5.2 reset/rewrite accept only one file-variable argument, no
+// file-name. The file-name form is taken over by the rewrite extension
+// (overriding the matching lowering.* key):
+//   - ISO form (file-variable + type descriptor) falls back to the internal
+//     terminal key;
+//   - dialect form is rewritten to host-injected openin/openout (option args
+//     are discarded).
+// The compiler's internal table errors on non-ISO forms by default; this
+// override legalizes the dialect form.
 //
-// 本表是**编译期**的（喂给 transform 的 syscallRewriters）；它产出的 key 由
-// @jitex/tex-runtime 的运行期实现消费，故 key 取自那边导出的 texOpenKeys。
+// This table is **compile-time** (fed to transform as syscallRewriters); the
+// keys it produces are consumed by the runtime implementation in
+// @jitex/tex-runtime, so the keys are taken from texOpenKeys exported there.
 
-/** TeX 方言的文件打开：以 rewrite 扩展覆盖 lowering 侧的无本体调用 key */
 export const fileOpenRewriters: SyscallRewriteTable = {
-  // key 为 lowering 统一产出的 `lowering.call.<小写名>`；实参布局 = (值, 类型描述) 平铺，
-  // 故 ISO 单实参形式长度为 2，方言形式（带 file-name）长度 > 2
+  // key is the lowering-produced `lowering.call.<lowercase name>`; arg layout =
+  // (value, type descriptor) flattened, so the ISO single-arg form has length
+  // 2 and the dialect form (with file-name) has length > 2.
   ['lowering.call.reset']: (sys) => {
     if (sys.args.length === 2) {
       return { kind: 'syscall', key: rtKeys.fileReset, args: [sys.args[0]] }

@@ -67,7 +67,7 @@ function loweringBlock(
   //
   // 顺序很关键：for / case / with 的编译期临时变量是在 lowering 语句期间由
   // allocTempLocal 追加到 info.locals 的，因此 locals 快照与默认初始化都必须
-  // 放在 lowering 之后 —— 否则这些临时变量既拿不到 let 声明（赋值落到全局，
+  // 放在 lowering 之后 -- 否则这些临时变量既拿不到 let 声明（赋值落到全局，
   // 递归时被内层激活覆盖），也拿不到默认初始化。
   const statements: JsonCode.Statement[] = []
 
@@ -76,7 +76,7 @@ function loweringBlock(
   // 绑定机制是 impl-defined（ISO 6.10）：本工程在运行时用 ctx.programFileUrl
   // 做映射（缺省为恒等映射），通过 program.fileUrl syscall 取 url，
   // 再用 rec.set 直接把 url 写入文件句柄的 .url 字段。
-  // （不使用 file.assign —— 那是 Borland 扩展过程，非 ISO 6.6.5.2。）
+  // （不使用 file.assign -- 那是 Borland 扩展过程，非 ISO 6.6.5.2。）
   if (info.kind === 'program' && programParams && programParams.length > 0) {
     for (const p of programParams) {
       const sym = analysis.globalSymbolOf(p.name)
@@ -116,7 +116,7 @@ function loweringBlock(
   // 函数体 = 进入钩子 → 变量默认初始化 → 语句 → 末尾 return
   const body: JsonCode.Statement[] = []
   // 进入钩子只在 debug 构建生成：它该不该存在取决于插入位置（函数入口），
-  // 而位置知识在本层 —— 所以由本层决定，而不是生成后交给 rewrite 抹掉
+  // 而位置知识在本层 -- 所以由本层决定，而不是生成后交给 rewrite 抹掉
   if (analysis.debug()) {
     const debugName = analysis.debugNames().get(info.funcId) ?? ''
     body.push(evalStmt(syscall(syscallKeys.hookFunctionEnter, [litField(info.funcId.toString()), litField(debugName)])))
