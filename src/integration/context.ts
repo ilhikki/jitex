@@ -1,9 +1,3 @@
-// Context stack: RunContext (top level) + StageContext (current stage)
-//
-// DSL primitives assert/attach/log all write to the top StageContext.
-// Calling these primitives without a StageContext (during suite declaration /
-// hook execution) throws.
-
 export interface Artifact {
   name: string
   bytes: Uint8Array
@@ -95,15 +89,12 @@ export class RunContext {
   }
 }
 
-// Global runtime context (only one run allowed concurrently at a time)
 let globalCtx: RunContext | undefined = undefined
 
 export function setGlobalRunContext(ctx: RunContext | undefined): void {
   globalCtx = ctx
 }
 
-// Log sink: every message from log / addLog is forwarded here in real time (console by default).
-// runner injects it via setLogSink and clears it after the run ends.
 let activeSink: ((msg: string) => void) | undefined = undefined
 
 export function setLogSink(sink: ((msg: string) => void) | undefined): void {
@@ -121,7 +112,6 @@ export function requireRunContext(): RunContext {
   return globalCtx
 }
 
-/** Nullable version: inside the suite callback (declaration phase) the run is not yet established, so ask "is there a run now" */
 export function tryRunContext(): RunContext | undefined {
   return globalCtx
 }

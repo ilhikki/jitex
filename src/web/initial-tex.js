@@ -1,23 +1,5 @@
 import { LOGO_TEX } from './logo-tex.js'
 
-/**
- * 页面正文 = build:jitex 的初始 TeX（单一真源）。
- *
- * 两页：
- *   第一页——样例。数学与物理按**历史**排列（毕达哥拉斯到 univalence、
- *          阿基米德到费曼），末尾一段展示各个字面。
- *   第二页——能力。是什么、能排什么、我们是怎么做的、边界在哪。**不写接口用法**：
- *          这一页的读者是要排版的人，接口的读者是要集成的人，两种读者不混在一页。
- *
- * 标志（名字那五个字母）的定义与渲染在 logo-tex.js；这里只内插那段定义——站头与
- * 正文里的宏因此永远是同一行。
- *
- * 几个书写约束（否则这段源码自己会出问题）：
- *   - 不用反引号：TeX 的引号写成 \lq\lq ... \rq\rq；
- *   - 每个 $$ 后留一个空格：避免出现 ${ 触发模板插值（LOGO_TEX 那处插值是有意的）；
- *   - 提到 LaTeX 只能写纯文本：plain.tex 里没有 \LaTeX；
- *   - 源码里的注释也是给读者看的，所以写英文。
- */
 
 export const INITIAL_TEX = String.raw`% Plain TeX, not LaTeX --- edit this, then press Ctrl + Enter.
 ${LOGO_TEX}

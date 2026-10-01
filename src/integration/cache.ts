@@ -1,12 +1,3 @@
-// Cache mechanism (directory layout + checksum + recovery decision + writing).
-//
-// Layout: {cacheDir}/{suiteName}/{stageName}/
-//   meta.json          // version, timestamp, dep list & checksums, self checksum
-//   results.json       // CacheableRecord (JSON serialized, Uint8Array as base64)
-//   attachments/{name} // attachments kept as-is
-//   assertions.json
-//   logs.txt
-
 import type { Stage } from './dsl.ts'
 import type { Artifact, AssertionRecord } from './context.ts'
 import type { CacheableRecord } from './dsl.ts'
@@ -120,7 +111,6 @@ function sanitize(s: string): string {
   return s.replace(/[^A-Za-z0-9_.-]/g, '_')
 }
 
-// Compute checksum for a stage (results + attachments).
 export async function computeChecksum(
   results: CacheableRecord,
   artifacts: Artifact[],
@@ -134,7 +124,6 @@ export async function computeChecksum(
   return await sha256Hex(chunks)
 }
 
-// Read meta.json; return undefined if it does not exist.
 export async function readMeta(dir: string): Promise<MetaJson | undefined> {
   const p = `${dir}/meta.json`
   try {
@@ -150,7 +139,6 @@ export async function writeMeta(dir: string, meta: MetaJson): Promise<void> {
   await Deno.writeFile(`${dir}/meta.json`, enc().encode(JSON.stringify(meta, undefined, 2)))
 }
 
-// Write a cache entry (called after success).
 export async function writeCache(
   cacheDir: string,
   suiteName: string,
@@ -164,10 +152,6 @@ export async function writeCache(
   const dir = stageDir(cacheDir, suiteName, stageName)
   await Deno.mkdir(dir, { recursive: true })
 
-  // Normalize attachments: dedup by on-disk filename (after sanitize), later wins.
-  // The recovery side only sees the on-disk file list, so the checksum must be
-  // fully reproducible from that list; otherwise repeated attach of the same
-  // artifact name (e.g. boot-tex's tangle.js) would break verification.
   const normalized: Artifact[] = []
   const byName = new Map<string, number>()
   for (const a of artifacts) {
@@ -201,10 +185,6 @@ export async function writeCache(
   return checksum
 }
 
-// Attempt to recover from cache; return undefined if conditions are not met.
-// When requireCacheStrict=true (CLI --with-cache):
-//   - stage is cacheable but no cache entry exists -> throw
-//   - a dep is cacheable but its cache is missing/mismatched -> throw
 export async function tryRecoverCache(
   cacheDir: string,
   suiteName: string,
@@ -320,7 +300,6 @@ export async function tryRecoverCache(
   return { results, artifacts, assertions, logs, checksum: actualChecksum }
 }
 
-// Purge the entire cache directory.
 export async function purgeCacheDir(cacheDir: string): Promise<void> {
   try {
     await Deno.remove(cacheDir, { recursive: true })

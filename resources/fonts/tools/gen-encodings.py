@@ -1,24 +1,4 @@
-"""从 AFM 生成 plain 的编码表。
 
-输入：一份 *.afm 目录（来自 CTAN fonts/amsfonts/afm/）——每个字体自己的
-      "C 码位 ; WX 宽 ; N 字形名"。**这是「码位 → 哪个字形」的权威来源**：
-      TeX 并不全局使用 OT1，75 个字体分属 10 种编码（见 afm-analyze.py）。
-
-输出：
-    src/tex-runtime/render/plain/encodings.ts     10 张「码位 → Unicode」表（入库）
-    .build/fonts/cm-map.json                      中间物，给 gen_cm_fonts.py 用
-    .build/fonts/encodings-report.txt             审计用：全表 + 私用区分配 + 覆盖量
-
-判据：
-    1. 码位 → 字形名   ：AFM 说了算（不假设全局 OT1）
-    2. 字形名 → Unicode：AGL 打底，TeX 专名覆盖（AGL 对数学字体的名字常给错，
-                          甚至给到私用区）——见 NAME_OVERRIDE
-    3. 一族内多个字形抢同一个 Unicode（尺寸档、text/display 档）：不给真 Unicode，
-       改用私用区保留位。理由：Unicode 里没有"第 3 档大括号"这种码位，
-       硬映射必然错档，用 CM 原码又会撞 ASCII 与 C0 控制字符。
-
-用法：python gen-encodings.py [afm 目录]     # 默认 ./afm
-"""
 
 import json
 import re
@@ -28,7 +8,7 @@ from os import listdir, makedirs, path
 from fontTools import agl
 
 HERE = path.dirname(path.abspath(__file__))
-REPO = path.dirname(path.dirname(path.dirname(HERE)))  # resources/fonts/tools → 仓库根
+REPO = path.dirname(path.dirname(path.dirname(HERE)))
 BUILD = path.join(REPO, '.build', 'fonts')
 
 AFM_DIR = sys.argv[1] if len(sys.argv) > 1 else path.join(HERE, 'afm')
@@ -37,21 +17,15 @@ OUT_REPORT = path.join(BUILD, 'encodings-report.txt')
 MAP_JSON = path.join(BUILD, 'cm-map.json')
 CM = re.compile(r'^C\s+(-?\d+)\s*;\s*WX\s+(\S+)\s*;\s*N\s+(\S+)\s*;')
 
-# ---------------------------------------------------------------- 名字 → Unicode
-
-# AGL 对这些名字给错的（含给到 PUA 的），以及 AGL 里没有的 TeX 专名。
-# 值 None 表示"有字形但没有公认的 Unicode 归属"。
 NAME_OVERRIDE = {
-    # --- AGL 给到 PUA 或明显错位 ---
-    'Delta': 0x0394,       # AGL 给 U+2206 INCREMENT；CM 里就是希腊 Δ
-    'Omega': 0x03A9,       # AGL 给 U+2126 OHM；CM 里就是希腊 Ω
-    'mu': 0x03BC,          # AGL 给 U+00B5 MICRO SIGN；cmmi 里是希腊 μ
-    'dotlessj': 0x0237,    # AGL 给 U+F6BE（PUA）
+    'Delta': 0x0394,
+    'Omega': 0x03A9,
+    'mu': 0x03BC,
+    'dotlessj': 0x0237,
     'zerooldstyle': 0x0030, 'oneoldstyle': 0x0031, 'twooldstyle': 0x0032,
     'threeoldstyle': 0x0033, 'fouroldstyle': 0x0034, 'fiveoldstyle': 0x0035,
     'sixoldstyle': 0x0036, 'sevenoldstyle': 0x0037, 'eightoldstyle': 0x0038,
-    'nineoldstyle': 0x0039,  # AGL 给 U+F730..U+F739（PUA）
-    # --- cmmi 专名 ---
+    'nineoldstyle': 0x0039,
     'epsilon1': 0x03F5, 'theta1': 0x03D1, 'pi1': 0x03D6, 'rho1': 0x03F1,
     'sigma1': 0x03C2, 'phi1': 0x03D5,
     'lscript': 0x2113, 'weierstrass': 0x2118, 'vector': 0x2192, 'tie': 0x2040,
@@ -61,7 +35,6 @@ NAME_OVERRIDE = {
     'arrowhookleft': 0x21A9, 'arrowhookright': 0x21AA,
     'arrowlefttophalf': 0x21BC, 'arrowleftbothalf': 0x21BD,
     'arrowrighttophalf': 0x21C0, 'arrowrightbothalf': 0x21C1,
-    # --- cmsy 专名 ---
     'minus': 0x2212, 'periodcentered': 0x22C5, 'multiply': 0x00D7,
     'asteriskmath': 0x2217, 'divide': 0x00F7, 'diamondmath': 0x22C4,
     'plusminus': 0x00B1, 'minusplus': 0x2213, 'circleplus': 0x2295,
@@ -94,20 +67,15 @@ NAME_OVERRIDE = {
     'diamond': 0x2662, 'heart': 0x2661, 'spade': 0x2660,
     'dagger': 0x2020, 'daggerdbl': 0x2021, 'lozenge': 0x25CA,
     'partialdiff': 0x2202,
-    'negationslash': 0x0338,   # cmsy 0x36 是 plain.tex 的 \not：一条长斜杠，
-                               # Unicode 里只有"组合用长斜线叠符"这一个身份
+    'negationslash': 0x0338,
+
     # --- cmtex ---
     'dotmath': 0x22C5,
-    # --- 文本字体的特殊码位 ---
-    # 注意：suppress（OT1 0x20）不在这里 —— 它有条真轮廓，但"suppress"这个名字没有
-    # Unicode 身份；真正的空白是另一个字形 space。宁缺勿错，让它落 null。
     'nbspace': 0x00A0, 'visiblespace': 0x2423,
     'sterling': 0x00A3, 'quotedbl': 0x0022, 'quotesingle': 0x0027,
     'less': 0x003C, 'greater': 0x003E, 'backslash': 0x005C,
     'bar': 0x007C, 'asciicircum': 0x005E, 'asciitilde': 0x007E,
     'underscore': 0x005F, 'braceleft': 0x007B, 'braceright': 0x007D,
-    # --- cmex：可伸缩符号的"片段"，Unicode 的 Miscellaneous Technical
-    #     区（U+239B..U+23AD、U+23D0）就是为它们而设，一档一个码位，不撞车 ---
     'parenlefttp': 0x239B, 'parenleftex': 0x239C, 'parenleftbt': 0x239D,
     'parenrighttp': 0x239E, 'parenrightex': 0x239F, 'parenrightbt': 0x23A0,
     'bracketlefttp': 0x23A1, 'bracketleftex': 0x23A2, 'bracketleftbt': 0x23A3,
@@ -116,8 +84,6 @@ NAME_OVERRIDE = {
     'braceex': 0x23AA, 'bracerighttp': 0x23AB, 'bracerightmid': 0x23AC,
     'bracerightbt': 0x23AD,
     'arrowvertex': 0x23D0,
-    # --- cmex：大号运算符（text 档给 Unicode，display 档按原码——同形不同档，
-    #     与尺寸档同一个道理；否则 \sum 在 display style 下会画成 text 档那么小） ---
     'summationtext': 0x2211, 'producttext': 0x220F,
     'integraltext': 0x222B, 'uniontext': 0x22C3, 'intersectiontext': 0x22C2,
     'unionmultitext': 0x2A04, 'logicalandtext': 0x22C0, 'logicalortext': 0x22C1,
@@ -125,17 +91,11 @@ NAME_OVERRIDE = {
     'circledottext': 0x2A00, 'circleplustext': 0x2A01, 'circlemultiplytext': 0x2A02,
 }
 
-# 同一个名字在不同族里语义不同（等价于"该字体自己的编码"），按 (族, 名字) 覆盖。
-# 例：cmsy 的 bar 是 \mid、backslash 是 \setminus；文本字体里就是 | 和 \。
 PER_ENCODING = {
     ('cmsy', 'bar'): 0x2223,
     ('cmsy', 'backslash'): 0x2216,
 }
 
-# 有意不给真 Unicode：字形存在，但 Unicode 里没有它的身份 → 落到私用区保留位。
-#   * 尺寸档：同一字形的第 1/2/3/4 档（\big/\Big/\bigg/\Bigg），Unicode 只有一个码位
-#   * 拼装件：根号的 bt/vertex/tp、箭头的 tp/bt、花括号的四个尖……
-#   * cmex 大号运算符的 display 档（与 text 档同形、只是更大一号）
 NO_UNICODE = {
     'parenleftbig', 'parenrightbig', 'bracketleftbig', 'bracketrightbig',
     'floorleftbig', 'floorrightbig', 'ceilingleftbig', 'ceilingrightbig',
@@ -159,17 +119,14 @@ NO_UNICODE = {
     'bracehtipdownleft', 'bracehtipdownright', 'bracehtipupleft', 'bracehtipupright',
     'hatwide', 'hatwider', 'hatwidest',
     'tildewide', 'tildewider', 'tildewidest',
-    # cmex 大号运算符的 display 档（与 text 档同形、只是更大一号）
     'summationdisplay', 'productdisplay', 'integraldisplay', 'uniondisplay',
     'intersectiondisplay', 'unionmultidisplay', 'logicalanddisplay', 'logicalordisplay',
     'coproductdisplay', 'unionsqdisplay', 'contintegraldisplay', 'circledotdisplay',
     'circleplusdisplay', 'circlemultiplydisplay',
 }
 
-# ---------------------------------------------------------------- 读 AFM
 
 def read_afm(p):
-    """返回 {code: name}，只取 0..127（128+ 是 AMS 的重复倾倒区）。"""
     d = {}
     for line in open(p, encoding='latin-1'):
         m = CM.match(line.rstrip('\n'))
@@ -179,7 +136,7 @@ def read_afm(p):
 
 
 def read_afm_all(p):
-    """返回 {code: name}，全码位（含 128+ 的重复倾倒区）。"""
+
     d = {}
     for line in open(p, encoding='latin-1'):
         m = CM.match(line.rstrip('\n'))
@@ -189,7 +146,7 @@ def read_afm_all(p):
 
 
 def base_unicode(enc, name):
-    """名字 → Unicode（不含私用区兜底）；None 表示"这个名字没有 Unicode 身份"。"""
+
     if name in NO_UNICODE:
         return None
     if (enc, name) in PER_ENCODING:
@@ -200,7 +157,7 @@ def base_unicode(enc, name):
     return ord(s) if len(s) == 1 else None
 
 
-# ---------------------------------------------------------------- 分族
+# ---------------------------------------------------------------- Grouping
 
 fonts = sorted(f[:-4] for f in listdir(AFM_DIR) if f.endswith('.afm'))
 tables = {}       # font -> {code: name}
@@ -208,7 +165,7 @@ sig2key = {}
 for font in fonts:
     tables[font] = read_afm(path.join(AFM_DIR, font + '.afm'))
 
-# 码表相同的字体归一族；名字按首次出现顺序给个可读的键
+# Fonts with identical code tables form one group; readable keys in first-seen order
 KEY_ORDER = [
     ('ot1', 'cmr10'), ('ot1-italic', 'cmti10'), ('ot1-nolig', 'cmr5'),
     ('ot1-tt', 'cmtt10'), ('ot1-tt-italic', 'cmitt10'), ('tex', 'cmtex10'),
@@ -222,18 +179,18 @@ for font in fonts:
 enc_of = {}
 for key, probe in KEY_ORDER:
     sig = tuple(sorted(tables[probe].items()))
-    assert sig in by_sig, f'{probe} 的码表没找到'
+    assert sig in by_sig, f'{probe} code table not found'
     for font in by_sig.pop(sig):
         key_of_font[font] = key
         enc_of[key] = tables[probe]
-assert not by_sig, f'有字体没归族：{by_sig}'
+assert not by_sig, f'unclassified fonts: {by_sig}'
 
-# ---------------------------------------------------------------- 私用区兜底
+# ---------------------------------------------------------------- PUA fallback
 
-# 有些字形在 Unicode 里**没有身份**（cmex 的尺寸档、拼装件，OT1 的 suppress…）。
-# 但它们必须有个码位，否则渲染端只能吐 CM 原码——那会撞 ASCII 和 C0 控制字符
-# （XML 都不合法）。所以给每个这样的名字在 Unicode **私用区**留一个位置：
-# 合法码点、不与任何真字符冲突、字体与渲染端同源指认。名字序保证分配是稳定的。
+# Some glyphs have **no identity** in Unicode (cmex size variants, assembly pieces, OT1 suppress...).
+# But they must have a code point; otherwise the renderer can only emit the raw CM code,
+# which collides with ASCII and C0 controls (not even legal in XML). So we reserve a slot
+# in the Unicode **Private Use Area** for each such name: a legal code point, no conflict
 PUA_BASE = 0xE000
 PUA: dict[str, int] = {}
 name_enc: dict[str, str] = {}
@@ -246,40 +203,40 @@ for name in sorted(name_enc):
 
 
 def unicode_of(enc, name):
-    """名字 → Unicode；没有身份的名字落到私用区保留位。"""
+
     u = base_unicode(enc, name)
     return PUA.get(name) if u is None else u
 
 
-# ---------------------------------------------------------------- 出表 + 审计
+
 
 report = []
-report.append('=== 分族（码表完全相同的字体归一族）')
+report.append('=== Grouping (fonts with identical code tables form one group)')
 groups = {}
 for font, key in key_of_font.items():
     groups.setdefault(key, []).append(font)
 for key, _ in KEY_ORDER:
     fs = sorted(groups.get(key, []))
-    report.append(f'  {key:<16} {len(fs):>2} 个：{" ".join(fs)}')
+    report.append(f'  {key:<16} {len(fs):>2} fonts: {" ".join(fs)}')
 
 report.append('')
-report.append(f'=== Unicode 里没有身份的字形 → 私用区保留位（U+{PUA_BASE:04X} 起）')
+report.append(f'=== Glyphs with no identity in Unicode -> PUA reserved slots (from U+{PUA_BASE:04X})')
 empties = {}
 for key, _ in KEY_ORDER:
     for c, n in sorted(enc_of[key].items()):
         if base_unicode(key, n) is None:
             empties.setdefault(key, []).append((c, n))
     if key in empties:
-        report.append(f'  [{key}] {len(empties[key])} 个码位、{len({n for _, n in empties[key]})} 个字形')
+        report.append(f'  [{key}] {len(empties[key])} code points, {len({n for _, n in empties[key]})} glyphs')
         report.append('    ' + ' '.join(f'{c:02X}:{n}(U+{PUA[n]:04X})' for c, n in empties[key]))
-report.append(f'  字形名合计 {len(PUA)} 个')
+report.append(f'  total glyph names: {len(PUA)}')
 report.append('')
-report.append('=== 私用区分配（名字 → 保留位，按名字序稳定分配）')
+report.append('=== PUA allocation (name -> reserved slot, stable by name order)')
 for name, u in sorted(PUA.items(), key=lambda kv: kv[1]):
     report.append(f'  U+{u:04X}  {name}')
 
 report.append('')
-report.append('=== 一族内多个字形抢同一个 Unicode（会退化成其中一档）')
+report.append('=== Multiple glyphs in one family claiming the same Unicode (degenerates to one variant)')
 for key, _ in KEY_ORDER:
     inv = {}
     for c, n in sorted(enc_of[key].items()):
@@ -292,7 +249,7 @@ for key, _ in KEY_ORDER:
         for u, v in sorted(dup.items()):
             report.append(f'    U+{u:04X}: ' + ' '.join(f'{c:02X}:{n}' for c, n in v))
 
-# 回归守卫：族 ot1 必须与现存的 ot1.ts 逐位一致
+
 LOW = [0x393, 0x394, 0x398, 0x39B, 0x39E, 0x3A0, 0x3A3, 0x3A5, 0x3A6, 0x3A8, 0x3A9,
        0xFB00, 0xFB01, 0xFB02, 0xFB03, 0xFB04]
 MID = [0x131, 0x237, 0x60, 0xB4, 0x2C7, 0x2D8, 0xAF, 0x2DA, 0xB8,
@@ -304,38 +261,38 @@ OLD_OT1.update({0x10 + i: u for i, u in enumerate(MID)})
 OLD_OT1.update({c: c for c in range(0x20, 0x80)})
 OLD_OT1.update(OVR)
 report.append('')
-report.append('=== 回归守卫：族 ot1 必须与 OT1 基准逐位一致')
-report.append('  （基准 = 独立按 OT1 定义手写的 128 位，用来挡住对 ot1 族的意外改动）')
+report.append('=== Regression guard: family ot1 must match the OT1 baseline slot-by-slot')
+report.append('  (baseline = independently hand-written 128 slots per the OT1 spec, to guard against accidental changes to the ot1 family)')
 bad = [(c, OLD_OT1.get(c), unicode_of('ot1', n)) for c, n in sorted(enc_of['ot1'].items())
        if OLD_OT1.get(c, 0x20) != unicode_of('ot1', n)]
-report.append(f'  逐位差异 {len(bad)} 处' + ('' if not bad else '：'))
+report.append(f'  slot-by-slot differences: {len(bad)}' + ('' if not bad else ':'))
 for c, a, b in bad:
-    report.append(f'    0x{c:02X} 基准={a and f"U+{a:04X}"} 实际={b and f"U+{b:04X}"}')
+    report.append(f'    0x{c:02X} baseline={a and f"U+{a:04X}"} actual={b and f"U+{b:04X}"}')
 
 report.append('')
-report.append('=== 各族覆盖量（128 位里有多少位给了码点）')
+report.append('=== Coverage per family (how many of the 128 slots have a code point)')
 for key, _ in KEY_ORDER:
     got = sum(1 for c in range(128) if enc_of[key].get(c) is not None)
     real = sum(1 for c, n in enc_of[key].items() if unicode_of(key, n) is not None and n not in PUA)
-    report.append(f'  {key:<16} 有字形 {got:>3} / 有真 Unicode {real:>3} / 私用区 {got - real:>3}')
+    report.append(f'  {key:<16} glyphs {got:>3} / real Unicode {real:>3} / PUA {got - real:>3}')
 
 
 report.append('')
-report.append('=== 人为覆盖的名字：AGL 原值 vs 本表（逐条核对用）')
+report.append('=== Manually overridden names: AGL value vs this table (for item-by-item review)')
 allnames = sorted({n for key, _ in KEY_ORDER for n in enc_of[key].values()})
 for n in allnames:
     if n not in NAME_OVERRIDE:
         continue
     s = agl.toUnicode(n)
-    a = f'U+{ord(s):04X}' if len(s) == 1 else ('(无)' if s == '' else f'(多字 {s!r})')
+    a = f'U+{ord(s):04X}' if len(s) == 1 else ('(none)' if s == '' else f'(multi {s!r})')
     u = NAME_OVERRIDE[n]
-    b = f'U+{u:04X}' if u is not None else '落不下'
-    report.append(f'  {n:<22} AGL={a:<12} 本表={b}')
+    b = f'U+{u:04X}' if u is not None else 'cannot fit'
+    report.append(f'  {n:<22} AGL={a:<12} this-table={b}')
 
-# ---------------------------------------------------------------- 给字体生成器
 
-# gen_cm_fonts.py 据此重建 cmap：字体与渲染端必须同源，否则渲染端输出的码位
-# 在字体里是豆腐块。这里给全码位（含 128+ 的重复倾倒区，那里面才有 nbspace 等）。
+
+
+
 cmap_json = {}
 for font in fonts:
     key = key_of_font[font]
@@ -347,28 +304,28 @@ makedirs(BUILD, exist_ok=True)
 with open(MAP_JSON, 'w', encoding='utf-8', newline='\n') as f:
     json.dump(cmap_json, f, ensure_ascii=False)
 
-# ---------------------------------------------------------------- 写 TS
+
 
 lines = []
 lines.append('/**')
-lines.append(' * CM 各族的「码位 → Unicode」。**生成物，勿手改。**')
+lines.append(' * Code point -> Unicode for each CM family. **Generated; do not edit by hand.**')
 lines.append(' *')
-lines.append(' * 来源：CTAN fonts/amsfonts/afm/ 的 *.afm，每个字体自己的')
-lines.append(' *       "C 码位 ; WX 宽 ; N 字形名" —— TeX 不是全局用 OT1，共 10 种编码；')
-lines.append(' *       同名字形在不同族里还可能语义不同（cmsy 的 bar 是 \\mid，文本字体的 bar 是 |）。')
-lines.append(' * 生成：resources/fonts/tools/gen-encodings.py（审计报告见该目录 README 说明的位置）')
+lines.append(' * Source: *.afm from CTAN fonts/amsfonts/afm/, each font's own')
+lines.append(' *       "C code ; WX width ; N name" - TeX does not use OT1 globally; 10 encodings total;')
+lines.append(' *       A glyph of the same name may differ in meaning across families.')
+lines.append(' * Generated by: resources/fonts/tools/gen-encodings.py (audit report at the location described in that directory's README)')
 lines.append(' *')
-lines.append(' * 表项两种形态：')
-lines.append(' *   number —— 该码位字形的 Unicode 码点')
-lines.append(' *   null   —— 该字体在这个码位上没有字形（TeX 本不该用），按原码直出')
+lines.append(' * Two forms of entries:')
+lines.append(' *   number - the Unicode code point of the glyph at that slot')
+lines.append(' *   null   - the font has no glyph at this slot (TeX should not use it); emit the raw code')
 lines.append(' *')
-lines.append(' * 少数字形在 Unicode 里**没有身份**（cmex 的尺寸档与拼装件、OT1 的 suppress…）。')
-lines.append(' * 它们照样给了码点，但取的是 **Unicode 私用区 U+E000 起**的保留位：合法码点、')
-lines.append(' * 不与任何真字符冲突、字体里也照着同一个位置放了那个字形。这是明说的取舍——')
-lines.append(' * cmex10 这类"多档同形"的字体放弃了 Unicode 语义（U+E0xx 不代表任何字符，')
-lines.append(' * 就是"第几档左圆括号"），换来的是每一档都拿得到、尺寸不会错。')
-lines.append(' * 文本字体不受影响：它们的 0x00..0x7F 全是真 Unicode。')
-lines.append(' * 分配表见 .build/fonts/encodings-report.txt（U+E000 起，按名字序稳定分配）。')
+lines.append(' * A few glyphs have **no identity** in Unicode (cmex size variants and assembly pieces, OT1 suppress...).')
+lines.append(' * They still get code points, taken from **Unicode Private Use Area starting at U+E000**: a legal')
+lines.append(' * code point, no conflict with any real character, and the font places that glyph at the same slot. An explicit tradeoff:')
+lines.append(' * "multi-variant same-shape" fonts like cmex10 give up Unicode semantics (U+E0xx means no character,')
+lines.append(' * it just means "the Nth left paren"), in exchange for every variant being available with the correct size.')
+lines.append(' * Text fonts are unaffected: their 0x00..0x7F are all real Unicode.')
+lines.append(' * The allocation table is in .build/fonts/encodings-report.txt (from U+E000, assigned stably by name order).')
 lines.append(' */')
 lines.append('export type CodeTable = readonly (number | null)[]')
 lines.append('')
@@ -377,8 +334,8 @@ for key, probe in KEY_ORDER:
     enc = enc_of[key]
     fs = sorted(groups.get(key, []))
     lines.append('/**')
-    lines.append(f' * {key}：{" ".join(fs)}')
-    lines.append(f' * 取自 {probe}.afm')
+    lines.append(f' * {key}: {" ".join(fs)}')
+    lines.append(f' * from {probe}.afm')
     lines.append(' */')
     name = 'ENC_' + key.upper().replace('-', '_')
     lines.append(f'const {name}: CodeTable = [')
@@ -386,23 +343,23 @@ for key, probe in KEY_ORDER:
         n = enc.get(c)
         u = None if n is None else unicode_of(key, n)
         if u is None:
-            lines.append('  null, // 该字体在这个码位上没有字形')
+            lines.append('  null, // the font has no glyph at this slot')
         elif PUA.get(n) == u:
-            lines.append(f'  0x{u:04X}, // {n}：Unicode 里没有身份，用私用区保留位')
+            lines.append(f'  0x{u:04X}, // {n}: no identity in Unicode, using PUA reserved slot')
         elif u == c:
-            lines.append(f'  0x{u:04X}, // {n}（就是 ASCII）')
+            lines.append(f'  0x{u:04X}, // {n} (plain ASCII)')
         else:
             lines.append(f'  0x{u:04X}, // {n}')
     lines.append(']')
     lines.append('')
 
-lines.append('/** 族名 → 码表 */')
+lines.append('/** family name -> code table */')
 lines.append('export const TABLES: Record<string, CodeTable> = {')
 for key, _ in KEY_ORDER:
     lines.append(f"  '{key}': ENC_{key.upper().replace('-', '_')},")
 lines.append('}')
 lines.append('')
-lines.append('/** DVI 字体名 → 族名（由 AFM 的分族直接给出，75 个字体全覆盖） */')
+lines.append('/** DVI font name -> family name (comes directly from the AFM grouping; all 75 fonts covered) */')
 lines.append('export const FONT_TABLE: Record<string, string> = {')
 for font in sorted(key_of_font):
     lines.append(f"  '{font}': '{key_of_font[font]}',")
@@ -412,4 +369,4 @@ open(OUT_TS, 'w', encoding='utf-8', newline='\n').write('\n'.join(lines) + '\n')
 open(OUT_REPORT, 'w', encoding='utf-8', newline='\n').write('\n'.join(report) + '\n')
 print(f'written {OUT_TS}, {OUT_REPORT}')
 print(f'fonts={len(fonts)} groups={len(groups)} pua={len(PUA)}')
-print('ot1 回归差异', len(bad))
+print('ot1 regression diff', len(bad))

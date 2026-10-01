@@ -1,16 +1,4 @@
-/*
- * Pass 3: 后置检查。
- *
- * 不遍历 AST，只读 Pass 1/2 的 result 做 goto 跨函数检查 + 无定义引用检查。
- * 有错直接抛异常，无错返回 CheckResult。
- *
- * 输入：DeclarationResult, StatementResult
- * 输出：CheckResult
- */
-
 import { DeclarationResult, StatementResult } from '../stage-types.ts'
-
-// Pass 3 入口
 
 export function runCheckPass(
   declResult: DeclarationResult,
@@ -19,8 +7,6 @@ export function runCheckPass(
   checkGotos(declResult, stmtResult)
   checkUndefinedRefs(stmtResult)
 }
-
-// goto 规则检查（ISO 7185 6.8.1, 6.8.2.4）
 
 function checkGotos(
   decl: DeclarationResult,
@@ -31,7 +17,7 @@ function checkGotos(
     if (!labelInfo) {
       throw new Error(`Goto to undeclared label: ${g.labelVal}`)
     }
-    // 跨过程 goto：仅允许跳到祖先函数的 label
+
     if (labelInfo.funcId !== g.fromFuncId) {
       if (!isAncestorFunc(decl, labelInfo.funcId, g.fromFuncId)) {
         throw new Error(
@@ -39,7 +25,7 @@ function checkGotos(
         )
       }
     }
-    // 跳入非透明块检查：label 深度 > goto 深度 → 跳入结构体内部
+
     const targetDepth = stmt.labelDepth.get(labelInfo.labelId)
     if (targetDepth !== undefined && targetDepth > g.fromDepth) {
       throw new Error(
@@ -48,8 +34,6 @@ function checkGotos(
     }
   }
 }
-
-// 无定义引用检查（ISO 7185: 标识符须先声明后使用）
 
 function checkUndefinedRefs(stmt: StatementResult): void {
   if (stmt.undefinedRefs.length === 0) {
@@ -67,8 +51,6 @@ function checkUndefinedRefs(stmt: StatementResult): void {
   })
   throw new Error(`Undefined reference(s):\n${lines.join('\n')}`)
 }
-
-// 辅助：沿 parentFuncId 链查找 label
 
 function findLabel(
   decl: DeclarationResult,
@@ -90,7 +72,6 @@ function findLabel(
   return undefined
 }
 
-/** 检查 ancestorFuncId 是否是 descFuncId 的祖先（含自身） */
 function isAncestorFunc(
   decl: DeclarationResult,
   ancestorFuncId: number,

@@ -3,11 +3,7 @@ import { bytesToString } from '../runtime-util.ts'
 export function createMemoryFileStore(initialData: Uint8Array | undefined = undefined): PascalFileStore {
   return new MemoryFileStore(initialData)
 }
-/**
- * 纯内存文本文件实现。
- * 内部使用动态扩容的 Uint8Array（双倍扩容策略），支持在任意位置读写。
- * 状态维护：容量、已用长度、当前位置、模式。
- */
+
 class MemoryFileStore implements PascalFileStore {
   private buffer: Uint8Array
   private length: number
@@ -29,10 +25,6 @@ class MemoryFileStore implements PascalFileStore {
     }
   }
 
-  /**
-   * 确保缓冲区至少能容纳 minCapacity 个字节。
-   * 若当前容量不足，则反复翻倍直到满足需求。
-   */
   private ensureCapacity(minCapacity: number): void {
     if (minCapacity <= this.buffer.length) {
       return
@@ -62,7 +54,6 @@ class MemoryFileStore implements PascalFileStore {
     return this.buffer[this.pos]
   }
 
-  /** 从 pos 取 size 字节视图（不推进）；不足 size 返回 undefined */
   peekBytes(size: number): Uint8Array | undefined {
     if (this.pos + size > this.length) {
       return undefined
@@ -127,7 +118,6 @@ class MemoryFileStore implements PascalFileStore {
     return this.pos < this.length
   }
 
-  /** 当前行是否已有内容且以非 end-of-line 字符结尾（ISO 6.9.5 page 的隐式 writeln 判定） */
   currentLineHasContent(): boolean {
     if (this.pos === 0) {
       return false
@@ -136,12 +126,10 @@ class MemoryFileStore implements PascalFileStore {
     return last !== 10 && last !== 13
   }
 
-  /** 获取全部内容（方便调试） */
   getData(): Uint8Array {
     return this.buffer.slice(0, this.length)
   }
 
-  /** 获取内容字符串（方便调试） */
   getContent(): string {
     return bytesToString(this.getData())
   }

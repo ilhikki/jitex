@@ -1,10 +1,3 @@
-/*
- * Pass 8：语法树 → 文本。
- *
- * 每种 SNode 一个打印函数，用一张表分派；缩进和空块的处理集中在这里，
- * 别的模块不需要知道排版规则。
- */
-
 import type { SNode } from './types.ts'
 
 const INDENT = '  '
@@ -16,7 +9,6 @@ function indentLines(text: string, indent: string): string {
     .join('\n')
 }
 
-/** `header { ... }`，body 为空时压成 `header {}` */
 function braced(header: string, body: readonly SNode[], indent: string): string {
   const inner = emitSNode(body, indent + INDENT)
   if (inner.length === 0) {

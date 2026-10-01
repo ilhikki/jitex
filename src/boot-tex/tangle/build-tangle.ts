@@ -6,7 +6,6 @@ import type { PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
 import { texRuntimeSyscalls } from '@jitex/tex-runtime'
 import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
 
-// noinspection SpellCheckingInspection
 const fileNames = {
   webFile: 'WEBFILE',
   changeFile: 'CHANGEFILE',
@@ -20,7 +19,6 @@ const tangleExtraCallables: Record<string, ExtraCallable> = {
   },
 }
 
-// TANGLE's TTY is backed by a plain memory file (not an interactive terminal), so the terminal eoln override is disabled.
 const tangleExtraSyscalls: Record<string, SyscallHandler> = texRuntimeSyscalls({ terminal: false })
 
 export type TangleInput = {

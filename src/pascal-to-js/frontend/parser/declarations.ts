@@ -17,12 +17,9 @@ import type {
 } from '@/frontend/node.ts'
 import type { ParseResult, ParserInput } from '@/frontend/types.ts'
 
-// Declaration Parsers
-
-// LABEL label {, label} ;
 export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDeclarationNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip LABEL
+  let pos = input.position + 1
   const labels: IntegerLiteralNode[] = []
 
   while (true) {
@@ -68,17 +65,15 @@ export function parseLabelDeclaration(input: ParserInput): ParseResult<LabelDecl
   )
 }
 
-// CONST { identifier = expression ; }
 export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDeclarationNode[]> {
   if (peek(input).type !== 'CONST') {
     return ok(input.position, [])
   }
 
-  let pos = input.position + 1 // skip CONST
+  let pos = input.position + 1
   const decls: ConstDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type === 'IDENTIFIER') {
-    // 循环条件已确认当前记号是标识符
     const nameStartToken = peek({ tokens: input.tokens, position: pos })
     const nameNode = loc({ kind: 'Identifier', name: nameStartToken.content } as IdentifierNode, nameStartToken)
     pos++
@@ -95,7 +90,6 @@ export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDec
     }
     pos = valResult.newPosition
 
-    // Optional semicolon (sometimes missing in web/tangle output)
     if (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
       pos++
     }
@@ -116,17 +110,15 @@ export function parseConstDeclarations(input: ParserInput): ParseResult<ConstDec
   return ok(pos, decls)
 }
 
-// TYPE { identifier = type ; }
 export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDeclarationNode[]> {
   if (peek(input).type !== 'TYPE') {
     return ok(input.position, [])
   }
 
-  let pos = input.position + 1 // skip TYPE
+  let pos = input.position + 1
   const decls: TypeDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type === 'IDENTIFIER') {
-    // 循环条件已确认当前记号是标识符
     const nameStartToken = peek({ tokens: input.tokens, position: pos })
     const nameNode = loc({ kind: 'Identifier', name: nameStartToken.content } as IdentifierNode, nameStartToken)
     pos++
@@ -163,7 +155,6 @@ export function parseTypeDeclarations(input: ParserInput): ParseResult<TypeDecla
   return ok(pos, decls)
 }
 
-// VAR { identifier_list : type ; }
 export function parseVariableDeclarations(
   input: ParserInput,
 ): ParseResult<VariableDeclarationNode[]> {
@@ -171,7 +162,7 @@ export function parseVariableDeclarations(
     return ok(input.position, [])
   }
 
-  let pos = input.position + 1 // skip VAR
+  let pos = input.position + 1
   const decls: VariableDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type === 'IDENTIFIER') {
@@ -191,18 +182,11 @@ export function parseVariableDeclarations(
   return ok(pos, decls)
 }
 
-// Procedure / Function Declarations
-// ISO 7185 6.6.3.1/6.6.3.5: functional-parameter-specification = function-heading
-//   function-heading = 'function' identifier [ formal-parameter-list ] ':' result-type
-/**
- * ISO 7185 6.6.3.1：procedural-parameter-specification = procedure-heading
- * procedure-heading = 'procedure' identifier [ formal-parameter-list ]
- */
 function parseProceduralParameterSection(
   input: ParserInput,
 ): ParseResult<ParameterDeclarationNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip PROCEDURE
+  let pos = input.position + 1
 
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
   if (!nameResult.success) {
@@ -238,7 +222,7 @@ function parseFunctionalParameterSection(
   input: ParserInput,
 ): ParseResult<ParameterDeclarationNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip FUNCTION
+  let pos = input.position + 1
 
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
   if (!nameResult.success) {
@@ -288,11 +272,10 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
     return ok(input.position, [])
   }
 
-  let pos = input.position + 1 // skip (
+  let pos = input.position + 1
   const params: ParameterDeclarationNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'RPAREN') {
-    // ISO 7185 6.6.3.1/6.6.3.4：procedural-parameter-specification = procedure-heading
     if (peek({ tokens: input.tokens, position: pos }).type === 'PROCEDURE') {
       const callableResult = parseProceduralParameterSection({ tokens: input.tokens, position: pos })
       if (!callableResult.success) {
@@ -308,7 +291,6 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
       continue
     }
 
-    // ISO 7185 6.6.3.1/6.6.3.5：functional-parameter-specification = function-heading
     if (peek({ tokens: input.tokens, position: pos }).type === 'FUNCTION') {
       const callableResult = parseFunctionalParameterSection({ tokens: input.tokens, position: pos })
       if (!callableResult.success) {
@@ -368,7 +350,7 @@ export function parseParameterList(input: ParserInput): ParseResult<ParameterDec
     pos++
   }
 
-  pos++ // 循环仅在右圆括号处退出，故此处必为右圆括号
+  pos++
 
   return ok(pos, params)
 }
@@ -378,7 +360,7 @@ export function parseProcedureDeclaration(
   outerLabels?: Set<number>,
 ): ParseResult<ProcedureDeclarationNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip PROCEDURE
+  let pos = input.position + 1
 
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
   if (!nameResult.success) {
@@ -398,7 +380,6 @@ export function parseProcedureDeclaration(
   }
   pos = semiResult.newPosition
 
-  // Check for FORWARD
   if (peek({ tokens: input.tokens, position: pos }).type === 'FORWARD') {
     pos++
     const semiResult2 = expectType({ tokens: input.tokens, position: pos }, 'SEMICOLON')
@@ -422,14 +403,12 @@ export function parseProcedureDeclaration(
     )
   }
 
-  // Parse block
   const blockResult = parseBlock({ tokens: input.tokens, position: pos }, outerLabels)
   if (!blockResult.success) {
     return fail(blockResult.error, blockResult.position)
   }
   pos = blockResult.newPosition
 
-  // Optional semicolon after block
   if (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
     pos++
   }
@@ -455,7 +434,7 @@ export function parseFunctionDeclaration(
   outerLabels?: Set<number>,
 ): ParseResult<FunctionDeclarationNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip FUNCTION
+  let pos = input.position + 1
 
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
   if (!nameResult.success) {
@@ -487,7 +466,6 @@ export function parseFunctionDeclaration(
   }
   pos = semiResult.newPosition
 
-  // Check for FORWARD
   if (peek({ tokens: input.tokens, position: pos }).type === 'FORWARD') {
     pos++
     const semiResult2 = expectType({ tokens: input.tokens, position: pos }, 'SEMICOLON')
@@ -512,7 +490,6 @@ export function parseFunctionDeclaration(
     )
   }
 
-  // Parse block
   const blockResult = parseBlock({ tokens: input.tokens, position: pos }, outerLabels)
   if (!blockResult.success) {
     return fail(blockResult.error, blockResult.position)
@@ -540,13 +517,10 @@ export function parseFunctionDeclaration(
   )
 }
 
-// Block & Program Parsers
-
 export function parseBlock(input: ParserInput, outerLabels?: Set<number>): ParseResult<BlockNode> {
   const startToken = peek(input)
   let pos = input.position
 
-  // Label section
   let labelDeclarations: LabelDeclarationNode | undefined = undefined
   if (peek({ tokens: input.tokens, position: pos }).type === 'LABEL') {
     const r = parseLabelDeclaration({ tokens: input.tokens, position: pos })
@@ -557,32 +531,27 @@ export function parseBlock(input: ParserInput, outerLabels?: Set<number>): Parse
     pos = r.newPosition
   }
 
-  // Const section
   const constResult = parseConstDeclarations({ tokens: input.tokens, position: pos })
   if (!constResult.success) {
     return fail(constResult.error, constResult.position)
   }
   pos = constResult.newPosition
 
-  // Type section
   const typeResult = parseTypeDeclarations({ tokens: input.tokens, position: pos })
   if (!typeResult.success) {
     return fail(typeResult.error, typeResult.position)
   }
   pos = typeResult.newPosition
 
-  // Var section
   const varResult = parseVariableDeclarations({ tokens: input.tokens, position: pos })
   if (!varResult.success) {
     return fail(varResult.error, varResult.position)
   }
   pos = varResult.newPosition
 
-  // Procedure / Function declarations
   const procDecls: ProcedureDeclarationNode[] = []
   const funcDecls: FunctionDeclarationNode[] = []
 
-  // 收集当前 block 可见的 label（外层 + 当前层），传递给嵌套 procedure/function
   const currentLabels = new Set<number>(outerLabels ?? [])
   if (labelDeclarations) {
     for (const l of labelDeclarations.labels) {
@@ -611,7 +580,6 @@ export function parseBlock(input: ParserInput, outerLabels?: Set<number>): Parse
     }
   }
 
-  // Compound statement
   const compoundResult = parseCompoundStatement({ tokens: input.tokens, position: pos })
   if (!compoundResult.success) {
     return fail(compoundResult.error, compoundResult.position)
@@ -641,22 +609,18 @@ export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
   const startToken = peek(input)
   let pos = input.position
 
-  // Skip compiler directives and comments (already handled by lexer)
-  // Expect PROGRAM keyword
   const progResult = expectKeyword({ tokens: input.tokens, position: pos }, 'PROGRAM')
   if (!progResult.success) {
     return fail(progResult.error, progResult.position)
   }
   pos = progResult.newPosition
 
-  // Program name
   const nameResult = parseIdentifier({ tokens: input.tokens, position: pos })
   if (!nameResult.success) {
     return fail(nameResult.error, nameResult.position)
   }
   pos = nameResult.newPosition
 
-  // Optional program parameters
   const parameters: IdentifierNode[] = []
   if (peek({ tokens: input.tokens, position: pos }).type === 'LPAREN') {
     pos++
@@ -680,28 +644,24 @@ export function parseProgram(input: ParserInput): ParseResult<ProgramNode> {
     pos = closeResult.newPosition
   }
 
-  // Semicolon
   const semiResult = expectType({ tokens: input.tokens, position: pos }, 'SEMICOLON')
   if (!semiResult.success) {
     return fail(semiResult.error, semiResult.position)
   }
   pos = semiResult.newPosition
 
-  // Block
   const blockResult = parseBlock({ tokens: input.tokens, position: pos })
   if (!blockResult.success) {
     return fail(blockResult.error, blockResult.position)
   }
   pos = blockResult.newPosition
 
-  // Final dot
   const dotResult = expectType({ tokens: input.tokens, position: pos }, 'DOT')
   if (!dotResult.success) {
     return fail(dotResult.error, dotResult.position)
   }
   pos = dotResult.newPosition
 
-  // Ensure all tokens are consumed (no trailing garbage after program)
   const trailing = peek({ tokens: input.tokens, position: pos })
   if (trailing.type !== 'EOF') {
     return fail(

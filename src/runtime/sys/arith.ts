@@ -27,7 +27,7 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
 
     [rtKeys.float32SquareRoot]: (_ctx, a) => {
       const x = a as number
-      // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
+
       if (!(x >= 0)) {
         throw new Error('sqrt: domain error (x < 0)')
       }
@@ -35,14 +35,13 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     },
     [rtKeys.float32Logarithm]: (_ctx, a) => {
       const x = a as number
-      // ISO 7185 6.6.6.2: "It shall be an error if such a value does not exist"
+
       if (!(x > 0)) {
         throw new Error('ln: domain error (x <= 0)')
       }
       return Math.log(x)
     },
 
-    // ISO 7185 6.6.6.3: round(x) = trunc(x+0.5) if x>=0, trunc(x-0.5) if x<0
     [rtKeys.castFloat32ToInt32Round]: (_ctx, a) => {
       const x = a as number
       return Math.trunc(x >= 0 ? x + 0.5 : x - 0.5) | 0

@@ -7,13 +7,6 @@ import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { readFile, readTextFile } from '../utils.ts'
 import { createStageOfGetTangleJs, transformTex } from './build-tex.ts'
 
-/*
- * boot-plain (test) and build:jitex (release) share the same set of stages to
- * avoid duplication.
- *
- * Stage names match the original boot-plain so reports and cache entries align.
- */
-
 export type TangleJsStage = Stage<{ tangleJs: string }>
 export type TexJsStage = Stage<{ texJs: string; poolFile: Uint8Array }>
 export type BaseFilesStage = Stage<Record<string, Uint8Array>>
@@ -120,12 +113,6 @@ async function loadFiles(basePath: string, fileNames: string[]) {
   return data
 }
 
-/**
- * Preloaded fonts have their metrics dumped with plain.fmt (tex.web's
- * store_fmt_file dumps font_info), so they need no tfm at runtime. However,
- * **resizing** (`at 12pt` / `scaled`) or switching font names triggers
- * read_font_info to read a tfm -- so jitex must still ship tfm files.
- */
 function extractPreloadedFonts(plainTex: string): string[] {
   const names = new Set<string>()
   for (const match of plainTex.matchAll(/\\font\s*\\?[a-zA-Z@]+\s*=\s*([a-zA-Z0-9]+)/g)) {
@@ -194,7 +181,6 @@ export function createTexStages(
       const plainFmtBytes = plainFmtStore.getData()
       attach('plain.fmt', plainFmtBytes)
 
-      // Record which fonts ship with the format and which rely on tfm files, so the support scope is knowable.
       const fontsJson = JSON.stringify(
         {
           preloaded: extractPreloadedFonts(bytesToString(baseFiles['plain.tex'])),

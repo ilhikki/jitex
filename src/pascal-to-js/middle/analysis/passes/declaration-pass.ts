@@ -39,12 +39,9 @@ export function runDeclarationPass(
   return pass.result()
 }
 
-// DeclarationPass
-
 class DeclarationPass {
   private ctx: AnalysisContext
 
-  // 输出
   private funcInfos = new Map<number, FuncInfo>()
   private blockFunc = new Map<BlockNode, number>()
   private declFunc = new Map<ProcedureDeclarationNode | FunctionDeclarationNode, number>()
@@ -57,7 +54,6 @@ class DeclarationPass {
   private labels = new Map<number, Map<number, { labelId: number; funcId: number }>>()
   private globalBindings = new Map<string, AnalysisSymbol>()
 
-  // 运行时作用域栈
   private scopeStack: MutableScope[] = []
 
   constructor(ctx: AnalysisContext) {
@@ -88,8 +84,6 @@ class DeclarationPass {
     }
   }
 
-  // ID 分配
-
   private allocId(): number {
     return this.nextId_++
   }
@@ -100,8 +94,6 @@ class DeclarationPass {
       this.idNames.set(id, cleaned)
     }
   }
-
-  // 作用域
 
   private pushScope(funcId: number, block?: BlockNode): void {
     const scope: MutableScope = {
@@ -140,8 +132,6 @@ class DeclarationPass {
     return undefined
   }
 
-  // 函数分配
-
   private allocFunc(
     block: BlockNode | undefined,
     decl: ProcedureDeclarationNode | FunctionDeclarationNode | undefined,
@@ -179,10 +169,7 @@ class DeclarationPass {
     return funcId
   }
 
-  // Block 分析（声明部分）
-
   private analyzeBlock(block: BlockNode, funcId: number): void {
-    // LABEL - per-function 作用域：每个函数有自己的 label 表。
     if (block.labelDeclarations) {
       let funcLabels = this.labels.get(funcId)
       if (!funcLabels) {
@@ -199,12 +186,10 @@ class DeclarationPass {
       }
     }
 
-    // CONST
     for (const c of block.constDeclarations) {
       this.analyzeConst(c)
     }
 
-    // TYPE - 两遍处理，支持 ISO 7185 6.4.4 指针前向引用
     const typePlaceholders = new Map<string, TypeInfo>()
     for (const t of block.typeDeclarations) {
       const lower = t.name.name.toLowerCase()
@@ -230,7 +215,6 @@ class DeclarationPass {
       }
     }
 
-    // VAR
     const info = this.funcInfos.get(funcId)!
     for (const v of block.variableDeclarations) {
       const ti = this.resolveTypeInfo(v.type)
@@ -247,7 +231,6 @@ class DeclarationPass {
       }
     }
 
-    // PROCEDURE / FUNCTION - 两遍分析
     for (const p of block.procedureDeclarations) {
       this.declareProcName(p)
     }
@@ -271,10 +254,6 @@ class DeclarationPass {
     }
   }
 
-  /**
-   * ISO 6.3：constant = [ sign ] ( unsigned-number | constant-identifier ) | character-string
-   * 除字面量外，还须支持带符号常量（-5）与对已定义常量的引用（B = A）。
-   */
   private evalConstValue(node: ExpressionNode): LiteralValue | undefined {
     const lit = evalLiteral(node)
     if (lit) {
@@ -296,16 +275,6 @@ class DeclarationPass {
     return undefined
   }
 
-  // 类型解析
-
-  /**
-   * 命名枚举类型：把枚举常量重新绑定到该 type-definition 的 placeholder。
-   *
-   * new-type 的同一性按对象身份判定（见 type-compat.ts），而类型声明的最终对象是
-   * placeholder（解析结果经 Object.assign 拷入），故枚举常量必须与它共享同一对象，
-   * `c := red` 才能在 6.4.6 下直接成立。匿名枚举没有 placeholder，
-   * 其常量已在 resolveTypeInfo 内绑定到那次解析的类型对象。
-   */
   private bindEnumConstants(typeDef: TypeNode, enumType: TypeInfo): void {
     if (typeDef.kind !== 'EnumerationType') {
       return
@@ -429,8 +398,6 @@ class DeclarationPass {
         break
       }
       case 'EnumerationType': {
-        // 枚举常量与其枚举类型共享同一 TypeInfo 对象：new-type 按对象身份判定同一性
-        // （见 type-compat.ts），故 `c := red` 无需任何特例即可满足 6.4.6 赋值兼容
         const enumType: TypeInfo = { tag: 'enum', enumCount: node.values.length }
         for (let i = 0; i < node.values.length; i++) {
           this.bind(node.values[i].name, {
@@ -470,8 +437,6 @@ class DeclarationPass {
     })
     return { tagName, branches }
   }
-
-  // 函数声明
 
   private declareProcName(decl: ProcedureDeclarationNode): void {
     const parentFuncId = this.currentScope().funcId
@@ -564,7 +529,6 @@ class DeclarationPass {
   ): void {
     const info = this.funcInfos.get(funcId)!
     for (const p of params) {
-      // ISO 7185 6.6.3.4/6.6.3.5：可调用形参（过程/函数作形式参数）
       if (p.callable) {
         const callable = this.resolveCallableParamInfo(p.callable)
         for (const name of p.names) {
@@ -573,8 +537,7 @@ class DeclarationPass {
           const sym: VarSymbol = {
             kind: 'param',
             varId,
-            // ISO 7185 6.6.3.4/6.6.3.5：函数形参在表达式中即调用，类型为返回类型；
-            // 过程形参不能出现在表达式中，用内部标记，analyzeExpr 遇到时报错。
+
             typeInfo: callable.kind === 'function' && callable.retTypeInfo
               ? callable.retTypeInfo
               : { tag: 'procedure' },
@@ -603,11 +566,9 @@ class DeclarationPass {
     }
   }
 
-  /** 可调用形参的 heading → 签名信息（含自带的 formal-parameter-list 与结果类型） */
   private resolveCallableParamInfo(spec: CallableParameterSpec): CallableParamInfo {
     const params: CallableParamSig[] = spec.parameters.map((inner) => {
       if (inner.callable) {
-        // 嵌套的可调用形参：过程形参用内部标记，函数形参用其返回类型
         return {
           isVar: false,
           typeInfo: inner.callable.kind === 'function' && inner.callable.returnType

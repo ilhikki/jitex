@@ -1,8 +1,3 @@
-// Reporter: writes overview.json + three aggregated txt files + two minimal index.html (zero style).
-//
-// Aligns with the pascal-ts/reports directory structure.
-// All HTML must not contain <style> or style=""; only semantic tags are used.
-
 import type { RunReport, StageRecord } from './runner.ts'
 
 const enc = new TextEncoder()
@@ -42,7 +37,6 @@ export interface WriteReportResult {
   runDir: string
 }
 
-/** Write a single run report. Also updates the top-level index.html. */
 export async function writeReport(
   reportDir: string,
   report: RunReport,
@@ -51,12 +45,8 @@ export async function writeReport(
   const runDir = `${reportDir}/${report.id}`
   await Deno.mkdir(runDir, { recursive: true })
 
-  // overview.json
   await Deno.writeFile(`${runDir}/overview.json`, enc.encode(JSON.stringify(report, undefined, 2)))
 
-  // Three aggregated log files: logs / consoleLogs / debugLogs.
-  // The DSL uses log(msg) uniformly; the default LogSink writes identical content to all three.
-  // Three files are kept to align with the sample structure.
   const runHeader = report.runLogs.length ? [...report.runLogs, ''] : []
   const allLogs: string[] = [...runHeader]
   const allConsole: string[] = [...runHeader]
@@ -76,7 +66,6 @@ export async function writeReport(
   await Deno.writeFile(`${runDir}/console.txt`, enc.encode(allConsole.join('\n')))
   await Deno.writeFile(`${runDir}/debug.txt`, enc.encode(allDebug.join('\n')))
 
-  // stages/{id}/...  artifacts + logs.txt
   for (const s of report.stages) {
     const stageDir = `${runDir}/stages/${s.id}`
     await Deno.mkdir(stageDir, { recursive: true })
@@ -96,7 +85,6 @@ export async function writeReport(
 }
 
 function sanitizeFilename(name: string): string {
-  // Keep path separators in filenames? The sample uses single filenames. Path traversal is forbidden here.
   const s = name.replace(/\\/g, '/')
   const base = s.split('/').pop() ?? name
   if (!base || base === '.' || base === '..') {
@@ -104,8 +92,6 @@ function sanitizeFilename(name: string): string {
   }
   return base
 }
-
-// HTML: run detail page (aligns with sample structure: h1 / env / files / stages)
 
 async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
   const status = r.success ? 'SUCCESS' : 'FAIL'
@@ -176,10 +162,7 @@ async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
   await Deno.writeFile(`${runDir}/index.html`, enc.encode(html))
 }
 
-// HTML: top-level run list (scans all runIds under reportDir)
-
 async function writeTopLevelIndex(reportDir: string): Promise<void> {
-  // Read all runIds (subdirectories, ignoring .cache)
   const runs: Array<{ id: string; overview?: { timestamp: string; success: boolean; duration: number } }> = []
   let entries: Deno.DirEntry[] = []
   try {
@@ -242,11 +225,8 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
   await Deno.writeFile(`${reportDir}/index.html`, enc.encode(html))
 }
 
-// Exported for CLI: usable when the CLI only wants to refresh the top-level index (e.g. manually trigger rebuild after --no-report).
 export { writeRunIndex as _writeRunIndex, writeTopLevelIndex as _writeTopLevelIndex }
 
-// For runner/cli: get artifact bytes from RunReport + stageContext to write to disk.
-// runner's StageContext already stores the artifacts[] bytes; here we export a helper to convert them into a map.
 export function buildArtifactMap(
   stages: Array<{ id: string; artifacts: Array<{ name: string; bytes: Uint8Array }> }>,
 ): Map<string, Array<{ name: string; bytes: Uint8Array }>> {
@@ -259,5 +239,4 @@ export function buildArtifactMap(
   return m
 }
 
-// Compatibility: imported but unused (kept for future extension)
 export type _StageRecord = StageRecord

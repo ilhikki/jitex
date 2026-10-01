@@ -1,9 +1,3 @@
-// Runner: topological sort + scheduling + failure policy + cache integration.
-//
-// Entry: run(suite, options) -> Promise<RunReport>
-//
-// Execution order: before -> stages (topological order, with cache decision) -> after
-
 import { RunContext, setGlobalRunContext, setLogSink, StageContext } from './context.ts'
 import { _drainDeclLogs } from './dsl.ts'
 import type { CacheableRecord, Stage, Suite } from './dsl.ts'
@@ -70,14 +64,6 @@ function artifactRecord(a: { name: string; bytes: Uint8Array }) {
   return { name: a.name, size: a.bytes.length, lines }
 }
 
-// Topological sort (Kahn)
-//
-// universe = all stages in the suite (used for dep ownership validation)
-// active   = stages to actually execute/display after user filter (the graph is built only from active)
-//
-// If a stage's dep is not in active but in universe -> allowed (the dep will be fetched from cache via "pre-recovery")
-// If a stage's dep is not in universe either -> throw (not part of this suite, illegal)
-
 function topoSort(
   active: Stage<unknown>[],
   universe: Stage<unknown>[],
@@ -98,7 +84,7 @@ function topoSort(
     for (const dep of s.deps) {
       if (!universeByName.has(dep.name)) {
         throw new Error(
-          `stage '${s.name}' depends on '${dep.name}' which is not in suite '${/* name available outside */ '?'}'`,
+          `stage '${s.name}' depends on '${dep.name}' which is not in suite '${'?'}'`,
         )
       }
       if (!byId.has(dep.id)) {
@@ -133,10 +119,6 @@ function topoSort(
   return order
 }
 
-// For stages "not in active (filtered out) but depended on by some active stage",
-// recursively attempt to recover their results/checksum from cache on demand,
-// and store them into stageResultById / checksumByName.
-// If withCache=true and recovery fails -> throw.
 async function preRecoverFilteredDeps(
   target: Stage<unknown>,
   ctx: {

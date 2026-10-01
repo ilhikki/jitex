@@ -1,10 +1,3 @@
-/*
- * structurizer 入口。
- *
- * 流水线：cfg → simplify → normalize → analyze → plan → lower → tidy → print
- * 每一级都是纯函数，输入输出都是数据结构；唯一的副作用在最后一级（产出文本）。
- */
-
 import type * as JsonCode from '@/middle/ir/json-code.ts'
 import { buildCfg } from './cfg.ts'
 import { simplify } from './simplify.ts'
@@ -25,7 +18,6 @@ export {
   type UnstructuredReason,
 } from './types.ts'
 
-/** 有跳转才需要建图；纯线性代码的 label 不产生运行时效果 */
 function hasControlFlow(body: readonly JsonCode.Statement[]): boolean {
   return body.some((stmt) => stmt.kind === 'jump' || stmt.kind === 'jumpIf')
 }
@@ -37,7 +29,6 @@ function linearBody(body: readonly JsonCode.Statement[], ctx: StructurizeContext
 }
 
 export function structurize(fn: JsonCode.Function, ctx: StructurizeContext): StructurizeResult {
-  // 跨函数跳转只能靠异常机制，结构化表达不了
   if (ctx.longJumpTargets.has(fn.id)) {
     return { kind: 'unstructured', reason: 'long-jump-target' }
   }
@@ -47,7 +38,6 @@ export function structurize(fn: JsonCode.Function, ctx: StructurizeContext): Str
 
   const cfg = buildCfg(fn, ctx)
 
-  // 先化简再归一化：穿线让图变小，不可约分量的复制预算也更省
   const normalized = normalize(simplify(cfg))
   if (normalized.kind === 'irreducible') {
     return { kind: 'unstructured', reason: 'irreducible' }

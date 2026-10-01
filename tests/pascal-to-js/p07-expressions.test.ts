@@ -174,7 +174,7 @@ begin
   writeln(x);
 end.`,
     purpose:
-      '[Category B  D.46] ISO 6.7.2.2: i mod j is an error when j is negative (j <= 0 is an error) - a designated error; §5.1 f) permits declaring in the accompanying documentation that it is not reported; this processor chooses to detect and report it',
+      '[Category B  D.46] ISO 6.7.2.2: i mod j is an error when j is negative (j <= 0 is an error) - a designated error; s5.1 f) permits declaring in the accompanying documentation that it is not reported; this processor chooses to detect and report it',
     expectedError: '',
   },
   {
@@ -547,7 +547,7 @@ begin
   writeln(f(1));
 end.`,
     purpose:
-      '[Category B  D.48] ISO 6.7.3: an error occurs if the result is undefined when the function activation ends (f is never assigned within the function body) - a designated error; §5.1 f) permits declaring in the accompanying documentation that it is not reported; this processor chooses to detect and report it',
+      '[Category B  D.48] ISO 6.7.3: an error occurs if the result is undefined when the function activation ends (f is never assigned within the function body) - a designated error; s5.1 f) permits declaring in the accompanying documentation that it is not reported; this processor chooses to detect and report it',
     expectedError: '',
   },
   {

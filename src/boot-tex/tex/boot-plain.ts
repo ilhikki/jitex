@@ -40,7 +40,6 @@ function createBootPlainSuite(): Suite {
     )
 
     stage('dvi => svg', [validPlainFmtStage, tfmFilesStage], ([{ dviData }, tfmFiles]) => {
-      // Pass tfm so the renderer advances h per spec (otherwise positioning is left to the renderer's font metrics).
       const svgs = dviToSvg(dviData, tfmFiles)
       for (const [index, svg] of svgs.entries()) {
         attachText(`story.${index + 1}.svg`, svg)

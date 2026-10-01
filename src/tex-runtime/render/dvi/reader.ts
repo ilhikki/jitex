@@ -1,10 +1,8 @@
-/** DVI 字节流顺序读取；越界即抛。 */
 export class DviReader {
   private pos = 0
 
   constructor(private readonly data: Uint8Array) {}
 
-  /** 下一个待读字节的位置 */
   get offset(): number {
     return this.pos
   }
@@ -13,7 +11,6 @@ export class DviReader {
     return this.pos >= this.data.length
   }
 
-  /** 读 1..4 字节无符号整数 */
   readUnsigned(n: number): number {
     let value = 0
     for (let i = 0; i < n; i++) {
@@ -22,7 +19,6 @@ export class DviReader {
     return value
   }
 
-  /** 读 1..4 字节有符号整数 */
   readSigned(n: number): number {
     const value = this.readUnsigned(n)
     const limit = 2 ** (8 * n - 1)

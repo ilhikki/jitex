@@ -12,12 +12,6 @@ import { toJs } from '@/backend/codegen/json-code-compiler.ts'
 import { PascalSemanticCompiler } from '@/backend/codegen/semantic-compiler.ts'
 import { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
 
-/**
- * 将 Pascal 源码解析为 AST。
- *
- * @param source - Pascal 源码字符串
- * @returns ParseResult<ProgramNode> - 解析结果，成功时包含 AST 节点
- */
 export function parse(source: string): ParseResult<ProgramNode> {
   const tokens = lex(source)
   const input: ParserInput = { tokens, position: 0 }
@@ -25,26 +19,12 @@ export function parse(source: string): ParseResult<ProgramNode> {
 }
 
 export interface TransformOptions {
-  /** 额外 callable 注入（编译期声明非标过程/函数） */
   extraCallables?: Record<string, ExtraCallable>
-  /**
-   * 用户自定义 syscall 重写表。
-   * 与内部 buildPascalRewriteTable() 合并，同 key 覆盖内部表。
-   * 某 key 设为 undefined 可禁用内部对该 key 的重写。
-   * 详见 middle/rewrite/rewrite.ts。
-   */
+
   syscallRewriters?: SyscallRewriteTable
-  /**
-   * 默认回退重写函数：未命中重写表时调用。
-   * 不传则使用 id 函数（原样返回 syscall）。
-   */
+
   defaultRewriter?: SyscallRewriter
-  /**
-   * 是否生成 debug 检查（默认 false）。
-   *
-   * 开启后才会产出 `runtime.debug.*` 系列检查（子界边界、循环步数、除零、
-   * 字节视图断言），代价是产物更大、更慢。仅供测试使用。
-   */
+
   debug?: boolean
 }
 
@@ -58,25 +38,14 @@ function parseSource(source: string): ProgramNode {
   return result.astNode as ProgramNode
 }
 
-/**
- * 将 Pascal 源码编译为 ESM 源码字符串（编译产物）。
- *
- * 产物顶层是柯里化的工厂：
- * `export default function main(__sys) { ... return function __run(__ctx) { ... } }`，
- * 由 @jitex/runtime 装载、注入 syscall 表与 ctx 后执行（见 runtime 的 exec.ts）。
- */
 export function transform(source: string, options: TransformOptions = {}): string {
   const ast = parseSource(source)
 
-  // debug 构建开关：lowering（决定是否生成独立检查语句）与 rewrite（决定检查的
-  // 具体形态）都需要它，故在两层之前先算出
   const debug = options.debug ?? false
   const analysis = analyzeProgram(ast, options.extraCallables, debug)
 
   const jsonCode = loweringProgram(ast, analysis)
 
-  // IR 重写：合并内部 pascal 表、注入 callable 的自动表与用户表（后者覆盖前者），
-  // 合成单一映射后执行后序 DFS 替换
   const table = mergeRewriteTables(
     mergeRewriteTables(buildPascalRewriteTable(debug), buildExtraCallableRewriters(options.extraCallables)),
     options.syscallRewriters,

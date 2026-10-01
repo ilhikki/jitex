@@ -1,10 +1,7 @@
 import { Position, Token } from '../token.ts'
 import { LexerInput } from '../types.ts'
 
-// Position helpers
-
 export function createOffsetToPosition(source: string): (offset: number) => Position {
-  // Pre-compute line start offsets for O(1) lookup
   const lineStarts: number[] = [0]
   for (let i = 0; i < source.length; i++) {
     if (source[i] === '\n') {
@@ -13,7 +10,6 @@ export function createOffsetToPosition(source: string): (offset: number) => Posi
   }
 
   return (offset: number): Position => {
-    // Binary search for line number
     let lo = 0
     let hi = lineStarts.length - 1
     while (lo < hi) {
@@ -32,10 +28,6 @@ export function createOffsetToPosition(source: string): (offset: number) => Posi
   }
 }
 
-// Lexer - pure function: LexerInput => Token[]
-
-// Only true reserved words - predefined identifiers (INTEGER, WRITE, etc.)
-// remain as IDENTIFIER tokens and are handled by the parser.
 const KEYWORDS = new Set([
   'PROGRAM',
   'LABEL',
@@ -98,18 +90,14 @@ export function tokenize(input: LexerInput): Token[] {
   let pos = input.offset
 
   while (pos < src.length) {
-    // Skip whitespace
     if (isWhitespace(src[pos])) {
       pos++
       continue
     }
 
-    // Skip comments: { ... } or (* ... *)
     if (src[pos] === '{') {
       pos++
-      // ISO 6.1.8: the construct
-      // (`{' | `(*') commentary (`*)' | `}') shall be a comment, so either closing
-      // delimiter terminates the comment regardless of which opening delimiter was used.
+
       while (pos < src.length && src[pos] !== '}' && !(src[pos] === '*' && src[pos + 1] === ')')) {
         pos++
       }
@@ -121,7 +109,7 @@ export function tokenize(input: LexerInput): Token[] {
 
     if (src[pos] === '(' && pos + 1 < src.length && src[pos + 1] === '*') {
       pos += 2
-      // ISO 6.1.8: `}` also terminates a comment opened with `(*`
+
       while (pos < src.length) {
         if (src[pos] === '}') {
           pos++
@@ -136,10 +124,6 @@ export function tokenize(input: LexerInput): Token[] {
       continue
     }
 
-    // Skip WEB-style comments: {:NN} and {NN:} patterns used in tangle
-    // These are already handled by the { ... } comment skip above
-
-    // Identifiers and keywords
     if (isLetter(src[pos])) {
       const start = pos
       while (pos < src.length && isAlphaNum(src[pos])) {
@@ -157,17 +141,13 @@ export function tokenize(input: LexerInput): Token[] {
       continue
     }
 
-    // Numbers
     if (isDigit(src[pos])) {
       const start = pos
       while (pos < src.length && isDigit(src[pos])) {
         pos++
       }
       let isReal = false
-      // ISO 6.1.5: unsigned-real = digit-sequence '.' [ fractional-part ] [ scale-factor ]
-      //                       | digit-sequence scale-factor
-      // so the fractional part is optional and a scale-factor may follow the
-      // integer part directly (e.g. 5e3).
+
       if (pos < src.length && src[pos] === '.' && pos + 1 < src.length && src[pos + 1] !== '.') {
         isReal = true
         pos++
@@ -175,7 +155,7 @@ export function tokenize(input: LexerInput): Token[] {
           pos++
         }
       }
-      // Optional scale-factor: ( 'e' | 'E' ) [ sign ] digit-sequence
+
       if (pos < src.length && (src[pos] === 'e' || src[pos] === 'E')) {
         const afterSign = src[pos + 1] === '+' || src[pos + 1] === '-' ? pos + 2 : pos + 1
         if (afterSign < src.length && isDigit(src[afterSign])) {
@@ -195,7 +175,6 @@ export function tokenize(input: LexerInput): Token[] {
       continue
     }
 
-    // String literals
     if (src[pos] === "'") {
       const start = pos
       pos++
@@ -203,7 +182,6 @@ export function tokenize(input: LexerInput): Token[] {
       while (pos < src.length) {
         if (src[pos] === "'") {
           if (pos + 1 < src.length && src[pos + 1] === "'") {
-            // Doubled quote = escaped quote
             content += "'"
             pos += 2
           } else {
@@ -224,7 +202,6 @@ export function tokenize(input: LexerInput): Token[] {
       continue
     }
 
-    // Multi-character operators
     const start = pos
     const c = src[pos]
     let type = ''
@@ -326,7 +303,6 @@ export function tokenize(input: LexerInput): Token[] {
   return tokens
 }
 
-// Convenience wrapper for simple usage
 export function lex(source: string): Token[] {
   const offsetToPosition = createOffsetToPosition(source)
   return tokenize({ source, offset: 0, offsetToPosition })

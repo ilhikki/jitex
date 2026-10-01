@@ -1,13 +1,3 @@
-/*
- * Pass 2: 语句分析。
- *
- * 递归遍历每个 block 的 compound 语句，重建作用域栈（只读 lookup），
- * 推断表达式类型，收集 goto/label 记录和无定义引用。
- *
- * 输入：ProgramNode, AnalysisContext, DeclarationResult
- * 输出：StatementResult
- */
-
 import {
   BlockNode,
   CaseStatementNode,
@@ -36,8 +26,6 @@ import {
 import { AnalysisContext, DeclarationResult, GotoRecord, ScopeSnapshot, StatementResult } from '../stage-types.ts'
 import { isAssignCompatible, isSameType } from '../type-compat.ts'
 
-// Pass 2 入口
-
 export function runStatementPass(
   program: ProgramNode,
   ctx: AnalysisContext,
@@ -48,13 +36,10 @@ export function runStatementPass(
   return pass.result()
 }
 
-// StatementPass
-
 class StatementPass {
   private ctx: AnalysisContext
   private decl: DeclarationResult
 
-  // 输出
   private exprType = new Map<ExpressionNode, TypeInfo>()
   private symbolCache = new Map<IdentifierNode, AnalysisSymbol | undefined>()
   private withTemps = new Map<WithStatementNode, VarSymbol[]>()
@@ -64,11 +49,10 @@ class StatementPass {
   private usedLabels = new Set<number>()
   private undefinedRefs: { kind: 'procedure' | 'function' | 'identifier'; name: string }[] = []
 
-  // 运行时状态
   private scopeStack: ScopeSnapshot[] = []
   private withStack: { fields: Map<string, TypeInfo> }[] = []
   private nonTransparentDepth = 0
-  /** varId → 变量声明的类型节点，供 6.6.3.3 判定 packed 分量 */
+
   private varTypeNodes = new Map<number, TypeNode>()
 
   constructor(ctx: AnalysisContext, decl: DeclarationResult) {
@@ -81,7 +65,6 @@ class StatementPass {
     this.analyzeBlockStatements(program.block)
   }
 
-  /** 收集 varId → 声明类型节点（沿 block 树递归） */
   private collectVarTypeNodes(block: BlockNode): void {
     const scope = this.decl.blockScopes.get(block)
     for (const v of block.variableDeclarations) {
@@ -117,8 +100,6 @@ class StatementPass {
     }
   }
 
-  // 作用域重建（只读 lookup，不 bind）
-
   private pushScope(block: BlockNode): void {
     this.scopeStack.push(this.decl.blockScopes.get(block)!)
   }
@@ -144,8 +125,6 @@ class StatementPass {
     return this.scopeStack[this.scopeStack.length - 1]!.funcId
   }
 
-  // Block 语句遍历（递归进入子函数）
-
   private analyzeBlockStatements(block: BlockNode): void {
     this.pushScope(block)
     this.analyzeStatement(block.compound)
@@ -161,8 +140,6 @@ class StatementPass {
     }
     this.popScope()
   }
-
-  // 语句分析
 
   private analyzeStatement(node: StatementNode): void {
     switch (node.kind) {
@@ -271,7 +248,7 @@ class StatementPass {
         const newEntries: { fields: Map<string, TypeInfo> }[] = []
         for (const r of node.records) {
           const ti = this.analyzeExpr(r)
-          // with 临时变量 ID：从 declResult.nextId 分配
+
           const withId = this.decl.nextId++
           this.decl.idNames.set(withId, 'with_temp')
           temps.push({
@@ -283,7 +260,7 @@ class StatementPass {
           newEntries.push({ fields: ti.fields ?? new Map() })
         }
         this.withTemps.set(node, temps)
-        // 把 with 临时变量注册到当前函数 locals
+
         const funcId = this.currentFuncId()
         const info = this.decl.funcInfos.get(funcId)
         if (info) {
@@ -310,12 +287,11 @@ class StatementPass {
         ) {
           this.recordUndefinedRef('procedure', node.name.name)
         }
-        // 用户定义过程 或 可调用形参（过程/函数形参）的形参表
+
         let params: VarSymbol[] | undefined
         if (sym?.kind === 'func') {
           params = this.decl.funcInfos.get(sym.funcId)?.params
         } else if (sym?.kind === 'param' && sym.callable) {
-          // 可调用形参的自带形参表签名（analysis-type CallableParamInfo.params → VarSymbol[]）
           params = sym.callable.params.map((s, i) => ({
             kind: 'param',
             varId: -1 - i,
@@ -328,8 +304,6 @@ class StatementPass {
           const arg = node.arguments[i]
           const formal = params?.[i]
           if (formal?.callable) {
-            // 可调用形参的实参是过程/函数标识符，不作表达式求值，
-            // 但仍需缓存符号供 lowering 查找函数引用。
             if (arg.kind === 'Identifier') {
               this.symbolCache.set(arg, this.lookup(arg.name))
             }
@@ -349,8 +323,6 @@ class StatementPass {
         return
     }
   }
-
-  // 表达式分析
 
   private analyzeExpr(node: ExpressionNode): TypeInfo {
     const cached = this.exprType.get(node)
@@ -402,7 +374,6 @@ class StatementPass {
         }
         if (sym?.kind === 'var' || sym?.kind === 'param') {
           if (sym.typeInfo.tag === 'procedure') {
-            // ISO 7185 6.6.3.4：过程形参不能出现在表达式中，只能作为过程语句
             throw new Error(
               `procedure formal parameter '${node.name}' cannot be used as an expression (ISO 7185 6.6.3.4)`,
             )
@@ -411,12 +382,10 @@ class StatementPass {
         } else if (sym?.kind === 'const') {
           info = sym.typeInfo
         } else if (sym?.kind === 'func') {
-          info = sym.retTypeInfo ?? this.unknown(node, `func '${node.name}' 无返回类型`)
+          info = sym.retTypeInfo ?? this.unknown(node, `func '${node.name}' without return type`)
         } else {
-          // 内置无参标识符的类型来自声明表 -- analysis 不写内置名字分支
-          // （内置语义归 rewrite，这里只查「它是什么类型」）
           info = BUILTIN_IDENTIFIER_TYPES[node.name.toLowerCase()] ??
-            this.unknown(node, `identifier '${node.name}' 未解析到符号`)
+            this.unknown(node, `identifier '${node.name}' not found symbol`)
         }
         break
       }
@@ -469,7 +438,7 @@ class StatementPass {
         ) {
           this.recordUndefinedRef('function', node.name.name)
         }
-        // 取被调用者的形参表（用户函数 或 可调用形参）
+
         let callParams: VarSymbol[] | undefined
         if (sym?.kind === 'func') {
           callParams = this.decl.funcInfos.get(sym.funcId)?.params
@@ -485,7 +454,6 @@ class StatementPass {
         for (let i = 0; i < node.arguments.length; i++) {
           const a = node.arguments[i]
           if (callParams?.[i]?.callable) {
-            // 可调用形参的实参是过程/函数标识符，不作表达式求值，但缓存符号
             if (a.kind === 'Identifier') {
               this.symbolCache.set(a, this.lookup(a.name))
             }
@@ -497,7 +465,6 @@ class StatementPass {
           this.checkCallableActuals(node.name.name, callParams, node.arguments)
         }
         if (sym?.kind === 'param' && sym.callable) {
-          // ISO 7185 6.6.3.5：调用可调用形参。过程形参不能作函数调用。
           if (sym.callable.kind !== 'function') {
             throw new Error(
               `'${node.name.name}' is a procedure formal parameter and is not a function (ISO 7185 6.6.3.4)`,
@@ -516,11 +483,11 @@ class StatementPass {
               `function '${node.name.name}' expects ${funcInfo.params.length} actual-parameter(s) but ${node.arguments.length} given (ISO 7185 6.7.3)`,
             )
           }
-          info = sym.retTypeInfo ?? this.unknown(node, `call '${node.name.name}' 无返回类型`)
+          info = sym.retTypeInfo ?? this.unknown(node, `call '${node.name.name}' not found return type`)
         } else {
           info = this.builtinFuncReturnType(node.name.name, node.arguments)
           if (info.tag === 'unknown') {
-            info = this.unknown(node, `builtin '${node.name.name}' 无已知返回类型`)
+            info = this.unknown(node, `builtin '${node.name.name}' unknown return type`)
           }
         }
         break
@@ -548,7 +515,7 @@ class StatementPass {
         if (info.tag === 'unknown') {
           info = this.unknown(
             node,
-            `array access 元素类型未知 (base=${arrType.tag}, indices=${node.indices.length})`,
+            `array access element type is unknown (base=${arrType.tag}, indices=${node.indices.length})`,
           )
         }
         break
@@ -558,16 +525,16 @@ class StatementPass {
         const objType = this.analyzeExpr(node.object)
         if (objType.tag === 'record' && objType.fields) {
           const f = this.findRecordField(objType, node.field.name.toLowerCase())
-          info = f ?? this.unknown(node, `record 无字段 '${node.field.name}' (objType.tag=${objType.tag})`)
+          info = f ?? this.unknown(node, `record has not field '${node.field.name}' (objType.tag=${objType.tag})`)
         } else if (node.field.name === '^' && objType.tag === 'pointer') {
           info = objType.domainType ??
-            this.unknown(node, `pointer 无 domainType（解引用 '^'）`)
+            this.unknown(node, `pointer has no domainType (dereference '^')`)
         } else if (node.field.name === '^' && objType.tag === 'file') {
           info = objType.elem ?? { tag: 'char' }
         } else {
           info = this.unknown(
             node,
-            `field access 基类型不可解 (objType.tag=${objType.tag}, field='${node.field.name}')`,
+            `field access base type cannot be resolved (objType.tag=${objType.tag}, field='${node.field.name}')`,
           )
         }
         break
@@ -594,18 +561,10 @@ class StatementPass {
     return info
   }
 
-  /**
-   * 记录一次 unknown 类型推断，打印出触发它的 AST 节点（printer 还原为源码）。
-   * 仅用于定位类型链断点，返回 `{tag:'unknown'}` 本身。
-   */
   private unknown(_node: ExpressionNode, _why: string): TypeInfo {
     return { tag: 'unknown' }
   }
 
-  /**
-   * 在 record 类型中查找字段，含 variant part（含嵌套分支）。
-   * 静态类型检查接受变体字段的并集，实际布局偏移由 rewrite 依据 selector 计算。
-   */
   private findRecordField(td: TypeInfo, name: string): TypeInfo | undefined {
     return td.fields?.get(name) ?? this.findInVariant(td.variant, name)
   }
@@ -631,43 +590,28 @@ class StatementPass {
     let t = arrType
     let remaining = dims
     while (remaining > 0 && t.tag === 'array' && t.elem) {
-      // declaration-pass 把 `array[a,b] of T` 展平成 {dims:[a,b], elem:T}，
-      // 因此按维度一次消费整层 dims，而不是逐层下沉 elem。
       const n = t.dims?.length ?? 1
       if (remaining >= n) {
         remaining -= n
         t = t.elem
       } else {
-        // 部分索引：返回剩余维度的数组类型
         return { tag: 'array', dims: (t.dims ?? []).slice(remaining), elem: t.elem }
       }
     }
     return remaining === 0 ? t : { tag: 'unknown' }
   }
 
-  /**
-   * 内置函数的返回类型。
-   *
-   * 这是唯一允许 analysis 依赖的内置语义，且只依赖「返回类型」：规则取自
-   * BUILTIN_FUNCTION_RETURN_TYPES，本函数不含任何内置函数名分支。实参个数、
-   * 实参形态、合法调用形式一律不问--那些归 rewrite 解释。
-   */
   private builtinFuncReturnType(name: string, args: ExpressionNode[]): TypeInfo {
     const rule = BUILTIN_FUNCTION_RETURN_TYPES[name.toLowerCase()]
     if (rule === undefined) {
       return { tag: 'unknown' }
     }
     if (rule.kind === 'sameAsFirstArg') {
-      // 无实参时沿用既有缺省（integer）
       return args.length > 0 ? this.analyzeExpr(args[0]) : { tag: 'integer' }
     }
     return rule.type
   }
 
-  // ISO 7185 检查：6.4.6 赋值兼容、6.8.3.4 条件类型、6.8.3.5 case 常量互异、
-  // 6.6.3.3 变量参数、6.7.3 实参个数
-
-  /** ISO 6.8.2.2 + 6.4.6：值须与变量类型赋值兼容 */
   private checkAssignmentCompatibility(
     target: TypeInfo,
     value: TypeInfo,
@@ -679,11 +623,10 @@ class StatementPass {
       return
     }
     throw new Error(
-      `Assignment is not assignment-compatible (ISO 7185 6.4.6): variable type '${target.tag}' ← expression type '${value.tag}'`,
+      `Assignment is not assignment-compatible (ISO 7185 6.4.6): variable type '${target.tag}' <- expression type '${value.tag}'`,
     )
   }
 
-  /** ISO 6.7.2.3 / 6.8.3.4：if/while/repeat 的条件须是 Boolean-expression */
   private requireBoolean(t: TypeInfo, what: string): void {
     if (t.tag === 'boolean' || t.tag === 'unknown') {
       return
@@ -693,14 +636,12 @@ class StatementPass {
     )
   }
 
-  /** ISO 6.8.3.5：case 常量所表示的值须互异 */
   private checkCaseConstants(node: CaseStatementNode): void {
     const seen = new Set<number>()
     for (const br of node.branches) {
       for (const lbl of br.labels) {
         const v = evalConstInt(lbl, (n) => this.lookup(n))
         if (v === undefined) {
-          // 无法求值的 case 常量交由其它检查处理，此处不做类型推断
           continue
         }
         if (seen.has(v)) {
@@ -713,7 +654,6 @@ class StatementPass {
     }
   }
 
-  /** ISO 6.6.3.3：变量参数实参的类型与形态限制 */
   private checkVariableParameter(
     procName: string,
     param: VarSymbol,
@@ -746,7 +686,6 @@ class StatementPass {
     }
   }
 
-  /** 沿数组访问回溯到基变量，判断其声明类型是否为 packed array */
   private isPackedComponent(arg: ExpressionNode): boolean {
     let base: ExpressionNode = arg
     while (base.kind === 'ArrayAccess') {
@@ -763,18 +702,11 @@ class StatementPass {
     return typeNode?.kind === 'ArrayType' && typeNode.isPacked
   }
 
-  // 辅助
-
-  /**
-   * ISO 7185 6.6.3.4/6.6.3.5：校验可调用形参对应的实参--
-   * 实参须是有定义点、且该定义点被 program-block 包含的过程/函数标识符。
-   */
   private checkCallableActuals(
     calleeName: string,
     formals: VarSymbol[],
     args: ExpressionNode[],
   ): void {
-    // ISO 7185 6.6.3.1：actual-parameter-list 须与 formal-parameter-list 一一对应
     if (args.length > formals.length) {
       throw new Error(
         `'${calleeName}' expects ${formals.length} actual parameter(s) but got ${args.length} (ISO 7185 6.6.3.1)`,
@@ -804,7 +736,6 @@ class StatementPass {
     }
     const sym = this.lookup(arg.name)
 
-    // 实参是用户定义的过程/函数
     if (sym?.kind === 'func') {
       const actualInfo = this.decl.funcInfos.get(sym.funcId)
       if (!actualInfo) {
@@ -837,7 +768,6 @@ class StatementPass {
       return
     }
 
-    // 实参是可调用形参（链式传递：形参本身作另一形参的实参，ISO 6.6.3.4/3.5）
     if (sym?.kind === 'param' && sym.callable) {
       if (sym.callable.kind !== spec.kind) {
         throw new Error(
@@ -856,7 +786,7 @@ class StatementPass {
           )
         }
       }
-      // 形参签名 congruity：逐位比较 isVar 与类型同一
+
       const actualSigs = sym.callable.params
       if (spec.params.length !== actualSigs.length) {
         throw new Error(
@@ -883,7 +813,6 @@ class StatementPass {
     )
   }
 
-  /** ISO 7185 6.6.3.6：形参段自带的形参表与实参函数的形参表须 congruous，或两者都不出现 */
   private checkCallableCongruity(
     calleeName: string,
     formalSigs: CallableParamSig[],

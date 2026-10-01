@@ -23,9 +23,6 @@ import {
 } from '@/frontend/node.ts'
 import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
-// Statement Parsers
-
-// parseStatement - dispatches based on lookahead
 export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
   const token = peek(input)
 
@@ -55,11 +52,9 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
       return parseWithStatement(input)
 
     case 'IDENTIFIER':
-      // Could be assignment or procedure call
       return parseAssignmentOrCall(input)
 
     case 'INTEGER':
-      // Labeled statement: 9999: statement
       return parseLabeledStatement(input)
 
     case 'SEMICOLON':
@@ -67,7 +62,6 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
     case 'END':
     case 'UNTIL':
     case 'EOF':
-      // Empty statement
       return ok(
         input.position,
         withLoc({ kind: 'EmptyStatement' } as EmptyStatementNode, token.start, token.end),
@@ -81,7 +75,6 @@ export function parseStatement(input: ParserInput): ParseResult<StatementNode> {
   }
 }
 
-// BEGIN statements END
 export function parseCompoundStatement(input: ParserInput): ParseResult<CompoundStatementNode> {
   const startToken = peek(input)
   const beginResult = expectKeyword(input, 'BEGIN')
@@ -99,7 +92,6 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
     statements.push(stmtResult.astNode)
     pos = stmtResult.newPosition
 
-    // Expect semicolon between statements
     const semi = peek({ tokens: input.tokens, position: pos })
     if (semi.type === 'SEMICOLON') {
       pos++
@@ -111,7 +103,6 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
     }
   }
 
-  // 循环仅在 END 处退出，故此处必为 END
   const endToken = peek({ tokens: input.tokens, position: pos })
   pos++
 
@@ -126,7 +117,6 @@ export function parseCompoundStatement(input: ParserInput): ParseResult<Compound
 }
 
 function parseLabeledStatement(input: ParserInput): ParseResult<StatementNode> {
-  // label: statement
   const startToken = peek(input)
   const labelToken = peek(input)
   const labelValue = parseInt(labelToken.content, 10)
@@ -174,7 +164,6 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
   const startToken = peek(input)
   const token = peek(input)
 
-  // Special handling for WRITE/WRITELN - they support format specifiers: expr:width:precision
   if (token.type === 'IDENTIFIER') {
     const upper = token.content.toUpperCase()
     if (upper === 'WRITE' || upper === 'WRITELN') {
@@ -182,7 +171,6 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
     }
   }
 
-  // Parse an expression first (handles identifier, array access, field access, function call)
   const exprResult = parsePrimary(input)
   if (!exprResult.success) {
     return fail(exprResult.error, exprResult.position)
@@ -192,7 +180,6 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
   const nextToken = peek({ tokens: input.tokens, position: pos })
 
   if (nextToken.type === 'ASSIGN') {
-    // Assignment statement
     pos++
     const rightResult = parseExpression({ tokens: input.tokens, position: pos })
     if (!rightResult.success) {
@@ -214,7 +201,6 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
     )
   }
 
-  // If it's a function call without :=, it's a procedure call
   if (exprResult.astNode.kind === 'FunctionCall') {
     const fc = exprResult.astNode as FunctionCallNode
     return ok(
@@ -231,7 +217,6 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
     )
   }
 
-  // If it's just an identifier, it's a procedure call with no args
   if (exprResult.astNode.kind === 'Identifier') {
     return ok(
       pos,
@@ -253,14 +238,13 @@ function parseAssignmentOrCall(input: ParserInput): ParseResult<StatementNode> {
   )
 }
 
-// Parse WRITE/WRITELN with format specifiers: WRITE([file,] expr[:width[:precision]] {, expr[:width[:precision]]})
 function parseWriteCall(input: ParserInput, name: string): ParseResult<StatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip WRITE/WRITELN
+  let pos = input.position + 1
   const args: ExpressionNode[] = []
 
   if (peek({ tokens: input.tokens, position: pos }).type === 'LPAREN') {
-    pos++ // skip (
+    pos++
     while (peek({ tokens: input.tokens, position: pos }).type !== 'RPAREN') {
       const exprResult = parseExpression({ tokens: input.tokens, position: pos })
       if (!exprResult.success) {
@@ -270,16 +254,14 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
 
       let arg = exprResult.astNode
 
-      // Check for format specifier: :width[:precision]
       if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
-        pos++ // skip :
+        pos++
         const widthResult = parseExpression({ tokens: input.tokens, position: pos })
         if (!widthResult.success) {
           return fail(widthResult.error, widthResult.position)
         }
         pos = widthResult.newPosition
 
-        // Wrap in a special node - use BinaryExpression with ":" operator to represent format
         arg = loc(
           {
             kind: 'BinaryExpression',
@@ -291,7 +273,6 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
           widthResult.astNode.loc.end,
         )
 
-        // Check for :precision
         if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
           pos++
           const precResult = parseExpression({ tokens: input.tokens, position: pos })
@@ -340,10 +321,9 @@ function parseWriteCall(input: ParserInput, name: string): ParseResult<Statement
   )
 }
 
-// IF expression THEN statement [ELSE statement]
 function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip IF
+  let pos = input.position + 1
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
   if (!condResult.success) {
@@ -389,10 +369,9 @@ function parseIfStatement(input: ParserInput): ParseResult<IfStatementNode> {
   )
 }
 
-// WHILE expression DO statement
 function parseWhileStatement(input: ParserInput): ParseResult<WhileStatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip WHILE
+  let pos = input.position + 1
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
   if (!condResult.success) {
@@ -426,10 +405,9 @@ function parseWhileStatement(input: ParserInput): ParseResult<WhileStatementNode
   )
 }
 
-// REPEAT statements UNTIL expression
 function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip REPEAT
+  let pos = input.position + 1
   const statements: StatementNode[] = []
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'UNTIL') {
@@ -451,7 +429,7 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
     }
   }
 
-  pos++ // 循环仅在 UNTIL 处退出，故此处必为 UNTIL
+  pos++
 
   const condResult = parseExpression({ tokens: input.tokens, position: pos })
   if (!condResult.success) {
@@ -473,10 +451,9 @@ function parseRepeatStatement(input: ParserInput): ParseResult<RepeatStatementNo
   )
 }
 
-// FOR identifier := expression (TO|DOWNTO) expression DO statement
 function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip FOR
+  let pos = input.position + 1
 
   const varResult = parseIdentifier({ tokens: input.tokens, position: pos })
   if (!varResult.success) {
@@ -496,7 +473,6 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   }
   pos = initResult.newPosition
 
-  // TO or DOWNTO
   const dirToken = peek({ tokens: input.tokens, position: pos })
   let direction: 'TO' | 'DOWNTO'
   if (dirToken.type === 'TO') {
@@ -547,10 +523,9 @@ function parseForStatement(input: ParserInput): ParseResult<ForStatementNode> {
   )
 }
 
-// CASE expression OF case_branch {; case_branch} [; OTHERWISE statement] END
 function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip CASE
+  let pos = input.position + 1
 
   const exprResult = parseExpression({ tokens: input.tokens, position: pos })
   if (!exprResult.success) {
@@ -568,15 +543,12 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   let otherwise: StatementNode | undefined = undefined
 
   while (peek({ tokens: input.tokens, position: pos }).type !== 'END') {
-    // Check for OTHERWISE / OTHERS (UCSD Pascal 别名)
-    // 两种语法：`OTHERWISE statement` 或 `OTHERS: statement`
     const peekTok = peek({ tokens: input.tokens, position: pos })
     if (
       peekTok.type === 'OTHERWISE' ||
       (peekTok.type === 'IDENTIFIER' && peekTok.content.toUpperCase() === 'OTHERS')
     ) {
       pos++
-      // 可选冒号（OTHERS: statement 风格）
       if (peek({ tokens: input.tokens, position: pos }).type === 'COLON') {
         pos++
       }
@@ -586,14 +558,13 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
       }
       otherwise = stmtResult.astNode
       pos = stmtResult.newPosition
-      // Skip trailing semicolons before END (same as ordinary branches)
+
       while (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
         pos++
       }
       break
     }
 
-    // Parse case labels
     const labelsResult = parseList(
       { tokens: input.tokens, position: pos },
       parseExpression,
@@ -628,13 +599,11 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
       ),
     )
 
-    // Skip semicolons
     while (peek({ tokens: input.tokens, position: pos }).type === 'SEMICOLON') {
       pos++
     }
   }
 
-  // 循环仅在 END 处退出，故此处必为 END
   const endToken = peek({ tokens: input.tokens, position: pos })
   pos++
 
@@ -653,10 +622,9 @@ function parseCaseStatement(input: ParserInput): ParseResult<CaseStatementNode> 
   )
 }
 
-// GOTO label
 function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip GOTO
+  let pos = input.position + 1
 
   const token = peek({ tokens: input.tokens, position: pos })
   if (token.type !== 'INTEGER') {
@@ -684,10 +652,9 @@ function parseGotoStatement(input: ParserInput): ParseResult<GotoStatementNode> 
   )
 }
 
-// WITH expression {, expression} DO statement
 function parseWithStatement(input: ParserInput): ParseResult<WithStatementNode> {
   const startToken = peek(input)
-  let pos = input.position + 1 // skip WITH
+  let pos = input.position + 1
 
   const recordsResult = parseList({ tokens: input.tokens, position: pos }, parseExpression, 'COMMA')
   if (!recordsResult.success) {

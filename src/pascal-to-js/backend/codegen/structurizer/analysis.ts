@@ -1,34 +1,19 @@
-/*
- * Pass 3：把 CFG 变成四个只读查询对象。
- *
- * 这一层不产生任何输出，只回答"谁支配谁""谁和谁在一个循环里""哪条边回边"。
- * 正支配和后支配共用同一份实现（后支配 = 在反向图上跑一遍），
- * 调用方拿到的都是不依赖方向的查询接口。
- */
-
 import { type BlockId, type Cfg, EXIT, reachableFrom, successorsOf } from './cfg.ts'
 
-/** 支配关系的只读查询。反向后即为"后支配"。 */
 export interface Dominators {
   readonly root: BlockId
-  /** a 支配 b（a === b 时为真） */
   dominates(a: BlockId, b: BlockId): boolean
-  /** 直接支配者；root 没有 */
   immediateOf(id: BlockId): BlockId | undefined
-  /** 最近公共支配者（两个块都在 root 之下时必有解） */
   commonAncestor(a: BlockId, b: BlockId): BlockId
-  /** 从 a 到祖先的链（含 a，不含 stop 及更上） */
   chainTo(id: BlockId, stop: BlockId): BlockId[]
 }
 
 export interface Loop {
   readonly header: BlockId
   readonly body: ReadonlySet<BlockId>
-  /** 循环体内节点所有通向循环外的边的目标 */
   readonly exits: ReadonlySet<BlockId>
 }
 
-/** 入口不唯一的强连通分量--不可约的本体 */
 export interface MultiEntryScc {
   readonly nodes: ReadonlySet<BlockId>
   readonly entries: readonly BlockId[]
@@ -40,8 +25,6 @@ export interface Analysis {
   readonly loops: ReadonlyMap<BlockId, Loop>
   readonly multiEntrySccs: readonly MultiEntryScc[]
 }
-
-// ---------- 支配树 ----------
 
 function reversePostOrder(root: BlockId, succOf: (id: BlockId) => readonly BlockId[]): BlockId[] {
   const post: BlockId[] = []
@@ -145,7 +128,6 @@ export function dominatorsOf(
     commonAncestor: (a, b) => {
       let x = a
       let y = b
-      // 深度相等只说明两者互不为祖先，必须同时上移，否则原地打转
       while (x !== y) {
         const dx = depthOf(x)
         const dy = depthOf(y)
@@ -170,8 +152,6 @@ export function dominatorsOf(
     },
   }
 }
-
-// ---------- 自然循环 ----------
 
 function backEdgeLatches(cfg: Cfg, dom: Dominators): Map<BlockId, BlockId[]> {
   const latches = new Map<BlockId, BlockId[]>()
@@ -228,8 +208,6 @@ function computeLoops(cfg: Cfg, dom: Dominators): Map<BlockId, Loop> {
   return loops
 }
 
-// ---------- 强连通分量 ----------
-
 function stronglyConnected(cfg: Cfg): Set<BlockId>[] {
   const reach = new Map<BlockId, Set<BlockId>>()
   for (const b of cfg.blocks) {
@@ -268,8 +246,6 @@ function entryTargetsOf(cfg: Cfg, nodes: ReadonlySet<BlockId>): BlockId[] {
   }
   return [...entries]
 }
-
-// ---------- 入口 ----------
 
 export function analyze(cfg: Cfg): Analysis {
   const dom = dominatorsOf(

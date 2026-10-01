@@ -1,39 +1,18 @@
-/*
- * Pass 1：语句序列 → CFG。
- *
- * 这一层承担三件事，做完之后后续 pass 就再也不用接触 JsonCode：
- *   1. 以 label 为界切块；
- *   2. 把 7 种 Statement 压成 3 种终结符（goto / branch / exit），
- *      其余语句全部渲染成文本塞进 body；
- *   3. 契约校验（未定义行为一次性抛干净）。
- */
-
 import type * as JsonCode from '@/middle/ir/json-code.ts'
 import { type StructurizeContext, StructurizerError } from './types.ts'
 
 export type BlockId = number
 
-/** 虚拟出口：所有 exit 终结符的后继 */
 export const EXIT: BlockId = -1
 
-/** 入口块在没有 label 时使用的 id（JsonCode 约定 labelId > 0） */
 const ENTRY_ID: BlockId = 0
 
-/**
- * 调试探针：lowering 决策 13 在每次 goto 前插入的 steps.check（见
- * middle/lowering/statements.ts）。它只服务于 maxSteps 兜底，不参与 Pascal 语义，
- * 所以"块里只剩它"等于块是空的--否则每个 goto 都会独占一个基本块，跳转穿线失效。
- */
 const DEBUG_PROBE_KEYS: ReadonlySet<string> = new Set(['runtime.debug.steps.check'])
 
 function isDebugProbe(stmt: JsonCode.Statement): boolean {
   return stmt.kind === 'eval' && stmt.expr.kind === 'syscall' && DEBUG_PROBE_KEYS.has(stmt.expr.key)
 }
 
-/**
- * 归一化后的终结符。整个子系统只认这三种：
- * 控制流类语句到这里就被压扁，之后所有 pass 面对的都是同一种形状。
- */
 export type Terminator =
   | { readonly kind: 'goto'; readonly to: BlockId }
   | { readonly kind: 'branch'; readonly cond: string; readonly then: BlockId; readonly else: BlockId }
@@ -41,7 +20,6 @@ export type Terminator =
 
 export interface Block {
   readonly id: BlockId
-  /** 已渲染成 JS 文本的普通语句，按源码顺序 */
   readonly body: readonly string[]
   readonly term: Terminator
 }
@@ -138,12 +116,9 @@ function lowerStatement(stmt: JsonCode.Statement, ctx: StructurizeContext): Lowe
         },
       }
     case 'label':
-      // 切块阶段已经消费掉，这里只是为了穷尽
       return { line: undefined, term: undefined }
   }
 }
-
-// ---------- 切块 ----------
 
 function splitBlocks(body: readonly JsonCode.Statement[], ctx: StructurizeContext): Block[] {
   const blocks: Block[] = []
@@ -151,16 +126,13 @@ function splitBlocks(body: readonly JsonCode.Statement[], ctx: StructurizeContex
 
   let labelId: BlockId | undefined
   let lines: string[] = []
-  /** lines 里有多少条来自调试探针--用于判断"这个块其实什么都没有" */
   let probes = 0
   let term: Terminator | undefined
 
   const isEmptyStartSegment = (): boolean => labelId === undefined && lines.length === 0 && term === undefined
 
-  /** 收尾当前段。nextLabel 是紧随其后的 label（用于补 fallthrough）。 */
   const close = (nextLabel: BlockId | undefined): void => {
     if (isEmptyStartSegment()) {
-      // body 以 label 开头：让那个 label 直接充当入口块的 id，不另起空块
       if (nextLabel !== undefined) {
         labelId = nextLabel
       }
@@ -197,7 +169,6 @@ function splitBlocks(body: readonly JsonCode.Statement[], ctx: StructurizeContex
       continue
     }
 
-    // 终结符之后的语句不可达（例如被 goto 跳过），结构化输出里没有东西能到达它们
     if (term !== undefined) {
       continue
     }
@@ -228,7 +199,6 @@ function assertTargetsExist(cfg: Cfg): void {
   }
 }
 
-/** 入口：JsonCode 的函数体 → 已剪枝的 CFG */
 export function buildCfg(fn: JsonCode.Function, ctx: StructurizeContext): Cfg {
   const cfg = makeCfg(splitBlocks(fn.body, ctx))
   assertTargetsExist(cfg)

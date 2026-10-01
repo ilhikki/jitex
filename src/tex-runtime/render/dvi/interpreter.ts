@@ -1,10 +1,8 @@
 import type { Color, Drawable, DviConfig, Page } from './types.ts'
 import { DviReader } from './reader.ts'
 
-/** 1 pt = 65536 sp */
 const SP_PER_PT = 65536
 
-// 「由内容推导页面尺寸」时对字形升部/降部/平均字宽的估算比例
 const ASCENT = 0.75
 const DESCENT = 0.25
 const AVG_WIDTH = 0.5
@@ -14,12 +12,11 @@ const BLACK: Color = { model: 'gray', v: 0 }
 const textDecoder = new TextDecoder()
 
 interface FontEntry {
-  /** DVI 里的字体名，用于查字符映射与度量 */
   dviName: string
   family: string
-  /** 字号（pt），用于 SVG 的 font-size */
+
   size: number
-  /** fnt_def 的 scaled size（sp，已含 scale）--字符宽度的基准 */
+
   sizeSp: number
   weight?: string
   style?: string
@@ -41,9 +38,7 @@ interface Box {
   y1: number
 }
 
-/** eop 暂存的一页：页面尺寸要等文件末尾的 post 才有权威值 */
 interface PendingPage {
-  /** bop 里的 c1 / c2+c3（sp），TeX82 通常写 0 */
   declaredWidth: number
   declaredHeight: number
   box: Box | undefined
@@ -51,7 +46,6 @@ interface PendingPage {
   drawables: Drawable[]
 }
 
-/** 解析完整 DVI 字节流，逐页产出 Page。 */
 export function parseDvi(data: Uint8Array, config: DviConfig): Page[] {
   return new Interpreter(data, config).run()
 }
@@ -71,11 +65,9 @@ class Interpreter {
   private preSeen = false
   private lastBopOffset = -1
 
-  /** bop 声明的页面尺寸（sp），TeX82 通常写 0 */
   private pageWidth = 0
   private pageHeight = 0
 
-  /** post 声明的页面尺寸（sp）：最高页面的高、最宽页面的宽。TeX82 一定写 */
   private postWidth = 0
   private postHeight = 0
 
@@ -86,7 +78,7 @@ class Interpreter {
   private y = 0
   private z = 0
   private font = -1
-  /** 上一个字形结束时的 h、v（sp）；下一个字形的 h 与 v 都等于它们，才算"紧接" */
+
   private lastEndH: number | undefined
   private lastEndV: number | undefined
 
@@ -109,12 +101,11 @@ class Interpreter {
   }
 
   private command(code: number): void {
-    // set_char_0..127
     if (code < 128) {
       this.setChar(code)
       return
     }
-    // fnt_num_0..63
+
     if (code >= 171 && code <= 234) {
       this.font = code - 171
       return
@@ -136,7 +127,7 @@ class Interpreter {
       return
     }
     if (code === 138) {
-      return // nop
+      return
     }
     if (code === 139) {
       this.bop()
@@ -158,8 +149,7 @@ class Interpreter {
       this.h += this.reader.readSigned(code - 142)
       return
     }
-    // 寄存器类位移：w0/x0/y0/z0 是「按寄存器当前值移动」（不清零），
-    // w1..4/x1..4/y1..4/z1..4 是「按参数移动并更新寄存器」
+
     if (code === 147) {
       this.h += this.w
       return
@@ -227,20 +217,18 @@ class Interpreter {
     throw new Error(`dvi: undefined opcode ${code} at ${this.reader.offset - 1}`)
   }
 
-  // 页面
-
   private bop(): void {
     if (this.open) {
       throw new Error('dvi: bop before eop')
     }
-    this.lastBopOffset = this.reader.offset - 1 // 已读过 bop 字节
-    this.reader.readUnsigned(4) // c0 页码
-    this.pageWidth = this.reader.readUnsigned(4) // c1
-    this.pageHeight = this.reader.readUnsigned(4) + this.reader.readUnsigned(4) // c2 + c3
+    this.lastBopOffset = this.reader.offset - 1
+    this.reader.readUnsigned(4)
+    this.pageWidth = this.reader.readUnsigned(4)
+    this.pageHeight = this.reader.readUnsigned(4) + this.reader.readUnsigned(4)
     for (let i = 0; i < 6; i++) {
-      this.reader.readUnsigned(4) // c4..c9
+      this.reader.readUnsigned(4)
     }
-    this.reader.readUnsigned(4) // 上一页 bop 的位置
+    this.reader.readUnsigned(4)
     this.h = 0
     this.v = 0
     this.w = 0
@@ -262,7 +250,7 @@ class Interpreter {
       throw new Error('dvi: eop without bop')
     }
     this.open = false
-    // 页面尺寸的权威值在文件末尾的 post 里，此处只暂存
+
     this.pending.push({
       declaredWidth: this.pageWidth,
       declaredHeight: this.pageHeight,
@@ -272,15 +260,6 @@ class Interpreter {
     })
   }
 
-  /**
-   * 定稿每页的尺寸。
-   *
-   * 优先用 bop 的 c1..c3（TeX82 通常写 0，即不声明）；否则用 post 的 u/l -- 那是 TeX
-   * 自己记下的"最宽页面的宽、最高页面的高"，含字符推进，**不需要读 TFM 就是正确值**。
-   * 两者都没有（文件被截断）才退化为内容包围盒的估算。
-   *
-   * 最后与包围盒取并集：估算的墨迹范围可能超出 TeX 声明的页面，viewBox 之下被裁掉。
-   */
   private finalize(): Page[] {
     const declaredWidth = this.postWidth / SP_PER_PT
     const declaredHeight = this.postHeight / SP_PER_PT
@@ -289,7 +268,6 @@ class Interpreter {
       const height = page.declaredHeight > 0 ? page.declaredHeight / SP_PER_PT : declaredHeight
       const box = page.box
       if (width <= 0 || height <= 0) {
-        // 没有任何尺寸声明（bop 为 0 且没有 post）：只能由内容包围盒推导
         if (box === undefined) {
           return { x: 0, y: 0, width, height, background: page.background, drawables: page.drawables }
         }
@@ -318,12 +296,6 @@ class Interpreter {
     })
   }
 
-  /**
-   * 内容包围盒（pt）。
-   *
-   * 只在 bop 与 post 都没给页面尺寸时兜底。h 已按规范推进，故 x 是准的，
-   * 估的只是"还要往右多宽、往上多高"（字形的升/降部与墨迹宽度）。
-   */
   private contentBox(): Box | undefined {
     let box: Box | undefined
     const extend = (x0: number, y0: number, x1: number, y1: number) => {
@@ -351,24 +323,14 @@ class Interpreter {
     return box
   }
 
-  // 图元
-
   private setChar(code: number): void {
     this.glyph(code, true)
   }
 
   private putChar(code: number): void {
-    // put 不推进 h：下一个字形仍落在同一位置，两者都不与它"紧接"
     this.glyph(code, false)
   }
 
-  /**
-   * 放一个字形。
-   *
-   * `set_char` 的语义是"放在 (h,v)，然后 h 加上字符宽度"；宽度来自字体度量。
-   * 没有度量（宽度 0）时 h 停在原地--同一行的字形于是共用一个 x，渲染端会把
-   * 它们并进同一个 text，字符间距交给字体度量承担。
-   */
   private glyph(code: number, advances: boolean): void {
     this.requirePage('character')
     const font = this.fonts.get(this.font)
@@ -382,7 +344,7 @@ class Interpreter {
       kind: 'glyph',
       x: this.h / SP_PER_PT,
       y: this.v / SP_PER_PT,
-      // 竖直位置也算：\lower、\raise 的字 h 是接续的，但 y 不同，不能并进同一段
+
       continues: this.lastEndH === this.h && this.lastEndV === this.v,
       text,
       family: font.family,
@@ -400,7 +362,7 @@ class Interpreter {
 
   private setRule(a: number, b: number): void {
     this.rule(a, b)
-    // set_rule 使当前点右移 b（put_rule 不移动）
+
     this.h += b
   }
 
@@ -408,7 +370,6 @@ class Interpreter {
     this.rule(a, b)
   }
 
-  /** a 为高度（厚度）、b 为宽度；参考点在矩形左下角 */
   private rule(a: number, b: number): void {
     this.requirePage('rule')
     if (a <= 0 || b <= 0) {
@@ -423,8 +384,6 @@ class Interpreter {
       color: this.currentColor(),
     })
   }
-
-  // 栈与寄存器
 
   private push(): void {
     this.stack.push({
@@ -448,22 +407,20 @@ class Interpreter {
     this.x = entry.x
     this.y = entry.y
     this.z = entry.z
-    // 出栈是本层盒的结束：不假设盒后第一个字形与盒内最后一个是同一条流
+
     this.lastEndH = undefined
     this.lastEndV = undefined
   }
 
-  // 字体
-
   private fntDef(n: number): void {
     const number = this.reader.readUnsigned(n)
-    this.reader.readUnsigned(4) // 校验和
-    const scaledSize = this.reader.readUnsigned(4) // scaled size（sp）
-    this.reader.readUnsigned(4) // design size
+    this.reader.readUnsigned(4)
+    const scaledSize = this.reader.readUnsigned(4)
+    this.reader.readUnsigned(4)
     const area = this.decode(this.reader.readBytes(this.reader.readUnsigned(1)))
     const name = this.decode(this.reader.readBytes(this.reader.readUnsigned(1)))
     const dviName = area === '' ? name : `${area}/${name}`
-    // DVI 约定：后置信息里重定义同一字体号且 scaled size 为 0 时沿用先前定义
+
     if (scaledSize === 0 && this.fonts.has(number)) {
       return
     }
@@ -479,17 +436,15 @@ class Interpreter {
     })
   }
 
-  // 前置/后置信息
-
   private pre(): void {
     const id = this.reader.readUnsigned(1)
     if (id !== 2) {
       throw new Error(`dvi: unsupported DVI format id ${id}`)
     }
-    this.reader.readUnsigned(4) // num
-    this.reader.readUnsigned(4) // den
-    this.reader.readUnsigned(4) // mag：fnt_def 的 scaled size 已含 mag，不再乘
-    this.reader.readBytes(this.reader.readUnsigned(1)) // 注释
+    this.reader.readUnsigned(4)
+    this.reader.readUnsigned(4)
+    this.reader.readUnsigned(4)
+    this.reader.readBytes(this.reader.readUnsigned(1))
     this.preSeen = true
   }
 
@@ -501,17 +456,17 @@ class Interpreter {
     if (lastBop !== this.lastBopOffset) {
       throw new Error(`dvi: post points to ${lastBop} but the last bop is at ${this.lastBopOffset}`)
     }
-    this.reader.readUnsigned(4) // num
-    this.reader.readUnsigned(4) // den
-    this.reader.readUnsigned(4) // mag
-    this.postHeight = this.reader.readUnsigned(4) // l：最高页面的高 + 深
-    this.postWidth = this.reader.readUnsigned(4) // u：最宽页面的宽
-    this.reader.readUnsigned(2) // 最大栈深
-    this.reader.readUnsigned(2) // 总页数
+    this.reader.readUnsigned(4)
+    this.reader.readUnsigned(4)
+    this.reader.readUnsigned(4)
+    this.postHeight = this.reader.readUnsigned(4)
+    this.postWidth = this.reader.readUnsigned(4)
+    this.reader.readUnsigned(2)
+    this.reader.readUnsigned(2)
   }
 
   private postPost(): void {
-    this.reader.readUnsigned(4) // post 的位置
+    this.reader.readUnsigned(4)
     const id = this.reader.readUnsigned(1)
     if (id !== 2) {
       throw new Error(`dvi: unsupported trailer id ${id}`)
@@ -519,17 +474,11 @@ class Interpreter {
     this.finished = true
   }
 
-  // special
-
   private xxx(n: number): void {
     const content = this.decode(this.reader.readBytes(this.reader.readUnsigned(n)))
     this.handleSpecial(content)
   }
 
-  /**
-   * 按 xcolor 的 dvips 约定解析：color push / color pop / color / background。
-   * 其余一律作为 special 图元原样透传。
-   */
   private handleSpecial(content: string): void {
     const parts = content.trim().split(/\s+/)
     const head = parts[0]

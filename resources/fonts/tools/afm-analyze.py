@@ -1,20 +1,11 @@
-"""把 *.afm 的 "C 码位 ; N 字形名" 抽出来，回答「到底有几种编码」。
 
-这是"我们的字体为何这么设计"的证据来源：把 75 个字体按「0..127 位的字形名序列」
-聚类，得到 10 种互不相同的编码（文本/斜体/无连字/打字机/打字机斜体/cmtex/cmmi/
-cmsy/cmex/cminch），并列出每种编码与 OT1 的逐位差异。没有这份证据就会误以为
-"TeX 全局用 OT1"，那么 \tt、cmtex、cmr5 这些族的字符会整片映射错。
-
-输出：.build/fonts/afm-analyze.txt
-用法：python afm-analyze.py [afm 目录]     # 默认 ./afm
-"""
 
 import re
 import sys
 from os import listdir, makedirs, path
 
 HERE = path.dirname(path.abspath(__file__))
-REPO = path.dirname(path.dirname(path.dirname(HERE)))  # resources/fonts/tools → 仓库根
+REPO = path.dirname(path.dirname(path.dirname(HERE)))
 BUILD = path.join(REPO, '.build', 'fonts')
 
 AFM_DIR = sys.argv[1] if len(sys.argv) > 1 else path.join(HERE, 'afm')
@@ -42,7 +33,7 @@ def w(s=''):
 
 try:
     fonts = sorted(f[:-4] for f in listdir(AFM_DIR) if f.endswith('.afm'))
-    w(f'=== AFM 编码分析（{len(fonts)} 个字体）')
+    w(f'=== AFM encoding analysis ({len(fonts)} fonts)')
 
     sig_map = {}
     for font in fonts:
@@ -51,16 +42,16 @@ try:
 
     groups = sorted(sig_map.items(), key=lambda kv: -len(kv[1]))
     base = groups[0][0]
-    w(f'=== 0..127 编码签名数：{len(groups)}')
+    w(f'=== distinct 0..127 encoding signatures: {len(groups)}')
     for i, (sig, fs) in enumerate(groups, 1):
         miss = [c for c, n in enumerate(sig) if n is None]
         w()
-        w(f'[{i}] 缺 {len(miss):>3} 位   {len(fs)} 个字体：{" ".join(fs)}')
+        w(f'[{i}] missing {len(miss):>3} slots  {len(fs)} fonts: {" ".join(fs)}')
         if miss:
-            w(f'    空洞码位：{miss}')
+            w(f'    hole code points: {miss}')
         if i > 1:
             diff = [c for c in range(128) if base[c] != sig[c]]
-            w(f'    与 [1] 相比 {len(diff)} 位不同：{diff}')
+            w(f'    differs from [1] in {len(diff)} slots: {diff}')
 
     for i, (sig, fs) in enumerate(groups, 1):
         w()
@@ -71,7 +62,7 @@ try:
                 continue
             mark = ''
             if i > 1 and base[c] != n:
-                mark = f'   <== [1] 是 {base[c]}'
+                mark = f'   <== [1] is {base[c]}'
             w(f'  {c:>3} 0x{c:02X}  {n}{mark}')
 finally:
     fh.close()

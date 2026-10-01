@@ -121,7 +121,7 @@ begin
   i := true;
 end.`,
     purpose:
-      '[Class B . D.49] 6.8.2.2: a value must be assignment-compatible with the variable type; boolean is incompatible with integer, so the program is invalid - a designated error, §5.1 f) permits not reporting it in the accompanying documentation; this processor chooses to detect and report it',
+      '[Class B . D.49] 6.8.2.2: a value must be assignment-compatible with the variable type; boolean is incompatible with integer, so the program is invalid - a designated error, s5.1 f) permits not reporting it in the accompanying documentation; this processor chooses to detect and report it',
     expectedError: '',
   },
   {

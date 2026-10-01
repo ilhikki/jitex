@@ -2,18 +2,6 @@ import type { Color, Drawable, Page } from '../dvi/types.ts'
 
 type Glyph = Extract<Drawable, { kind: 'glyph' }>
 
-/**
- * 把一页渲染成 SVG 字符串。
- *
- * 位置模型：每个字形都带**绝对**坐标（DVI 的 h/v 按规范推进后的值），所以这里
- * 只做一件事--把"紧接在一起"的字形合并进同一个 text 元素，字符间距交给字体度量；
- * 其余情况各起一个 text。合并是省体积的关键：一行文字通常只落成一个标签。
- *
- * 这里只画 DVI 说的那点内容，**不替用户决定纸张**：白边多大、页面缩放到多宽、
- * 底色如何，都是展示层的事（见 src/web/styles.css 的 .page）。
- *
- * 代价是 rule / special 与文字的层叠顺序固定为"文字先画"。
- */
 export function renderPage(page: Page): string {
   const lines: string[] = []
   const { x, y, width, height } = page
@@ -47,13 +35,6 @@ export function renderPage(page: Page): string {
   return lines.join('\n')
 }
 
-/**
- * 全部文字放进一个 text，每段一个 tspan。
- *
- * 位置全是绝对值（DVI 的 h/v 按规范推进后的值），所以每个 tspan 各自带 x/y、
- * 彼此不接续。呈现属性只在 text 上写一份，与它不同的段才在 tspan 上覆盖--
- * 这一份属性乘以段数，正是 SVG 体积的主要来源。
- */
 function renderText(drawables: Drawable[]): string {
   const runs = toRuns(drawables)
   const first = runs[0]
@@ -80,7 +61,6 @@ function renderText(drawables: Drawable[]): string {
   return `<text ${attrs.join(' ')}>${children.join('')}</text>`
 }
 
-/** 一段紧接在一起的字形 */
 interface Run {
   x: number
   y: number
@@ -106,7 +86,6 @@ function toRuns(drawables: Drawable[]): Run[] {
   return runs
 }
 
-/** 相对 text 上那份属性的差异--只补不同的项 */
 function overrides(base: Glyph, glyph: Glyph): string[] {
   const attrs: string[] = []
   if (!sameColor(base.color, glyph.color)) {
@@ -148,7 +127,6 @@ function sameColor(a: Color, b: Color): boolean {
   return false
 }
 
-/** cmyk 先按 (1-c)(1-k) 转 rgb，再统一转 #rrggbb */
 function toHex(color: Color): string {
   let r: number
   let g: number
@@ -179,7 +157,6 @@ function escapeXml(text: string): string {
     .replaceAll("'", '&apos;')
 }
 
-/** 保留 3 位小数（1/1000 pt 远小于 1 sp） */
 function num(value: number): string {
   return String(Math.round(value * 1000) / 1000)
 }

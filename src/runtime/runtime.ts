@@ -30,8 +30,6 @@ export function toRunState(
   }
 }
 
-// syscall 表
-
 function getDefaultSyscalls(): Record<string, SyscallHandler> {
   return {
     ...basicSyscall(),
@@ -43,12 +41,6 @@ function getDefaultSyscalls(): Record<string, SyscallHandler> {
   }
 }
 
-/**
- * 合成 `__sys` 表：默认实现 + 使用方覆盖（同 key 后者胜）。
- *
- * 只做合并，不做绑定：表内每个 handler 仍需在调用点接收 ctx。
- * 表的身份只取决于默认实现与 extraSyscalls，与单次运行无关。
- */
 export function createSyscallTable(
   extraSyscalls: Record<string, SyscallHandler> = {},
 ): SyscallTable {

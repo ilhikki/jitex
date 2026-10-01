@@ -1,5 +1,3 @@
-// 辅助函数：real 格式化（单精度：7 位有效小数为本实现的输出精度，ISO 6.9.3.6 允许实现定义）
-
 const REAL_FRACTION_DIGITS = 7
 
 export function formatReal(n: number): string {
@@ -16,10 +14,6 @@ export function formatReal(n: number): string {
   return `${mantissa}E${sign}${padded}`
 }
 
-/**
- * 字段格式化：右对齐，左填充空格到 width。
- * Pascal 写参数语义：x:width 表示最小字段宽度，右对齐。
- */
 export function formatField(text: string, width: number): string {
   if (!width || text.length >= width) {
     return text

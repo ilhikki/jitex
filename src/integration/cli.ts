@@ -1,28 +1,3 @@
-// CLI entry point.
-//
-// Usage:
-//   deno run -A cli.ts run <entry.ts> [options]
-//
-//   <entry.ts> must export default a Suite
-//
-//   options:
-//     --report-dir <path>     default ./reports
-//     --run-id <id>           explicit runId
-//     --filter <glob>         filter by stage name (minimatch style)
-//     --fail-fast             stop on first failure
-//     --cache-dir <path>      default {reportDir}/.cache
-//     --with-cache            strict cache mode: all cacheable stages must hit, throw otherwise
-//     --purge                 clear cache dir before run
-//     --no-report             MVP placeholder: do not write report files
-//
-//   Passthrough args: -a / --arguments collects `key=value` into the config dict
-//   and passes it to the suite callback (see suite in dsl.ts). The CLI does not
-//   interpret the semantics of these keys:
-//     -a debug=true  -a mode=fast   ->  { debug: 'true', mode: 'fast' }
-//     -a flag                       ->  { flag: '' }
-//
-// Cache is disabled by default (fresh run). Only --with-cache enables strict cache recovery.
-
 import type { Suite } from './dsl.ts'
 import { _setDeclConfig } from './dsl.ts'
 import { run, type RunOptions } from './runner.ts'
@@ -38,12 +13,11 @@ interface CliArgs {
   withCache: boolean
   purge: boolean
   noReport: boolean
-  /** Passthrough config collected from -a/--arguments (always non-empty) */
+
   config: Record<string, string>
   rest: string[]
 }
 
-/** Parse `key=value` into the config dict; value defaults to empty string when no `=` */
 function addArgument(kv: string, config: Record<string, string>): void {
   const eq = kv.indexOf('=')
   if (eq < 0) {
@@ -99,7 +73,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--no-report':
         out.noReport = true
         break
-      // Passthrough: the CLI does not interpret key semantics; passes through to suite callback
+
       case '-a':
       case '--arguments':
         addArgument(argv[++i] ?? '', out.config)
@@ -141,7 +115,6 @@ function printHelp(): void {
   )
 }
 
-// Minimal minimatch: supports * and ?, not ** (sufficient)
 function globMatch(pattern: string, s: string): boolean {
   const p = pattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
@@ -162,10 +135,8 @@ async function main(argv: string[]): Promise<number> {
     return 2
   }
 
-  // Config must be injected before loading the entry: suite() runs during import and needs the config then.
   _setDeclConfig(args.config)
 
-  // Dynamically load the entry
   const entryUrl = new URL(args.entry, `file://${Deno.cwd()}/`).href
   let mod: { default?: unknown }
   try {

@@ -2,25 +2,8 @@ import type { JsCompiler, SemanticCompiler } from '@/backend/codegen/json-code-c
 import * as JsonCode from '@/middle/ir/json-code.ts'
 import { rtKeys } from '@jitex/runtime'
 
-/**
- * syscall 内联表：key → 「已编译的实参表达式 → 内联 JS 表达式」。
- *
- * 语义必须与 runtime 的 sys handler（@jitex/runtime 的 sys/arith.ts 等）完全一致
- * （返回值、异常、副作用）。表达式整体用括号包裹，保证嵌入父表达式时运算符优先级安全。
- * 未在此表的 key 一律回退 dispatcher。
- */
-
-/** 内联表达式生成器：返回 undefined 表示放弃内联、回退 dispatcher */
 type InlineGen = (args: string[]) => string | undefined
 
-/**
- * Pascal 数字字面量 → 合法的 JS 数字字面量。
- *
- * Pascal 的 digit-sequence 是十进制，前导零只表示位数（0100000 = 100000，ISO 6.1.5）。
- * 编译产物按 ES 模块执行（严格模式），而严格模式禁用前导 0 的八进制字面量--
- * `0100000`、`010E2` 都会直接 parse 失败。因此以 0 开头且紧跟数字的字面量一律
- * 按十进制重新求值再输出。
- */
 function jsNumberLiteral(raw: string): string {
   return /^0[0-9]/.test(raw) ? String(Number(raw)) : raw
 }
@@ -58,46 +41,31 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.compareGreater]: (a) => `(((${a[0]}) > (${a[1]})) ? 1 : 0)`,
   [rtKeys.compareGreaterOrEqual]: (a) => `(((${a[0]}) >= (${a[1]})) ? 1 : 0)`,
 
-  // 注：cast.float32.to.int32.round / cast.char.to.int32 的参数在 handler 里被多次使用，
-  // 内联会造成实参重复求值（与 dispatcher 语义不一致），暂不内联。
   [rtKeys.castFloat32ToInt32]: (a) => `(Math.trunc(${a[0]}))`,
   [rtKeys.castBooleanToInt32]: (a) => `((${a[0]}) ? 1 : 0)`,
   [rtKeys.castInt32ToChar]: (a) => `((${a[0]}) & 0xff)`,
 
-  // 注：bytes.host / alloc / clone / copy / view.subarray 以及 bytes.get.* / bytes.set.*
-  // 都不内联--宿主是 { bytes, dv } 对象，构造与标量读写统一由 mem.ts 的 handler 承担
-  // （dv 随宿主走，不再需要按 ArrayBuffer 缓存）。
-
-  // 槽赋值：内联为 JS 赋值表达式。**必须内联** -- dispatcher 的实参只能拿到槽的
-  // 值而非引用，无法写回（见 @jitex/runtime 的 keys.ts 的 assign 说明）。
   [rtKeys.assign]: (a) => `((${a[0]}) = ${a[1]})`,
 
-  // 求值序列（闭包）：用一个立即执行函数把多个表达式按顺序求值（见 @jitex/runtime 的 keys.ts）。
-  // 参数必须 >= 2 -- 只有一项时规则应直接返回该项，包一层闭包没有意义。
   [rtKeys.closureNoValue]: (a) => {
     if (a.length < 2) {
-      throw new Error(`runtime.closure.noValue 至少需要 2 个参数，实际 ${a.length} 个`)
+      throw new Error(`runtime.closure.noValue args < 2, actual ${a.length}`)
     }
     return `(() => { ${a.map((e) => `${e};`).join(' ')} })()`
   },
 
   [rtKeys.cellNew]: (a) => `({ kind: 'cell', value: ${a[0]} })`,
   [rtKeys.cellGet]: (a) => `(${a[0]}.value)`,
-  // cell.set 的 handler 返回 undefined，用 void 保持返回值语义
   [rtKeys.cellSet]: (a) => `(void (${a[0]}.value = ${a[1]}))`,
 
-  // objectarray.* 都是类型无知的原子操作：统一走 base[offset+idx]，
-  // 无需在运行时区分「完整数组」与「子数组视图」。
   [rtKeys.objectArrayGet]: (a) => `(${a[0]}.base[${a[0]}.offset + ${a[1]}])`,
   [rtKeys.objectArraySet]: (a) => `(void (${a[0]}.base[${a[0]}.offset + ${a[1]}] = ${a[2]}))`,
   [rtKeys.objectArraySublist]: (a) => `({base: ${a[0]}.base, offset: (${a[0]}.offset + ${a[1]}) | 0})`,
 
-  // callee 是函数值；每个实参只出现一次，语义与 dispatcher 一致
   [rtKeys.callIndirect]: (a) => `(${a[0]})(${a.slice(1).join(', ')})`,
 }
 
 export class PascalSemanticCompiler implements SemanticCompiler {
-  /** 命中内联规则时返回生成函数，否则 undefined */
   private inlineFor(key: string): InlineGen | undefined {
     return inlineSyscalls[key]
   }
@@ -107,13 +75,10 @@ export class PascalSemanticCompiler implements SemanticCompiler {
       case 'jsExpr':
         return literal.arg
       case 'number':
-        // 数值字面量：整型 / 实型 / 布尔序数值
         return jsNumberLiteral(literal.arg)
       case 'string':
-        // 字符串 / 字符字面量的内容
         return JSON.stringify(literal.arg)
       case 'bytes':
-        // 字符串字面量（packed array of char）→ 字节宿主
         return compiler.compileExpr({
           kind: 'syscall',
           key: rtKeys.bytesHost,
@@ -124,15 +89,10 @@ export class PascalSemanticCompiler implements SemanticCompiler {
           }],
         })
       case 'field':
-        // 记录字段名
         return JSON.stringify(literal.arg)
       case 'null':
-        // ISO 7185 6.4.4: nil-value → JS undefined
         return 'undefined'
       case 'type':
-        // 类型描述字面量：arg 已是 JSON 字符串，直接作为 JS 对象字面量嵌入。
-        // 正常路径上 rewrite 会消费掉所有类型参数，codegen 不应再遇到本 key；
-        // 保留该分支是为了兼容用户自定义 syscall 表透传的未重写节点。
         return literal.arg
       default:
         throw new Error(`literal kind '${literal.key}' not support`)
@@ -143,7 +103,6 @@ export class PascalSemanticCompiler implements SemanticCompiler {
     const key = syscall.key
     const args = syscall.args.map((a) => compiler.compileExpr(a))
 
-    // 内联开关命中 → 展开为内联 JS 表达式（消除 dispatcher 的数组分配 + 两层调用）
     const inline = this.inlineFor(key)
     if (inline) {
       const code = inline(args)

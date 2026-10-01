@@ -1,10 +1,3 @@
-/*
- * 分析阶段协调入口。
- *
- * 顺序调用 3 个 pass，拼接 result → Analysis。
- * re-export analysis-type.ts 的所有对外类型。
- */
-
 import { ProgramNode } from '@/frontend/node.ts'
 import {
   Analysis,
@@ -67,9 +60,7 @@ function buildAnalysis(
     globalSymbolOf: (name) => decl.globalBindings.get(name.toLowerCase()),
     debugNames: () => new Map(decl.idNames),
     extraCallables: () => ctx.extraCallables,
-    // debug 构建开关。它决定 lowering 是否**生成**独立检查语句（步数 / 边界 /
-    // 函数进入钩子）--这些语句的插入位置只有 lowering 知道，所以"是否生成"也由
-    // 它决定，而不是生成之后再由 rewrite 抹掉。
+
     debug: () => debug,
   }
 }

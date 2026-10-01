@@ -1,12 +1,3 @@
-// AST Node to Pascal Source Code Printer
-// 幂等性保证：s0 -> parse -> n0 -> print -> s1 -> parse -> n1 -> print -> s2, s1 === s2
-//
-// 格式规则：
-// - 关键字全部大写
-// - 2 空格缩进
-// - 语句分隔符 ; 不出现在最后一条语句后（标准 Pascal 风格）
-// - 字面量保留 raw 字段（原始 token 内容），BooleanLiteral 输出 TRUE/FALSE
-
 import type {
   ArrayAccessNode,
   ArrayTypeNode,
@@ -57,15 +48,10 @@ import type {
   WithStatementNode,
 } from '../node.ts'
 
-// 公开 API
-
-/** AST 节点转 Pascal 源代码（幂等） */
 export function nodeToCode(node: AstNode): string {
   const ctx: PrintContext = { indent: 0 }
   return printNode(node, ctx)
 }
-
-// 内部实现
 
 interface PrintContext {
   indent: number
@@ -110,7 +96,6 @@ function printNode(node: AstNode, ctx: PrintContext): string {
     case 'ProcedureCall':
       return printProcedureCall(node as ProcedureCallNode)
 
-    // 声明
     case 'LabelDeclaration':
       return printLabelDecl(node as LabelDeclarationNode)
     case 'ConstDeclaration':
@@ -126,7 +111,6 @@ function printNode(node: AstNode, ctx: PrintContext): string {
     case 'ParameterDeclaration':
       return printParamDecl(node as ParameterDeclarationNode, ctx)
 
-    // 类型
     case 'SimpleType':
       return printSimpleType(node as SimpleTypeNode)
     case 'RangeType':
@@ -144,7 +128,6 @@ function printNode(node: AstNode, ctx: PrintContext): string {
     case 'PointerType':
       return printPointerType(node as PointerTypeNode, ctx)
 
-    // 表达式
     case 'Identifier':
       return (node as IdentifierNode).name
     case 'IntegerLiteral':
@@ -178,14 +161,10 @@ function printNode(node: AstNode, ctx: PrintContext): string {
   }
 }
 
-// 表达式
-
-/** 字符串字面量加引号，内部单引号转义为双单引号 */
 function quoteString(raw: string): string {
   return `'${raw.replace(/'/g, "''")}'`
 }
 
-/** 字符字面量加引号，内部单引号转义为双单引号 */
 function quoteChar(raw: string): string {
   return `'${raw.replace(/'/g, "''")}'`
 }
@@ -204,7 +183,6 @@ function printBinary(node: BinaryExpressionNode, ctx: PrintContext): string {
 function printUnary(node: UnaryExpressionNode, ctx: PrintContext): string {
   const operand = printExpr(node.operand, ctx)
   const op = node.operator.toUpperCase()
-  // not 前置，+/- 前置
   return `${op} ${operand}`
 }
 
@@ -225,7 +203,6 @@ function printFieldAccess(
   ctx: PrintContext,
 ): string {
   const obj = printExpr(node.object, ctx)
-  // Pascal 指针解引用/文件缓冲区：F^ 在 AST 中表示为 FieldAccess(field.name='^')
   if (node.field.name === '^') {
     return `${obj}^`
   }
@@ -248,8 +225,6 @@ function printIn(node: InExpressionNode, ctx: PrintContext): string {
   const right = printExpr(node.right, ctx)
   return `${left} IN ${right}`
 }
-
-// 语句
 
 function printProgram(node: ProgramNode, ctx: PrintContext): string {
   const params = node.parameters.length > 0 ? `(${node.parameters.map((p) => p.name).join(', ')})` : ''
@@ -328,7 +303,6 @@ function printIf(node: IfStatementNode, ctx: PrintContext): string {
   return `if ${cond} then\n${thenCode}`
 }
 
-/** then/else 分支体：单语句需缩进，复合语句保持原样 */
 function printThenElseBody(stmt: StatementNode, ctx: PrintContext): string {
   if (stmt.kind === 'CompoundStatement') {
     return printCompound(stmt as CompoundStatementNode, ctx)
@@ -361,7 +335,6 @@ function printFor(node: ForStatementNode, ctx: PrintContext): string {
   return `for ${node.variable.name} := ${init} ${node.direction} ${final} do\n${body}`
 }
 
-/** 循环体：单语句需缩进，复合语句保持原样 */
 function printLoopBody(stmt: StatementNode, ctx: PrintContext): string {
   if (stmt.kind === 'CompoundStatement') {
     return printCompound(stmt as CompoundStatementNode, ctx)
@@ -406,8 +379,6 @@ function printProcedureCall(node: ProcedureCallNode): string {
   const args = node.arguments.length > 0 ? `(${node.arguments.map((a) => printExpr(a, { indent: 0 })).join(', ')})` : ''
   return `${node.name.name}${args}`
 }
-
-// 声明
 
 function printLabelDecl(node: { labels: IntegerLiteralNode[] }): string {
   return node.labels.map((l) => l.raw).join(', ')
@@ -460,7 +431,6 @@ function printFunctionDecl(node: FunctionDeclarationNode, ctx: PrintContext): st
 
 function printParamDecl(node: ParameterDeclarationNode, ctx: PrintContext): string {
   const names = node.names.map((n) => n.name).join(', ')
-  // ISO 7185 6.6.3.4/6.6.3.5：可调用形参段（过程/函数作形式参数）
   if (node.callable) {
     const params = node.callable.parameters.length > 0
       ? `(${node.callable.parameters.map((p) => printParamDecl(p, ctx)).join('; ')})`
@@ -471,8 +441,6 @@ function printParamDecl(node: ParameterDeclarationNode, ctx: PrintContext): stri
   const type = node.type ? printType(node.type, ctx) : ''
   return node.isVar ? `var ${names}: ${type}` : `${names}: ${type}`
 }
-
-// 类型
 
 function printType(type: TypeNode, ctx: PrintContext): string {
   return printNode(type, ctx)

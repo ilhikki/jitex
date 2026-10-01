@@ -17,9 +17,6 @@ import {
   UnaryExpressionNode,
 } from '@/frontend/node.ts'
 
-// Expression Parsers
-
-// parseIdentifier: IDENTIFIER
 export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode> {
   const token = peek(input)
   if (token.type !== 'IDENTIFIER') {
@@ -34,7 +31,6 @@ export function parseIdentifier(input: ParserInput): ParseResult<IdentifierNode>
   )
 }
 
-// parsePrimary - the base factor
 export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
   const token = peek(input)
 
@@ -99,7 +95,6 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
     }
 
     case 'IDENTIFIER':
-      // Handle TRUE/FALSE/NIL as identifiers (predefined, not reserved)
       if (token.content.toUpperCase() === 'TRUE') {
         return ok(
           input.position + 1,
@@ -118,18 +113,13 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
           loc({ kind: 'Identifier', name: 'NIL' } as IdentifierNode, token),
         )
       }
-      // Could be: identifier, function call, array access, field access
+
       return parsePostfix(input)
 
     case 'LPAREN': {
-      // Could be parenthesized expression or set constructor
       const startPos = input.position
       const startToken = token
       const afterParen = { tokens: input.tokens, position: startPos + 1 }
-
-      // Check for set constructor: [ ... ]
-      // Actually ( ... ) with no colon is just a parenthesized expression
-      // Set constructors use [ ] in Pascal
 
       const exprResult = parseExpression(afterParen)
       if (!exprResult.success) {
@@ -175,7 +165,7 @@ export function parsePrimary(input: ParserInput): ParseResult<ExpressionNode> {
 function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode> {
   const startPos = input.position
   const startToken = peek(input)
-  // Skip [
+
   let pos = startPos + 1
   const elements: [ExpressionNode, ExpressionNode | undefined][] = []
 
@@ -220,10 +210,8 @@ function parseSetConstructor(input: ParserInput): ParseResult<SetConstructorNode
   )
 }
 
-// parsePostfix - handles function calls, array access, field access
 export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
-  // 调用方（parsePrimary 的 IDENTIFIER 分支）已确认当前记号是标识符
   const idNode = loc({ kind: 'Identifier', name: startToken.content } as IdentifierNode, startToken)
 
   let pos = input.position + 1
@@ -234,7 +222,6 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
     const token = peek({ tokens: input.tokens, position: pos })
 
     if (token.type === 'LPAREN') {
-      // Function call
       pos++
       const args: ExpressionNode[] = []
       if (peek({ tokens: input.tokens, position: pos }).type !== 'RPAREN') {
@@ -261,7 +248,6 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
         endPos,
       )
     } else if (token.type === 'LBRACKET') {
-      // Array access
       pos++
       const indices: ExpressionNode[] = []
       const listResult = parseList(
@@ -286,7 +272,6 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
         endPos,
       )
     } else if (token.type === 'DOT') {
-      // Field access
       pos++
       const fieldResult = parseIdentifier({ tokens: input.tokens, position: pos })
       if (!fieldResult.success) {
@@ -300,7 +285,6 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
         endPos,
       )
     } else if (token.type === 'CARET') {
-      // Pointer dereference (treat as field access for simplicity)
       pos++
       endPos = token.end
       expr = loc(
@@ -320,7 +304,6 @@ export function parsePostfix(input: ParserInput): ParseResult<ExpressionNode> {
   return ok(pos, expr)
 }
 
-// parseNot - NOT factor
 function parseNot(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const afterNot = { tokens: input.tokens, position: input.position + 1 }
@@ -343,12 +326,10 @@ function parseNot(input: ParserInput): ParseResult<ExpressionNode> {
   )
 }
 
-// parseFactor - handles multiplication-level operators
 export function parseFactor(input: ParserInput): ParseResult<ExpressionNode> {
   return parsePrimary(input)
 }
 
-// parseTerm - term: factor { (* | / | DIV | MOD | AND) factor }
 export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const result = parseFactor(input)
@@ -408,7 +389,6 @@ export function parseTerm(input: ParserInput): ParseResult<ExpressionNode> {
   return ok(pos, left)
 }
 
-// parseSimpleExpression - [ (+|-|NOT) ] term { (+|-|OR) term }
 export function parseSimpleExpression(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   let pos = input.position
@@ -484,7 +464,6 @@ export function parseSimpleExpression(input: ParserInput): ParseResult<Expressio
   return ok(pos, left)
 }
 
-// parseExpression - simple_expression [ (= | <> | < | <= | > | >= | IN) simple_expression ]
 export function parseExpression(input: ParserInput): ParseResult<ExpressionNode> {
   const startToken = peek(input)
   const leftResult = parseSimpleExpression(input)
@@ -550,7 +529,6 @@ export function parseExpression(input: ParserInput): ParseResult<ExpressionNode>
   return ok(pos, left)
 }
 
-// Convenience: parse a list of expressions separated by commas
 export function parseExpressionList(input: ParserInput): ParseResult<ExpressionNode[]> {
   return parseList(input, parseExpression, 'COMMA')
 }

@@ -18,9 +18,6 @@ import {
 import { Position } from '@/frontend/token.ts'
 import { ParseResult, ParserInput } from '@/frontend/types.ts'
 
-// Type Parsers
-
-// parseType - dispatches to the correct type parser based on lookahead
 export function parseType(input: ParserInput): ParseResult<TypeNode> {
   const token = peek(input)
 
@@ -44,7 +41,6 @@ export function parseType(input: ParserInput): ParseResult<TypeNode> {
       return parseEnumerationType(input)
 
     case 'CARET':
-      // ISO 7185 6.4.4: new-pointer-type = '↑' domain-type
       return parsePointerType(input)
 
     case 'MINUS':
@@ -54,7 +50,6 @@ export function parseType(input: ParserInput): ParseResult<TypeNode> {
     case 'IDENTIFIER':
     case 'TRUE':
     case 'FALSE':
-      // Could be range type or simple type
       return parseRangeOrSimpleType(input)
 
     default:
@@ -138,14 +133,13 @@ function parsePackedType(input: ParserInput): ParseResult<TypeNode> {
   }
 }
 
-// ARRAY [ indexType {, indexType} ] OF elementType
 function parseArrayType(
   input: ParserInput,
   isPacked: boolean = false,
   startPos?: Position,
 ): ParseResult<ArrayTypeNode> {
   const start = startPos ?? peek(input).start
-  let pos = input.position + 1 // skip ARRAY
+  let pos = input.position + 1
 
   const openResult = expectType({ tokens: input.tokens, position: pos }, 'LBRACKET')
   if (!openResult.success) {
@@ -192,8 +186,6 @@ function parseArrayType(
   )
 }
 
-// RECORD field_list END
-// field_list = [ (fixed-part [; variant-part] | variant-part) [;] ]
 function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<RecordTypeNode> {
   const start = startPos ?? peek(input).start
   let pos = input.position + 1
@@ -227,7 +219,6 @@ function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<R
     }
   }
 
-  // 循环仅在 END 处退出，故此处必为 END
   pos++
 
   return ok(
@@ -240,7 +231,6 @@ function parseRecordType(input: ParserInput, startPos?: Position): ParseResult<R
   )
 }
 
-// CASE [tag:] type OF variant {; variant}
 function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPartNode> {
   const start = peek(input).start
   let pos = input.position + 1
@@ -248,7 +238,6 @@ function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPa
   let tagName: IdentifierNode | undefined
   const afterCaseToken = peek({ tokens: input.tokens, position: pos })
   if (afterCaseToken.type === 'IDENTIFIER' && peek({ tokens: input.tokens, position: pos + 1 }).type === 'COLON') {
-    // 已确认「标识符 :」形式的 tag-field
     tagName = withLoc(
       { kind: 'Identifier', name: afterCaseToken.content } as IdentifierNode,
       afterCaseToken.start,
@@ -302,7 +291,6 @@ function parseRecordVariantPart(input: ParserInput): ParseResult<RecordVariantPa
   )
 }
 
-// case-constant-list : ( field-list )
 function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> {
   const start = peek(input).start
   let pos = input.position
@@ -378,10 +366,9 @@ function parseRecordVariant(input: ParserInput): ParseResult<RecordVariantNode> 
   )
 }
 
-// ISO 7185 6.4.4: '^' domain-type  (domain-type = type-identifier)
 function parsePointerType(input: ParserInput): ParseResult<PointerTypeNode> {
   const start = peek(input).start
-  let pos = input.position + 1 // skip '^'
+  let pos = input.position + 1
 
   const domainResult = parseType({ tokens: input.tokens, position: pos })
   if (!domainResult.success) {
@@ -399,14 +386,13 @@ function parsePointerType(input: ParserInput): ParseResult<PointerTypeNode> {
   )
 }
 
-// FILE OF type  |  FILE
 function parseFileType(
   input: ParserInput,
   isPacked: boolean = false,
   startPos?: Position,
 ): ParseResult<FileTypeNode> {
   const start = startPos ?? peek(input).start
-  let pos = input.position + 1 // skip FILE
+  let pos = input.position + 1
 
   let elementType: TypeNode | undefined = undefined
 
@@ -434,10 +420,9 @@ function parseFileType(
   )
 }
 
-// SET OF type
 function parseSetType(input: ParserInput, startPos?: Position): ParseResult<SetTypeNode> {
   const start = startPos ?? peek(input).start
-  let pos = input.position + 1 // skip SET
+  let pos = input.position + 1
 
   const ofResult = expectKeyword({ tokens: input.tokens, position: pos }, 'OF')
   if (!ofResult.success) {
@@ -461,9 +446,7 @@ function parseSetType(input: ParserInput, startPos?: Position): ParseResult<SetT
   )
 }
 
-// ( identifier {, identifier} )
 function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNode> {
-  // 分派前已确认当前记号是左圆括号
   const start = peek(input).start
   let pos = input.position + 1
 
@@ -492,9 +475,6 @@ function parseEnumerationType(input: ParserInput): ParseResult<EnumerationTypeNo
   )
 }
 
-// Declaration Parsers
-
-// identifier_list : type
 export function parseVariableDeclaration(input: ParserInput): ParseResult<VariableDeclarationNode> {
   const startPos = peek(input).start
 

@@ -1,15 +1,5 @@
-// DSL primitives and hook implementation.
-//
-// Six primitives: stage / suite / cache / assert / attach / log
-//   Syntactic sugar: assertEquals / attachText / attachJson
-// Two hooks: before / after (suite-level)
-//
-// Type gymnastics: Unwrap / UnwrapAll unpack result tuples from Stage<X> tuples.
-
 import { requireRunContext, requireStageContext, tryRunContext } from './context.ts'
 import type { Artifact, AssertionRecord } from './context.ts'
-
-// Type definitions
 
 export interface Stage<R> {
   readonly __brand: 'Stage'
@@ -37,28 +27,17 @@ export type UnwrapAll<T extends readonly Stage<unknown>[]> = {
   [K in keyof T]: Unwrap<T[K]>
 }
 
-// Declaration-phase global state (for suite registration)
-
 let currentDeclSuite: Suite | undefined = undefined
 let nextStageId = 1
 
-/**
- * Declaration-phase config: any `--key[=value]` from the CLI is parsed into this.
- *
- * Must be injected before the dynamic import of the entry (which triggers the
- * suite() call); suite hands the same object to its callback. When not injected
- * it is an empty object, so the callback parameter is guaranteed non-empty.
- */
 let declConfig: Record<string, string> = {}
 
-/** Logs produced during the declaration phase (suite callback): the run is not yet established, so buffer them first */
 const pendingDeclLogs: string[] = []
 
 export function _setDeclConfig(config: Record<string, string>): void {
   declConfig = config
 }
 
-/** For runner: after the run is established, take the declaration-phase logs and feed them into run-level logs */
 export function _drainDeclLogs(): string[] {
   return pendingDeclLogs.splice(0)
 }
@@ -68,13 +47,6 @@ export function _resetDeclState(): void {
   nextStageId = 1
 }
 
-// suite
-
-/**
- * Declare a suite. `fn` runs immediately to register stages/hooks; its argument
- * is the config for this run (parsed from CLI `--key[=value]`, e.g.
- * `{debug: 'false'}`), always non-empty.
- */
 export function suite(name: string, fn: (config: Record<string, string>) => void): Suite {
   if (currentDeclSuite) {
     throw new Error(`nested suites not allowed: already inside '${currentDeclSuite.name}'`)
@@ -95,8 +67,6 @@ export function suite(name: string, fn: (config: Record<string, string>) => void
   }
   return s
 }
-
-// stage
 
 export function stage<const T extends readonly Stage<unknown>[], R>(
   name: string,
@@ -120,8 +90,6 @@ export function stage<const T extends readonly Stage<unknown>[], R>(
   return stageObj
 }
 
-// cache (explicit marking)
-
 export function cache<R extends CacheableRecord>(stage: Stage<R>): Stage<R> {
   if (!currentDeclSuite) {
     throw new Error(`cache() must be called inside a suite block`)
@@ -129,8 +97,6 @@ export function cache<R extends CacheableRecord>(stage: Stage<R>): Stage<R> {
   stage.cacheable = true
   return stage
 }
-
-// before / after
 
 export function before(fn: () => void | Promise<void>): void {
   if (!currentDeclSuite) {
@@ -145,8 +111,6 @@ export function after(fn: () => void | Promise<void>): void {
   }
   currentDeclSuite.afterFn = fn
 }
-
-// assert family
 
 export class AssertionError extends Error {
   override name = 'AssertionError'
@@ -172,8 +136,6 @@ export function assertEquals<T>(actual: T, expected: T, message?: string): void 
   }
 }
 
-// attach family
-
 export function attach(name: string, bytes: Uint8Array): void {
   const ctx = requireStageContext()
   const a: Artifact = { name, bytes }
@@ -189,15 +151,6 @@ export function attachJson(name: string, obj: unknown): void {
   attachText(name, JSON.stringify(obj, undefined, 2))
 }
 
-// log
-
-/**
- * Emit a log line. Can be called directly from three places without needing to
- * know which layer you are in:
- *   - inside a stage fn -> current stage's logs;
- *   - inside a before / after hook -> run-level logs;
- *   - inside the suite callback (declaration phase, run not yet established) -> buffered first, fed into run-level logs when the run starts.
- */
 export function log(message: string): void {
   const run = tryRunContext()
   if (run === undefined) {
@@ -210,8 +163,6 @@ export function log(message: string): void {
   }
   run.log(message)
 }
-
-// For runner: ensure we are inside a run but not inside a stage (hook-phase safety check)
 
 export function _ensureNoActiveStage(): void {
   const run = requireRunContext()

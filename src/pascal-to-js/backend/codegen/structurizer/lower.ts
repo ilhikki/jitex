@@ -1,10 +1,3 @@
-/*
- * Pass 6：把规划结果落成语法树。
- *
- * 这里没有任何判断--每条边该 fall 还是 break/continue 已经在 routes 里定好了，
- * 本模块只负责按盒的 items 顺序输出、按 routes 查表渲染跳转。
- */
-
 import { type Block, type BlockId, type Cfg } from './cfg.ts'
 import { type Box, edgeKey, type JumpKind, type Plan } from './plan.ts'
 import type { SNode } from './types.ts'
@@ -31,7 +24,6 @@ function blockNodes(cfg: Cfg, plan: Plan, id: BlockId): SNode[] {
 
   switch (term.kind) {
     case 'exit':
-      // return / longJump 已经渲染进 body 了
       return literal
     case 'goto':
       return [...literal, ...jumpNodes(routeOf(plan, id, term.to))]

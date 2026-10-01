@@ -5,11 +5,6 @@ import { bundle } from 'jsr:@deno/emit@^0.46.0'
 import { createTexStages } from '../tex/stages.ts'
 import { INITIAL_TEX } from '../../web/initial-tex.js'
 
-/*
- * build:jitex
- *
- *   deno task build:jitex
- */
 const REPO_ROOT = new URL('../../../', import.meta.url)
 
 const JITEX_VERSION = '0.1.0'
@@ -20,10 +15,6 @@ const SITE_DIR = new URL('site/', DIST_DIR)
 
 const SITE_FILES = ['index.html', 'styles.css', 'app.js', 'worker.js', 'initial-tex.js', 'logo-tex.js']
 
-/**
- * Bare specifiers in generated modules: the bundle must be supplied explicitly,
- * without relying on the host's workspace configuration.
- */
 const IMPORT_MAP: ImportMap = {
   baseUrl: REPO_ROOT,
   imports: {
@@ -69,12 +60,6 @@ async function listFiles(dir: URL, prefix = ''): Promise<string[]> {
   return out
 }
 
-/**
- * The entry statically imports the generated tex program and asset modules, so
- * after bundling there is **no dynamic loading**: no fetch, no data:/Blob URL,
- * no import.meta dependency. This is why the same jitex.js runs in
- * browser / Worker / Deno / Node.
- */
 async function writeBundleInputs(
   texJs: string,
   format: Uint8Array,
@@ -126,18 +111,10 @@ export function createTexEngine(options = {}) {
 
 const SMOKE_PLAIN = String.raw`Hello, \TeX!  $a^2 + b^2 = c^2$\par
 `
-/**
- * Declaring a "new size" font forces read_font_info to read cmr10.tfm. This is
- * why tfm files must be bundled with the release: without them only this case
- * fails.
- */
+
 const SMOKE_FONT = String.raw`\font\big=cmr10 at 12pt \big Big text at 12pt\par
 `
 
-/**
- * No assertion gating: when reproducing a tex issue, the errored output itself
- * is what needs to be inspected.
- */
 type SmokeRunResult =
   | { status: 'completed'; svgs: string[] }
   | { status: 'interrupted'; error: { message: string } }
@@ -161,7 +138,6 @@ export function createBuildJitexSuite(): Suite {
         const entry = await writeBundleInputs(texFiles.texJs, plainFmt.plainFmtBytes, texFiles.poolFile, tfmFiles)
         const { code } = await bundle(entry, { importMap: IMPORT_MAP })
 
-        // dist is rebuilt from scratch every time: renamed/deleted artifacts must not linger.
         await Deno.remove(DIST_DIR, { recursive: true }).catch((error: unknown) => {
           if (!(error instanceof Deno.errors.NotFound)) {
             throw error
@@ -172,8 +148,6 @@ export function createBuildJitexSuite(): Suite {
         const codeBytes = new TextEncoder().encode(code)
         attach('jitex.js', codeBytes)
 
-        // The program, format and fonts are produced in the same batch: record
-        // this correspondence together with their fingerprints.
         const manifest = {
           name: 'jitex',
           version: JITEX_VERSION,
@@ -206,7 +180,6 @@ export function createBuildJitexSuite(): Suite {
     ))
 
     cache(stage('smoke: tex => svg', [jitexStage], async () => {
-      // Only import the artifact itself: the thing under test must be the release build.
       const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
       assert(typeof jitex.createTexEngine === 'function', 'createTexEngine should be exported')
       const engine = jitex.createTexEngine()
@@ -254,8 +227,6 @@ export function createBuildJitexSuite(): Suite {
       return { plainPages: plain.svgs.length, fontPages: font.svgs.length }
     }))
 
-    // No assertion gating: when reproducing a tex issue, the errored output itself
-    // is what needs to be inspected.
     stage('site tex => svg', [jitexStage], async () => {
       const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
       let consoleText = ''
@@ -274,13 +245,6 @@ export function createBuildJitexSuite(): Suite {
       return { sitePages: svgs.length }
     })
 
-    /*
-     * The manifest only **declares** fonts, it does not download them: the browser
-     * fetches only the families actually used on the page (on-demand loading).
-     *
-     * Depends on jitexStage because it rebuilds dist (clearing it first); running
-     * later would delete the fonts.
-     */
     const fontsStage = cache(stage('copy fonts', [jitexStage], async () => {
       const fontDir = new URL('resources/fonts/', REPO_ROOT)
       const names: string[] = []
@@ -296,7 +260,7 @@ export function createBuildJitexSuite(): Suite {
       for (const name of names) {
         const bytes = await Deno.readFile(new URL(name, fontDir))
         await Deno.writeFile(new URL(`fonts/${name}`, LIB_DIR), bytes)
-        // Family name = uppercase filename (CMR10...), matching the runtime resolveFont output.
+
         lines.push(
           `@font-face {\n  font-family: '${name.replace(/\.woff2$/, '').toUpperCase()}';\n` +
             `  src: url('./fonts/${name}') format('woff2');\n}`,
@@ -306,15 +270,10 @@ export function createBuildJitexSuite(): Suite {
       assert(!/url\(\s*['"]?\//.test(css), 'fonts.css: resource paths must not start with / (would 404 on Pages)')
       await Deno.writeTextFile(new URL('fonts.css', LIB_DIR), css)
       attach('fonts.css', new TextEncoder().encode(css))
-      log(`fonts: ${names.length} woff2 + fonts.css → dist/lib/`)
+      log(`fonts: ${names.length} woff2 + fonts.css -> dist/lib/`)
       return { fontFiles: names.length }
     }))
 
-    /*
-     * dist/site/ is a self-contained demo site: worker.js -> ./jitex.js and
-     * index.html -> ./fonts.css resolve in place; GitHub Pages can host
-     * dist/site/ directly.
-     */
     const copySiteStage = stage('copy site', [jitexStage, fontsStage], async () => {
       await Deno.mkdir(SITE_DIR, { recursive: true })
       const siteSource = new URL('src/web/', REPO_ROOT)
@@ -323,7 +282,7 @@ export function createBuildJitexSuite(): Suite {
         await Deno.writeFile(new URL(name, SITE_DIR), bytes)
         attach(name, bytes)
         const text = new TextDecoder().decode(bytes)
-        // GitHub Pages serves under /<repo>/: resource paths starting with / blank the page.
+
         assert(
           !/\s(?:src|href)="\//.test(text) && !/from '\//.test(text),
           `${name}: resource paths must not start with / (would 404 on Pages)`,
@@ -347,7 +306,7 @@ export function createBuildJitexSuite(): Suite {
       })
 
       const svgs = run.status === 'completed' ? run.svgs : []
-      // language=HTML
+
       const html = `<!doctype html>
       <html lang="en">
       <head>
@@ -380,13 +339,10 @@ export function createBuildJitexSuite(): Suite {
       attachText('plain-visual.console.txt', consoleText)
 
       const status = run.status === 'completed' ? 'ok' : `error: ${run.error.message}`
-      log(`[plain-visual] ${status}  pages=${svgs.length} → dist/site/`)
+      log(`[plain-visual] ${status}  pages=${svgs.length} -> dist/site/`)
       return { plainVisualPages: svgs.length }
     })
 
-    /*
-     * Release split: site -> GitHub Pages, lib -> GitHub Release.
-     */
     stage('publish', [jitexStage, fontsStage, copySiteStage, plainVisualStage], async () => {
       const names: string[] = []
       for (const area of ['lib', 'site']) {

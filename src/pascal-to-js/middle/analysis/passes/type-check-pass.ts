@@ -1,20 +1,3 @@
-/*
- * Pass 4: 声明期与类型定义期的静态检查。
- *
- * 只读 ProgramNode 与 Pass 1 的 result，独立遍历 AST，不介入前三个 pass 的处理流程。
- * 覆盖（ISO 7185）：
- *   6.10    program-parameter-list 的标识符须互不相同
- *   6.6.1   forward 声明的标识符须有对应的 procedure-identification；
- *           一个 identifier 至多关联一个 procedure-block
- *   6.2.2.7 同一 region 内不得出现两个同拼写的定义点（不区分声明种类）
- *   6.2.2.9 定义点须先于应用出现（new-pointer-type 的 domain-type 为例外）
- *   6.4.3.4 set-type 的 base-type 须为 ordinal-type
- *   6.6.2   function-block 须至少含一条对该函数标识符赋值的语句
- *
- * 输入：ProgramNode, DeclarationResult
- * 输出：无（违规直接抛错）
- */
-
 import {
   BlockNode,
   FunctionDeclarationNode,
@@ -29,10 +12,7 @@ import { SIMPLE_TYPES } from '../analysis-type.ts'
 import { DeclarationResult } from '../stage-types.ts'
 import { isOrdinalType } from '../type-compat.ts'
 
-/** 内置类型名（ISO 6.4.2.2 的 required simple-types + 实现提供的 text/string 等） */
 const BUILTIN_TYPE_NAMES = new Set(Object.keys(SIMPLE_TYPES))
-
-// Pass 4 入口
 
 export function runTypeCheckPass(program: ProgramNode, declResult: DeclarationResult): void {
   const pass = new TypeCheckPass(declResult)
@@ -52,8 +32,6 @@ class TypeCheckPass {
     this.checkBlock(program.block, new Set(BUILTIN_TYPE_NAMES))
   }
 
-  // ISO 6.10：program-parameter-list 的标识符须互不相同
-
   private checkProgramParameters(program: ProgramNode): void {
     const seen = new Set<string>()
     for (const p of program.parameters) {
@@ -67,8 +45,6 @@ class TypeCheckPass {
     }
   }
 
-  // ISO 6.6.1：forward 声明的标识符须有对应的 procedure-identification
-
   private checkForwardResidue(): void {
     const names = [...this.decl.forwardFuncs.keys()].sort()
     if (names.length > 0) {
@@ -77,8 +53,6 @@ class TypeCheckPass {
       )
     }
   }
-
-  // 逐 block 检查
 
   private checkBlock(
     block: BlockNode,
@@ -102,13 +76,6 @@ class TypeCheckPass {
     }
   }
 
-  // ISO 6.2.2.7：同一 region 内不得出现同拼写的定义
-
-  /**
-   * ISO 6.2.2.7：同一 region 内不得有两个同拼写的定义点（不区分声明种类）。
-   * 另外按 6.6.1，一个 procedure-identifier 至多关联一个 procedure-block；
-   * forward 声明与其后的 procedure-identification 合起来只算一个定义点。
-   */
   private checkDeclaredNames(block: BlockNode, formalParamNames: string[] = []): void {
     const kinds = new Map<string, string>()
     const declareKind = (name: string, kind: string) => {
@@ -122,7 +89,6 @@ class TypeCheckPass {
       kinds.set(key, kind)
     }
 
-    // ISO 6.2.2.7：形参与块内局部声明同属一个 region
     for (const name of formalParamNames) {
       declareKind(name, 'a formal parameter')
     }
@@ -168,9 +134,6 @@ class TypeCheckPass {
     }
   }
 
-  // ISO 6.2.2.9 定义点先于应用 + 6.4.3.4 set-type 的 base-type
-
-  /** 返回本 block 结束后（含外层）可见的类型名集合 */
   private checkTypeDefinitions(block: BlockNode, outerTypes: Set<string>): Set<string> {
     const available = new Set(outerTypes)
     for (const t of block.typeDeclarations) {
@@ -192,7 +155,6 @@ class TypeCheckPass {
         )
       }
       case 'PointerType':
-        // ISO 6.4.1：new-pointer-type 的 domain-type 允许应用出现早于其定义点
         this.checkTypeNode(node.domainType, available, true)
         return
       case 'ArrayType': {
@@ -220,10 +182,8 @@ class TypeCheckPass {
         return
       }
       case 'RangeType':
-        // 子界边界是常量表达式，不含类型引用
         return
       case 'EnumerationType':
-        // 枚举列举的是值标识符，不含类型引用
         return
     }
   }
@@ -245,7 +205,6 @@ class TypeCheckPass {
     }
   }
 
-  /** ISO 6.4.3.4：set-type = 'set' 'of' base-type，base-type = ordinal-type */
   private checkSetBaseType(node: SetTypeNode): void {
     const base = this.decl.typeNodeInfo.get(node.baseType)
     if (base && !isOrdinalType(base)) {
@@ -254,8 +213,6 @@ class TypeCheckPass {
       )
     }
   }
-
-  // ISO 6.6.2：function-block 须含对函数标识符的赋值语句
 
   private checkFunctionAssignment(decl: FunctionDeclarationNode): void {
     const block = decl.block

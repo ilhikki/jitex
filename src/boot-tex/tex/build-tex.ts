@@ -4,11 +4,6 @@ import { fileOpenRewriters, readTextFile } from '../utils.ts'
 import { runTanglePascal, transformTangle } from '../tangle/build-tangle.ts'
 import { attachText, stage } from '@jitex/integration'
 
-/*
- * Runtime parts (TTY terminal, extra/open syscall implementations) live in the
- * tex/ layer of @jitex/tex-runtime; this file only handles compiling TeX to JS.
- */
-
 const texExtraCallables: Record<string, ExtraCallable> = {
   'BREAK': {
     sysCallName: 'extra.break',

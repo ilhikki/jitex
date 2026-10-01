@@ -67,7 +67,7 @@ function toError(e: unknown): Error {
 
 function reportErrorAsState(e: unknown, ctx: RuntimeContext): RunState {
   const error = toError(e)
-  // 错误对象自己带着 message 与 stack，日志只留一行，不复制堆栈
+
   ctx.debugLog.push(`[run] error: ${error.message}`)
   return toRunState(ctx, 'error', error)
 }

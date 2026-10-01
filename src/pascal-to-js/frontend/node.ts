@@ -104,22 +104,14 @@ export interface FunctionDeclarationNode extends AstNode {
 export interface ParameterDeclarationNode extends AstNode {
   kind: 'ParameterDeclaration'
   names: IdentifierNode[]
-  /** 值/变量参数的类型；可调用形参（functional/procedural parameter）无此项 */
   type?: TypeNode
   isVar: boolean
-  /**
-   * ISO 7185 6.6.3.1：procedural-parameter-specification / functional-parameter-specification
-   * 都是 heading 形式。有值时本形参段为可调用形参（过程/函数作形式参数）。
-   */
   callable?: CallableParameterSpec
 }
 
-/** 可调用形参（过程 / 函数作形式参数）的 heading 信息 */
 export interface CallableParameterSpec {
   kind: 'procedure' | 'function'
-  /** 形参自带的 formal-parameter-list（可为空：无形参表形式） */
   parameters: ParameterDeclarationNode[]
-  /** 仅 function：结果类型 */
   returnType?: TypeNode
 }
 
@@ -173,7 +165,7 @@ export interface RecordVariantNode extends AstNode {
 
 export interface FileTypeNode extends AstNode {
   kind: 'FileType'
-  elementType: TypeNode | undefined // undefined for "FILE" without OF
+  elementType: TypeNode | undefined
   isPacked: boolean
 }
 
@@ -187,8 +179,6 @@ export interface EnumerationTypeNode extends AstNode {
   values: IdentifierNode[]
 }
 
-// ISO 7185 6.4.4 Pointer-types: new-pointer-type = '↑' domain-type
-// 实际源码中使用 '^' 代替 '↑'。
 export interface PointerTypeNode extends AstNode {
   kind: 'PointerType'
   domainType: TypeNode
@@ -341,7 +331,7 @@ export interface ParenthesizedExpressionNode extends AstNode {
 
 export interface SetConstructorNode extends AstNode {
   kind: 'SetConstructor'
-  elements: [ExpressionNode, ExpressionNode | undefined][] // [start, end|undefined] pairs
+  elements: [ExpressionNode, ExpressionNode | undefined][]
 }
 
 export interface InExpressionNode extends AstNode {

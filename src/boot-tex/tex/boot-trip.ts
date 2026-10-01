@@ -35,14 +35,6 @@ async function runTripTex(args: RunTripTexArgs) {
   return { state, consoleFile }
 }
 
-// suite
-
-/**
- * Black-box entry: callers only supply the "inline" switch; the rest of the
- * stages are orchestrated internally by this suite.
- *
- * Stage durations are recorded by the runner in RunReport.stages[].duration.
- */
 export function createBootTexSuite(): Suite {
   return suite('boot tex', ({ debug }) => {
     const isDebug = debug === 'true'
@@ -231,10 +223,6 @@ export function createBootTexSuite(): Suite {
         log(`[pass2 verify] assert 8terminal.tex empty, actual length = ${actual.terminalTex.length}`)
         assertEquals(actual.terminalTex.length, 0, '8terminal.tex should be empty')
 
-        // trip.log comparison: tripman Step 5 allows several exceptions (date,
-        // glue set, accent kern, capacity values, help messages, string
-        // count/length, memory stats). The first pass uses strict assertion;
-        // normalization will be added after differences are exposed.
         log(
           `[pass2 verify] assert trip.log match, actual length = ${
             actual.tripLog?.length ?? 'undefined'
