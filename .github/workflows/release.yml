@@ -59,31 +59,16 @@ jobs:
           zip -r "$GITHUB_WORKSPACE/jitex-${{ inputs.version }}.zip" .
 
       - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          files: jitex-${{ inputs.version }}.zip
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease }}
+          overwrite_files: true
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: v${{ inputs.version }}
-          ASSET: jitex-${{ inputs.version }}.zip
-          PRERELEASE: ${{ inputs.prerelease }}
-        run: |
-          set -euo pipefail
-
-          args=( --title "$TAG" --generate-notes )
-          if [ "$PRERELEASE" = "true" ]; then
-            args+=( --prerelease )
-          fi
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::notice::Release $TAG already exists, updating"
-
-            # 1) refresh title / notes / prerelease flag
-            gh release edit "$TAG" "${args[@]}"
-
-            # 2) upload or overwrite the asset (--clobber is the key)
-            gh release upload "$TAG" "$ASSET" --clobber
-          else
-            echo "::notice::Release $TAG not found, creating"
-            gh release create "$TAG" "$ASSET" "${args[@]}"
-          fi
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
