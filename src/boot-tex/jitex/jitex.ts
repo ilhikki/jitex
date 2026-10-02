@@ -7,7 +7,7 @@ import { INITIAL_TEX } from '../../web/initial-tex.js'
 
 const REPO_ROOT = new URL('../../../', import.meta.url)
 
-const JITEX_VERSION = '0.1.0'
+const JITEX_VERSION = Deno.env.get('JITEX_VERSION') ?? '0.1.0'
 const DIST_DIR = new URL('dist/', REPO_ROOT)
 const BUILD_ROOT = new URL('.build/', DIST_DIR)
 const BUILD_DIR = new URL('jitex/', BUILD_ROOT)
