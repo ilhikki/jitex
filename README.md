@@ -1,6 +1,6 @@
 # JiTex
 
-<!-- TODO: site link -->
+[Try it online](https://ilhikki.github.io/jitex/)
 
 A TeX engine that runs in JavaScript. JiTex is compiled from Knuth's TeX and the Plain format, and typesets TeX source
 to SVG pages in the browser or on the server.
@@ -45,7 +45,7 @@ This writes the engine to `dist/lib/`, the demo site to `dist/site/`, and report
 
 ## Releases
 
-<!-- TODO: release link -->
+[Browse releases](https://github.com/ilhikki/jitex/releases)
 
 ## License
 
