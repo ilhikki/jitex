@@ -9,6 +9,10 @@
 dist/
 .build/
 /temp/
+# Generated font intermediates (woff2 is the checked-in artifact)
+resources/fonts/*.otf
+# Node is no longer used; keep it out of the repo
+node_modules/
 /test/temp/
 coverage-temp/
 /reports/
