@@ -175,6 +175,10 @@ function makeBundleStage(
       await Deno.writeFile(new URL('LICENSE.knuth', LIB_DIR), knuthLicense)
       attach('LICENSE.knuth', knuthLicense)
 
+      const projectLicense = await Deno.readFile(new URL('LICENSE', REPO_ROOT))
+      await Deno.writeFile(new URL('LICENSE', LIB_DIR), projectLicense)
+      attach('LICENSE', projectLicense)
+
       log(`jitex.js = ${codeBytes.length} bytes (${manifest.sha256.slice(0, 12)}...)`)
       return { jitexBytes: codeBytes.length, jitexSha256: manifest.sha256 }
     },
