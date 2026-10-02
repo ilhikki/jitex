@@ -5,11 +5,10 @@ import { registerTrip } from './tex/trip.ts'
 import { registerPlain } from './tex/plain.ts'
 import { registerJitex } from './jitex/jitex.ts'
 
-export default suite('boot-tex', ({ debug }) => {
-  const isDebug = debug === 'true'
-  const tangleCollect = registerTangle(isDebug)
-  const tripCollect = registerTrip(isDebug, tangleCollect)
-  const texCollect = registerTexCommon(isDebug, tangleCollect, tripCollect)
+export default suite('boot-tex', () => {
+  const tangleCollect = registerTangle()
+  const tripCollect = registerTrip(tangleCollect)
+  const texCollect = registerTexCommon(tangleCollect, tripCollect)
   const plainCollect = registerPlain(texCollect, tripCollect)
   registerJitex(texCollect, plainCollect)
 })

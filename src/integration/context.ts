@@ -22,7 +22,8 @@ export class StageContext {
   assertions: AssertionRecord[] = []
   logs: string[] = []
   stackTrace: string[] = []
-  cached = false
+  // Direct upstream cause, not the root cause.
+  skipReason: string | null = null
 
   constructor(id: string, stageName: string) {
     this.id = id
@@ -48,28 +49,28 @@ export class StageContext {
     const stack = err instanceof Error && err.stack ? err.stack.split('\n') : []
     this.stackTrace = [msg, ...stack]
   }
+
+  skip(reason: string): void {
+    this.status = 'skipped'
+    this.skipReason = reason
+    this.durationMs = 0
+  }
 }
 
 export class RunContext {
   readonly runId: string
   readonly suiteName: string
-  stages: StageContext[] = []
-  runLogs: string[] = []
+  readonly config: Record<string, string>
   private stageStack: StageContext[] = []
 
-  constructor(runId: string, suiteName: string) {
+  constructor(runId: string, suiteName: string, config: Record<string, string> = {}) {
     this.runId = runId
     this.suiteName = suiteName
-  }
-
-  log(msg: string): void {
-    this.runLogs.push(msg)
-    emitSink(msg)
+    this.config = config
   }
 
   pushStage(s: StageContext): void {
     this.stageStack.push(s)
-    this.stages.push(s)
   }
 
   popStage(): StageContext | undefined {
@@ -105,6 +106,11 @@ function emitSink(msg: string): void {
   activeSink?.(msg)
 }
 
+// Sink only; never recorded in stage logs or the report.
+export function emitLog(msg: string): void {
+  emitSink(msg)
+}
+
 export function requireRunContext(): RunContext {
   if (!globalCtx) {
     throw new Error('no active run context')
@@ -118,4 +124,16 @@ export function tryRunContext(): RunContext | undefined {
 
 export function requireStageContext(): StageContext {
   return requireRunContext().currentStage()
+}
+
+export interface ExecContext {
+  readonly config: Record<string, string>
+  readonly runId: string
+  readonly stageName: string
+}
+
+export function context(): ExecContext {
+  const run = requireRunContext()
+  const stageName = run.hasActiveStage() ? run.currentStage().stageName : ''
+  return { config: run.config, runId: run.runId, stageName }
 }

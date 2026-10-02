@@ -1,4 +1,4 @@
-import { assert, assertEquals, attach, attachText, log, stage, type Stage } from '@jitex/integration'
+import { assert, assertIs, attach, attachText, log, type Stage, stage } from '@jitex/integration'
 import { createMemoryFileStore, runJs } from '@jitex/runtime'
 import type { PascalFileStore } from '@jitex/runtime'
 import { ConsoleFile, texFontKey, texFormatKey, texRuntimeSyscalls } from '@jitex/tex-runtime'
@@ -66,7 +66,7 @@ async function runTripTex(args: RunTripTexArgs) {
 function makeTripPasStage(
   tangleCollect: Stage<{ tangleJs: string }>,
 ): Stage<TangleOutput> {
-  return stage('trip: tangle tex.web => tex.trip', [tangleCollect], async ([{ tangleJs }]) => {
+  return stage('trip: tangle tex.web => tex.trip').dep(tangleCollect, async ({ tangleJs }) => {
     const texWeb = await readTextFile('./resources/knuth/tex/tex.web')
     const chFileContent = await getTripChFile()
     const result = validRunTangleResult(await runTangleJs(tangleJs, texWeb, chFileContent))
@@ -77,18 +77,17 @@ function makeTripPasStage(
 }
 
 function makeTripTexJsStage(
-  isDebug: boolean,
   tripPasStage: Stage<TangleOutput>,
 ): Stage<{ texTripJs: string }> {
-  return stage('trip: compile tex.trip.js', [tripPasStage], ([{ pasFile }]) => {
-    const texTripJs = transformTex(pasFile, isDebug)
+  return stage('trip: compile tex.trip.js').dep(tripPasStage, ({ pasFile }) => {
+    const texTripJs = transformTex(pasFile, false)
     attachText('tex.trip.js', texTripJs)
     return { texTripJs }
   })
 }
 
 function makeTripSourcesStage(): Stage<TripSources> {
-  return stage('trip: load sources', [], async () => {
+  return stage('trip: load sources').nodeps(async () => {
     const tripTex = await readFile('./resources/knuth/tex/trip.tex')
     const tripTfm = await readFile('./resources/knuth/tex/trip.tfm')
     const tripinLog = await readTextFile('./resources/knuth/tex/tripin.log')
@@ -108,10 +107,9 @@ function makePass1RunStage(
   tripPasStage: Stage<TangleOutput>,
   tripSourcesStage: Stage<TripSources>,
 ): Stage<Pass1RunResult> {
-  return stage(
-    'trip: pass 1 run',
+  return stage('trip: pass 1 run').deps(
     [tripTexJsStage, tripPasStage, tripSourcesStage],
-    async ([{ texTripJs }, { poolFile }, { tripTex, tripTfm }]) => {
+    async ({ texTripJs }, { poolFile }, { tripTex, tripTfm }) => {
       const { state, consoleFile } = await runTripTex({
         tripJs: texTripJs,
         poolFile,
@@ -158,18 +156,21 @@ function makePass1VerifyStage(
   pass1RunStage: Stage<Pass1RunResult>,
   tripSourcesStage: Stage<TripSources>,
 ): Stage<void> {
-  return stage('trip: pass 1 verify', [pass1RunStage, tripSourcesStage], ([{ tripFmt, tripLog, status }, { tripinLog }]) => {
-    log(`[pass1 verify] assert status === 'terminated', actual = ${JSON.stringify(status)}`)
-    assertEquals(status, 'terminated')
-    log(`[pass1 verify] assert trip.fmt exists, tripFmt defined = ${tripFmt !== undefined}`)
-    assert(tripFmt !== undefined, 'trip.fmt not found')
-    log(
-      `[pass1 verify] assert trip.log === tripin.log, tripLog length = ${
-        tripLog?.length ?? 'undefined'
-      }, tripinLog length = ${tripinLog.length}`,
-    )
-    assertEquals(tripLog, tripinLog, 'output should equal tripin.log')
-  })
+  return stage('trip: pass 1 verify').deps(
+    [pass1RunStage, tripSourcesStage],
+    ({ tripFmt, tripLog, status }, { tripinLog }) => {
+      log(`[pass1 verify] assert status === 'terminated', actual = ${JSON.stringify(status)}`)
+      assertIs(status, 'terminated')
+      log(`[pass1 verify] assert trip.fmt exists, tripFmt defined = ${tripFmt !== undefined}`)
+      assert(tripFmt !== undefined, 'trip.fmt not found')
+      log(
+        `[pass1 verify] assert trip.log === tripin.log, tripLog length = ${
+          tripLog?.length ?? 'undefined'
+        }, tripinLog length = ${tripinLog.length}`,
+      )
+      assertIs(tripLog, tripinLog, 'output should equal tripin.log')
+    },
+  )
 }
 
 function makePass2RunStage(
@@ -178,10 +179,9 @@ function makePass2RunStage(
   tripSourcesStage: Stage<TripSources>,
   pass1RunStage: Stage<Pass1RunResult>,
 ): Stage<Pass2RunResult> {
-  return stage(
-    'trip: pass 2 run',
+  return stage('trip: pass 2 run').deps(
     [tripTexJsStage, tripPasStage, tripSourcesStage, pass1RunStage],
-    async ([{ texTripJs }, { poolFile }, { tripTex, tripTfm }, { tripFmt }]) => {
+    async ({ texTripJs }, { poolFile }, { tripTex, tripTfm }, { tripFmt }) => {
       assert(tripFmt !== undefined, 'trip.fmt from pass 1 is required')
 
       const extraFiles = new Map<string, PascalFileStore>()
@@ -232,19 +232,18 @@ function makePass2VerifyStage(
   pass2RunStage: Stage<Pass2RunResult>,
   tripSourcesStage: Stage<TripSources>,
 ): Stage<void> {
-  return stage(
-    'trip: pass 2 verify',
+  return stage('trip: pass 2 verify').deps(
     [pass2RunStage, tripSourcesStage],
-    ([actual, expect]) => {
+    (actual, expect) => {
       log(`[pass2 verify] assert status === 'terminated', actual = ${JSON.stringify(actual.status)}`)
-      assertEquals(actual.status, 'terminated')
+      assertIs(actual.status, 'terminated')
 
       log(`[pass2 verify] assert trip.dvi exists, tripDvi defined = ${actual.tripDvi !== undefined}`)
       assert(actual.tripDvi !== undefined, 'trip.dvi not found')
       log(
         `[pass2 verify] assert trip.dvi length match, actual = ${actual.tripDvi.length}, expected = ${expect.tripDvi.length}`,
       )
-      assertEquals(
+      assertIs(
         actual.tripDvi.length,
         expect.tripDvi.length,
         `trip.dvi length mismatch expect ${expect.tripDvi.length} actual ${actual.tripDvi.length}`,
@@ -264,34 +263,34 @@ function makePass2VerifyStage(
           actual.triposTex?.length ?? 'undefined'
         }, expected length = ${expect.triposTex.length}`,
       )
-      assertEquals(actual.triposTex, expect.triposTex, 'tripos.tex mismatch')
+      assertIs(actual.triposTex, expect.triposTex, 'tripos.tex mismatch')
 
       log(`[pass2 verify] assert 8terminal.tex exists, terminalTex defined = ${actual.terminalTex !== undefined}`)
       assert(actual.terminalTex !== undefined, '8terminal.tex not found')
       log(`[pass2 verify] assert 8terminal.tex empty, actual length = ${actual.terminalTex.length}`)
-      assertEquals(actual.terminalTex.length, 0, '8terminal.tex should be empty')
+      assertIs(actual.terminalTex.length, 0, '8terminal.tex should be empty')
 
       log(
         `[pass2 verify] assert trip.log match, actual length = ${
           actual.tripLog?.length ?? 'undefined'
         }, expected length = ${expect.tripLog.length}`,
       )
-      assertEquals(actual.tripLog, expect.tripLog, 'trip.log mismatch (may need normalization per tripman Step 5)')
+      assertIs(actual.tripLog, expect.tripLog, 'trip.log mismatch (may need normalization per tripman Step 5)')
       log(
         `[pass2 verify] assert console output === trip.fot, actual length = ${actual.consoleOutput.length}, expected length = ${expect.tripFot.length}`,
       )
-      assertEquals(actual.consoleOutput, expect.tripFot, 'terminal output should equal trip.fot')
+      assertIs(actual.consoleOutput, expect.tripFot, 'terminal output should equal trip.fot')
     },
   )
 }
 
 function makeCollectStage(pass2Verify: Stage<void>): Stage<void> {
-  return stage('trip: collect', [pass2Verify], () => {})
+  return stage('trip: collect').dep(pass2Verify, () => {})
 }
 
-export function registerTrip(isDebug: boolean, tangleCollect: Stage<{ tangleJs: string }>): Stage<void> {
+export function registerTrip(tangleCollect: Stage<{ tangleJs: string }>): Stage<void> {
   const tripPasStage = makeTripPasStage(tangleCollect)
-  const tripTexJsStage = makeTripTexJsStage(isDebug, tripPasStage)
+  const tripTexJsStage = makeTripTexJsStage(tripPasStage)
   const tripSourcesStage = makeTripSourcesStage()
   const pass1RunStage = makePass1RunStage(tripTexJsStage, tripPasStage, tripSourcesStage)
   makePass1VerifyStage(pass1RunStage, tripSourcesStage)

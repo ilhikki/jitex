@@ -1,4 +1,4 @@
-import { assert, attach, attachText, log, stage, type Stage } from '@jitex/integration'
+import { assert, attach, attachText, log, type Stage, stage } from '@jitex/integration'
 import type { ImportMap } from 'jsr:@deno/emit@^0.46.0'
 import { bundle } from 'jsr:@deno/emit@^0.46.0'
 import type { TexCollect } from '../tex/common.ts'
@@ -128,10 +128,9 @@ function makeBundleStage(
   texCollect: Stage<TexCollect>,
   plainCollect: Stage<void>,
 ): Stage<{ jitexBytes: number; jitexSha256: string }> {
-  return stage(
-    'jitex: bundle',
+  return stage('jitex: bundle').deps(
     [texCollect, plainCollect],
-    async ([{ texJs, poolFile, plainFmtBytes, fontsJson, tfmFiles }]) => {
+    async ({ texJs, poolFile, plainFmtBytes, fontsJson, tfmFiles }) => {
       const entry = await writeBundleInputs(texJs, plainFmtBytes, poolFile, tfmFiles)
       const { code } = await bundle(entry, { importMap: IMPORT_MAP })
 
@@ -177,8 +176,10 @@ function makeBundleStage(
   )
 }
 
-function makeSmokeStage(bundleStage: Stage<{ jitexBytes: number; jitexSha256: string }>): Stage<{ plainPages: number; fontPages: number }> {
-  return stage('jitex: smoke', [bundleStage], async () => {
+function makeSmokeStage(
+  bundleStage: Stage<{ jitexBytes: number; jitexSha256: string }>,
+): Stage<{ plainPages: number; fontPages: number }> {
+  return stage('jitex: smoke').dep(bundleStage, async () => {
     const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
     assert(typeof jitex.createTexEngine === 'function', 'createTexEngine should be exported')
     const engine = jitex.createTexEngine()
@@ -228,7 +229,7 @@ function makeSmokeStage(bundleStage: Stage<{ jitexBytes: number; jitexSha256: st
 }
 
 function makeSiteStage(bundleStage: Stage<{ jitexBytes: number; jitexSha256: string }>): Stage<{ sitePages: number }> {
-  return stage('jitex: site', [bundleStage], async () => {
+  return stage('jitex: site').dep(bundleStage, async () => {
     const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
     let consoleText = ''
     const run = jitex.createTexEngine().render(INITIAL_TEX, {
@@ -247,8 +248,10 @@ function makeSiteStage(bundleStage: Stage<{ jitexBytes: number; jitexSha256: str
   })
 }
 
-function makeCopyFontsStage(bundleStage: Stage<{ jitexBytes: number; jitexSha256: string }>): Stage<{ fontFiles: number }> {
-  return stage('jitex: copy fonts', [bundleStage], async () => {
+function makeCopyFontsStage(
+  bundleStage: Stage<{ jitexBytes: number; jitexSha256: string }>,
+): Stage<{ fontFiles: number }> {
+  return stage('jitex: copy fonts').dep(bundleStage, async () => {
     const fontDir = new URL('resources/fonts/', REPO_ROOT)
     const names: string[] = []
     for await (const entry of Deno.readDir(fontDir)) {
@@ -282,7 +285,7 @@ function makeCopySiteStage(
   bundleStage: Stage<{ jitexBytes: number; jitexSha256: string }>,
   copyFontsStage: Stage<{ fontFiles: number }>,
 ): Stage<{ siteFiles: number }> {
-  return stage('jitex: copy site', [bundleStage, copyFontsStage], async () => {
+  return stage('jitex: copy site').deps([bundleStage, copyFontsStage], async () => {
     await Deno.mkdir(SITE_DIR, { recursive: true })
     const siteSource = new URL('src/web/', REPO_ROOT)
     for (const name of SITE_FILES) {
@@ -308,7 +311,7 @@ function makePlainVisualStage(
   bundleStage: Stage<{ jitexBytes: number; jitexSha256: string }>,
   copySiteStage: Stage<{ siteFiles: number }>,
 ): Stage<{ plainVisualPages: number }> {
-  return stage('jitex: plain-visual => html', [bundleStage, copySiteStage], async () => {
+  return stage('jitex: plain-visual => html').deps([bundleStage, copySiteStage], async () => {
     const source = await Deno.readTextFile(new URL('resources/jitex/plain-visual.tex', REPO_ROOT))
     const jitex = await import(new URL('jitex.js', LIB_DIR).href) as JitexModule
     let consoleText = ''
@@ -363,7 +366,7 @@ function makePublishStage(
   copySiteStage: Stage<{ siteFiles: number }>,
   plainVisualStage: Stage<{ plainVisualPages: number }>,
 ): Stage<{ distFiles: number }> {
-  return stage('jitex: publish', [bundleStage, copyFontsStage, copySiteStage, plainVisualStage], async () => {
+  return stage('jitex: publish').deps([bundleStage, copyFontsStage, copySiteStage, plainVisualStage], async () => {
     const names: string[] = []
     for (const area of ['lib', 'site']) {
       for (const rel of await listFiles(new URL(`${area}/`, DIST_DIR))) {

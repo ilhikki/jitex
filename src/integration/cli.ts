@@ -1,19 +1,12 @@
 import type { Suite } from './dsl.ts'
-import { _setDeclConfig } from './dsl.ts'
-import { run, type RunOptions } from './runner.ts'
+import { run, type RunOptions, type RunReport } from './runner.ts'
 
 interface CliArgs {
   command: 'run' | 'help'
   entry?: string
   reportDir: string
-  runId?: string
   filterGlob?: string
-  failFast: boolean
-  cacheDir?: string
-  withCache: boolean
-  purge: boolean
   noReport: boolean
-
   config: Record<string, string>
   rest: string[]
 }
@@ -31,9 +24,6 @@ function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = {
     command: 'help',
     reportDir: './reports',
-    failFast: false,
-    withCache: false,
-    purge: false,
     noReport: false,
     config: {},
     rest: [],
@@ -52,28 +42,12 @@ function parseArgs(argv: string[]): CliArgs {
       case '--report-dir':
         out.reportDir = argv[++i]
         break
-      case '--run-id':
-        out.runId = argv[++i]
-        break
       case '--filter':
         out.filterGlob = argv[++i]
-        break
-      case '--fail-fast':
-        out.failFast = true
-        break
-      case '--cache-dir':
-        out.cacheDir = argv[++i]
-        break
-      case '--with-cache':
-        out.withCache = true
-        break
-      case '--purge':
-        out.purge = true
         break
       case '--no-report':
         out.noReport = true
         break
-
       case '-a':
       case '--arguments':
         addArgument(argv[++i] ?? '', out.config)
@@ -100,17 +74,10 @@ function printHelp(): void {
       '',
       'OPTIONS:',
       '  --report-dir <path>   report dir (default ./reports)',
-      '  --run-id <id>         explicit runId',
-      '  --filter <glob>       include stage by name glob',
-      '  --fail-fast           stop on first failure',
-      '  --cache-dir <path>    cache dir (default {reportDir}/.cache)',
-      '  --with-cache          strict cache mode (requires all cacheable stages hit)',
-      '  --purge               clear cache dir before run',
-      '  --no-report           (MVP) do not write report files',
-      '  -a, --arguments <k=v> pass a key=value through to the suite callback',
+      '  --filter <glob>       run matching stages plus their upstream deps',
+      '  --no-report           do not write report files',
+      '  -a, --arguments <k=v> pass a key=value through to context().config',
       '                        (repeatable, e.g. -a debug=false)',
-      '',
-      'DEFAULT: fresh run (no cache recovery). Use --with-cache to require cache hits.',
     ].join('\n'),
   )
 }
@@ -121,6 +88,16 @@ function globMatch(pattern: string, s: string): boolean {
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.')
   return new RegExp('^' + p + '$').test(s)
+}
+
+function statusMark(s: RunReport['stages'][number]): string {
+  if (s.status === 'success') {
+    return '[ok]    '
+  }
+  if (s.status === 'failed') {
+    return '[FAIL]  '
+  }
+  return '[SKIP]  '
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -134,8 +111,6 @@ async function main(argv: string[]): Promise<number> {
     printHelp()
     return 2
   }
-
-  _setDeclConfig(args.config)
 
   const entryUrl = new URL(args.entry, `file://${Deno.cwd()}/`).href
   let mod: { default?: unknown }
@@ -153,34 +128,36 @@ async function main(argv: string[]): Promise<number> {
 
   const opts: RunOptions = {
     reportDir: args.reportDir,
-    runId: args.runId,
-    failFast: args.failFast,
-    cacheDir: args.cacheDir,
-    withCache: args.withCache,
-    purge: args.purge,
     noReport: args.noReport,
     args: argv.slice(),
+    config: args.config,
   }
   if (args.filterGlob) {
     const pat = args.filterGlob
     opts.filter = (s) => globMatch(pat, s.name)
   }
 
-  const report = await run(suite, opts)
+  let report: RunReport
+  try {
+    report = await run(suite, opts)
+  } catch (err) {
+    console.error(`error: ${(err as Error).message}`)
+    return 2
+  }
 
   const okCount = report.stages.filter((s) => s.status === 'success').length
   const failCount = report.stages.filter((s) => s.status === 'failed').length
   const skipCount = report.stages.filter((s) => s.status === 'skipped').length
-  const cachedCount = report.stages.filter((s) => s.cached).length
   console.log(`run ${report.id} ${report.success ? 'SUCCESS' : 'FAIL'} (${report.duration}ms)`)
-  console.log(`  stages: ${okCount} ok / ${failCount} fail / ${skipCount} skip / ${cachedCount} cached`)
+  console.log(`  stages: ${okCount} ok / ${failCount} fail / ${skipCount} skip`)
+  if (report.before) {
+    console.log(`  before: ${report.before.status}`)
+  }
   for (const s of report.stages) {
-    const mark = s.status === 'success'
-      ? s.cached ? '[cached]' : '[ok]    '
-      : s.status === 'failed'
-      ? '[FAIL]  '
-      : '[SKIP]  '
-    console.log(`  ${mark} #${s.id} ${s.title} (${s.duration}ms)`)
+    console.log(`  ${statusMark(s)} #${s.id} ${s.name} (${s.duration}ms)`)
+    if (s.skipReason) {
+      console.log(`           skip: ${s.skipReason}`)
+    }
     for (const a of s.artifacts) {
       console.log(`           artifact: ${a.name} (${a.size} bytes${a.lines != undefined ? `, ${a.lines} lines` : ''})`)
     }
@@ -189,6 +166,9 @@ async function main(argv: string[]): Promise<number> {
         console.log(`           ${line}`)
       }
     }
+  }
+  if (report.after) {
+    console.log(`  after: ${report.after.status}`)
   }
 
   return report.success ? 0 : 1

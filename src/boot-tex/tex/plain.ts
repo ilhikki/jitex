@@ -1,4 +1,4 @@
-import { assert, attach, attachText, stage, type Stage } from '@jitex/integration'
+import { assert, attach, attachText, type Stage, stage } from '@jitex/integration'
 import { createMemoryFileStore, runJs } from '@jitex/runtime'
 import type { PascalFileStore } from '@jitex/runtime'
 import { ConsoleFile, texFormatKey, texRuntimeSyscalls } from '@jitex/tex-runtime'
@@ -16,10 +16,9 @@ function makeValidPlainFmtStage(
   texCollect: Stage<TexCollect>,
   tripCollect: Stage<void>,
 ): Stage<{ dviData: Uint8Array }> {
-  return stage(
-    'plain: valid plain fmt',
+  return stage('plain: valid plain fmt').deps(
     [texCollect, tripCollect],
-    async ([{ texJs, poolFile, plainFmtBytes }]) => {
+    async ({ texJs, poolFile, plainFmtBytes }) => {
       const files = new Map<string, PascalFileStore>()
       files.set(texFormatKey('TEX.POOL'), createMemoryFileStore(poolFile))
       files.set('plain.fmt', createMemoryFileStore(plainFmtBytes))
@@ -49,7 +48,7 @@ function makeDviToSvgStage(
   validPlainFmtStage: Stage<{ dviData: Uint8Array }>,
   texCollect: Stage<TexCollect>,
 ): Stage<{ svgs: string[] }> {
-  return stage('plain: dvi => svg', [validPlainFmtStage, texCollect], ([{ dviData }, { tfmFiles }]) => {
+  return stage('plain: dvi => svg').deps([validPlainFmtStage, texCollect], ({ dviData }, { tfmFiles }) => {
     const svgs = dviToSvg(dviData, tfmFiles)
     for (const [index, svg] of svgs.entries()) {
       attachText(`story.${index + 1}.svg`, svg)
@@ -59,7 +58,7 @@ function makeDviToSvgStage(
 }
 
 function makeCollectStage(dviToSvg: Stage<{ svgs: string[] }>): Stage<void> {
-  return stage('plain: collect', [dviToSvg], () => {})
+  return stage('plain: collect').dep(dviToSvg, () => {})
 }
 
 export function registerPlain(texCollect: Stage<TexCollect>, tripCollect: Stage<void>): Stage<void> {

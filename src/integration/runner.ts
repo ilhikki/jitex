@@ -1,36 +1,30 @@
-import { RunContext, setGlobalRunContext, setLogSink, StageContext } from './context.ts'
-import { _drainDeclLogs } from './dsl.ts'
-import type { CacheableRecord, Stage, Suite } from './dsl.ts'
-import type { DepChecksum } from './cache.ts'
-import { purgeCacheDir, tryRecoverCache, writeCache } from './cache.ts'
-import { buildArtifactMap, writeReport } from './reporter.ts'
+import { emitLog, RunContext, setGlobalRunContext, setLogSink, StageContext } from './context.ts'
+import type { Artifact, StageStatus } from './context.ts'
+import type { Stage, Suite } from './dsl.ts'
+import { writeReport } from './reporter.ts'
+import type { ReportNode } from './reporter.ts'
 
 export interface RunOptions {
   reportDir?: string
   runId?: string
   filter?: (stage: Stage<unknown>) => boolean
-  failFast?: boolean
-  cacheDir?: string
-  withCache?: boolean
-  purge?: boolean
   noReport?: boolean
   args?: string[]
-  env?: Record<string, string>
+  config?: Record<string, string>
   log?: (msg: string) => void
 }
 
 export interface StageRecord {
   id: string
-  title: string
+  name: string
   status: 'success' | 'failed' | 'skipped'
   duration: number
-  cached: boolean
-  artifacts: Array<{ name: string; size: number; lines?: number }>
-  logs: string[]
-  consoleLogs: string[]
-  debugLogs: string[]
+  deps: string[]
+  skipReason: string | null
   stackTrace: string[]
   assertions: Array<{ name: string; passed: boolean; actual?: unknown; expected?: unknown }>
+  artifacts: Array<{ name: string; size: number; lines?: number }>
+  logPath: string
 }
 
 export interface RunReport {
@@ -40,8 +34,9 @@ export interface RunReport {
   duration: number
   env: { runtime: string; platform: string; arch: string }
   args: string[]
+  before: StageRecord | null
   stages: StageRecord[]
-  runLogs: string[]
+  after: StageRecord | null
 }
 
 function defaultRunId(): string {
@@ -49,11 +44,11 @@ function defaultRunId(): string {
   const pad = (n: number, w = 2) => String(n).padStart(w, '0')
   const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${
     pad(now.getMinutes())
-  }-${pad(now.getSeconds())}`
-  return `${ts}_001`
+  }-${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}`
+  return ts
 }
 
-function artifactRecord(a: { name: string; bytes: Uint8Array }) {
+function artifactRecord(a: Artifact) {
   let lines: number | undefined
   try {
     const text = new TextDecoder('utf-8', { fatal: false }).decode(a.bytes)
@@ -64,16 +59,31 @@ function artifactRecord(a: { name: string; bytes: Uint8Array }) {
   return { name: a.name, size: a.bytes.length, lines }
 }
 
-function topoSort(
-  active: Stage<unknown>[],
-  universe: Stage<unknown>[],
-  _suiteName: string,
-): Stage<unknown>[] {
-  const universeByName = new Map<string, Stage<unknown>>()
-  for (const s of universe) {
-    universeByName.set(s.name, s)
+function computeActive(suite: Suite, filter?: (stage: Stage<unknown>) => boolean): Stage<unknown>[] {
+  const suiteSet = new Set<Stage<unknown>>(suite.stages)
+  const activeSet = new Set<Stage<unknown>>()
+  const queue: Stage<unknown>[] = []
+  const seeds = filter ? suite.stages.filter(filter) : suite.stages.slice()
+  for (const s of seeds) {
+    activeSet.add(s)
+    queue.push(s)
   }
+  while (queue.length) {
+    const s = queue.pop()!
+    for (const d of s.deps) {
+      if (!suiteSet.has(d)) {
+        throw new Error(`stage '${s.name}' depends on '${d.name}' which is not in suite '${suite.name}'`)
+      }
+      if (!activeSet.has(d)) {
+        activeSet.add(d)
+        queue.push(d)
+      }
+    }
+  }
+  return suite.stages.filter((s) => activeSet.has(s))
+}
 
+function topoSort(active: Stage<unknown>[]): Stage<unknown>[] {
   const byId = new Map<string, Stage<unknown>>()
   const indeg = new Map<string, number>()
   for (const s of active) {
@@ -81,34 +91,23 @@ function topoSort(
     indeg.set(s.id, 0)
   }
   for (const s of active) {
-    for (const dep of s.deps) {
-      if (!universeByName.has(dep.name)) {
-        throw new Error(
-          `stage '${s.name}' depends on '${dep.name}' which is not in suite '${'?'}'`,
-        )
+    for (const d of s.deps) {
+      if (byId.has(d.id)) {
+        indeg.set(s.id, (indeg.get(s.id) ?? 0) + 1)
       }
-      if (!byId.has(dep.id)) {
-        continue
-      }
-      indeg.set(s.id, (indeg.get(s.id) ?? 0) + 1)
     }
   }
-  const queue: string[] = []
-  for (const [id, d] of indeg) {
-    if (d === 0) {
-      queue.push(id)
-    }
-  }
+  const queue: Stage<unknown>[] = active.filter((s) => indeg.get(s.id) === 0)
   const order: Stage<unknown>[] = []
   while (queue.length) {
-    const id = queue.shift()!
-    order.push(byId.get(id)!)
-    for (const s of active) {
-      if (s.deps.some((d) => d.id === id)) {
-        const nd = (indeg.get(s.id) ?? 0) - 1
-        indeg.set(s.id, nd)
+    const s = queue.shift()!
+    order.push(s)
+    for (const t of active) {
+      if (t.deps.some((d) => d.id === s.id)) {
+        const nd = (indeg.get(t.id) ?? 0) - 1
+        indeg.set(t.id, nd)
         if (nd === 0) {
-          queue.push(s.id)
+          queue.push(t)
         }
       }
     }
@@ -119,292 +118,181 @@ function topoSort(
   return order
 }
 
-async function preRecoverFilteredDeps(
-  target: Stage<unknown>,
-  ctx: {
-    suiteName: string
-    cacheDir: string
-    withCache: boolean
-    allStages: Stage<unknown>[]
-    activeStageNames: Set<string>
-    recovering: Set<string>
-    stageResultById: Map<string, unknown>
-    checksumByName: Map<string, string>
-  },
-): Promise<void> {
-  for (const dep of target.deps) {
-    if (ctx.activeStageNames.has(dep.name)) {
-      continue
-    }
-    if (ctx.recovering.has(dep.name)) {
-      continue
-    }
-    ctx.recovering.add(dep.name)
-
-    await preRecoverFilteredDeps(dep, ctx)
-
-    if (!dep.cacheable) {
-      if (ctx.withCache) {
-        throw new Error(
-          `--with-cache: stage '${target.name}' needs '${dep.name}' (filtered out), but '${dep.name}' is not cache() marked`,
-        )
-      }
-      continue
-    }
-
-    const depChecksums = new Map<string, string>()
-    for (const dd of dep.deps) {
-      const c = ctx.checksumByName.get(dd.name)
-      if (c) {
-        depChecksums.set(dd.name, c)
-      }
-    }
-
-    const recovered = await tryRecoverCache(
-      ctx.cacheDir,
-      ctx.suiteName,
-      dep,
-      depChecksums,
-      ctx.withCache,
-    )
-    if (recovered) {
-      ctx.stageResultById.set(dep.id, recovered.results)
-      ctx.checksumByName.set(dep.name, recovered.checksum)
-    }
+function nodeLogPath(id: string): string {
+  if (id === 'before') {
+    return 'before/logs.txt'
   }
+  if (id === 'after') {
+    return 'after/logs.txt'
+  }
+  return `stages/${id}/logs.txt`
+}
+
+function toRecord(ctx: StageContext, deps: readonly Stage<unknown>[]): StageRecord {
+  return {
+    id: ctx.id,
+    name: ctx.stageName,
+    status: ctx.status,
+    duration: ctx.durationMs,
+    deps: deps.map((d) => d.name),
+    skipReason: ctx.skipReason,
+    stackTrace: ctx.stackTrace,
+    assertions: ctx.assertions,
+    artifacts: ctx.artifacts.map(artifactRecord),
+    logPath: nodeLogPath(ctx.id),
+  }
+}
+
+async function runHook(
+  runCtx: RunContext,
+  id: string,
+  fn: () => void | Promise<void>,
+): Promise<StageContext> {
+  const ctx = new StageContext(id, id)
+  runCtx.pushStage(ctx)
+  const t0 = performance.now()
+  try {
+    const r = fn()
+    if (r instanceof Promise) {
+      await r
+    }
+    ctx.status = 'success'
+  } catch (err) {
+    ctx.failWith(err)
+  } finally {
+    ctx.durationMs = Math.max(0, Math.round(performance.now() - t0))
+    runCtx.popStage()
+  }
+  return ctx
 }
 
 export async function run(suite: Suite, options: RunOptions = {}): Promise<RunReport> {
   const startedAt = Date.now()
   const runId = options.runId ?? defaultRunId()
   const reportDir = options.reportDir ?? './reports'
-  const cacheDir = options.cacheDir ?? `${reportDir}/.cache`
-  const failFast = options.failFast ?? false
-  const withCache = options.withCache ?? false
   const filter = options.filter
   const args = options.args ?? []
-  const purge = options.purge ?? false
+  const config = options.config ?? {}
+  const noReport = options.noReport ?? false
 
-  if (purge) {
-    await purgeCacheDir(cacheDir)
-  }
-
-  const runCtx = new RunContext(runId, suite.name)
+  const runCtx = new RunContext(runId, suite.name, config)
   setGlobalRunContext(runCtx)
   setLogSink(options.log ?? ((msg: string) => console.log(msg)))
 
-  for (const msg of _drainDeclLogs()) {
-    runCtx.log(msg)
-  }
-
-  let suiteSuccess = true
-
   try {
-    const filtered = filter ? suite.stages.filter(filter) : suite.stages.slice()
-    runCtx.log(`suite '${suite.name}' (${filtered.length} stage${filtered.length === 1 ? '' : 's'})`)
-    for (const s of filtered) {
-      const depsText = s.deps.length ? ` (deps: ${s.deps.map((d) => d.name).join(', ')})` : ''
-      const cacheText = s.cacheable ? ' [cacheable]' : ''
-      runCtx.log(`  [${s.id}] ${s.name}${depsText}${cacheText}`)
+    const active = computeActive(suite, filter)
+    const order = topoSort(active)
+    const depMap = new Map(order.map((s) => [s.id, s] as const))
+
+    const beforeCtx = suite.beforeFn ? await runHook(runCtx, 'before', suite.beforeFn) : null
+    const beforeFailed = beforeCtx !== null && beforeCtx.status === 'failed'
+    if (beforeFailed) {
+      const count = order.length
+      const suffix = count ? `; skipping ${count} stage${count === 1 ? '' : 's'}` : ''
+      emitLog(`before failed: ${beforeCtx.stackTrace[0] ?? 'unknown error'}${suffix}`)
     }
 
-    if (suite.beforeFn) {
+    const resultOf = new Map<string, unknown>()
+    const statusOf = new Map<string, StageStatus>()
+    const stageCtxs: StageContext[] = []
+    let step = 0
+
+    for (const s of order) {
+      step++
+      const ctx = new StageContext(s.id, s.name)
+      stageCtxs.push(ctx)
+      runCtx.pushStage(ctx)
       try {
-        const r = suite.beforeFn()
-        if (r instanceof Promise) {
-          await r
+        if (beforeFailed) {
+          ctx.skip('before failed')
+          statusOf.set(s.id, 'skipped')
+          emitLog(`[${s.name}] skipped: before failed`)
+          continue
         }
-      } catch (_err) {
-        suiteSuccess = false
-        for (const s of suite.stages) {
-          if (filter && !filter(s)) {
-            continue
-          }
-          const sc = new StageContext(s.id, s.name)
-          sc.status = 'skipped'
-          sc.addLog('skipped: suite before hook failed')
-          runCtx.stages.push(sc)
-        }
-      }
-    }
 
-    if (suiteSuccess) {
-      const activeStageNames = new Set(filtered.map((s) => s.name))
-
-      const order = topoSort(filtered, suite.stages, suite.name)
-
-      const stageResultById = new Map<string, unknown>()
-      const checksumByName = new Map<string, string>()
-      const failedIds = new Set<string>()
-
-      const recovering = new Set<string>()
-      let step = 0
-
-      for (const s of order) {
-        await preRecoverFilteredDeps(s, {
-          suiteName: suite.name,
-          cacheDir,
-          withCache,
-          allStages: suite.stages,
-          activeStageNames,
-          recovering,
-          stageResultById,
-          checksumByName,
+        const failedDep = s.deps.find((d) => {
+          const st = statusOf.get(d.id)
+          return st === 'failed' || st === 'skipped'
         })
+        if (failedDep) {
+          ctx.skip(`dep '${failedDep.name}' failed`)
+          statusOf.set(s.id, 'skipped')
+          emitLog(`[${s.name}] skipped: dep '${failedDep.name}' failed`)
+          continue
+        }
 
-        const depFailed = s.deps.some((d) => failedIds.has(d.id))
-
-        const sc = new StageContext(s.id, s.name)
-        runCtx.pushStage(sc)
-        step++
-        runCtx.log(`[${step}/${order.length}] running '${s.name}'...`)
+        emitLog(`[${step}/${order.length}] running '${s.name}'...`)
+        const depResults = s.deps.map((d) => resultOf.get(d.id))
+        const t0 = performance.now()
         try {
-          if (depFailed) {
-            sc.status = 'skipped'
-            sc.addLog(`skipped: dep failed`)
-            runCtx.log(`[${s.id}] skipped (dep failed)`)
-            continue
-          }
-
-          const depResults: unknown[] = s.deps.map((d) => {
-            if (!stageResultById.has(d.id)) {
-              return undefined
-            }
-            return stageResultById.get(d.id)
-          })
-
-          if (s.cacheable && withCache) {
-            const depChecksums = new Map<string, string>()
-            for (const d of s.deps) {
-              const c = checksumByName.get(d.name)
-              if (c) {
-                depChecksums.set(d.name, c)
-              }
-            }
-            const recovered = await tryRecoverCache(
-              cacheDir,
-              suite.name,
-              s,
-              depChecksums,
-              withCache,
-            )
-            if (recovered) {
-              sc.results = recovered.results
-              sc.artifacts = recovered.artifacts
-              sc.assertions = recovered.assertions
-              sc.logs = recovered.logs
-              sc.cached = true
-              sc.status = 'success'
-              sc.durationMs = 0
-              stageResultById.set(s.id, recovered.results)
-              checksumByName.set(s.name, recovered.checksum)
-              runCtx.log(
-                `[${s.id}] cached (${sc.artifacts.length} artifact${
-                  sc.artifacts.length === 1 ? '' : 's'
-                }, ${sc.logs.length} log line${sc.logs.length === 1 ? '' : 's'})`,
-              )
-              continue
-            }
-          }
-
-          const t0 = performance.now()
-          try {
-            const ret = s.fn(depResults)
-            const value = ret instanceof Promise ? await ret : ret
-            const t1 = performance.now()
-            sc.durationMs = Math.max(0, Math.round(t1 - t0))
-            sc.results = value
-            sc.status = 'success'
-            stageResultById.set(s.id, value)
-            runCtx.log(`[${s.id}] done (${sc.durationMs}ms)`)
-
-            if (s.cacheable) {
-              const asRecord = value as CacheableRecord
-              const depsChecksums: DepChecksum[] = s.deps
-                .filter((d) => checksumByName.has(d.name))
-                .map((d) => ({ stageName: d.name, checksum: checksumByName.get(d.name)! }))
-              const cs = await writeCache(
-                cacheDir,
-                suite.name,
-                s.name,
-                asRecord,
-                sc.artifacts,
-                sc.assertions,
-                sc.logs,
-                depsChecksums,
-              )
-              checksumByName.set(s.name, cs)
-            }
-          } catch (err) {
-            const t1 = performance.now()
-            sc.durationMs = Math.max(0, Math.round(t1 - t0))
-            sc.failWith(err)
-            failedIds.add(s.id)
-            runCtx.log(`[${s.id}] FAILED: ${err instanceof Error ? err.message : String(err)}`)
-            if (failFast) {
-              break
-            }
-          }
-        } finally {
-          runCtx.popStage()
+          const ret = s.fn(depResults)
+          const value = ret instanceof Promise ? await ret : ret
+          ctx.durationMs = Math.max(0, Math.round(performance.now() - t0))
+          ctx.status = 'success'
+          ctx.results = value
+          resultOf.set(s.id, value)
+          statusOf.set(s.id, 'success')
+        } catch (err) {
+          ctx.durationMs = Math.max(0, Math.round(performance.now() - t0))
+          ctx.failWith(err)
+          statusOf.set(s.id, 'failed')
+          emitLog(`[${s.name}] FAILED: ${ctx.stackTrace[0] ?? 'unknown error'}`)
         }
+      } finally {
+        runCtx.popStage()
       }
     }
 
-    if (suite.afterFn) {
-      try {
-        const r = suite.afterFn()
-        if (r instanceof Promise) {
-          await r
-        }
-      } catch (_err) {
-        suiteSuccess = false
-      }
+    const afterCtx = suite.afterFn ? await runHook(runCtx, 'after', suite.afterFn) : null
+    if (afterCtx !== null && afterCtx.status === 'failed') {
+      emitLog(`after failed: ${afterCtx.stackTrace[0] ?? 'unknown error'}`)
     }
+
+    const totalMs = Date.now() - startedAt
+    const stagesRec = stageCtxs.map((c) => toRecord(c, depMap.get(c.id)?.deps ?? []))
+    const beforeRec = beforeCtx ? toRecord(beforeCtx, []) : null
+    const afterRec = afterCtx ? toRecord(afterCtx, []) : null
+
+    const stagesOk = stageCtxs.every((c) => c.status === 'success')
+    const beforeOk = beforeCtx === null || beforeCtx.status === 'success'
+    const afterOk = afterCtx === null || afterCtx.status === 'success'
+    const success = beforeOk && afterOk && stagesOk
+
+    const env = {
+      runtime: `deno ${Deno.version.deno}`,
+      platform: Deno.build.os,
+      arch: Deno.build.arch,
+    }
+
+    const report: RunReport = {
+      id: runId,
+      timestamp: new Date(startedAt).toISOString(),
+      success,
+      duration: totalMs,
+      env,
+      args,
+      before: beforeRec,
+      stages: stagesRec,
+      after: afterRec,
+    }
+
+    if (!noReport) {
+      const nodes: ReportNode[] = []
+      if (beforeCtx && beforeRec) {
+        nodes.push({ record: beforeRec, logs: beforeCtx.logs, artifacts: beforeCtx.artifacts, dir: 'before' })
+      }
+      stageCtxs.forEach((c, i) => {
+        nodes.push({ record: stagesRec[i], logs: c.logs, artifacts: c.artifacts, dir: `stages/${c.id}` })
+      })
+      if (afterCtx && afterRec) {
+        nodes.push({ record: afterRec, logs: afterCtx.logs, artifacts: afterCtx.artifacts, dir: 'after' })
+      }
+      await writeReport(reportDir, report, nodes)
+    }
+
+    return report
   } finally {
     setGlobalRunContext(undefined)
     setLogSink(undefined)
   }
-
-  const totalMs = Date.now() - startedAt
-  const stagesRec: StageRecord[] = runCtx.stages.map((s) => ({
-    id: s.id,
-    title: s.stageName,
-    status: s.status,
-    duration: s.durationMs,
-    cached: s.cached,
-    artifacts: s.artifacts.map(artifactRecord),
-    logs: s.logs,
-    consoleLogs: s.logs,
-    debugLogs: s.logs,
-    stackTrace: s.stackTrace,
-    assertions: s.assertions,
-  }))
-
-  const allSuccess = suiteSuccess && stagesRec.every((s) => s.status === 'success')
-
-  const env = {
-    runtime: `deno ${Deno.version.deno}`,
-    platform: Deno.build.os,
-    arch: Deno.build.arch,
-  }
-
-  const report: RunReport = {
-    id: runId,
-    timestamp: new Date(startedAt).toISOString(),
-    success: allSuccess,
-    duration: totalMs,
-    env,
-    args,
-    stages: stagesRec,
-    runLogs: runCtx.runLogs,
-  }
-
-  const noReport = options.noReport ?? false
-  if (!noReport) {
-    const artifacts = buildArtifactMap(runCtx.stages)
-    await writeReport(reportDir, report, artifacts)
-  }
-
-  return report
 }

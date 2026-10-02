@@ -4,7 +4,8 @@ import type { ExtraCallable } from '@jitex/pascal-to-js'
 import { bytesToString, createMemoryFileStore, encodeUtf8, runJs } from '@jitex/runtime'
 import type { PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
 import { texRuntimeSyscalls } from '@jitex/tex-runtime'
-import { assert, assertEquals, attach, attachText, log, Stage, stage, UnwrapAll } from '@jitex/integration'
+import { assert, assertIs, attach, attachText, log, stage } from '@jitex/integration'
+import type { Stage, UnwrapAll } from '@jitex/integration'
 
 const fileNames = {
   webFile: 'WEBFILE',
@@ -56,7 +57,7 @@ export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   if (state.error) {
     console.error(state.error)
   }
-  assertEquals(state.status, 'terminated')
+  assertIs(state.status, 'terminated')
   return { pasFile, poolFile }
 }
 
@@ -72,8 +73,8 @@ export function createTangleStage<const T extends readonly Stage<unknown>[], R>(
   deps: T,
   fn: (results: UnwrapAll<T>) => TangleInput,
 ): Stage<TangleOutput> {
-  return stage(name, deps, async (results) => {
-    const tangleInput = fn(results)
+  return stage(name).deps(deps, async (...results) => {
+    const tangleInput = fn(results as UnwrapAll<T>)
     return await runTanglePascal(tangleInput)
   })
 }

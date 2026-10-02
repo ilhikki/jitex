@@ -1,4 +1,5 @@
-import type { RunReport, StageRecord } from './runner.ts'
+import type { Artifact } from './context.ts'
+import type { RunReport } from './runner.ts'
 
 const enc = new TextEncoder()
 
@@ -33,57 +34,6 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-export interface WriteReportResult {
-  runDir: string
-}
-
-export async function writeReport(
-  reportDir: string,
-  report: RunReport,
-  stageArtifacts: Map<string, Array<{ name: string; bytes: Uint8Array }>>,
-): Promise<WriteReportResult> {
-  const runDir = `${reportDir}/${report.id}`
-  await Deno.mkdir(runDir, { recursive: true })
-
-  await Deno.writeFile(`${runDir}/overview.json`, enc.encode(JSON.stringify(report, undefined, 2)))
-
-  const runHeader = report.runLogs.length ? [...report.runLogs, ''] : []
-  const allLogs: string[] = [...runHeader]
-  const allConsole: string[] = [...runHeader]
-  const allDebug: string[] = [...runHeader]
-  for (const s of report.stages) {
-    if (s.logs.length) {
-      allLogs.push(`[${s.id}] ${s.title}`, ...s.logs, '')
-    }
-    if (s.consoleLogs.length) {
-      allConsole.push(`[${s.id}] ${s.title}`, ...s.consoleLogs, '')
-    }
-    if (s.debugLogs.length) {
-      allDebug.push(`[${s.id}] ${s.title}`, ...s.debugLogs, '')
-    }
-  }
-  await Deno.writeFile(`${runDir}/logs.txt`, enc.encode(allLogs.join('\n')))
-  await Deno.writeFile(`${runDir}/console.txt`, enc.encode(allConsole.join('\n')))
-  await Deno.writeFile(`${runDir}/debug.txt`, enc.encode(allDebug.join('\n')))
-
-  for (const s of report.stages) {
-    const stageDir = `${runDir}/stages/${s.id}`
-    await Deno.mkdir(stageDir, { recursive: true })
-    await Deno.writeFile(`${stageDir}/logs.txt`, enc.encode(s.logs.join('\n')))
-    const arts = stageArtifacts.get(s.id) ?? []
-    for (const a of arts) {
-      const safe = sanitizeFilename(a.name)
-      await Deno.writeFile(`${stageDir}/${safe}`, a.bytes)
-    }
-  }
-
-  await writeRunIndex(runDir, report)
-
-  await writeTopLevelIndex(reportDir)
-
-  return { runDir }
-}
-
 function sanitizeFilename(name: string): string {
   const s = name.replace(/\\/g, '/')
   const base = s.split('/').pop() ?? name
@@ -93,51 +43,78 @@ function sanitizeFilename(name: string): string {
   return base
 }
 
-async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
+export interface ReportNode {
+  record: RunReport['stages'][number]
+  logs: string[]
+  artifacts: Artifact[]
+  dir: string
+}
+
+export interface WriteReportResult {
+  runDir: string
+}
+
+export async function writeReport(
+  reportDir: string,
+  report: RunReport,
+  nodes: ReportNode[],
+): Promise<WriteReportResult> {
+  const runDir = `${reportDir}/${report.id}`
+  await Deno.mkdir(runDir, { recursive: true })
+
+  await Deno.writeFile(`${runDir}/run.json`, enc.encode(JSON.stringify(report, undefined, 2)))
+
+  for (const n of nodes) {
+    const dir = `${runDir}/${n.dir}`
+    await Deno.mkdir(dir, { recursive: true })
+    await Deno.writeFile(`${dir}/logs.txt`, enc.encode(n.logs.join('\n')))
+    if (n.artifacts.length) {
+      const attachDir = `${dir}/attachments`
+      await Deno.mkdir(attachDir, { recursive: true })
+      for (const a of n.artifacts) {
+        await Deno.writeFile(`${attachDir}/${sanitizeFilename(a.name)}`, a.bytes)
+      }
+    }
+  }
+
+  await writeRunIndex(runDir, report, nodes)
+
+  await writeTopLevelIndex(reportDir)
+
+  return { runDir }
+}
+
+async function writeRunIndex(runDir: string, r: RunReport, nodes: ReportNode[]): Promise<void> {
   const status = r.success ? 'SUCCESS' : 'FAIL'
   const dur = formatDuration(r.duration)
   const argsText = r.args.length ? r.args.join(' ') : '(none)'
 
-  const files = [
-    { name: 'console.txt', path: `${runDir}/console.txt` },
-    { name: 'debug.txt', path: `${runDir}/debug.txt` },
-    { name: 'logs.txt', path: `${runDir}/logs.txt` },
-    { name: 'overview.json', path: `${runDir}/overview.json` },
-  ]
-  const fileLi: string[] = []
-  for (const f of files) {
-    let size = 0
-    try {
-      const stat = Deno.statSync(f.path)
-      size = stat.size ?? 0
-    } catch {
-      size = 0
-    }
-    fileLi.push(`<li><a href="${escapeHtml(f.name)}">${escapeHtml(f.name)}</a> - ${formatBytes(size)}</li>`)
-  }
-
-  const stageLi: string[] = []
-  for (const s of r.stages) {
-    const mark = s.status === 'success' ? (s.cached ? 'cached' : 'ok') : s.status
-    const head = `<li>[${mark}] [${s.id}] ${escapeHtml(s.title)} - ${formatDuration(s.duration)}</li>`
-    const artifacts = s.artifacts.map((a) => {
+  const nodeLi: string[] = []
+  for (const n of nodes) {
+    const rec = n.record
+    const mark = rec.status === 'success' ? 'ok' : rec.status
+    const skip = rec.skipReason ? ` (${escapeHtml(rec.skipReason)})` : ''
+    const artifacts = rec.artifacts.map((a) => {
       const safe = sanitizeFilename(a.name)
       let size = 0
       try {
-        const stat = Deno.statSync(`${runDir}/stages/${s.id}/${safe}`)
+        const stat = Deno.statSync(`${runDir}/${n.dir}/attachments/${safe}`)
         size = stat.size ?? 0
       } catch {
         size = 0
       }
-      return `<a href="stages/${s.id}/${escapeHtml(safe)}">${escapeHtml(a.name)}</a> - ${formatBytes(size)}`
+      return `<a href="${n.dir}/attachments/${escapeHtml(safe)}">${escapeHtml(a.name)}</a> - ${formatBytes(size)}`
     })
-    const children: string[] = [`<a href="stages/${s.id}/logs.txt">logs.txt</a>`, ...artifacts]
-    stageLi.push(`${head}<ul><li>${children.join(' ')}</li></ul>`)
+    const children = [`<a href="${n.dir}/logs.txt">logs.txt</a>`, ...artifacts]
+    nodeLi.push(
+      `<li>[${mark}] [${escapeHtml(rec.id)}] ${escapeHtml(rec.name)} - ${formatDuration(rec.duration)}${skip}` +
+        `<ul><li>${children.join(' ')}</li></ul></li>`,
+    )
   }
 
   const html = [
     '<!DOCTYPE html>',
-    '<html lang="zh-CN">',
+    '<html lang="en">',
     `<head><meta charset="UTF-8"><title>${escapeHtml(r.id)}</title></head>`,
     '<body>',
     `<h1>${escapeHtml(r.id)}</h1>`,
@@ -146,13 +123,9 @@ async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
     `<p>${escapeHtml(r.env.runtime)} / ${escapeHtml(r.env.platform)} / ${escapeHtml(r.env.arch)}</p>`,
     `<p>Args: ${escapeHtml(argsText)}</p>`,
     '<p><a href="../index.html">Back</a></p>',
-    '<h2>Files</h2>',
+    '<h2>Nodes</h2>',
     '<ul>',
-    ...fileLi,
-    '</ul>',
-    '<h2>Stages</h2>',
-    '<ul>',
-    ...stageLi,
+    ...nodeLi,
     '</ul>',
     '</body>',
     '</html>',
@@ -163,7 +136,7 @@ async function writeRunIndex(runDir: string, r: RunReport): Promise<void> {
 }
 
 async function writeTopLevelIndex(reportDir: string): Promise<void> {
-  const runs: Array<{ id: string; overview?: { timestamp: string; success: boolean; duration: number } }> = []
+  const runs: Array<{ id: string; summary?: { timestamp: string; success: boolean; duration: number } }> = []
   let entries: Deno.DirEntry[] = []
   try {
     entries = Array.from(Deno.readDirSync(reportDir))
@@ -177,31 +150,28 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
     if (!e.isDirectory) {
       continue
     }
-    if (e.name === '.cache') {
-      continue
-    }
-    let overview: { timestamp: string; success: boolean; duration: number } | undefined
+    let summary: { timestamp: string; success: boolean; duration: number } | undefined
     try {
-      const buf = Deno.readFileSync(`${reportDir}/${e.name}/overview.json`)
+      const buf = Deno.readFileSync(`${reportDir}/${e.name}/run.json`)
       const obj = JSON.parse(new TextDecoder().decode(buf)) as {
         timestamp?: string
         success?: boolean
         duration?: number
       }
       if (typeof obj.timestamp === 'string' && typeof obj.success === 'boolean' && typeof obj.duration === 'number') {
-        overview = { timestamp: obj.timestamp, success: obj.success, duration: obj.duration }
+        summary = { timestamp: obj.timestamp, success: obj.success, duration: obj.duration }
       }
     } catch {
       // Incomplete run directory: list the name only
     }
-    runs.push({ id: e.name, overview })
+    runs.push({ id: e.name, summary })
   }
   runs.sort((a, b) => a.id.localeCompare(b.id))
 
   const li = runs.map((r) => {
-    const ts = r.overview?.timestamp ?? '(unknown)'
-    const status = r.overview ? (r.overview.success ? 'SUCCESS' : 'FAIL') : '(no overview)'
-    const dur = r.overview ? formatDuration(r.overview.duration) : ''
+    const ts = r.summary?.timestamp ?? '(unknown)'
+    const status = r.summary ? (r.summary.success ? 'SUCCESS' : 'FAIL') : '(no run.json)'
+    const dur = r.summary ? formatDuration(r.summary.duration) : ''
     return `<li><a href="${escapeHtml(r.id)}/index.html">${escapeHtml(r.id)}</a> - ${escapeHtml(ts)} - ${
       escapeHtml(status)
     }${dur ? ' - ' + dur : ''}</li>`
@@ -209,7 +179,7 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
 
   const html = [
     '<!DOCTYPE html>',
-    '<html lang="zh-CN">',
+    '<html lang="en">',
     '<head><meta charset="UTF-8"><title>E2E</title></head>',
     '<body>',
     '<h1>E2E</h1>',
@@ -226,17 +196,3 @@ async function writeTopLevelIndex(reportDir: string): Promise<void> {
 }
 
 export { writeRunIndex as _writeRunIndex, writeTopLevelIndex as _writeTopLevelIndex }
-
-export function buildArtifactMap(
-  stages: Array<{ id: string; artifacts: Array<{ name: string; bytes: Uint8Array }> }>,
-): Map<string, Array<{ name: string; bytes: Uint8Array }>> {
-  const m = new Map<string, Array<{ name: string; bytes: Uint8Array }>>()
-  for (const s of stages) {
-    if (s.artifacts.length) {
-      m.set(s.id, s.artifacts.slice())
-    }
-  }
-  return m
-}
-
-export type _StageRecord = StageRecord

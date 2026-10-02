@@ -1,5 +1,5 @@
-import { requireRunContext, requireStageContext, tryRunContext } from './context.ts'
-import type { Artifact, AssertionRecord } from './context.ts'
+import { context as execContext, requireStageContext, tryRunContext } from './context.ts'
+import type { Artifact, AssertionRecord, ExecContext } from './context.ts'
 
 export interface Stage<R> {
   readonly __brand: 'Stage'
@@ -7,7 +7,6 @@ export interface Stage<R> {
   readonly name: string
   readonly deps: readonly Stage<unknown>[]
   readonly fn: (results: unknown[]) => R | Promise<R>
-  cacheable: boolean
   ownerSuite: Suite | undefined
 }
 
@@ -19,9 +18,6 @@ export interface Suite {
   afterFn: (() => void | Promise<void>) | undefined
 }
 
-export type CacheableValue = string | Uint8Array | number
-export type CacheableRecord = Record<string, CacheableValue>
-
 export type Unwrap<S> = S extends Stage<infer R> ? Awaited<R> : never
 export type UnwrapAll<T extends readonly Stage<unknown>[]> = {
   [K in keyof T]: Unwrap<T[K]>
@@ -30,24 +26,7 @@ export type UnwrapAll<T extends readonly Stage<unknown>[]> = {
 let currentDeclSuite: Suite | undefined = undefined
 let nextStageId = 1
 
-let declConfig: Record<string, string> = {}
-
-const pendingDeclLogs: string[] = []
-
-export function _setDeclConfig(config: Record<string, string>): void {
-  declConfig = config
-}
-
-export function _drainDeclLogs(): string[] {
-  return pendingDeclLogs.splice(0)
-}
-
-export function _resetDeclState(): void {
-  currentDeclSuite = undefined
-  nextStageId = 1
-}
-
-export function suite(name: string, fn: (config: Record<string, string>) => void): Suite {
+export function suite(name: string, fn: () => void): Suite {
   if (currentDeclSuite) {
     throw new Error(`nested suites not allowed: already inside '${currentDeclSuite.name}'`)
   }
@@ -61,17 +40,27 @@ export function suite(name: string, fn: (config: Record<string, string>) => void
   currentDeclSuite = s
   nextStageId = 1
   try {
-    fn(declConfig)
+    fn()
   } finally {
     currentDeclSuite = undefined
   }
   return s
 }
 
-export function stage<const T extends readonly Stage<unknown>[], R>(
+// Terminal methods fix deps; the callback gets one argument per dep in order.
+export interface StageBuilder {
+  nodeps<R>(fn: () => R | Promise<R>): Stage<R>
+  dep<D extends Stage<unknown>, R>(dep: D, fn: (result: Unwrap<D>) => R | Promise<R>): Stage<R>
+  deps<const D extends readonly Stage<unknown>[], R>(
+    deps: D,
+    fn: (...results: UnwrapAll<D>) => R | Promise<R>,
+  ): Stage<R>
+}
+
+function registerStage<R>(
   name: string,
-  deps: T,
-  fn: (results: UnwrapAll<T>) => R | Promise<R>,
+  deps: readonly Stage<unknown>[],
+  fn: (results: unknown[]) => R | Promise<R>,
 ): Stage<R> {
   if (!currentDeclSuite) {
     throw new Error(`stage('${name}') must be declared inside a suite block`)
@@ -82,22 +71,32 @@ export function stage<const T extends readonly Stage<unknown>[], R>(
     id,
     name,
     deps,
-    fn: fn as (results: unknown[]) => R | Promise<R>,
-    cacheable: false,
+    fn,
     ownerSuite: currentDeclSuite,
   }
   currentDeclSuite.stages.push(stageObj as Stage<unknown>)
   return stageObj
 }
 
-export function cache<R extends CacheableRecord>(stage: Stage<R>): Stage<R> {
-  if (!currentDeclSuite) {
-    throw new Error(`cache() must be called inside a suite block`)
+export function stage(name: string): StageBuilder {
+  return {
+    nodeps<R>(fn: () => R | Promise<R>): Stage<R> {
+      return registerStage<R>(name, [], () => fn())
+    },
+    dep<D extends Stage<unknown>, R>(dep: D, fn: (result: Unwrap<D>) => R | Promise<R>): Stage<R> {
+      return registerStage<R>(name, [dep], (results) => fn(results[0] as Unwrap<D>))
+    },
+    deps<const D extends readonly Stage<unknown>[], R>(
+      deps: D,
+      fn: (...results: UnwrapAll<D>) => R | Promise<R>,
+    ): Stage<R> {
+      return registerStage<R>(name, deps, (results) => fn(...(results as UnwrapAll<D>)))
+    },
   }
-  stage.cacheable = true
-  return stage
 }
 
+// Hooks run unconditionally when declared and sit outside the DAG:
+// a failed before skips every stage, a failed after fails the run.
 export function before(fn: () => void | Promise<void>): void {
   if (!currentDeclSuite) {
     throw new Error('before() must be declared inside a suite block')
@@ -125,7 +124,8 @@ export function assert(cond: boolean, message: string): asserts cond {
   }
 }
 
-export function assertEquals<T>(actual: T, expected: T, message?: string): void {
+// Uses Object.is, not deep equality.
+export function assertIs<T>(actual: T, expected: T, message?: string): void {
   const msg = message ?? `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
   const ctx = requireStageContext()
   const passed = Object.is(actual, expected)
@@ -153,20 +153,13 @@ export function attachJson(name: string, obj: unknown): void {
 
 export function log(message: string): void {
   const run = tryRunContext()
-  if (run === undefined) {
-    pendingDeclLogs.push(message)
-    return
+  if (run === undefined || !run.hasActiveStage()) {
+    throw new Error('log() must be called inside a stage or hook body')
   }
-  if (run.hasActiveStage()) {
-    run.currentStage().addLog(message)
-    return
-  }
-  run.log(message)
+  run.currentStage().addLog(message)
 }
 
-export function _ensureNoActiveStage(): void {
-  const run = requireRunContext()
-  if (run.hasActiveStage()) {
-    throw new Error('this call must happen outside any stage fn')
-  }
+// Config and run metadata are only available during a run.
+export function context(): ExecContext {
+  return execContext()
 }
