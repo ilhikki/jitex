@@ -10,10 +10,7 @@
     "strict": true
   },
   "tasks": {
-    "boot:tangle": "deno run -RW ./src/integration/cli.ts run ./src/boot-tex/tangle/boot-tangle.ts",
-    "boot:trip": "deno run -RW ./src/integration/cli.ts run ./src/boot-tex/tex/boot-trip.ts",
-    "boot:plain": "deno run -RW ./src/integration/cli.ts run ./src/boot-tex/tex/boot-plain.ts",
-    "build:jitex": "deno run -A ./src/integration/cli.ts run ./src/boot-tex/jitex/build-jitex.ts"
+    "build:jitex": "deno run -A ./src/integration/cli.ts run ./src/boot-tex/build-jitex.ts"
   },
   "lint": {
     "rules": {

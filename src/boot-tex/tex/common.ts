@@ -1,24 +1,17 @@
-import { attach, attachText, cache, stage } from '@jitex/integration'
-import type { Stage } from '@jitex/integration'
+import { attach, attachText, stage, type Stage } from '@jitex/integration'
 import { bytesToString, createMemoryFileStore, runJs } from '@jitex/runtime'
 import type { PascalFileStore } from '@jitex/runtime'
 import { ConsoleFile, texFontKey, texFormatKey, texRuntimeSyscalls } from '@jitex/tex-runtime'
 import { runTangleJs, validRunTangleResult } from '../tangle/build-tangle.ts'
 import { readFile, readTextFile } from '../utils.ts'
-import { createStageOfGetTangleJs, transformTex } from './build-tex.ts'
+import { transformTex } from './build-tex.ts'
 
-export type TangleJsStage = Stage<{ tangleJs: string }>
-export type TexJsStage = Stage<{ texJs: string; poolFile: Uint8Array }>
-export type BaseFilesStage = Stage<Record<string, Uint8Array>>
-export type TfmFilesStage = Stage<Record<string, Uint8Array>>
-export type PlainFmtStage = Stage<{ plainFmtBytes: Uint8Array; fontsJson: string }>
-
-export interface TexStages {
-  tangleJsStage: TangleJsStage
-  texJsStage: TexJsStage
-  baseFilesStage: BaseFilesStage
-  tfmFilesStage: TfmFilesStage
-  plainFmtStage: PlainFmtStage
+export interface TexCollect {
+  texJs: string
+  poolFile: Uint8Array
+  plainFmtBytes: Uint8Array
+  fontsJson: string
+  tfmFiles: Record<string, Uint8Array>
 }
 
 const tfmNames = [
@@ -104,7 +97,7 @@ const baseFileNames = [
   'hyphen.tex',
 ]
 
-async function loadFiles(basePath: string, fileNames: string[]) {
+async function loadFiles(basePath: string, fileNames: string[]): Promise<Record<string, Uint8Array>> {
   const data: Record<string, Uint8Array> = {}
   for (const fileName of fileNames) {
     const fileData = await readFile(basePath + fileName)
@@ -121,13 +114,12 @@ function extractPreloadedFonts(plainTex: string): string[] {
   return [...names].sort()
 }
 
-export function createTexStages(
+function makeGetInitexStage(
   isDebug: boolean,
-  options: { cachePlainFmt?: boolean } = {},
-): TexStages {
-  const tangleJsStage = cache(createStageOfGetTangleJs(isDebug))
-
-  const texJsStage = cache(stage('get initex', [tangleJsStage], async ([{ tangleJs }]) => {
+  tangleCollect: Stage<{ tangleJs: string }>,
+  tripCollect: Stage<void>,
+): Stage<{ texJs: string; poolFile: Uint8Array }> {
+  return stage('tex: get initex', [tangleCollect, tripCollect], async ([{ tangleJs }]) => {
     const texWeb = await readTextFile('./resources/knuth/tex/tex.web')
     const result = validRunTangleResult(await runTangleJs(tangleJs, texWeb, undefined))
     attachText('tex.pas', result.pasFile)
@@ -135,20 +127,30 @@ export function createTexStages(
     const texJs = transformTex(result.pasFile, isDebug)
     attachText('tex.js', texJs)
     return { texJs, poolFile: result.poolFile }
-  }))
+  })
+}
 
-  const baseFilesStage = cache(stage('load base files', [], async () => {
+function makeLoadBaseFilesStage(tripCollect: Stage<void>): Stage<Record<string, Uint8Array>> {
+  return stage('tex: load base files', [tripCollect], async () => {
     return await loadFiles('./resources/knuth/plain/base/', baseFileNames)
-  }))
+  })
+}
 
-  const tfmFilesStage = cache(stage('load plain tfm files', [], async () => {
+function makeLoadPlainTfmStage(tripCollect: Stage<void>): Stage<Record<string, Uint8Array>> {
+  return stage('tex: load plain tfm files', [tripCollect], async () => {
     const cm = await loadFiles('./resources/knuth/plain/fonts/cm/', tfmNames)
     const man = await loadFiles('./resources/knuth/plain/fonts/manfnt/', ['manfnt.tfm'])
     return { ...cm, ...man }
-  }))
+  })
+}
 
-  const plainFmtStage = stage(
-    'get plain.fmt',
+function makeGetPlainFmtStage(
+  texJsStage: Stage<{ texJs: string; poolFile: Uint8Array }>,
+  baseFilesStage: Stage<Record<string, Uint8Array>>,
+  tfmFilesStage: Stage<Record<string, Uint8Array>>,
+): Stage<{ plainFmtBytes: Uint8Array; fontsJson: string }> {
+  return stage(
+    'tex: get plain.fmt',
     [texJsStage, baseFilesStage, tfmFilesStage],
     async ([texFiles, baseFiles, tfmFiles]) => {
       const files = new Map<string, PascalFileStore>()
@@ -193,12 +195,30 @@ export function createTexStages(
       return { plainFmtBytes, fontsJson }
     },
   )
+}
 
-  return {
-    tangleJsStage,
-    texJsStage,
-    baseFilesStage,
-    tfmFilesStage,
-    plainFmtStage: options.cachePlainFmt ? cache(plainFmtStage) : plainFmtStage,
-  }
+function makeCollectStage(
+  getInitex: Stage<{ texJs: string; poolFile: Uint8Array }>,
+  tfmFilesStage: Stage<Record<string, Uint8Array>>,
+  plainFmtStage: Stage<{ plainFmtBytes: Uint8Array; fontsJson: string }>,
+): Stage<TexCollect> {
+  return stage('tex: collect', [getInitex, tfmFilesStage, plainFmtStage], ([initex, tfmFiles, plainFmt]) => ({
+    texJs: initex.texJs,
+    poolFile: initex.poolFile,
+    plainFmtBytes: plainFmt.plainFmtBytes,
+    fontsJson: plainFmt.fontsJson,
+    tfmFiles,
+  }))
+}
+
+export function registerTexCommon(
+  isDebug: boolean,
+  tangleCollect: Stage<{ tangleJs: string }>,
+  tripCollect: Stage<void>,
+): Stage<TexCollect> {
+  const texJsStage = makeGetInitexStage(isDebug, tangleCollect, tripCollect)
+  const baseFilesStage = makeLoadBaseFilesStage(tripCollect)
+  const tfmFilesStage = makeLoadPlainTfmStage(tripCollect)
+  const plainFmtStage = makeGetPlainFmtStage(texJsStage, baseFilesStage, tfmFilesStage)
+  return makeCollectStage(texJsStage, tfmFilesStage, plainFmtStage)
 }
