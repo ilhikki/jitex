@@ -3,93 +3,80 @@ import { LOGO_TEX } from './logo-tex.js'
 
 export const INITIAL_TEX = String.raw`% Plain TeX, not LaTeX --- edit this, then press Ctrl + Enter.
 ${LOGO_TEX}
-\noindent \JiTex \quad \TeX82, in your browser.
 
-\medskip
-\noindent This page was set by \TeX82 itself. The next page says what it can
-set, and how it is done.
+\def\Color#1#2{{\special{color push #1}#2\special{color pop}}}
+\noindent This page is a specimen: Ferrari's method for the quartic, set by \JiTex, running \TeX82.
 
-\medskip
-\noindent{\bf Mathematics.} \quad a chronology
-$$
-  a^{2} + b^{2} = c^{2} \qquad {\rm Pythagoras, \sim500\ BC}
-$$
-$$
-  x = {-b \pm \sqrt{b^{2} - 4ac} \over 2a} \qquad {\rm al-Khwarizmi, \sim820}
-$$
-$$
-  \int_{a}^{b} f'(x)\,dx = f(b) - f(a) \qquad {\rm Newton, \ Leibniz, 1675}
-$$
-$$
-  e^{i\pi} + 1 = 0 \qquad {\rm Euler, 1748}
-$$
-$$
-  \int_{-\infty}^{\infty} e^{-x^{2}} dx = \sqrt{\pi} \qquad {\rm Gauss, 1812}
-$$
-$$
-  \zeta(s) = \sum_{n=1}^{\infty} {1 \over n^{s}}
-  = \prod_{p\ {\rm prime}} {1 \over 1 - p^{-s}}
-  \qquad {\rm Riemann, 1859}
-$$
-$$
-  (A = B) \simeq (A \simeq B) \qquad {\rm univalence, 2013}
-$$
+\bigskip
+\noindent Assume
+$$ x^4 + a x^3 + b x^2 + c x + d = 0. $$
 
-\medskip
-\noindent{\bf Physics.} \quad a chronology
-$$
-  F_{1} d_{1} = F_{2} d_{2} \qquad {\rm Archimedes, \sim250\ BC}
-$$
-$$
-  F = G {m_{1} m_{2} \over r^{2}} \qquad {\rm Newton, 1687}
-$$
-$$
-  {d \over dt} \left( {\partial L \over \partial \dot q} \right)
-  - {\partial L \over \partial q} = 0
-  \qquad {\rm Lagrange, 1788}
-$$
-$$
-  \nabla \cdot {\bf E} = 4 \pi \rho, \qquad \nabla \cdot {\bf B} = 0
-  \qquad {\rm Maxwell, 1865}
-$$
-$$
-  \nabla \times {\bf E} = -{1 \over c} {\partial {\bf B} \over \partial t},
-  \qquad
-  \nabla \times {\bf B} = {1 \over c} (4 \pi {\bf J}
-  + {\partial {\bf E} \over \partial t})
-$$
-$$
-  S = k \log W \qquad {\rm Boltzmann, 1877}
-$$
-$$
-  R_{\mu \nu} - {1 \over 2} R g_{\mu \nu} + \Lambda g_{\mu \nu}
-  = {8 \pi G \over c^{4}} T_{\mu \nu}
-  \qquad {\rm Einstein, 1915}
-$$
-$$
-  i \hbar {\partial \psi \over \partial t}
-  = -{\hbar^{2} \over 2m} \nabla^{2} \psi + V \psi
-  \qquad {\rm Schrodinger, 1926}
-$$
-$$
-  (i \gamma^{\mu} \partial_{\mu} - m) \psi = 0 \qquad {\rm Dirac, 1928}
-$$
-$$
-  \langle x' | e^{-iHt/\hbar} | x \rangle
-  = \int {\cal D} x\, e^{iS[x]/\hbar}
-  \qquad {\rm Feynman, 1948}
-$$
+\bigskip
+\noindent Then
+$$ \eqalign{
+ x &= y - {a \over 4}, \cr
+ \noalign{\vskip 8pt}
+ y^4 + p y^2 + q y + r &= 0, \cr
+}$$
+with
+$$ \eqalign{
+ p &= b - {3a^2 \over 8}, \cr
+ \noalign{\vskip 8pt}
+ q &= c - {ab \over 2} + {a^3 \over 8}, \cr
+ \noalign{\vskip 8pt}
+ r &= d - {ac \over 4} + {a^2 b \over 16} - {3a^4 \over 256}. \cr
+}$$
+
+\bigskip
+\noindent Then
+$$ \eqalign{
+ \left( y^2 + {p \over 2} \right)^2 &= -q y - r + {p^2 \over 4}, \cr
+ \noalign{\vskip 8pt}
+ \left( y^2 + {p \over 2} + m \right)^2
+   &= 2m y^2 - q y + \left( m p + m^2 - r + {p^2 \over 4} \right). \cr
+}$$
+
+\bigskip
+\noindent So
+$$ \eqalign{
+ q^2 - 4(2m)\left( m p + m^2 - r + {p^2 \over 4} \right) &= 0, \cr
+ \noalign{\vskip 8pt}
+ 8m^3 + 8p m^2 + (2p^2 - 8r)m - q^2 &= 0. \cr
+}$$
+
+\bigskip
+\noindent Thus
+$$ \eqalign{
+ \left( y^2 + {p \over 2} + m \right)^2
+   &= \left( \sqrt{2m}\, y - {q \over 2\sqrt{2m}} \right)^2, \cr
+ \noalign{\vskip 8pt}
+ y^2 + {p \over 2} + m
+   &= \pm \left( \sqrt{2m}\, y - {q \over 2\sqrt{2m}} \right), \qquad m \neq 0. \cr
+}$$
+
+\bigskip
+\noindent Then the four roots $x_1, x_2, x_3, x_4$ satisfy
+$$ \eqalign{
+ \sum_{i=1}^4 x_i &= -a, \cr
+ \noalign{\vskip 8pt}
+ \sum_{1 \le i < j \le 4} x_i x_j &= b, \cr
+ \noalign{\vskip 8pt}
+ \sum_{1 \le i < j < k \le 4} x_i x_j x_k &= -c, \cr
+ \noalign{\vskip 8pt}
+ x_1 x_2 x_3 x_4 &= d. \cr
+}$$
 
 \medskip
 \noindent{\bf The faces.} \quad Ten point roman, {\bf bold}, {\it italic},
 {\tt typewriter}, {\font\scc=cmcsc10 \scc Small Caps} and
 {\font\bigfont=cmr10 at 24pt \bigfont 24 pt}; ligatures in a
-{\it flowing final}; \lq\lq quotes\rq\rq\ like these, an em dash---like that.
+{\it flowing final}; \lq\lq quotes\rq\rq\ like these, an em dash---like that;
+and color, {\Color{rgb 1 0 0}{red}}, {\Color{rgb 0 0 1}{blue}}, and
+{\Color{rgb 0 1 0}{green}}.
 
-\medskip
-\noindent Edit this text and press Ctrl/$\mathsurround=0pt$+ Enter.
-
+\vfill
 \eject
+
 \noindent \JiTex \quad what it can set.
 
 \beginsection 1. The two pages
