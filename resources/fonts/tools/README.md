@@ -1,6 +1,6 @@
 `resources/fonts/tools/` - How fonts are made
 
-This directory contains one-off tools that build `resources/fonts/jitex-*.otf` and `jitex-*.woff2` from CTAN Computer Modern Type 1 fonts, and produce the encoding tables used by the renderer. `build:jitex` only copies the artifacts; it does not run these scripts. The `jitex-` prefix keeps the OFL Reserved Font Names off our Modified Versions (see section IV).
+This directory contains one-off tools that build `resources/fonts/jitex-*.otf` and `jitex-*.woff2` from CTAN Computer Modern Type 1 fonts, and produce the encoding tables used by the renderer. `build:jitex` only copies the artifacts; it does not run these scripts. The `jitex-` prefix is explained in section IV.
 
 ```
 CTAN fonts/amsfonts/pfb/*.pfb --|

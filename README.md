@@ -49,4 +49,5 @@ This writes the engine to `dist/lib/`, the demo site to `dist/site/`, and report
 
 ## License
 
-MIT. See `LICENSE`. Files under `resources/` keep their own upstream terms; see `resources/README.md`.
+MIT. See `LICENSE`. The release bundles the third-party notices for its components: `LICENSE.knuth` (Knuth's TeX)
+and `fonts/OFL.txt` (the Computer Modern web fonts). See `resources/README.md` for full provenance and terms.
