@@ -48,6 +48,12 @@ import type {
   WithStatementNode,
 } from '../node.ts'
 
+/**
+ * Prints an AST node back to Pascal source code.
+ *
+ * @param node - The AST node to print.
+ * @returns The Pascal source representation of the node.
+ */
 export function nodeToCode(node: AstNode): string {
   const ctx: PrintContext = { indent: 0 }
   return printNode(node, ctx)

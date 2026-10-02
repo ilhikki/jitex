@@ -12,19 +12,32 @@ import { toJs } from '@/backend/codegen/json-code-compiler.ts'
 import { PascalSemanticCompiler } from '@/backend/codegen/semantic-compiler.ts'
 import { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
 
+/**
+ * Parses Pascal source text into a program AST.
+ *
+ * @param source - Pascal source code to parse.
+ * @returns The parse result, holding the AST on success or an error on failure.
+ */
 export function parse(source: string): ParseResult<ProgramNode> {
   const tokens = lex(source)
   const input: ParserInput = { tokens, position: 0 }
   return parseProgram(input)
 }
 
+/**
+ * Options controlling {@link transform}.
+ */
 export interface TransformOptions {
+  /** User-provided callables exposed to the Pascal program. */
   extraCallables?: Record<string, ExtraCallable>
 
+  /** Rewrite rules for syscalls, keyed by syscall name. */
   syscallRewriters?: SyscallRewriteTable
 
+  /** Fallback rewriter applied to syscalls without a matching rule. */
   defaultRewriter?: SyscallRewriter
 
+  /** Enables debug names and diagnostics in the generated code. */
   debug?: boolean
 }
 
@@ -38,6 +51,13 @@ function parseSource(source: string): ProgramNode {
   return result.astNode as ProgramNode
 }
 
+/**
+ * Compiles Pascal source text into a JavaScript module.
+ *
+ * @param source - Pascal source code to compile.
+ * @param options - Compilation options.
+ * @returns JavaScript source whose default export is the program entry point.
+ */
 export function transform(source: string, options: TransformOptions = {}): string {
   const ast = parseSource(source)
 

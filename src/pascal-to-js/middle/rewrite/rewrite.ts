@@ -1,7 +1,17 @@
 import type * as JsonCode from '@/middle/ir/json-code.ts'
 
+/**
+ * Rewrites a single syscall expression into another expression.
+ *
+ * @param sc - The syscall expression to rewrite.
+ * @returns The expression that replaces the syscall.
+ */
 export type SyscallRewriter = (sc: JsonCode.Syscall) => JsonCode.Expr
 
+/**
+ * Maps syscall names to the rewriter applied when that syscall is encountered.
+ * Names without an entry are left to the default rewriter.
+ */
 export type SyscallRewriteTable = Record<string, SyscallRewriter | undefined>
 
 export type SyscallMapping = SyscallRewriter

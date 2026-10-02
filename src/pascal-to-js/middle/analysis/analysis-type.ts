@@ -118,11 +118,17 @@ export interface FuncInfo {
   kind: FuncKind
 }
 
+/**
+ * Describes an external callable that a Pascal program may invoke.
+ */
 export interface ExtraCallable {
+  /** Name of the syscall emitted for calls to this callable. */
   sysCallName: string
 
+  /** Whether the callable behaves as a function or a procedure. */
   kind: 'function' | 'procedure'
 
+  /** Allows this callable to shadow a builtin of the same name. */
   allowOverrideNative?: boolean | undefined
 }
 

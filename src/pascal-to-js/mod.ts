@@ -1,4 +1,6 @@
 export { parse, transform } from '@/run.ts'
+export type { TransformOptions } from '@/run.ts'
 export { nodeToCode } from '@/frontend/printer/printer.ts'
 export type { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
-export type { SyscallRewriteTable } from '@/middle/rewrite/rewrite.ts'
+export type { SyscallRewriteTable, SyscallRewriter } from '@/middle/rewrite/rewrite.ts'
+export type * as JsonCode from '@/middle/ir/json-code.ts'
