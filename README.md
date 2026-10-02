@@ -2,8 +2,8 @@
 
 <!-- TODO: site link -->
 
-A TeX engine that runs in JavaScript. JiTex is compiled from Knuth's TeX and the Plain format, and typesets TeX
-source to SVG pages in the browser or on the server.
+A TeX engine that runs in JavaScript. JiTex is compiled from Knuth's TeX and the Plain format, and typesets TeX source
+to SVG pages in the browser or on the server.
 
 ## Usage
 
@@ -49,5 +49,5 @@ This writes the engine to `dist/lib/`, the demo site to `dist/site/`, and report
 
 ## License
 
-MIT. See `LICENSE`. The release bundles the third-party notices for its components: `LICENSE.knuth` (Knuth's TeX)
-and `fonts/OFL.txt` (the Computer Modern web fonts). See `resources/README.md` for full provenance and terms.
+MIT. See `LICENSE`. The release bundles the third-party notices for its components: `LICENSE.knuth` (Knuth's TeX) and
+`fonts/OFL.txt` (the Computer Modern web fonts). See `resources/README.md` for full provenance and terms.
