@@ -8,8 +8,9 @@ import { INITIAL_TEX } from '../../web/initial-tex.js'
 const REPO_ROOT = new URL('../../../', import.meta.url)
 
 const JITEX_VERSION = '0.1.0'
-const BUILD_DIR = new URL('.build/jitex/', REPO_ROOT)
 const DIST_DIR = new URL('dist/', REPO_ROOT)
+const BUILD_ROOT = new URL('.build/', DIST_DIR)
+const BUILD_DIR = new URL('jitex/', BUILD_ROOT)
 const LIB_DIR = new URL('lib/', DIST_DIR)
 const SITE_DIR = new URL('site/', DIST_DIR)
 
@@ -135,7 +136,7 @@ function makeBundleStage(
       const entry = await writeBundleInputs(texJs, plainFmtBytes, poolFile, tfmFiles)
       const { code } = await bundle(entry, { importMap: IMPORT_MAP })
 
-      await Deno.remove(DIST_DIR, { recursive: true }).catch((error: unknown) => {
+      await Deno.remove(LIB_DIR, { recursive: true }).catch((error: unknown) => {
         if (!(error instanceof Deno.errors.NotFound)) {
           throw error
         }
@@ -304,6 +305,11 @@ function makeCopySiteStage(
   copyFontsStage: Stage<{ fontFiles: number }>,
 ): Stage<{ siteFiles: number }> {
   return stage('jitex: copy site').deps([bundleStage, copyFontsStage], async () => {
+    await Deno.remove(SITE_DIR, { recursive: true }).catch((error: unknown) => {
+      if (!(error instanceof Deno.errors.NotFound)) {
+        throw error
+      }
+    })
     await Deno.mkdir(SITE_DIR, { recursive: true })
     const siteSource = new URL('src/web/', REPO_ROOT)
     for (const name of SITE_FILES) {
@@ -404,6 +410,18 @@ function makePublishStage(
   })
 }
 
+function makeCleanStage(publishStage: Stage<{ distFiles: number }>): Stage<{ cleaned: boolean }> {
+  return stage('jitex: clean').dep(publishStage, async () => {
+    await Deno.remove(BUILD_ROOT, { recursive: true }).catch((error: unknown) => {
+      if (!(error instanceof Deno.errors.NotFound)) {
+        throw error
+      }
+    })
+    log('clean: removed dist/.build/')
+    return { cleaned: true }
+  })
+}
+
 export function registerJitex(texCollect: Stage<TexCollect>, plainCollect: Stage<void>) {
   const bundleStage = makeBundleStage(texCollect, plainCollect)
   makeSmokeStage(bundleStage)
@@ -411,5 +429,6 @@ export function registerJitex(texCollect: Stage<TexCollect>, plainCollect: Stage
   const copyFontsStage = makeCopyFontsStage(bundleStage)
   const copySiteStage = makeCopySiteStage(bundleStage, copyFontsStage)
   const plainVisualStage = makePlainVisualStage(bundleStage, copySiteStage)
-  makePublishStage(bundleStage, copyFontsStage, copySiteStage, plainVisualStage)
+  const publishStage = makePublishStage(bundleStage, copyFontsStage, copySiteStage, plainVisualStage)
+  makeCleanStage(publishStage)
 }
