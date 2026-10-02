@@ -1,0 +1,51 @@
+The Knuth License
+=================
+
+This directory tree (resources/knuth/**), together with the generated files
+resources/jitex/trip.ch and resources/jitex/tangle.pas, comes from Donald
+E. Knuth's sources, distributed via CTAN:
+
+  https://ctan.org/tex-archive/systems/knuth/dist
+  https://ctan.org/license/knuth
+
+The applicable notices, reproduced from the source files:
+
+1. TeX (tex.web)
+
+   This program is copyright (C) 1982 by D. E. Knuth; all rights are
+   reserved. Unlimited copying and redistribution of this file are
+   permitted as long as this file is not modified. Modifications are
+   permitted, but only if the resulting file is not named tex.web. (The WEB
+   system provides for alterations via an auxiliary file; the master file
+   should stay intact.)
+
+   Although considerable effort has been expended to make the TeX program
+   correct and reliable, no warranty is implied; the author disclaims any
+   obligation or liability for damages, including but not limited to
+   special, indirect, or consequential damages arising out of or in
+   connection with the use or performance of this software.
+
+   TeX is a trademark of the American Mathematical Society.
+   METAFONT is a trademark of Addison-Wesley Publishing Company.
+
+2. Plain format (plain.tex)
+
+   Unlimited copying and redistribution of this file are permitted as long
+   as this file is not modified. Modifications are permitted, but only if
+   the resulting file is not named plain.tex.
+
+   The same terms apply to hyphen.tex (rename it if modified); its tables
+   are marked "NOT TO BE CHANGED IN ANY WAY!".
+
+3. TANGLE, WEAVE, GLUE (tangle.web, weave.web, glue.web)
+
+   This program by D. E. Knuth is not copyrighted and can be used freely.
+
+Derived files:
+
+- resources/jitex/tangle.pas is the Pascal program produced by tangle from
+  tangle.web. It is renamed, as the license requires.
+- resources/jitex/trip.ch is Knuth's change file for the TRIP test.
+- The compiled TeX output and the other generated files in this tree are
+  derived from the sources above; if modified they must not reuse the
+  original file names.

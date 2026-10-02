@@ -11,6 +11,11 @@ from fontTools.ttLib.woff2 import compress as woff2_compress
 
 UNITS_PER_EM = 1000
 
+# OFL Reserved Font Names are owned by AMS; our converted fonts are Modified
+# Versions and must not present those names. Keep this in sync with
+# FONT_PREFIX in src/tex-runtime/render/plain/fonts.ts.
+# Artifacts produced before this prefix existed are fixed up by rename_fonts.py.
+FONT_PREFIX = "jitex-"
 
 AMS_DATE = 3330346620
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -76,7 +81,7 @@ def build(pfb_path, font, rows, out_dir, report):
             g.draw(pen)
         charstrings[n] = pen.getCharString()
 
-    ps = font.upper()
+    ps = (FONT_PREFIX + font).upper()
     fb = FontBuilder(UNITS_PER_EM, isTTF=False)
     fb.setupGlyphOrder([".notdef"] + names)
     fb.setupCharacterMap(cmap)
@@ -107,8 +112,8 @@ def build(pfb_path, font, rows, out_dir, report):
     fb.setupHead(created=AMS_DATE, modified=AMS_DATE)
 
     os.makedirs(out_dir, exist_ok=True)
-    otf = os.path.join(out_dir, font + ".otf")
-    woff2 = os.path.join(out_dir, font + ".woff2")
+    otf = os.path.join(out_dir, FONT_PREFIX + font + ".otf")
+    woff2 = os.path.join(out_dir, FONT_PREFIX + font + ".woff2")
     fb.save(otf)
 
     with open(otf, "rb") as src, open(woff2, "wb") as dst:

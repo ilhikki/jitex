@@ -1,6 +1,6 @@
 `resources/fonts/tools/` - How fonts are made
 
-This directory contains one-off tools that build `resources/fonts/*.otf` and `*.woff2` from CTAN Computer Modern Type 1 fonts, and produce the encoding tables used by the renderer. `build:jitex` only copies the artifacts; it does not run these scripts.
+This directory contains one-off tools that build `resources/fonts/jitex-*.otf` and `jitex-*.woff2` from CTAN Computer Modern Type 1 fonts, and produce the encoding tables used by the renderer. `build:jitex` only copies the artifacts; it does not run these scripts. The `jitex-` prefix keeps the OFL Reserved Font Names off our Modified Versions (see section IV).
 
 ```
 CTAN fonts/amsfonts/pfb/*.pfb --|
@@ -8,7 +8,7 @@ CTAN fonts/amsfonts/pfb/*.pfb --|
 CTAN fonts/amsfonts/afm/*.afm --|                    |--> .build/fonts/cm-map.json   (intermediate)
                                                              |
                                      gen_cm_fonts.py --------|
-                                           |--> resources/fonts/{*.otf, *.woff2}     (checked in)
+                                           |--> resources/fonts/{jitex-*.otf, jitex-*.woff2}  (checked in)
 ```
 
 `afm-analyze.py` does not produce artifacts. It only answers "how many encodings are there?" and supports the design rationale below.
@@ -92,7 +92,10 @@ python gen-encodings.py     # reads ./afm -> src/tex-runtime/render/plain/encodi
                             #            + .build/fonts/{cm-map.json, encodings-report.txt}
 
 # 4. Generate fonts.
-python gen_cm_fonts.py      # reads ./pfb -> ../{*.otf, *.woff2}
+python gen_cm_fonts.py      # reads ./pfb -> ../{jitex-*.otf, jitex-*.woff2}
+
+# 5. Rename old artifacts in place (only if ../ still has unprefixed files).
+python rename_fonts.py
 ```
 
 Step 4 also verifies metrics: each glyph advance must equal the width in the corresponding TFM. TFM files come from `resources/knuth/plain/fonts/cm/`. This is required for DVI absolute positioning; a mismatch means the codepoint and glyph were paired incorrectly.
@@ -103,9 +106,13 @@ Correct reproduction:
 - The report's "multiple glyphs in one group compete for the same Unicode" is empty.
 - "ot1 baseline per-position differences" should be exactly 1 place: `0x20`, glyph name `suppress`. It has its own outline, but the name has no Unicode identity; the actual blank is `space`, so rule 3 gives it a PUA slot.
 - `gen_cm_fonts.py`'s "advance mismatches" should be only two, both raw material discrepancies: `cmssdc10`'s `C` (606.9 vs 609), and `cmtex9`'s `arrowleft`/`arrowright` (525 vs 547).
-- Artifact count: 75 `*.otf` + 75 `*.woff2` under `resources/fonts/`.
+- Artifact count: 75 `jitex-*.otf` + 75 `jitex-*.woff2` under `resources/fonts/`.
 
 Generation is byte-deterministic: the `head` timestamp is pinned to AMS's release date, and woff2 directly compresses the OTF bytes. Rerunning it will not change any file in the repository. Artifacts can be verified by hash.
+
+### Renaming existing artifacts
+
+`gen_cm_fonts.py` only writes `jitex-` prefixed names. If a checkout still has the original `cmr10.*` style files (created before the prefix existed), run `python rename_fonts.py` from this directory. It rewrites the file names, the name table, and the CFF names, and leaves outlines and metrics untouched. It reads `FONT_PREFIX` from `gen_cm_fonts.py` and is idempotent: already-prefixed files are skipped.
 
 ---
 
@@ -113,7 +120,7 @@ Generation is byte-deterministic: the `head` timestamp is pinned to AMS's releas
 
 | Artifact | Used by |
 |---|---|
-| `resources/fonts/*.{otf,woff2}` | `build:jitex` copies them into `dist/fonts/`, and generates `dist/fonts.css`'s `@font-face` from filenames. Family name = filename uppercased, e.g. `CMEX10` |
+| `resources/fonts/{jitex-*.otf,jitex-*.woff2}` | `build:jitex` copies them into `dist/lib/fonts/`, and generates `dist/lib/fonts.css`'s `@font-face` from filenames. Family name = filename uppercased, e.g. `JITEX-CMEX10` |
 | `src/tex-runtime/render/plain/encodings.ts` | Renderer `resolveUnicode`: DVI font name -> family table -> Unicode |
 | `.build/fonts/*` | Audit reports and intermediates only; not checked in |
 
@@ -125,6 +132,7 @@ If fonts change, rerun `gen-encodings.py` and then `gen_cm_fonts.py`. The order 
 
 ## IV. Known tradeoffs and leftovers
 
+- OFL Reserved Font Names: the AMS OFL reserves every original CM name, and our converted fonts are Modified Versions. The generator therefore prefixes all file and family names with `jitex-`, and `resources/fonts/license/OFL.txt` ships alongside the fonts.
 - PUA reserved slots: see rule 3. This is the price paid to keep text fonts pure Unicode.
 - `manfnt`: not produced, for the reason above.
 - `cmsy`'s `\not` (`0x36`, glyph name `negationslash`): Unicode only has "combining long solidus overlay" (U+0338); whether this architecture can draw it correctly has not been visually confirmed.

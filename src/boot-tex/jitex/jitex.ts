@@ -1,4 +1,5 @@
 import { assert, attach, attachText, log, type Stage, stage } from '@jitex/integration'
+import { FONT_PREFIX } from '@jitex/tex-runtime'
 import type { ImportMap } from 'jsr:@deno/emit@^0.46.0'
 import { bundle } from 'jsr:@deno/emit@^0.46.0'
 import type { TexCollect } from '../tex/common.ts'
@@ -99,8 +100,8 @@ import { fonts, format, pool } from './assets.js'
 
 export const version = ${JSON.stringify(JITEX_VERSION)}
 
-export function createTexEngine(options = {}) {
-  return createEngine({ program: texProgram, format, pool, fonts, ...options })
+export function createTexEngine() {
+  return createEngine({ program: texProgram, format, pool, fonts})
 }
 `,
   )
@@ -119,7 +120,7 @@ type SmokeRunResult =
   | { status: 'interrupted'; error: { message: string } }
 
 interface JitexModule {
-  createTexEngine: (o?: Record<string, unknown>) => {
+  createTexEngine: () => {
     render: (tex: string, o?: Record<string, unknown>) => SmokeRunResult
   }
 }
@@ -169,6 +170,10 @@ function makeBundleStage(
       const manifestText = JSON.stringify(manifest, undefined, 2)
       await Deno.writeTextFile(new URL('jitex.manifest.json', LIB_DIR), manifestText)
       attach('jitex.manifest.json', new TextEncoder().encode(manifestText))
+
+      const knuthLicense = await Deno.readFile(new URL('resources/knuth/LICENSE', REPO_ROOT))
+      await Deno.writeFile(new URL('LICENSE.knuth', LIB_DIR), knuthLicense)
+      attach('LICENSE.knuth', knuthLicense)
 
       log(`jitex.js = ${codeBytes.length} bytes (${manifest.sha256.slice(0, 12)}...)`)
       return { jitexBytes: codeBytes.length, jitexSha256: manifest.sha256 }
@@ -260,6 +265,12 @@ function makeCopyFontsStage(
       }
     }
     names.sort()
+    for (const name of names) {
+      assert(
+        name.startsWith(FONT_PREFIX),
+        `font file ${name} must start with "${FONT_PREFIX}" (OFL Reserved Font Name)`,
+      )
+    }
 
     await Deno.mkdir(new URL('fonts/', LIB_DIR), { recursive: true })
     const lines = []
@@ -276,7 +287,10 @@ function makeCopyFontsStage(
     assert(!/url\(\s*['"]?\//.test(css), 'fonts.css: resource paths must not start with / (would 404 on Pages)')
     await Deno.writeTextFile(new URL('fonts.css', LIB_DIR), css)
     attach('fonts.css', new TextEncoder().encode(css))
-    log(`fonts: ${names.length} woff2 + fonts.css -> dist/lib/`)
+    const ofl = await Deno.readFile(new URL('resources/fonts/license/OFL.txt', REPO_ROOT))
+    await Deno.writeFile(new URL('fonts/OFL.txt', LIB_DIR), ofl)
+    attach('OFL.txt', ofl)
+    log(`fonts: ${names.length} woff2 + fonts.css + OFL.txt -> dist/lib/`)
     return { fontFiles: names.length }
   })
 }
