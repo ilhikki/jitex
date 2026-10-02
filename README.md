@@ -49,4 +49,4 @@ This writes the engine to `dist/lib/`, the demo site to `dist/site/`, and report
 
 ## License
 
-MIT. Files under `resources/` keep their own upstream terms; see `resources/README.md`.
+MIT. See `LICENSE`. Files under `resources/` keep their own upstream terms; see `resources/README.md`.
