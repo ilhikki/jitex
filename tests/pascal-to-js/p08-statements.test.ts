@@ -585,6 +585,122 @@ end.`,
       '6.8.1 c): a goto within a function block may reference a label at the top level of the function block statement-part',
     expectedOutput: '2\n',
   },
+  {
+    name: '6.8 goto can jump out of a case statement',
+    code: `program test(output);
+label 1;
+var x: integer;
+begin
+  x := 2;
+  case x of
+    1: writeln('one');
+    2:
+      begin
+        goto 1;
+        writeln('never');
+      end;
+    3: writeln('three');
+  end;
+1:
+  writeln('done');
+end.`,
+    purpose:
+      '6.8.2.4: goto jumps out of a case-statement (a structured-statement), terminating its execution and continuing at the label',
+    expectedOutput: 'done\n',
+  },
+  {
+    name: '6.8 goto can jump out of a with statement',
+    code: `program test(output);
+label 1;
+type r = record x: integer end;
+var v: r;
+begin
+  v.x := 5;
+  with v do
+  begin
+    goto 1;
+    x := 99;
+  end;
+1:
+  writeln(v.x);
+end.`,
+    purpose:
+      '6.8.2.4: goto jumps out of a with-statement before the remaining body statements execute, so the record field keeps its original value',
+    expectedOutput: '5\n',
+  },
+  {
+    name: '6.8 a goto loop may skip an iteration and exit at multiple points',
+    code: `program test(output);
+label 10, 20;
+var i: integer;
+begin
+  i := 0;
+10:
+  i := i + 1;
+  if i = 2 then
+    goto 10;
+  writeln(i);
+  if i < 4 then
+    goto 10
+  else
+    goto 20;
+20:
+  writeln('done');
+end.`,
+    purpose:
+      '6.8.2.4: a goto-implemented loop may both skip an iteration (a continue-like jump to the loop head) and exit the loop (a break-like jump to an outside label) via multiple exit points',
+    expectedOutput: '1\n3\n4\ndone\n',
+  },
+  {
+    name: '6.8 goto unwinds a recursive call stack to a top-level label',
+    code: `program test(output);
+label 999;
+var depth: integer;
+procedure recurse(n: integer);
+begin
+  depth := depth + 1;
+  writeln('enter', n);
+  if n = 0 then
+    goto 999;
+  recurse(n - 1);
+  writeln('never', n);
+end;
+begin
+  depth := 0;
+  recurse(3);
+999:
+  writeln('done', depth);
+end.`,
+    purpose:
+      '6.8.2.4: a goto from deep inside a recursion terminates every intermediate activation of the recursive procedure and continues at the top-level label; depth = 4 confirms all four activations were entered and then unwound',
+    expectedOutput: 'enter3\nenter2\nenter1\nenter0\ndone4\n',
+  },
+  {
+    name: '6.8 goto from an inner loop to the head of an outer loop (restart the outer body)',
+    code: `program test(output);
+label 10, 99;
+var i, j: integer;
+begin
+  i := 0;
+10:
+  i := i + 1;
+  if i > 2 then
+    goto 99;
+  j := 0;
+  while j < 3 do
+  begin
+    j := j + 1;
+    if j = 2 then
+      goto 10;
+    writeln(i, j);
+  end;
+99:
+  writeln('done');
+end.`,
+    purpose:
+      '6.8.2.4: a goto inside an inner loop may jump to the head of an outer loop (restarting the outer loop body) as well as jump past the outer loop to exit; both targets are top-level labels',
+    expectedOutput: '11\n21\ndone\n',
+  },
 
   // 6.8.3.2 Compound-statements
 

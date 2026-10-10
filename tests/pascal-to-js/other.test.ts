@@ -260,6 +260,82 @@ end.`,
     expectedOutput: '1\n',
   },
   {
+    name: 'goto forming a loop with two entry points (irreducible control flow)',
+    code: `program test(output);
+label 1, 2, 3;
+var x: integer;
+begin
+  x := 0;
+  if x = 0 then
+    goto 1
+  else
+    goto 2;
+1:
+  writeln('A');
+  x := x + 1;
+  goto 2;
+2:
+  writeln('B');
+  if x < 2 then
+    goto 1
+  else
+    goto 3;
+3:
+  writeln('C');
+end.`,
+    purpose:
+      'ISO 6.8.2.4: a loop whose two labels are both reachable from outside the loop is a valid goto pattern; the structurizer must normalize the multi-entry cycle (by duplicating a block) rather than report an error',
+    expectedOutput: 'A\nB\nA\nB\nC\n',
+  },
+  {
+    name: 'chained goto as a statement dispatcher',
+    code: `program test(output);
+label 1, 2, 3, 4;
+begin
+  goto 1;
+1:
+  writeln('one');
+  goto 2;
+2:
+  writeln('two');
+  goto 3;
+3:
+  writeln('three');
+  goto 4;
+4:
+  writeln('done');
+end.`,
+    purpose:
+      'ISO 6.8.2.4: a sequence of gotos chains execution from one labeled statement to the next in declaration order',
+    expectedOutput: 'one\ntwo\nthree\ndone\n',
+  },
+  {
+    name: 'a long-jump target function that also contains its own goto loop and forward goto',
+    code: `program test(output);
+label 1, 999;
+var i: integer;
+procedure inner;
+begin
+  writeln('inner');
+  goto 999;
+end;
+begin
+  i := 0;
+1:
+  i := i + 1;
+  writeln('loop', i);
+  if i < 2 then
+    goto 1;
+  inner;
+  goto 999;
+999:
+  writeln('done');
+end.`,
+    purpose:
+      'a function that is the target of a non-local goto and also contains its own local goto loop and forward goto falls back to the state-machine code generator, which must then compile jump and jumpIf statements rather than structured control flow',
+    expectedOutput: 'loop1\nloop2\ninner\ndone\n',
+  },
+  {
     name: 'WITH statement',
     code:
       'program test(output);\ntype\n  TRec = record\n    x: integer;\n  end;\nvar\n  r: TRec;\nbegin\n  with r do\n    x := 1;\n  writeln(r.x);\nend.',
