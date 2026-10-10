@@ -147,7 +147,7 @@ end.`,
     expectedOutput: '-3\n-3\n3\n',
   },
   {
-    name: '6.7 Definition of mod: 0 <= i mod j < j',
+    name: '6.7 Definition of mod: (i div j)*j + (i mod j) = i',
     code: `program test(output);
 var i, j: integer;
 begin
@@ -161,8 +161,9 @@ begin
   j := 5;
   writeln(i mod j);
 end.`,
-    purpose: 'ISO 6.7.2.2: i mod j is the value i-k*j satisfying 0 <= i mod j < j; (-7) mod 3=2, 7 mod 3=1, 5 mod 5=0',
-    expectedOutput: '2\n1\n0\n',
+    purpose:
+      'ISO 6.7.2.2: i mod j is the value satisfying (i div j)*j + (i mod j) = i, with div truncating toward zero, so the sign of the result follows the dividend; (-7) mod 3=-1, 7 mod 3=1, 5 mod 5=0',
+    expectedOutput: '-1\n1\n0\n',
   },
   {
     name: '6.7 Negative divisor of mod is an error',

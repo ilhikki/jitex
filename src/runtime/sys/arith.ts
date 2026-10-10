@@ -7,7 +7,7 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
     [rtKeys.int32Modulo]: (_ctx, a, b) => {
       const l = a as number
       const m = b as number
-      return (l - Math.floor(l / m) * m) | 0
+      return (l - Math.trunc(l / m) * m) | 0
     },
 
     [rtKeys.debugDivideCheck]: (_ctx, b) => {
