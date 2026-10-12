@@ -27,10 +27,10 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.float32Divide]: (a) => `(Math.fround(${a[0]} / ${a[1]}))`,
   [rtKeys.float32Negate]: (a) => `(Math.fround(-(${a[0]})))`,
   [rtKeys.float32Absolute]: (a) => `(Math.fround(Math.abs(${a[0]})))`,
-  [rtKeys.float32Sine]: (a) => `(Math.sin(${a[0]}))`,
-  [rtKeys.float32Cosine]: (a) => `(Math.cos(${a[0]}))`,
-  [rtKeys.float32Exponential]: (a) => `(Math.exp(${a[0]}))`,
-  [rtKeys.float32Arctangent]: (a) => `(Math.atan(${a[0]}))`,
+  [rtKeys.float32Sine]: (a) => `(Math.fround(Math.sin(${a[0]})))`,
+  [rtKeys.float32Cosine]: (a) => `(Math.fround(Math.cos(${a[0]})))`,
+  [rtKeys.float32Exponential]: (a) => `(Math.fround(Math.exp(${a[0]})))`,
+  [rtKeys.float32Arctangent]: (a) => `(Math.fround(Math.atan(${a[0]})))`,
 
   [rtKeys.booleanNot]: (a) => `((${a[0]}) ? 0 : 1)`,
 

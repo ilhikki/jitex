@@ -31,7 +31,7 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
       if (!(x >= 0)) {
         throw new Error('sqrt: domain error (x < 0)')
       }
-      return Math.sqrt(x)
+      return Math.fround(Math.sqrt(x))
     },
     [rtKeys.float32Logarithm]: (_ctx, a) => {
       const x = a as number
@@ -39,7 +39,7 @@ export function arithSyscalls(): Record<string, SyscallHandler> {
       if (!(x > 0)) {
         throw new Error('ln: domain error (x <= 0)')
       }
-      return Math.log(x)
+      return Math.fround(Math.log(x))
     },
 
     [rtKeys.castFloat32ToInt32Round]: (_ctx, a) => {
