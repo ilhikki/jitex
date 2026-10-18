@@ -59,7 +59,7 @@ export const rtKeys = {
   hookFunctionEnter: 'runtime.debug.hook.function.enter',
 
   debugRangeCheck: 'runtime.debug.range.check',
-  debugStepsCheck: 'runtime.debug.steps.check',
+  loopCheck: 'runtime.loop.check',
   debugDivideCheck: 'runtime.debug.divide.check',
   debugModuloCheck: 'runtime.debug.modulo.check',
   debugAssertView: 'runtime.debug.assert.view',

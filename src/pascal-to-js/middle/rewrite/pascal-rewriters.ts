@@ -712,7 +712,7 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
     'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
 
     'lowering.range.check': (sys) => sc(rtKeys.debugRangeCheck, sys.args),
-    'lowering.steps.check': () => sc(rtKeys.debugStepsCheck, []),
+    'lowering.loop.check': () => sc(rtKeys.loopCheck, []),
     'lowering.hook.function.enter': () => sc(rtKeys.hookFunctionEnter, []),
   }
 }

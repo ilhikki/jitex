@@ -9,15 +9,15 @@ export function basicSyscall(): Record<string, SyscallHandler> {
     return index
   }
 
-  const debugStepsCheck: SyscallHandler = (ctx, _args) => {
-    if (++ctx.steps > ctx.maxSteps) {
-      throw new Error('step limit exceeded')
+  const loopCheck: SyscallHandler = (ctx, _args) => {
+    if (++ctx.iterations > ctx.loopLimit) {
+      throw new Error('loop limit exceeded')
     }
     return undefined
   }
 
   return {
-    [rtKeys.debugStepsCheck]: debugStepsCheck,
+    [rtKeys.loopCheck]: loopCheck,
     [rtKeys.hookFunctionEnter]: () => undefined,
     [rtKeys.debugRangeCheck]: debugRangeCheck,
   }

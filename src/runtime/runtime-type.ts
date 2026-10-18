@@ -1,7 +1,7 @@
 export interface RuntimeContext {
   files: Map<string, PascalFileStore>
-  steps: number
-  maxSteps: number
+  iterations: number
+  loopLimit: number
   programFileUrls: Record<string, string>
   debugLog: string[]
 }
@@ -9,7 +9,7 @@ export interface RuntimeContext {
 export interface RuntimeOptions {
   files?: Map<string, PascalFileStore>
   programFileUrls?: Record<string, string>
-  maxSteps?: number
+  loopLimit?: number
   extraSyscalls?: Record<string, SyscallHandler>
 }
 

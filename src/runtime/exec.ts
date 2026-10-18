@@ -76,7 +76,7 @@ export async function runJs(code: string, options: RuntimeOptions = {}): Promise
   const ctx = createRuntimeContext({
     files: options.files,
     programFileUrls: options.programFileUrls,
-    maxSteps: options.maxSteps,
+    loopLimit: options.loopLimit,
   })
   try {
     const run = await createRunner(code, options.extraSyscalls ?? {})

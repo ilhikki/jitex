@@ -51,8 +51,8 @@ export interface PascalTest {
   /** Require the specified file content to contain this substring */
   expectedFileContains?: { url: string; contains: string }[]
 
-  /** Maximum execution steps (default 1e5) */
-  maxSteps?: number
+  /** Maximum loop iterations (default 1e5) */
+  loopLimit?: number
 }
 
 function newTextFile(mode: 'inspection' | 'generation', text?: string) {
@@ -91,7 +91,7 @@ export async function runPascal(t: PascalTest): Promise<PascalRunResult> {
   const state = await runJs(jsCode, {
     files,
     programFileUrls: t.programFileUrls,
-    maxSteps: t.maxSteps ?? 1e5,
+    loopLimit: t.loopLimit ?? 1e5,
     extraSyscalls: t.extraSyscalls,
   })
   return { state, jsCode }

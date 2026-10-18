@@ -86,7 +86,7 @@ export function returnStmt(value?: JsonCode.Expr): JsonCode.Return {
 
 export const syscallKeys = {
   hookFunctionEnter: 'lowering.hook.function.enter',
-  stepsCheck: 'lowering.steps.check',
+  loopCheck: 'lowering.loop.check',
   rangeCheck: 'lowering.range.check',
 
   assign: 'lowering.assign',

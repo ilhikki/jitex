@@ -84,6 +84,8 @@ function loweringBlock(
 
   const body: JsonCode.Statement[] = []
 
+  body.push(evalStmt(syscall(syscallKeys.loopCheck, [])))
+
   if (analysis.debug()) {
     const debugName = analysis.debugNames().get(info.funcId) ?? ''
     body.push(evalStmt(syscall(syscallKeys.hookFunctionEnter, [litField(info.funcId.toString()), litField(debugName)])))

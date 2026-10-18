@@ -44,7 +44,7 @@ export type RunTangleResult = {
 export function validRunTangleResult(result: RunTangleResult): TangleOutput {
   const { state, jsCode, pasFile, poolFile, debugLog, output } = result
   log(`state.status = ${state.status}`)
-  log(`state.steps = ${state.steps}`)
+  log(`state.iterations = ${state.iterations}`)
   attachText('debugLog.log', debugLog.join('\n'))
   attachText('output.txt', output)
   if (jsCode) {
@@ -102,7 +102,7 @@ export async function runTangleJs(
 
   const state = await runJs(jsCode, {
     files,
-    maxSteps: 1e9,
+    loopLimit: 1e9,
     extraSyscalls: tangleExtraSyscalls,
   })
   const debugLog = state.debugLog

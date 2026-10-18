@@ -230,8 +230,8 @@ function loweringIf(
   return out
 }
 
-function stepsCheckStmts(a: Analysis): JsonCode.Statement[] {
-  return a.debug() ? [evalStmt(syscall(syscallKeys.stepsCheck, []))] : []
+function loopCheckStmts(): JsonCode.Statement[] {
+  return [evalStmt(syscall(syscallKeys.loopCheck, []))]
 }
 
 function loweringWhile(
@@ -246,7 +246,7 @@ function loweringWhile(
   const cond = loweringExpr(node.condition, a, ws)
   return [
     labelStmt(L_top),
-    ...stepsCheckStmts(a),
+    ...loopCheckStmts(),
     jumpIfStmt(cond, L_body, L_end),
     labelStmt(L_body),
     ...loweringStmt(node.body, a, funcId, ws),
@@ -270,7 +270,7 @@ function loweringRepeat(
   }
   return [
     labelStmt(L_top),
-    ...stepsCheckStmts(a),
+    ...loopCheckStmts(),
     ...bodyStmts,
     jumpIfStmt(cond, L_end, L_top),
     labelStmt(L_end),
@@ -308,7 +308,7 @@ function loweringFor(
     assignStmt(ref(vid), initE),
     assignStmt(ref(limitVar), finalE),
     labelStmt(L_top),
-    ...stepsCheckStmts(a),
+    ...loopCheckStmts(),
     jumpIfStmt(syscall(cmpKey, [varRef, i32Td, ref(limitVar), i32Td]), L_body, L_end),
     labelStmt(L_body),
     ...loweringStmt(node.body, a, funcId, ws),
@@ -375,7 +375,7 @@ function loweringGoto(node: GotoStatementNode, a: Analysis, funcId: number): Jso
     throw new AssertionError(`loweringGoto: label ${node.label.value} not declared`)
   }
 
-  const checks = stepsCheckStmts(a)
+  const checks = loopCheckStmts()
   const useFuncId = a.labelUseFuncOf(info.labelId) ?? info.funcId
   if (useFuncId === funcId) {
     return [...checks, jumpStmt(info.labelId)]

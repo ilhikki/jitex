@@ -20,6 +20,8 @@ export interface TexRenderOptions {
   files?: Record<string, string | Uint8Array>
 
   onConsole?: (chunk: string) => void
+
+  loopLimit?: number
 }
 
 export type TexRenderResult =
@@ -48,7 +50,7 @@ export function createTexEngine(assets: TexEngineAssets): TexEngine {
       if (options.onConsole) {
         job.console.onOutput = options.onConsole
       }
-      const ctx: RuntimeContext = createRuntimeContext({ files: job.files })
+      const ctx: RuntimeContext = createRuntimeContext({ files: job.files, loopLimit: options.loopLimit })
       const state: RunState = run(ctx)
 
       if (state.status === 'error' && state.error !== undefined) {

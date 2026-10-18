@@ -7,7 +7,7 @@ export const EXIT: BlockId = -1
 
 const ENTRY_ID: BlockId = 0
 
-const DEBUG_PROBE_KEYS: ReadonlySet<string> = new Set(['runtime.debug.steps.check'])
+const DEBUG_PROBE_KEYS: ReadonlySet<string> = new Set(['runtime.loop.check'])
 
 function isDebugProbe(stmt: JsonCode.Statement): boolean {
   return stmt.kind === 'eval' && stmt.expr.kind === 'syscall' && DEBUG_PROBE_KEYS.has(stmt.expr.key)
