@@ -1,4 +1,5 @@
 import type * as JsonCode from '@/middle/ir/json-code.ts'
+import { rtKeys } from '@jitex/runtime'
 import { type StructurizeContext, StructurizerError } from './types.ts'
 
 export type BlockId = number
@@ -7,7 +8,7 @@ export const EXIT: BlockId = -1
 
 const ENTRY_ID: BlockId = 0
 
-const PROBE_KEYS: ReadonlySet<string> = new Set(['runtime.loop.check'])
+const PROBE_KEYS: ReadonlySet<string> = new Set([rtKeys.loopCheck])
 
 function isDebugProbe(stmt: JsonCode.Statement): boolean {
   return stmt.kind === 'eval' && stmt.expr.kind === 'syscall' && PROBE_KEYS.has(stmt.expr.key)

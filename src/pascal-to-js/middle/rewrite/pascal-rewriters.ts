@@ -2,6 +2,7 @@ import type * as JsonCode from '@/middle/ir/json-code.ts'
 import type { TypeDescriptor } from '@/middle/lowering/type.ts'
 import type { ExtraCallable } from '@/middle/analysis/analysis-type.ts'
 import { syscallKeys } from '@/middle/lowering/helpers.ts'
+import { callKey } from '@/middle/lowering/expressions.ts'
 import {
   arrayCount,
   arraySlot,
@@ -468,7 +469,7 @@ export function buildExtraCallableRewriters(
     return table
   }
   for (const [name, spec] of Object.entries(extraCallables)) {
-    table[`lowering.call.${name.toLowerCase()}`] = (sys) =>
+    table[callKey(name)] = (sys) =>
       sc(spec.sysCallName, actualPairs(sys.args).map((p) => p.value))
   }
   return table
@@ -476,66 +477,66 @@ export function buildExtraCallableRewriters(
 
 export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
   return {
-    'lowering.add': binary(rtKeys.int32Add, rtKeys.float32Add, rtKeys.bitmapUnion),
-    'lowering.sub': binary(rtKeys.int32Subtract, rtKeys.float32Subtract, rtKeys.bitmapDifference),
-    'lowering.mul': binary(rtKeys.int32Multiply, rtKeys.float32Multiply, rtKeys.bitmapIntersection),
-    'lowering.div': binaryFixed(rtKeys.float32Divide),
+    [syscallKeys.add]: binary(rtKeys.int32Add, rtKeys.float32Add, rtKeys.bitmapUnion),
+    [syscallKeys.sub]: binary(rtKeys.int32Subtract, rtKeys.float32Subtract, rtKeys.bitmapDifference),
+    [syscallKeys.mul]: binary(rtKeys.int32Multiply, rtKeys.float32Multiply, rtKeys.bitmapIntersection),
+    [syscallKeys.div]: binaryFixed(rtKeys.float32Divide),
 
-    'lowering.intDiv': (sys) =>
+    [syscallKeys.intDiv]: (sys) =>
       sc(rtKeys.int32Divide, [
         sys.args[0],
         debug ? sc(rtKeys.debugDivideCheck, [sys.args[1]]) : sys.args[1],
       ]),
-    'lowering.mod': (sys) =>
+    [syscallKeys.mod]: (sys) =>
       sc(rtKeys.int32Modulo, [
         sys.args[0],
         debug ? sc(rtKeys.debugModuloCheck, [sys.args[1]]) : sys.args[1],
       ]),
 
-    'lowering.and': logical(rtKeys.int32And, rtKeys.booleanAnd),
-    'lowering.or': logical(rtKeys.int32Or, rtKeys.booleanOr),
+    [syscallKeys.and]: logical(rtKeys.int32And, rtKeys.booleanAnd),
+    [syscallKeys.or]: logical(rtKeys.int32Or, rtKeys.booleanOr),
 
-    'lowering.neg': unaryFloatOrI32(rtKeys.float32Negate, rtKeys.int32Negate),
-    'lowering.not': unaryI32OrOther(rtKeys.int32Not, rtKeys.booleanNot),
+    [syscallKeys.neg]: unaryFloatOrI32(rtKeys.float32Negate, rtKeys.int32Negate),
+    [syscallKeys.not]: unaryI32OrOther(rtKeys.int32Not, rtKeys.booleanNot),
 
-    'lowering.call.abs': unaryFloatOrI32(rtKeys.float32Absolute, rtKeys.int32Absolute),
-    'lowering.call.sqr': (sys) => {
+    [callKey('abs')]: unaryFloatOrI32(rtKeys.float32Absolute, rtKeys.int32Absolute),
+    [callKey('sqr')]: (sys) => {
       const t = parseType(sys.args[1])
       const x = sys.args[0]
       return sc(isFloat(t) ? rtKeys.float32Multiply : rtKeys.int32Multiply, [x, x])
     },
-    'lowering.call.sqrt': unary(rtKeys.float32SquareRoot),
-    'lowering.call.sin': unary(rtKeys.float32Sine),
-    'lowering.call.cos': unary(rtKeys.float32Cosine),
-    'lowering.call.exp': unary(rtKeys.float32Exponential),
-    'lowering.call.ln': unary(rtKeys.float32Logarithm),
-    'lowering.call.arctan': unary(rtKeys.float32Arctangent),
-    'lowering.call.odd': unary(rtKeys.int32Odd),
-    'lowering.call.trunc': unary(rtKeys.castFloat32ToInt32),
-    'lowering.call.round': unary(rtKeys.castFloat32ToInt32Round),
-    'lowering.call.ord': ordRewrite,
-    'lowering.call.chr': ordRewrite,
-    'lowering.call.pred': predSucc(false, debug),
-    'lowering.call.succ': predSucc(true, debug),
+    [callKey('sqrt')]: unary(rtKeys.float32SquareRoot),
+    [callKey('sin')]: unary(rtKeys.float32Sine),
+    [callKey('cos')]: unary(rtKeys.float32Cosine),
+    [callKey('exp')]: unary(rtKeys.float32Exponential),
+    [callKey('ln')]: unary(rtKeys.float32Logarithm),
+    [callKey('arctan')]: unary(rtKeys.float32Arctangent),
+    [callKey('odd')]: unary(rtKeys.int32Odd),
+    [callKey('trunc')]: unary(rtKeys.castFloat32ToInt32),
+    [callKey('round')]: unary(rtKeys.castFloat32ToInt32Round),
+    [callKey('ord')]: ordRewrite,
+    [callKey('chr')]: ordRewrite,
+    [callKey('pred')]: predSucc(false, debug),
+    [callKey('succ')]: predSucc(true, debug),
 
-    'lowering.eq': compare(rtKeys.bitmapEqual, rtKeys.compareEqual),
-    'lowering.ne': compare(rtKeys.bitmapNotEqual, rtKeys.compareNotEqual),
-    'lowering.lt': compare(undefined, rtKeys.compareLess),
-    'lowering.le': compare(rtKeys.bitmapSubset, rtKeys.compareLessOrEqual),
-    'lowering.gt': compare(undefined, rtKeys.compareGreater),
-    'lowering.ge': compare(rtKeys.bitmapSuperset, rtKeys.compareGreaterOrEqual),
+    [syscallKeys.eq]: compare(rtKeys.bitmapEqual, rtKeys.compareEqual),
+    [syscallKeys.ne]: compare(rtKeys.bitmapNotEqual, rtKeys.compareNotEqual),
+    [syscallKeys.lt]: compare(undefined, rtKeys.compareLess),
+    [syscallKeys.le]: compare(rtKeys.bitmapSubset, rtKeys.compareLessOrEqual),
+    [syscallKeys.gt]: compare(undefined, rtKeys.compareGreater),
+    [syscallKeys.ge]: compare(rtKeys.bitmapSuperset, rtKeys.compareGreaterOrEqual),
 
-    'lowering.in': (sys) => {
+    [syscallKeys.in]: (sys) => {
       const st = parseType(sys.args[3])
       return sc(rtKeys.bitmapContains, [sys.args[0], sys.args[2], litInt(setSize(st!))])
     },
-    'lowering.ptr.deref': (sys) => sc(rtKeys.pointerDereference, sys.args),
-    'lowering.ptr.assign': (sys) => sc(rtKeys.pointerAssign, sys.args),
-    'lowering.ptr.dispose.check': (sys) => sc(rtKeys.pointerDisposeCheck, sys.args),
+    [syscallKeys.ptrDeref]: (sys) => sc(rtKeys.pointerDereference, sys.args),
+    [syscallKeys.ptrAssign]: (sys) => sc(rtKeys.pointerAssign, sys.args),
+    [syscallKeys.ptrDisposeCheck]: (sys) => sc(rtKeys.pointerDisposeCheck, sys.args),
 
-    'lowering.assign': (sys) => sc(rtKeys.assign, sys.args),
+    [syscallKeys.assign]: (sys) => sc(rtKeys.assign, sys.args),
 
-    'lowering.mem.default': (sys) => {
+    [syscallKeys.memDefault]: (sys) => {
       const td = parseType(sys.args[0])
       if (!td) {
         throw new Error('rewrite: mem.default expects a type descriptor')
@@ -549,24 +550,24 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       }
       return sc(rtKeys.bytesAlloc, [litInt(sizeOf(td))])
     },
-    'lowering.mem.copy': (sys) => {
+    [syscallKeys.memCopy]: (sys) => {
       const td = parseType(sys.args[3])
       return sc(rtKeys.bytesCopy, [sys.args[0], sys.args[1], sys.args[2], litInt(sizeOf(td!))])
     },
 
-    'lowering.set.empty': (sys) => {
+    [syscallKeys.setEmpty]: (sys) => {
       const td = parseType(sys.args[0])
       return sc(rtKeys.bytesAlloc, [litInt(setSize(td!))])
     },
-    'lowering.set.elem': (sys) => {
+    [syscallKeys.setElem]: (sys) => {
       const td = parseType(sys.args[1])
       return sc(rtKeys.bitmapSingleton, [sys.args[0], litInt(setSize(td!))])
     },
-    'lowering.set.range': (sys) => {
+    [syscallKeys.setRange]: (sys) => {
       const td = parseType(sys.args[2])
       return sc(rtKeys.bitmapRange, [sys.args[0], sys.args[1], litInt(setSize(td!))])
     },
-    'lowering.set.literal': (sys) => {
+    [syscallKeys.setLiteral]: (sys) => {
       const td = parseType(sys.args[sys.args.length - 1])
       const elems = sys.args.slice(0, -1)
       const size = litInt(setSize(td!))
@@ -576,16 +577,16 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       return elems.reduce((a, b) => sc(rtKeys.bitmapUnion, [a, b, size]))
     },
 
-    'lowering.file.create': (sys) => sc(rtKeys.fileCreate, [litStr(fileKind(parseType(sys.args[0])))]),
-    'lowering.call.reset': (sys) => {
+    [syscallKeys.fileCreate]: (sys) => sc(rtKeys.fileCreate, [litStr(fileKind(parseType(sys.args[0])))]),
+    [callKey('reset')]: (sys) => {
       requireIsoFileActuals(sys, 'reset')
       return sc(rtKeys.fileReset, [sys.args[0]])
     },
-    'lowering.call.rewrite': (sys) => {
+    [callKey('rewrite')]: (sys) => {
       requireIsoFileActuals(sys, 'rewrite')
       return sc(rtKeys.fileRewrite, [sys.args[0]])
     },
-    'lowering.call.get': (sys) => {
+    [callKey('get')]: (sys) => {
       const td = parseType(sys.args[1])
 
       if (td?.elem?.tag === 'record') {
@@ -594,9 +595,9 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       return sc(rtKeys.fileGet, [sys.args[0]])
     },
 
-    'lowering.call.put': filePutRewrite,
-    'lowering.file.put': filePutRewrite,
-    'lowering.file.peek': (sys) => {
+    [callKey('put')]: filePutRewrite,
+    [syscallKeys.filePut]: filePutRewrite,
+    [syscallKeys.filePeek]: (sys) => {
       const td = parseType(sys.args[1])
 
       if (td?.elem?.tag === 'record') {
@@ -604,28 +605,28 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       }
       return sc(rtKeys.filePeek, [sys.args[0]])
     },
-    'lowering.file.eof': (sys) => sc(rtKeys.fileEof, [sys.args[0]]),
-    'lowering.file.eoln': (sys) => sc(rtKeys.fileEoln, [sys.args[0]]),
-    'lowering.program.fileUrl': (sys) => sc(rtKeys.fileProgramUrl, [sys.args[0], sys.args[1]]),
+    [syscallKeys.fileEof]: (sys) => sc(rtKeys.fileEof, [sys.args[0]]),
+    [syscallKeys.fileEoln]: (sys) => sc(rtKeys.fileEoln, [sys.args[0]]),
+    [syscallKeys.programFileUrl]: (sys) => sc(rtKeys.fileProgramUrl, [sys.args[0], sys.args[1]]),
 
-    'lowering.call.write': (sys) => writeCall(sys, false),
-    'lowering.call.writeln': (sys) => writeCall(sys, true),
-    'lowering.call.read': (sys) => readCall(sys, false, debug),
-    'lowering.call.readln': (sys) => readCall(sys, true, debug),
-    'lowering.call.page': (sys) => {
+    [callKey('write')]: (sys) => writeCall(sys, false),
+    [callKey('writeln')]: (sys) => writeCall(sys, true),
+    [callKey('read')]: (sys) => readCall(sys, false, debug),
+    [callKey('readln')]: (sys) => readCall(sys, true, debug),
+    [callKey('page')]: (sys) => {
       const pairs = actualPairs(sys.args)
       return sc(rtKeys.filePage, [pairs.length > 0 ? pairs[0].value : litNullLiteral()])
     },
-    'lowering.call.eof': (sys) => {
+    [callKey('eof')]: (sys) => {
       const pairs = actualPairs(sys.args)
       return sc(rtKeys.fileEof, [pairs.length > 0 ? pairs[0].value : litNullLiteral()])
     },
-    'lowering.call.eoln': (sys) => {
+    [callKey('eoln')]: (sys) => {
       const pairs = actualPairs(sys.args)
       return sc(rtKeys.fileEoln, [pairs.length > 0 ? pairs[0].value : litNullLiteral()])
     },
 
-    'lowering.call.new': (sys) => {
+    [callKey('new')]: (sys) => {
       const [p, ptd] = sys.args
       const pt = parseType(ptd)
       if (pt?.tag !== 'pointer' || !pt.elem) {
@@ -636,7 +637,7 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       const inner = isObjectRepr(domain) ? defaultValueExpr(domain) : sc(rtKeys.bytesAlloc, [litInt(sizeOf(domain))])
       return writeBack(p, sc(rtKeys.cellNew, [inner]), debug)
     },
-    'lowering.call.dispose': (sys) => {
+    [callKey('dispose')]: (sys) => {
       const [p, ptd] = sys.args
       if (parseType(ptd)?.tag !== 'pointer') {
         throw new Error('ISO 7185 6.6.5.3: the actual parameter to dispose(p) shall be a variable of pointer type.')
@@ -647,7 +648,7 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       ])
     },
 
-    'lowering.call.pack': (sys) => {
+    [callKey('pack')]: (sys) => {
       const [src, srcTd, start, , dst, dstTd] = sys.args
       const srcArr = arraySlot(parseType(srcTd)!)
       return sc(rtKeys.bytesPack, [
@@ -659,7 +660,7 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
         litInt(arrayCount(parseType(dstTd)!)),
       ])
     },
-    'lowering.call.unpack': (sys) => {
+    [callKey('unpack')]: (sys) => {
       const [src, srcTd, dst, dstTd, start] = sys.args
       const dstArr = arraySlot(parseType(dstTd)!)
       return sc(rtKeys.bytesUnpack, [
@@ -671,30 +672,30 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
         litInt(arrayCount(parseType(srcTd)!)),
       ])
     },
-    'lowering.array.access': (sys) => {
+    [syscallKeys.arrayAccess]: (sys) => {
       const td = parseType(sys.args[sys.args.length - 1])
       const indices = sys.args.slice(0, -1)
       const arr = indices.shift()!
       return accessAt(arr, td!, indices, undefined, debug)
     },
-    'lowering.array.assign': (sys) => {
+    [syscallKeys.arrayAssign]: (sys) => {
       const td = parseType(sys.args[sys.args.length - 1])
       const rest = sys.args.slice(0, -1)
       const arr = rest.shift()!
       const value = rest.pop()!
       return assignAt(arr, td!, rest, value, undefined, debug)
     },
-    'lowering.rec.access': (sys) => {
+    [syscallKeys.recAccess]: (sys) => {
       const td = parseType(sys.args[2])
       const name = (sys.args[1] as JsonCode.Literal).arg
       return accessAt(sys.args[0], td!, [], name, debug)
     },
-    'lowering.rec.assign': (sys) => {
+    [syscallKeys.recAssign]: (sys) => {
       const td = parseType(sys.args[3])
       const name = (sys.args[1] as JsonCode.Literal).arg
       return assignAt(sys.args[0], td!, [], sys.args[2], name, debug)
     },
-    'lowering.rec.copy': (sys) => {
+    [syscallKeys.recCopy]: (sys) => {
       const td = parseType(sys.args[1])
       if (td && isObjectRepr(td)) {
         return sc(
@@ -705,15 +706,15 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
       return sc(rtKeys.bytesClone, [sys.args[0], litInt(sizeOf(td!))])
     },
 
-    'lowering.cell.create': (sys) => sc(rtKeys.cellNew, [sys.args[0]]),
-    'lowering.cell.get': (sys) => sc(rtKeys.cellGet, [sys.args[0]]),
-    'lowering.cell.set': (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),
+    [syscallKeys.cellCreate]: (sys) => sc(rtKeys.cellNew, [sys.args[0]]),
+    [syscallKeys.cellGet]: (sys) => sc(rtKeys.cellGet, [sys.args[0]]),
+    [syscallKeys.cellSet]: (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),
 
-    'lowering.call.indirect': (sys) => sc(rtKeys.callIndirect, sys.args),
+    [syscallKeys.callIndirect]: (sys) => sc(rtKeys.callIndirect, sys.args),
 
-    'lowering.range.check': (sys) => sc(rtKeys.debugRangeCheck, sys.args),
-    'lowering.loop.check': () => sc(rtKeys.loopCheck, []),
-    'lowering.hook.function.enter': () => sc(rtKeys.hookFunctionEnter, []),
+    [syscallKeys.rangeCheck]: (sys) => sc(rtKeys.debugRangeCheck, sys.args),
+    [syscallKeys.loopCheck]: () => sc(rtKeys.loopCheck, []),
+    [syscallKeys.hookFunctionEnter]: () => sc(rtKeys.hookFunctionEnter, []),
   }
 }
 

@@ -49,7 +49,7 @@ const inlineSyscalls: Record<string, InlineGen> = {
 
   [rtKeys.closureNoValue]: (a) => {
     if (a.length < 2) {
-      throw new Error(`runtime.closure.noValue args < 2, actual ${a.length}`)
+      throw new Error(`${rtKeys.closureNoValue} args < 2, actual ${a.length}`)
     }
     return `(() => { ${a.map((e) => `${e};`).join(' ')} })()`
   },

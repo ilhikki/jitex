@@ -1,5 +1,6 @@
 import { bytesToString, rtKeys } from '@jitex/runtime'
 import type { RunState } from '@jitex/runtime'
+import { callKey } from '@jitex/pascal-to-js'
 import type { SyscallRewriteTable } from '@jitex/pascal-to-js'
 import { texOpenKeys } from '@jitex/tex-runtime'
 
@@ -12,13 +13,13 @@ export function readFile(path: string): Promise<Uint8Array> {
 }
 
 export const fileOpenRewriters: SyscallRewriteTable = {
-  ['lowering.call.reset']: (sys) => {
+  [callKey('reset')]: (sys) => {
     if (sys.args.length === 2) {
       return { kind: 'syscall', key: rtKeys.fileReset, args: [sys.args[0]] }
     }
     return { kind: 'syscall', key: texOpenKeys.openIn, args: [sys.args[0], sys.args[2]] }
   },
-  ['lowering.call.rewrite']: (sys) => {
+  [callKey('rewrite')]: (sys) => {
     if (sys.args.length === 2) {
       return { kind: 'syscall', key: rtKeys.fileRewrite, args: [sys.args[0]] }
     }
