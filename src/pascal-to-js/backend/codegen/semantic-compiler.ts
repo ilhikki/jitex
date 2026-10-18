@@ -61,8 +61,6 @@ const inlineSyscalls: Record<string, InlineGen> = {
   [rtKeys.objectArrayGet]: (a) => `(${a[0]}.base[${a[0]}.offset + ${a[1]}])`,
   [rtKeys.objectArraySet]: (a) => `(void (${a[0]}.base[${a[0]}.offset + ${a[1]}] = ${a[2]}))`,
   [rtKeys.objectArraySublist]: (a) => `({base: ${a[0]}.base, offset: (${a[0]}.offset + ${a[1]}) | 0})`,
-
-  [rtKeys.callIndirect]: (a) => `(${a[0]})(${a.slice(1).join(', ')})`,
 }
 
 export class PascalSemanticCompiler implements SemanticCompiler {

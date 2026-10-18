@@ -143,6 +143,4 @@ export const rtKeys = {
   cellNew: 'runtime.cell.new',
   cellGet: 'runtime.cell.get',
   cellSet: 'runtime.cell.set',
-
-  callIndirect: 'runtime.call.indirect',
 } as const

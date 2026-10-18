@@ -710,8 +710,6 @@ export function buildPascalRewriteTable(debug: boolean): SyscallRewriteTable {
     [syscallKeys.cellGet]: (sys) => sc(rtKeys.cellGet, [sys.args[0]]),
     [syscallKeys.cellSet]: (sys) => sc(rtKeys.cellSet, [sys.args[0], sys.args[1]]),
 
-    [syscallKeys.callIndirect]: (sys) => sc(rtKeys.callIndirect, sys.args),
-
     [syscallKeys.rangeCheck]: (sys) => sc(rtKeys.debugRangeCheck, sys.args),
     [syscallKeys.loopCheck]: () => sc(rtKeys.loopCheck, []),
     [syscallKeys.hookFunctionEnter]: () => sc(rtKeys.hookFunctionEnter, []),

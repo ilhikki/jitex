@@ -103,7 +103,10 @@ export interface Literal {
 }
 
 /**
- * Direct call to another function by id.
+ * Call to a binding identified by id, with argument expressions.
+ *
+ * The id is either the id of a declared function, or the id of a callable
+ * parameter variable that holds a function value at runtime.
  */
 export interface Call {
   kind: 'call'

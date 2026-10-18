@@ -87,7 +87,9 @@ function loweringIdentifier(node: IdentifierNode, a: Analysis, ws: WithBinding[]
   const sym = resolveSymbol(node, a, ws)
 
   if (sym?.kind === 'param' && sym.callable) {
-    return syscall(syscallKeys.callIndirect, [ref(sym.varId)])
+    // ISO 7185 6.6.3.5: a functional formal parameter without a
+    // formal-parameter list is invoked by its identifier alone.
+    return callExpr(sym.varId, [])
   }
 
   if (sym?.kind === 'var' || sym?.kind === 'param') {
@@ -248,7 +250,7 @@ function loweringFunctionCall(
 
   if (sym?.kind === 'param' && sym.callable) {
     const args = node.arguments.map((x) => loweringExpr(x, a, ws))
-    return syscall(syscallKeys.callIndirect, [ref(sym.varId), ...args])
+    return callExpr(sym.varId, args)
   }
 
   if (sym?.kind === 'func') {

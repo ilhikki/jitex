@@ -172,8 +172,6 @@ export const syscallKeys = {
   ptrAssign: 'lowering.ptr.assign',
   ptrDisposeCheck: 'lowering.ptr.dispose.check',
 
-  callIndirect: 'lowering.call.indirect',
-
   pack: 'lowering.pack',
   unpack: 'lowering.unpack',
 } as const

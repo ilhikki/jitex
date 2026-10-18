@@ -458,7 +458,7 @@ function loweringProcedureCall(
         argExprs.push(loweringExpr(arg, a, ws))
       }
     }
-    out.push(evalStmt(syscall(syscallKeys.callIndirect, [ref(sym.varId), ...argExprs])))
+    out.push(evalStmt(callExpr(sym.varId, argExprs)))
 
     for (const cv of cellVars) {
       const valExpr = syscall(syscallKeys.cellGet, [ref(cv.cellVar)])
