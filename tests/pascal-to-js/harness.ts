@@ -51,7 +51,7 @@ export interface PascalTest {
   /** Require the specified file content to contain this substring */
   expectedFileContains?: { url: string; contains: string }[]
 
-  /** Maximum loop iterations (default 1e5) */
+  /** Maximum loop count (default 1e5) */
   loopLimit?: number
 
   /**

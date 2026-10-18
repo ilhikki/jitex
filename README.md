@@ -13,7 +13,9 @@ Download and extract the release, then import the bundled engine by relative pat
 import { createTexEngine } from './jitex.js'
 
 const engine = createTexEngine()
-const result = engine.render(String.raw`Hello, \TeX!  $a^2 + b^2 = c^2$\par`)
+const result = engine.render(String.raw`Hello, \TeX!  $a^2 + b^2 = c^2$\par\bye`, {
+  onConsole: (chunk) => console.log(chunk),
+})
 
 if (result.status === 'completed') {
   for (const svg of result.svgs) {
@@ -22,16 +24,20 @@ if (result.status === 'completed') {
 }
 ```
 
+The source must end with `\bye`; it is not appended automatically.
+
 `render` returns either:
 
 - `{ status: 'completed', svgs: string[] }`
 - `{ status: 'interrupted', error: Error }`
 
-To capture the engine console output:
+`render` accepts options, all optional:
 
-```js
-engine.render(source, { onConsole: (chunk) => console.log(chunk) })
-```
+| Option      | Type                                   | Description                                                                                                                                                   |
+| ----------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files`     | `Record<string, string \| Uint8Array>` | Extra files visible to the run, keyed by file name                                                                                                            |
+| `onConsole` | `(chunk: string) => void`              | Receives the engine console output as it is produced                                                                                                          |
+| `loopLimit` | `number`                               | Maximum loop count (`while` / `repeat` / `for` and recursion entries); the run is interrupted with a `loop limit exceeded` error when exceeded. Default `1e8` |
 
 ## Building from source
 

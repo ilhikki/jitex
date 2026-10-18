@@ -145,4 +145,6 @@ prose. And a run is not interruptible from the outside.
 
 \TeX82 and {\tt plain.tex} are Donald Knuth's. The typefaces are the Computer
 Modern of the American Mathematical Society and Bluesky, under the SIL Open Font
-License.`
+License.
+
+\bye`

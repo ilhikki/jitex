@@ -7,4 +7,5 @@ export const LOGO_DOC = String.raw`${LOGO_TEX}
 \hsize=\wd0
 \vsize=\ht0
 \maxdepth=\dp0
-\noindent\box0`
+\noindent\box0
+\bye`

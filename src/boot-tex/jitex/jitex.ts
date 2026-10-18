@@ -111,9 +111,11 @@ export function createTexEngine() {
 }
 
 const SMOKE_PLAIN = String.raw`Hello, \TeX!  $a^2 + b^2 = c^2$\par
+\bye
 `
 
 const SMOKE_FONT = String.raw`\font\big=cmr10 at 12pt \big Big text at 12pt\par
+\bye
 `
 
 type SmokeRunResult =

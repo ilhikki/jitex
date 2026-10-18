@@ -118,7 +118,7 @@ function makePass1RunStage(
         ttyInput: '\\input trip\n',
       })
 
-      log(`state.iterations = ${state.iterations}`)
+      log(`state.loopCount = ${state.loopCount}`)
       log('all files = ' + [...state.files.keys()].join(', '))
 
       for (const [key, value] of state.files) {
@@ -197,7 +197,7 @@ function makePass2RunStage(
         extraFiles,
       })
 
-      log(`state.iterations = ${state.iterations}`)
+      log(`state.loopCount = ${state.loopCount}`)
       log('all files = ' + [...state.files.keys()].join(', '))
 
       for (const [key, value] of state.files) {

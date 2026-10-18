@@ -1,6 +1,6 @@
 export interface RuntimeContext {
   files: Map<string, PascalFileStore>
-  iterations: number
+  loopCount: number
   loopLimit: number
   programFileUrls: Record<string, string>
   debugLog: string[]

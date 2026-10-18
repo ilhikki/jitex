@@ -9,8 +9,8 @@ import { fileRuntimeSyscalls } from './sys/file-runtime.ts'
 export function createRuntimeContext(options: RuntimeOptions = {}): RuntimeContext {
   return {
     files: options?.files ?? new Map(),
-    iterations: 0,
-    loopLimit: options.loopLimit ?? 1e9,
+    loopCount: 0,
+    loopLimit: options.loopLimit ?? 1e8,
     programFileUrls: options.programFileUrls ?? {},
     debugLog: [],
   }
@@ -23,7 +23,7 @@ export function toRunState(
 ): RunState {
   return {
     status,
-    iterations: ctx.iterations,
+    loopCount: ctx.loopCount,
     error: error ?? undefined,
     files: ctx.files,
     debugLog: ctx.debugLog,

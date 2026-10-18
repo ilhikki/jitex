@@ -34,7 +34,7 @@ export interface TexJobFiles {
 export function createTexJobFiles(input: TexJobInput): TexJobFiles {
   const jobName = JOB_NAME
   const formatName = input.formatName ?? 'plain'
-  const console = new ConsoleFile(`&${formatName} ${jobName} \n \\bye \n`)
+  const console = new ConsoleFile(`&${formatName} ${jobName} \n`)
 
   const files = new Map<string, PascalFileStore>()
   files.set(`${formatName}.fmt`, createMemoryFileStore(input.format))

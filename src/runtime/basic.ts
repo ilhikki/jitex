@@ -10,7 +10,7 @@ export function basicSyscall(): Record<string, SyscallHandler> {
   }
 
   const loopCheck: SyscallHandler = (ctx, _args) => {
-    if (++ctx.iterations > ctx.loopLimit) {
+    if (++ctx.loopCount > ctx.loopLimit) {
       throw new Error('loop limit exceeded')
     }
     return undefined
