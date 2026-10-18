@@ -629,6 +629,7 @@ end.`,
     code: 'program test; type T = 1..10; var a: T; i: integer; begin i := 100; a := i; end.',
     purpose: '6.4.6 error rule a: T1 and T2 are compatible ordinal-types but value 100 is not within 1..10',
     expectedError: '',
+    debugOnly: true,
   },
   {
     name: '6.4.6 c integer constant exceeding subrange upper bound is an error',
@@ -642,6 +643,7 @@ end.`,
     purpose:
       '6.7.2.1+6.4.6 c: the subrange factor participates in the operation as host-type integer yielding 13, which is not within 1..10',
     expectedError: '',
+    debugOnly: true,
   },
   {
     name: '6.4.6 c assignment between compatible subranges with value within target range',
@@ -654,6 +656,7 @@ end.`,
     code: 'program test; type T1 = 1..10; T2 = 1..5; var a: T1; b: T2; begin a := 8; b := a; end.',
     purpose: '6.4.6 error rule a: value 8 is not within the target subrange 1..5',
     expectedError: '',
+    debugOnly: true,
   },
   {
     name: '6.4.6 c character subrange assignment exceeding upper bound is an error',

@@ -177,6 +177,7 @@ end.`,
     purpose:
       '[Category B  D.46] ISO 6.7.2.2: i mod j is an error when j is negative (j <= 0 is an error) - a designated error; s5.1 f) permits declaring in the accompanying documentation that it is not reported; this processor chooses to detect and report it',
     expectedError: '',
+    debugOnly: true,
   },
   {
     name: '6.7 Zero divisor of div is an error',
@@ -189,6 +190,7 @@ begin
 end.`,
     purpose: 'ISO 6.7.2.2: i div j is an error when j is zero',
     expectedError: '',
+    debugOnly: true,
   },
   {
     name: '6.7 Zero divisor of mod is an error',
@@ -201,6 +203,7 @@ begin
 end.`,
     purpose: 'ISO 6.7.2.2: i mod j is an error when j is zero',
     expectedError: '',
+    debugOnly: true,
   },
   {
     name: '6.7 Mathematical properties of maxint (independent of its specific value)',

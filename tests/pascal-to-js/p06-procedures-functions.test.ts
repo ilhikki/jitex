@@ -1644,6 +1644,7 @@ end.`,
     purpose: 'ISO 6.6.6.4: it is an error when there is no value with a greater ordinal number',
     expectedError: '',
     loopLimit: 1000,
+    debugOnly: true,
   },
   {
     name: '6.6 pred on the first value of an enumeration type should be an error',
@@ -1651,6 +1652,7 @@ end.`,
     purpose: 'ISO 6.6.6.4: it is an error when there is no value with a smaller ordinal number',
     expectedError: '',
     loopLimit: 1000,
+    debugOnly: true,
   },
 
   // 6.6.6.5 Boolean functions

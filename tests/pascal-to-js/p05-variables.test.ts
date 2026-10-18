@@ -303,6 +303,7 @@ end.`,
     purpose:
       'ISO 6.6.6.4/6.4.6 c: the result of succ must fall within the value range of the subrange type; otherwise it is an error',
     expectedError: '',
+    debugOnly: true,
   },
 ]
 

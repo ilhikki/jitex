@@ -53,6 +53,15 @@ export interface PascalTest {
 
   /** Maximum loop iterations (default 1e5) */
   loopLimit?: number
+
+  /**
+   * Whether this case only applies to debug builds.
+   *
+   * By default every case runs twice: once with debug checks enabled and once without.
+   * Cases whose expected behaviour depends on debug-only checks (e.g. subrange bounds,
+   * divide-by-zero, pred/succ overflow) must set this to true so the release run is skipped.
+   */
+  debugOnly?: boolean
 }
 
 function newTextFile(mode: 'inspection' | 'generation', text?: string) {
@@ -68,7 +77,7 @@ export interface PascalRunResult {
 }
 
 /** Execute a single case, return run state and compiled artifact */
-export async function runPascal(t: PascalTest): Promise<PascalRunResult> {
+export async function runPascal(t: PascalTest, debug: boolean): Promise<PascalRunResult> {
   const files = new Map<string, PascalFileStore>()
   files.set('INPUT', newTextFile('inspection', t.input))
   files.set('OUTPUT', newTextFile('generation'))
@@ -82,7 +91,7 @@ export async function runPascal(t: PascalTest): Promise<PascalRunResult> {
   try {
     jsCode = transform(t.code, {
       extraCallables: t.extraCallables,
-      debug: true,
+      debug,
     })
   } catch (e) {
     return { state: toErrorState(e), jsCode: undefined }
@@ -116,25 +125,28 @@ function decode(store: PascalFileStore | undefined): string | undefined {
 }
 /** Execute and assert a single case; on failure, print the compiled artifact before throwing the assertion error */
 export async function runPascalTest(t: PascalTest): Promise<void> {
-  const { state, jsCode } = await runPascal(t)
-  const output = state.files.get('OUTPUT')
-  const ctx = `[${t.name}] ${t.purpose}`
+  const modes: boolean[] = t.debugOnly ? [true] : [true, false]
+  for (const debug of modes) {
+    const { state, jsCode } = await runPascal(t, debug)
+    const output = state.files.get('OUTPUT')
+    const ctx = `[${t.name}] (${debug ? 'debug' : 'release'}) ${t.purpose}`
 
-  try {
-    const outputContent = decode(output)
-    assertCase(t, state, outputContent ?? '', ctx)
-    // Cases expected to compile: additionally verify the stability of source round-trip (parse -> print -> parse -> print)
-    if (t.expectedError === undefined) {
-      assertPrintRoundTripStable(t.code, ctx)
+    try {
+      const outputContent = decode(output)
+      assertCase(t, state, outputContent ?? '', ctx)
+      // Cases expected to compile: additionally verify the stability of source round-trip (parse -> print -> parse -> print)
+      if (t.expectedError === undefined) {
+        assertPrintRoundTripStable(t.code, ctx)
+      }
+    } catch (err) {
+      if (jsCode) {
+        console.error(jsCode)
+      }
+      if (state.error) {
+        console.error(state.error)
+      }
+      throw err
     }
-  } catch (err) {
-    if (jsCode) {
-      console.error(jsCode)
-    }
-    if (state.error) {
-      console.error(state.error)
-    }
-    throw err
   }
 }
 
