@@ -10,7 +10,7 @@
     "strict": true
   },
   "tasks": {
-    "build:jitex": "deno run -A ./src/integration/cli.ts run ./src/boot-tex/build-jitex.ts"
+    "build:jitex": "deno run --allow-read --allow-write --allow-env ./src/integration/cli.ts run ./src/boot-tex/build-jitex.ts"
   },
   "lint": {
     "rules": {
