@@ -469,8 +469,7 @@ export function buildExtraCallableRewriters(
     return table
   }
   for (const [name, spec] of Object.entries(extraCallables)) {
-    table[callKey(name)] = (sys) =>
-      sc(spec.sysCallName, actualPairs(sys.args).map((p) => p.value))
+    table[callKey(name)] = (sys) => sc(spec.sysCallName, actualPairs(sys.args).map((p) => p.value))
   }
   return table
 }
