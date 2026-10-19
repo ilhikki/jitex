@@ -9,6 +9,10 @@
   "compilerOptions": {
     "strict": true
   },
+  "imports": {
+    "@deno/emit": "jsr:@deno/emit@^0.46.0",
+    "@std/assert": "jsr:@std/assert@^1.0.0"
+  },
   "tasks": {
     "build:jitex": "deno run --allow-read --allow-write --allow-env ./src/integration/cli.ts run ./src/boot-tex/build-jitex.ts"
   },

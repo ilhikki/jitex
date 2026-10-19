@@ -1,7 +1,7 @@
 import { assert, attach, attachText, log, type Stage, stage } from '@jitex/integration'
 import { FONT_PREFIX } from '@jitex/tex-runtime'
-import type { ImportMap } from 'jsr:@deno/emit@^0.46.0'
-import { bundle } from 'jsr:@deno/emit@^0.46.0'
+import type { ImportMap } from '@deno/emit'
+import { bundle } from '@deno/emit'
 import type { TexCollect } from '../tex/common.ts'
 import { INITIAL_TEX } from '../../web/initial-tex.js'
 

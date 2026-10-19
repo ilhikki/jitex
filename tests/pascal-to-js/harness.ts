@@ -2,7 +2,7 @@ import { nodeToCode, parse, transform } from '@jitex/pascal-to-js'
 import type { ExtraCallable } from '@jitex/pascal-to-js'
 import { createMemoryFileStore, encodeUtf8, runJs, toErrorState } from '@jitex/runtime'
 import type { PascalFileStore, RunState, SyscallHandler } from '@jitex/runtime'
-import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@^1.0.0'
+import { assert, assertEquals, assertStringIncludes } from '@std/assert'
 const textDecoder = new TextDecoder()
 /**
  * A single Pascal test case.
